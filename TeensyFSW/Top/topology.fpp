@@ -135,43 +135,43 @@ module TeensyFSW {
 
       # Rate Group 1
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup1] -> rateGroup1.CycleIn
-      rateGroup1.RateGroupMemberOut[0] -> gps.run
+      # rateGroup1.RateGroupMemberOut[0] -> gps.run
 
       # Rate group 2
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup2] -> rateGroup2.CycleIn
-      # rateGroup2.RateGroupMemberOut[0] -> rfm23.run
-      rateGroup2.RateGroupMemberOut[0] -> commDriver.schedIn
+      rateGroup2.RateGroupMemberOut[0] -> rfm23.run
+      # rateGroup2.RateGroupMemberOut[0] -> commDriver.schedIn
       rateGroup2.RateGroupMemberOut[1] -> blinker.run
-      rateGroup2.RateGroupMemberOut[2] -> hubCommDriver.schedIn
-      rateGroup2.RateGroupMemberOut[3] -> pduCommDriver.schedIn
-      rateGroup2.RateGroupMemberOut[4] -> fileDownlink.Run
-      rateGroup2.RateGroupMemberOut[5] -> ModeManager.run
+      # rateGroup2.RateGroupMemberOut[2] -> hubCommDriver.schedIn
+      # rateGroup2.RateGroupMemberOut[3] -> pduCommDriver.schedIn
+      # rateGroup2.RateGroupMemberOut[4] -> fileDownlink.Run
+      # rateGroup2.RateGroupMemberOut[5] -> ModeManager.run
 
       # Rate group 3
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup3] -> rateGroup3.CycleIn
       rateGroup3.RateGroupMemberOut[0] -> systemResources.run
       rateGroup3.RateGroupMemberOut[1] -> tlmSend.Run
-      rateGroup3.RateGroupMemberOut[2] -> imu.run
-      rateGroup3.RateGroupMemberOut[3] -> mag.run
-      rateGroup3.RateGroupMemberOut[4] -> pdu.run
-      rateGroup3.RateGroupMemberOut[5] -> current_solar_panel_1.run
-      rateGroup3.RateGroupMemberOut[6] -> current_solar_panel_2.run
-      rateGroup3.RateGroupMemberOut[7] -> current_solar_panel_3.run
-      rateGroup3.RateGroupMemberOut[8] -> current_solar_panel_4.run
-      rateGroup3.RateGroupMemberOut[9] -> current_battery_board.run
-      rateGroup3.RateGroupMemberOut[10] -> ModeManager.tlmSend
+      # rateGroup3.RateGroupMemberOut[2] -> imu.run
+      # rateGroup3.RateGroupMemberOut[3] -> mag.run
+      # rateGroup3.RateGroupMemberOut[4] -> pdu.run
+      # rateGroup3.RateGroupMemberOut[5] -> current_solar_panel_1.run
+      # rateGroup3.RateGroupMemberOut[6] -> current_solar_panel_2.run
+      # rateGroup3.RateGroupMemberOut[7] -> current_solar_panel_3.run
+      # rateGroup3.RateGroupMemberOut[8] -> current_solar_panel_4.run
+      # rateGroup3.RateGroupMemberOut[9] -> current_battery_board.run
+      # rateGroup3.RateGroupMemberOut[10] -> ModeManager.tlmSend
      
 
       # Rate Group 4
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup4] -> rateGroup4.CycleIn
-      rateGroup4.RateGroupMemberOut[0] -> temperature_obc.run
-      rateGroup4.RateGroupMemberOut[1] -> temperature_pdu.run
-      rateGroup4.RateGroupMemberOut[2] -> temperature_solar_panel_1.run
-      rateGroup4.RateGroupMemberOut[3] -> temperature_solar_panel_2.run
-      rateGroup4.RateGroupMemberOut[4] -> temperature_solar_panel_3.run
-      rateGroup4.RateGroupMemberOut[5] -> temperature_solar_panel_4.run
-      rateGroup4.RateGroupMemberOut[6] -> temperature_battery_board.run
-      rateGroup4.RateGroupMemberOut[7] -> heater.run
+      # rateGroup4.RateGroupMemberOut[0] -> temperature_obc.run
+      # rateGroup4.RateGroupMemberOut[1] -> temperature_pdu.run
+      # rateGroup4.RateGroupMemberOut[2] -> temperature_solar_panel_1.run
+      # rateGroup4.RateGroupMemberOut[3] -> temperature_solar_panel_2.run
+      # rateGroup4.RateGroupMemberOut[4] -> temperature_solar_panel_3.run
+      # rateGroup4.RateGroupMemberOut[5] -> temperature_solar_panel_4.run
+      # rateGroup4.RateGroupMemberOut[6] -> temperature_battery_board.run
+      # rateGroup4.RateGroupMemberOut[7] -> heater.run
 
       # Rate Group 5
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup5] -> rateGroup5.CycleIn
@@ -198,24 +198,24 @@ module TeensyFSW {
       commQueue.buffQueueSend -> framer.bufferIn
 
       framer.framedAllocate -> staticMemory.bufferAllocate[Ports_StaticMemory.framer]
-      # framer.framedOut -> rfm23.comDataIn
-      # rfm23.deallocate -> staticMemory.bufferDeallocate[Ports_StaticMemory.framer]
-      # rfm23.comStatus -> commQueue.comStatusIn
-      framer.framedOut -> commStub.comDataIn
-      commDriver.deallocate -> staticMemory.bufferDeallocate[Ports_StaticMemory.framer]
-      commStub.drvDataOut -> commDriver.send
-      commDriver.ready -> commStub.drvConnected
-      commStub.comStatus -> commQueue.comStatusIn
+      framer.framedOut -> rfm23.comDataIn
+      rfm23.deallocate -> staticMemory.bufferDeallocate[Ports_StaticMemory.framer]
+      rfm23.comStatus -> commQueue.comStatusIn
+      # framer.framedOut -> commStub.comDataIn
+      # commDriver.deallocate -> staticMemory.bufferDeallocate[Ports_StaticMemory.framer]
+      # commStub.drvDataOut -> commDriver.send
+      # commDriver.ready -> commStub.drvConnected
+      # commStub.comStatus -> commQueue.comStatusIn
 
     }
 
     connections Uplink {
 
-      # rfm23.allocate -> staticMemory.bufferAllocate[Ports_StaticMemory.deframer]
-      # rfm23.comDataOut -> deframer.framedIn
-      commDriver.allocate -> staticMemory.bufferAllocate[Ports_StaticMemory.deframer]
-      commDriver.$recv -> commStub.drvDataIn
-      commStub.comDataOut -> deframer.framedIn
+      rfm23.allocate -> staticMemory.bufferAllocate[Ports_StaticMemory.deframer]
+      rfm23.comDataOut -> deframer.framedIn
+      # commDriver.allocate -> staticMemory.bufferAllocate[Ports_StaticMemory.deframer]
+      # commDriver.$recv -> commStub.drvDataIn
+      # commStub.comDataOut -> deframer.framedIn
       deframer.framedDeallocate -> staticMemory.bufferDeallocate[Ports_StaticMemory.deframer]
 
       deframer.comOut -> cmdSplitter.CmdBuff
@@ -263,8 +263,8 @@ module TeensyFSW {
     }
 
     connections Radio {
-      # rfm23.gpioSetRxOn -> gpioRxOn.gpioWrite
-      # rfm23.gpioSetTxOn -> gpioTxOn.gpioWrite
+      rfm23.gpioSetRxOn -> gpioRxOn.gpioWrite
+      rfm23.gpioSetTxOn -> gpioTxOn.gpioWrite
       rfm23.PDUSetSwitch -> pdu.SetSwitchInternal
       rfm23.PDUGetSwitch -> pdu.GetSwitchInternal
     }

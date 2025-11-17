@@ -105,6 +105,7 @@ bool RFM23::send(const U8* payload, NATIVE_UINT_TYPE len) {
 Drv::SendStatus RFM23::comDataIn_handler(const NATIVE_INT_TYPE portNum, Fw::Buffer& sendBuffer) {
     if ((this->radio_state == Fw::On::ON) && (sendBuffer.getSize() > 0) &&
         (not this->send(sendBuffer.getData(), sendBuffer.getSize()))) {
+        Fw::Logger::logMsg("comDataIn_handler, setting radio state off\n");
         this->radio_state = Fw::On::OFF;
     }
     deallocate_out(0, sendBuffer);
@@ -113,7 +114,9 @@ Drv::SendStatus RFM23::comDataIn_handler(const NATIVE_INT_TYPE portNum, Fw::Buff
 }
 
 void RFM23::run_handler(const NATIVE_INT_TYPE portNum, NATIVE_UINT_TYPE context) {
+    // Fw::Logger::logMsg("In run_handler \n");
     if (this->isInitialized == false) {
+        this->PDUSetSwitch_out(0, Components::PDU_SW::RFM23_RADIO, Fw::On::ON);
         // rfm23.reset();
         if (!rfm23.init()) {
             Fw::Logger::logMsg("radio init failed \n");
@@ -149,18 +152,19 @@ void RFM23::healthCheck_handler(const NATIVE_INT_TYPE portNum, NATIVE_UINT_TYPE 
         }
     }
 
-    Components::PDUTlm states;
-    this->PDUGetSwitch_out(0, states);
-    if (states[1].getstate() == 0 && this->radio_state == Fw::On::ON) {
-        this->radio_state = Fw::On::OFF;
-        this->offTime     = 0;
-    }
-    if (this->radio_state == Fw::On::OFF && this->offTime > 30000) {
-        this->log_WARNING_HI_RadioReset(30);
-        this->PDUSetSwitch_out(0, Components::PDU_SW::RFM23_RADIO, Fw::On::ON);
-        this->offTime = 0;
-        this->isInitialized = false;
-    }
+    // Components::PDUTlm states;
+    // this->PDUGetSwitch_out(0, states);
+    // if (states[1].getstate() == 0 && this->radio_state == Fw::On::ON) {
+    //     this->radio_state = Fw::On::OFF;
+    //     Fw::Logger::logMsg("state[1] may be 0\n");
+    //     this->offTime     = 0;
+    // }
+    // if (this->radio_state == Fw::On::OFF && this->offTime > 30000) {
+    //     this->log_WARNING_HI_RadioReset(30);
+    //     this->PDUSetSwitch_out(0, Components::PDU_SW::RFM23_RADIO, Fw::On::ON);
+    //     this->offTime = 0;
+    //     this->isInitialized = false;
+    // }
 }
 
 }  // end namespace Radios

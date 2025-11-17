@@ -16,7 +16,8 @@ namespace Components {
 
 ModeManager ::ModeManager(const char* const compName)
     : ModeManagerComponentBase(compName),
-      currentMode(OpModes::Startup),
+    //   currentMode(OpModes::Startup),
+      currentMode(OpModes::Nominal),
       started(false),
       timeout(0) {}
 
@@ -108,8 +109,8 @@ void ModeManager ::run_handler(NATIVE_INT_TYPE portNum, NATIVE_UINT_TYPE context
     // Check power of battery. If below threshold, switch to PowerEmergency mode.
     if (this->currentMode != OpModes::Startup && this->currentMode != OpModes::PowerEmergency &&
         vbattVoltage < 6.5) {
-        this->prevOpMode  = this->currentMode;
-        this->currentMode = OpModes::PowerEmergency;
+        // this->prevOpMode  = this->currentMode;
+        // this->currentMode = OpModes::PowerEmergency;
     }
 }
 
