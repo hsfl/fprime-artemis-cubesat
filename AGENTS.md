@@ -120,3 +120,40 @@ cd ArtemisTeensy_N2_Baremetal
 - Editing generated build cache under `ArtemisTeensy_N2_Baremetal/build/` instead of source files.
 - Treating `espcor_teensy_demo/` as active code; it is reference-only unless explicitly requested.
 - Changing UART settings without updating both firmware and UART contract docs.
+
+## Biggest Lessons / SWE Flow (Neutron 2)
+
+### Lessons Learned
+- Keep `ArtemisRpiTeensy_N2/lib/fprime` as a root-managed Git submodule; avoid nested standalone repos inside the workspace.
+- If using `fprime-util new --deployment` for validation, register it in `project.cmake` during the prompt so build targets exist.
+- In this repo, prefer `fprime-util generate -f` to avoid stale build-cache failures.
+- For deployment smoke validation, direct CMake target build is reliable:
+  - `cmake --build build-fprime-automatic-native --target <DeploymentName>`
+- Remove temporary smoke deployments after validation unless explicitly requested to keep them.
+
+### Recommended Development Flow
+1. Read `README.md` and `NOTES.md` for current architecture/state.
+2. Activate F' venv:
+   - `. ArtemisRpiTeensy_N2/fprime-venv/bin/activate`
+3. Validate F' build:
+   - `cd ArtemisRpiTeensy_N2`
+   - `fprime-util generate -f`
+   - `fprime-util build`
+4. Validate Teensy compile:
+   - `cd ../ArtemisTeensy_N2_Baremetal`
+   - `./tools/arduino-cli/build.sh`
+5. Re-run both validations after topology/driver changes.
+6. Before commit/push:
+   - verify submodule SHA is intentional (`git submodule status --recursive`)
+   - verify no build/cache artifacts are staged (`git status --short`)
+   - verify remote branch naming is push-compatible (avoid `dev/x` if `dev` branch already exists remotely)
+
+### Runtime Smoke Flow (RPi)
+- Binary:
+  - `ArtemisRpiTeensy_N2/build-artifacts/Darwin/ArtemisRpiTeensyDeployment/bin/ArtemisRpiTeensyDeployment`
+- Run:
+  - `./ArtemisRpiTeensyDeployment -d /dev/serial0`
+- Minimum pass criteria:
+  - startup banner appears
+  - no immediate init assertion
+  - process remains alive for multiple seconds
