@@ -1,0 +1,7 @@
+board_manager:
+  additional_urls:
+    - https://www.pjrc.com/teensy/package_teensy_index.json
+directories:
+  data: ./.arduino15
+  downloads: ./.arduino15/staging
+  user: ./sketchbook

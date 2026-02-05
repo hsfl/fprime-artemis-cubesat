@@ -1,0 +1,39 @@
+# macOS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Root docs/build scratch
+logs/
+
+# F' project generated artifacts
+ArtemisRpiTeensy_N2/build-artifacts/
+ArtemisRpiTeensy_N2/build-fprime-*/
+ArtemisRpiTeensy_N2/cmake-build-*/
+ArtemisRpiTeensy_N2/*-template
+ArtemisRpiTeensy_N2/*.template.cpp
+ArtemisRpiTeensy_N2/*.template.hpp
+ArtemisRpiTeensy_N2/fprime-venv/
+
+# Teensy Arduino CLI generated artifacts
+ArtemisTeensy_N2_Baremetal/.arduino15/
+ArtemisTeensy_N2_Baremetal/sketchbook/
+ArtemisTeensy_N2_Baremetal/build/
+
+# Coverage / local tooling
+*.gcov
+
+# Temporary/editor artifacts
+*.tmp
+*.swp
+*.swo
+*.bak
