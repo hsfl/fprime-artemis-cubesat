@@ -2,19 +2,19 @@
 
 ## 1) Build Teensy Baremetal Relay
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+cd ArtemisTeensy_N2_Baremetal
 ./tools/arduino-cli/build.sh
 ```
 
 Upload (example port):
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+cd ArtemisTeensy_N2_Baremetal
 ./tools/arduino-cli/upload.sh /dev/ttyACM0
 ```
 
 ## 2) Build F' RPi Project (in-place promoted sample)
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat
+cd <repo-root>
 . ArtemisRpiTeensy_N2/fprime-venv/bin/activate
 cd ArtemisRpiTeensy_N2
 fprime-util generate -f
@@ -23,7 +23,7 @@ fprime-util build
 
 ## 3) Run Deployment
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+cd ArtemisRpiTeensy_N2
 ./build-artifacts/Linux/bin/ArtemisRpiTeensyDeployment -d /dev/serial0
 ```
 

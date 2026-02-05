@@ -55,13 +55,13 @@ This repo is the Neutron 2 team F' integration workspace:
 ## Important Paths
 
 - Main F' project:
-  - `/Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2`
+  - `ArtemisRpiTeensy_N2`
 - Teensy baremetal project:
-  - `/Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal`
+  - `ArtemisTeensy_N2_Baremetal`
 - Reference-only legacy demo (do not modify for MVP implementation work):
-  - `/Users/sozodennis/Developer/fprime-artemis-cubesat/espcor_teensy_demo`
+  - `espcor_teensy_demo`
 - Build runbook:
-  - `/Users/sozodennis/Developer/fprime-artemis-cubesat/docs/build_runbook.md`
+  - `docs/build_runbook.md`
 
 ## Agent Guidance
 

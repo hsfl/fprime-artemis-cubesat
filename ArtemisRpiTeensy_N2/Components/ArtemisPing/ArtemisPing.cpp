@@ -1,6 +1,6 @@
 // ======================================================================
 // \title  ArtemisPing.cpp
-// \author sozodennis
+// \author Dennis Sarsozo
 // \brief  cpp file for ArtemisPing component implementation class
 // ======================================================================
 

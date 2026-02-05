@@ -1,6 +1,6 @@
 // ======================================================================
 // \title  ArtemisPing.hpp
-// \author sozodennis
+// \author Dennis Sarsozo
 // \brief  hpp file for ArtemisPing component implementation class
 // ======================================================================
 

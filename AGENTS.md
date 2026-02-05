@@ -24,14 +24,14 @@ Use this project with the `fprime-swe` skill and follow these steps exactly.
 
 ## Current Project Quick Start (Read First)
 
-- Read `/Users/sozodennis/Developer/fprime-artemis-cubesat/README.md` for the top-level architecture and current status.
-- Read `/Users/sozodennis/Developer/fprime-artemis-cubesat/NOTES.md` for latest implementation details and pending TODO items.
+- Read `README.md` for the top-level architecture and current status.
+- Read `NOTES.md` for latest implementation details and pending TODO items.
 - Active F' project root is:
-  - `/Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2`
+  - `ArtemisRpiTeensy_N2`
 - Active baremetal Teensy workspace is:
-  - `/Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal`
+  - `ArtemisTeensy_N2_Baremetal`
 - `espcor_teensy_demo` is reference-only unless explicitly requested:
-  - `/Users/sozodennis/Developer/fprime-artemis-cubesat/espcor_teensy_demo`
+  - `espcor_teensy_demo`
 
 ## Quick Start
 1. Activate the venv before any F' command:
@@ -90,7 +90,7 @@ fprime-util build
 ## Teensy Baremetal Agent Usage Guide
 
 Use this section when working in the Teensy bridge workspace:
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal`
+- `ArtemisTeensy_N2_Baremetal`
 
 ### Build (Arduino CLI)
 Run from the baremetal project root:

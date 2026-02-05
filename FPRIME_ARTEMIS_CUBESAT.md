@@ -158,7 +158,7 @@ Goal:
 Commands (reference):
 
 ```bash
-cd /Users/sozodennis/Developer/epscor-c3m-payload
+cd <project-root>
 python -m venv .venv
 . .venv/bin/activate
 pip install fprime-bootstrap

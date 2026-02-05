@@ -9,13 +9,13 @@ Baremetal Teensy relay MVP workspace.
 
 ## Build (Arduino CLI)
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+cd ArtemisTeensy_N2_Baremetal
 ./tools/arduino-cli/build.sh
 ```
 
 ## Upload
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+cd ArtemisTeensy_N2_Baremetal
 ./tools/arduino-cli/upload.sh /dev/ttyACM0
 ```
 
