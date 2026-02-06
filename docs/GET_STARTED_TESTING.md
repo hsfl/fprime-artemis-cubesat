@@ -2,7 +2,7 @@
 
 This is a temporary first-pass test flow for students.
 
-Assumes `/Users/sozodennis/Developer/fprime-artemis-cubesat/RPI_SETUP.md` is already completed.
+Assumes `/Users/sozodennis/Developer/fprime-artemis-cubesat/docs/RPI_SETUP.md` is already completed.
 
 ## MVP intent
 
@@ -157,7 +157,7 @@ Pass if all are true:
 ## 8) If something fails
 
 - No `/dev/serial0` on Pi:
-  - Recheck UART setup in `/Users/sozodennis/Developer/fprime-artemis-cubesat/RPI_SETUP.md`
+  - Recheck UART setup in `/Users/sozodennis/Developer/fprime-artemis-cubesat/docs/RPI_SETUP.md`
 - Deployment exits immediately:
   - Recheck UART wiring and common ground.
 - GDS page not opening:

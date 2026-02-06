@@ -24,7 +24,7 @@ Current milestone is **Relay MVP**:
   - Legacy/reference demo code (reference-only)
 - `docs/`
   - Runbooks and integration notes
-- `agents_notes.md`
+- `docs/agents_notes.md`
   - Current implementation status and next-agent guidance
 
 ## Build and run
@@ -70,5 +70,5 @@ Not implemented yet:
 
 ## Notes
 
-- Use `FPRIME_ARTEMIS_CUBESAT.md` for the original implementation plan.
+- Use `docs/FPRIME_ARTEMIS_CUBESAT.md` for the original implementation plan.
 - Use `docs/build_runbook.md` for operational command sequence.

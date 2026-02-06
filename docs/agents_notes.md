@@ -64,7 +64,7 @@ This repo is the Neutron 2 team F' integration workspace:
 - Teensy baremetal project:
   - `ArtemisTeensy_N2_Baremetal`
 - Quick test guide:
-  - `GET_STARTED_TESTING.md`
+  - `docs/GET_STARTED_TESTING.md`
 - Build runbook:
   - `docs/build_runbook.md`
 
