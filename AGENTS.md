@@ -25,7 +25,7 @@ Use this project with the `fprime-swe` skill and follow these steps exactly.
 ## Current Project Quick Start (Read First)
 
 - Read `README.md` for the top-level architecture and current status.
-- Read `NOTES.md` for latest implementation details and pending TODO items.
+- Read `agents_notes.md` for latest implementation details and pending TODO items.
 - Active F' project root is:
   - `ArtemisRpiTeensy_N2`
 - Active baremetal Teensy workspace is:
@@ -132,7 +132,7 @@ cd ArtemisTeensy_N2_Baremetal
 - Remove temporary smoke deployments after validation unless explicitly requested to keep them.
 
 ### Recommended Development Flow
-1. Read `README.md` and `NOTES.md` for current architecture/state.
+1. Read `README.md` and `agents_notes.md` for current architecture/state.
 2. Activate F' venv:
    - `. ArtemisRpiTeensy_N2/fprime-venv/bin/activate`
 3. Validate F' build:

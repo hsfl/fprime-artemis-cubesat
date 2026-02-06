@@ -24,7 +24,7 @@ Current milestone is **Relay MVP**:
   - Legacy/reference demo code (reference-only)
 - `docs/`
   - Runbooks and integration notes
-- `NOTES.md`
+- `agents_notes.md`
   - Current implementation status and next-agent guidance
 
 ## Build and run
