@@ -1,44 +1,83 @@
-# Raspberry Pi Setup Guide (Neutron 2 MVP)
+# Raspberry Pi Quick Start (Beginner Guide)
 
-This guide sets up the Raspberry Pi side for the active architecture in this repo:
+This guide is for new students.
 
-- RPi runs F' deployment: `ArtemisRpiTeensy_N2`
-- Teensy runs baremetal relay: `ArtemisTeensy_N2_Baremetal`
-- Transport is a single UART link at `115200 8N1`
+Goal: get a Raspberry Pi running the F' app in this repo, using UART to talk to the Teensy.
 
-## 1) Platform
+You only need to do 4 things:
+1. Flash Raspberry Pi OS
+2. Enable UART
+3. Build F' on the Pi
+4. Run a quick test
 
-Use Linux on the Raspberry Pi for this project.
+---
 
-Why:
-- The current deployment already uses `Drv.LinuxUartDriver`.
-- Runtime/startup flow and docs in this repo assume Linux (`-d /dev/serial0`).
+## What you need
 
-## 2) Hardware Wiring (RPi <-> Teensy UART)
+- Raspberry Pi (with SD card)
+- SD card reader for your laptop
+- Power supply for the Pi
+- Internet on the Pi
+- This repo copied to the Pi
+- Teensy board + USB cable
+- 3 jumper wires for UART + GND
 
-Use 3.3V TTL UART levels.
+---
 
-- RPi `GPIO14/TXD` (physical pin 8) -> Teensy `RX`
-- RPi `GPIO15/RXD` (physical pin 10) -> Teensy `TX`
-- RPi `GND` -> Teensy `GND`
+## 1) Flash Raspberry Pi OS
 
-Notes:
-- Cross TX/RX.
-- Do not use RS-232 voltage levels.
-- Keep wiring short for bring-up.
+Use **Raspberry Pi Imager** on your laptop.
 
-## 3) Raspberry Pi OS UART Configuration
+1. Open Raspberry Pi Imager.
+2. Choose device: your Pi model.
+3. Choose OS: **Raspberry Pi OS (64-bit)**.
+4. Choose storage: your SD card.
+5. Click **Next** and complete setup.
 
-On the Raspberry Pi:
+Recommended in the Imager advanced settings:
+- Set hostname
+- Enable SSH
+- Set username/password
+- Configure Wi-Fi
+
+When flash is done:
+1. Put SD card into Pi.
+2. Boot the Pi.
+3. Log in.
+4. Update packages:
+
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+
+---
+
+## 2) Wire and enable UART
+
+### A) Wire Pi <-> Teensy
+
+Use 3.3V TTL UART only (not RS-232).
+
+- Pi `GPIO14/TXD` (physical pin 8) -> Teensy 4.1 `pin 7` (`Serial2 RX2`)
+- Pi `GPIO15/RXD` (physical pin 10) -> Teensy 4.1 `pin 8` (`Serial2 TX2`)
+- Pi `GND` -> Teensy `GND`
+
+Important:
+- TX goes to RX (crossed)
+- Share ground
+
+### B) Enable UART on the Pi
+
+Run:
 
 ```bash
 sudo raspi-config
 ```
 
-In the menu:
+Then:
 1. `Interface Options` -> `Serial Port`
-2. Login shell over serial: `No`
-3. Enable serial hardware: `Yes`
+2. "Login shell over serial?" -> **No**
+3. "Enable serial hardware?" -> **Yes**
 
 Reboot:
 
@@ -46,53 +85,39 @@ Reboot:
 sudo reboot
 ```
 
-After reboot, verify UART device:
+Check UART exists (make sure the Teensy is on!)
 
 ```bash
 ls -l /dev/serial0
 ```
 
-Optional checks:
+If it prints a device link, UART is ready.
 
-```bash
-# Bookworm commonly uses /boot/firmware/config.txt
-# Older images may use /boot/config.txt
-grep -E "^enable_uart=1" /boot/firmware/config.txt /boot/config.txt 2>/dev/null
+---
 
-# Ensure no serial console service is attached to the same UART
-systemctl status serial-getty@serial0.service --no-pager
-```
+## 3) Build F' on the Pi
 
-If `serial-getty@serial0.service` is active, disable it:
-
-```bash
-sudo systemctl disable --now serial-getty@serial0.service
-```
-
-## 4) Prepare Repo and F' Environment on RPi
-
-Clone/copy this repo to the Pi, then from repo root:
+From your repo root on the Pi:
 
 ```bash
 cd /path/to/fprime-artemis-cubesat
 ```
 
-If `ArtemisRpiTeensy_N2/fprime-venv` already exists, use it:
-
-```bash
-. ArtemisRpiTeensy_N2/fprime-venv/bin/activate
-```
-
-If it does not exist yet, create one:
+Create/activate the project virtual environment:
 
 ```bash
 python3 -m venv ArtemisRpiTeensy_N2/fprime-venv
 . ArtemisRpiTeensy_N2/fprime-venv/bin/activate
+```
+
+Install tools (safe to re-run):
+
+```bash
 pip install --upgrade pip
 pip install fprime-tools
 ```
 
-## 5) Build the RPi Deployment
+Build:
 
 ```bash
 cd ArtemisRpiTeensy_N2
@@ -100,36 +125,31 @@ fprime-util generate -f
 fprime-util build
 ```
 
-Expected runtime binary (Linux):
+If build succeeds, your Pi can compile this F' project.
+
+---
+
+## 4) Quick runtime test (does F' work?)
+
+Run the deployment:
 
 ```bash
-./build-artifacts/Linux/bin/ArtemisRpiTeensyDeployment
-```
-
-## 6) Run the Deployment over UART
-
-Default UART device in code is `/dev/serial0`.
-
-```bash
-cd ArtemisRpiTeensy_N2
+cd /path/to/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 ./build-artifacts/Linux/bin/ArtemisRpiTeensyDeployment -d /dev/serial0
 ```
 
-You should see startup output and the process should remain alive.
+Pass condition:
+- App starts
+- You see startup logs
+- Process stays running (no immediate crash)
 
-Reference points in code:
-- Default UART CLI arg: `ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Main.cpp`
-- UART open settings (`BAUD_115K`, no flow, no parity):
-  `ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Top/ArtemisRpiTeensyDeploymentTopology.cpp`
+Stop with `Ctrl+C`.
 
-## 7) Teensy Side Expectations
+---
 
-Teensy firmware must match these UART settings:
-- `115200 8N1`
-- Framing/CRC behavior documented in:
-  `ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md`
+## Optional: build/upload Teensy firmware
 
-Build/upload Teensy from this repo:
+From repo root:
 
 ```bash
 cd /path/to/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
@@ -137,27 +157,26 @@ cd /path/to/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
 ./tools/arduino-cli/upload.sh /dev/ttyACM0
 ```
 
-## 8) Bring-Up Smoke Checklist
+(Your Teensy port may not be `/dev/ttyACM0`; check with `ls /dev/ttyACM*`.)
 
-1. Teensy firmware is running and prints relay-ready logs on its debug serial.
-2. RPi app starts with no init assertion failures.
-3. UART cable disconnect/reconnect does not kill the RPi app process.
-4. GDS command `TeensyLink.LINK_STATUS` shows counter updates.
+---
 
-## 9) Troubleshooting
+## Fast troubleshooting
 
 - `/dev/serial0` missing:
-  - Recheck `raspi-config` serial settings.
-  - Reboot.
+  - Re-run `raspi-config` serial settings
+  - Reboot
 
-- Permission denied opening UART:
-  - Add your user to `dialout` and re-login:
+- Permission denied on serial device:
 
 ```bash
 sudo usermod -aG dialout $USER
 ```
 
-- No traffic / framing errors:
-  - Check TX/RX cross wiring and common ground.
-  - Confirm both sides are exactly `115200 8N1`.
-  - Review counters (`crcDrops`, `framingDrops`, `timeoutEvents`) per UART contract doc.
+Then log out and log back in.
+
+- App starts but no UART traffic:
+  - Recheck TX/RX crossed wiring
+  - Recheck common ground
+  - Confirm both sides are `115200 8N1`
+
