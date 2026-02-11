@@ -1,11 +1,11 @@
 # agents_notes.md
 
-## Project Snapshot (2026-02-06)
+## Project Snapshot (2026-02-10)
 
 This repo is the Neutron 2 team F' integration workspace:
 - F' flight software runs on Raspberry Pi.
-- Teensy is a baremetal bridge/adapter for hardware-facing interfaces.
-- Single UART between RPi and Teensy is the current MVP transport.
+- Satellite Teensy provides UART wrapper + RF23BP bridge.
+- Ground Teensy reassembles RF messages to USB and supports simple USB-burst uplink back to RF.
 
 ## Current State
 
@@ -19,50 +19,56 @@ This repo is the Neutron 2 team F' integration workspace:
   - `fprime-util generate -f` passes
   - `fprime-util build` passes
 
-### 2) Teensy side (`ArtemisTeensy_N2_Baremetal`)
+### 2) Satellite Teensy (`ArtemisTeensy_N2_Baremetal`)
 - Source of truth:
   - `firmware/satellite_teensy/satellite_teensy.ino`
   - `firmware/satellite_teensy/src/relay_uart_rf.*`
   - `firmware/satellite_teensy/src/rf23_driver.*`
   - `firmware/satellite_teensy/src/link_protocol.hpp`
   - `firmware/satellite_teensy/src/link_counters.hpp`
-- Startup behavior now includes:
-  - RPi enable pin asserted HIGH (`pin 36`)
-  - Teensy LED asserted HIGH (`pin 13`)
+- Transport behavior:
+  - RPi<->Teensy UART uses custom framing (`0xD4 0xC3 + len + crc16`)
+  - UART payload max now `220` bytes
+  - RF uses segmented message transport (`msg_id`, `seg_idx`, `seg_count`, `chunk_len`)
+- Build status:
+  - `./tools/arduino-cli/build.sh` passes for `teensy:avr:teensy41`
+
+### 3) Ground Teensy (`GDS_Teensy`)
+- Source of truth:
+  - `firmware/gds_teensy/gds_teensy.ino`
+  - `firmware/gds_teensy/src/relay_uart_rf.*`
+  - `firmware/gds_teensy/src/rf23_driver.*`
+- Behavior:
+  - Receives RF segments and reassembles full message bytes
+  - Streams reassembled bytes directly to USB serial (`Serial`) for laptop GDS UART input
+  - Also packetizes raw USB byte bursts (`8 ms` idle flush or `220`-byte full buffer) for simple uplink
 - Build status:
   - `./tools/arduino-cli/build.sh` passes for `teensy:avr:teensy41`
 
 ## Important Clarification: Framing
 
-- Current UART link uses a custom transport wrapper documented in:
+- End-to-end payload is still opaque F' bytes.
+- Satellite UART framing is custom and remains required on the RPi<->satellite link.
+- RF transport is now segmented and reassembled before UART egress.
+- Contract documentation:
   - `ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md`
-- This means current chain behavior is **not pure end-to-end F' framing** between laptop GDS and RPi over Teensy.
-- Current custom wrapper exists for MVP relay bring-up (bounded payload, CRC, timeout/drop counters, simple local control commands).
-
-## GDS + Chain Test Notes
-
-- `fprime-gds` locally confirms:
-  - `--communication-selection {uart,ip,none}`
-  - `--uart-device`, `--uart-baud`, `--uart-skip-port-check`
-- Current feasibility:
-1. GDS on RPi: works.
-2. RPi <-> Teensy packet path visibility via USB logs: partial (needs explicit byte logging to observe packets).
-3. RPi -> Teensy -> laptop direct GDS bytes (no radio): blocked until transparent bridge mode is added.
-4. RPi -> Teensy -> RF23 -> laptop SDR: blocked until SDR byte recovery/adapter path exists.
+  - `GDS_Teensy/docs/transport_contract.md`
 
 ## Primary TODO
 
-1. Add transparent Teensy bridge mode (`Serial2 <-> USB`) for end-to-end laptop GDS UART testing.
-2. Decide whether to keep custom UART wrapper as optional diagnostic mode or remove it.
-3. Implement post-MVP mission/service multiplexing only after chain stability.
-4. Build RF ground receive path (second RF23 node or SDR decoder + adapter).
+1. Run full HIL end-to-end tests with real `fprime-gds` UART traffic over RF (both directions).
+2. Decide if segment ACK/retry is required for acceptable RF reliability.
+3. Add deterministic packet boundary extraction for uplink beyond simple burst mode.
+4. Build post-MVP mission/service multiplexing only after chain stability.
 
 ## Important Paths
 
 - F' project root:
   - `ArtemisRpiTeensy_N2`
-- Teensy baremetal project:
+- Satellite Teensy project:
   - `ArtemisTeensy_N2_Baremetal`
+- Ground Teensy project:
+  - `GDS_Teensy`
 - Quick test guide:
   - `docs/GET_STARTED_TESTING.md`
 - Build runbook:

@@ -30,6 +30,8 @@ Use this project with the `fprime-swe` skill and follow these steps exactly.
   - `ArtemisRpiTeensy_N2`
 - Active baremetal Teensy workspace is:
   - `ArtemisTeensy_N2_Baremetal`
+- Active ground-station Teensy workspace is:
+  - `GDS_Teensy`
 - `espcor_teensy_demo` is reference-only unless explicitly requested:
   - `espcor_teensy_demo`
 
@@ -81,6 +83,33 @@ fprime-util generate -f
 fprime-util build
 ```
 
+## Run `fprime-gds` over UART (RPi/Operator Side)
+
+Preferred launcher (repo-maintained defaults):
+```bash
+cd ArtemisRpiTeensy_N2
+./tools/run_gds_uart.sh
+```
+
+Script defaults:
+- UART device: `/dev/cu.usbmodem115551201`
+- UART baud: `115200`
+- GUI port: `5050`
+- dictionary: `build-artifacts/Darwin/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json`
+
+Useful overrides:
+```bash
+./tools/run_gds_uart.sh --port /dev/cu.usbmodemXXXX --baud 115200
+./tools/run_gds_uart.sh --gui-port 5060
+./tools/run_gds_uart.sh --dictionary /abs/path/to/TopologyDictionary.json
+./tools/run_gds_uart.sh --dry-run
+```
+
+Notes:
+- On macOS, port `5000` may already be occupied by Control Center/AirPlay Receiver. Use non-5000 GUI ports (default script port is `5050`).
+- If using raw CLI instead of script, pass UART args explicitly:
+  - `fprime-gds -n --communication-selection uart --uart-device <device> --uart-baud 115200 --framing-selection fprime`
+
 ## Common Pitfalls
 - Running generators without a build cache.
 - Running `fprime-util new --component` from the project root instead of `Components/`.
@@ -120,6 +149,43 @@ cd ArtemisTeensy_N2_Baremetal
 - Editing generated build cache under `ArtemisTeensy_N2_Baremetal/build/` instead of source files.
 - Treating `espcor_teensy_demo/` as active code; it is reference-only unless explicitly requested.
 - Changing UART settings without updating both firmware and UART contract docs.
+
+## Ground Teensy (`GDS_Teensy`) Agent Usage Guide
+
+Use this section when working in the ground bridge workspace:
+- `GDS_Teensy`
+
+### Build (Arduino CLI)
+Run from `GDS_Teensy`:
+```bash
+cd GDS_Teensy
+./tools/arduino-cli/build.sh
+```
+
+### Upload (Arduino CLI)
+Run from `GDS_Teensy`:
+```bash
+cd GDS_Teensy
+./tools/arduino-cli/upload.sh /dev/cu.usbmodemXXXX
+```
+- Use the actual detected USB modem/ACM port.
+- `upload.sh` expects artifacts from `build.sh` in `build/arduino-cli`.
+
+### Ground Teensy Source of Truth
+- Main sketch:
+  - `GDS_Teensy/firmware/gds_teensy/gds_teensy.ino`
+- Relay/link modules:
+  - `GDS_Teensy/firmware/gds_teensy/src/relay_uart_rf.*`
+  - `GDS_Teensy/firmware/gds_teensy/src/rf23_driver.*`
+  - `GDS_Teensy/firmware/gds_teensy/src/link_protocol.hpp`
+  - `GDS_Teensy/firmware/gds_teensy/src/link_counters.hpp`
+
+### Ground Teensy Common Pitfalls
+- Uploading without compiling first can fail with “Compiled sketch not found”.
+- Stale `build/arduino-cli` cache can cause link errors; clean with:
+  - `arduino-cli compile --clean ...` or remove `build/arduino-cli`.
+- On macOS, first upload may fail while `teensy.app` starts; retry once it is open.
+- Running `arduino-cli` outside `GDS_Teensy` can pick up wrong config paths.
 
 ## Biggest Lessons / SWE Flow (Neutron 2)
 

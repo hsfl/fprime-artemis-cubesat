@@ -16,7 +16,8 @@ static constexpr uint32_t UART_BAUD = 115200;
 
 LinkCounters g_linkCounters;
 Rf23Driver g_rfDriver(RADIO_CS, RADIO_INT, RADIO_RX_ON_PIN, RADIO_TX_ON_PIN);
-RelayUartRf g_relay(Serial2, g_rfDriver, g_linkCounters);
+RelayConfig g_relayConfig;
+RelayUartRf g_relay(Serial2, g_rfDriver, g_linkCounters, g_relayConfig);
 
 void setup() {
   Serial.begin(115200);
@@ -29,11 +30,12 @@ void setup() {
   Serial.println("[ArtemisTeensy] RPI power enable asserted (pin 36 HIGH)");
   Serial.println("[ArtemisTeensy] LED asserted (pin 13 HIGH)");
 
+  Serial2.begin(UART_BAUD);
   const bool radioOk = g_rfDriver.begin();
-  g_relay.begin(UART_BAUD);
+  g_relay.begin();
 
   if (radioOk) {
-    Serial.println("[ArtemisTeensy] Relay MVP ready");
+    Serial.println("[ArtemisTeensy] Relay bridge ready (UART frame + RF segmentation)");
   } else {
     Serial.println("[ArtemisTeensy] RF23 init failed; relay running without RF");
   }
