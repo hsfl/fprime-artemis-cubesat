@@ -1,6 +1,6 @@
 # agents_notes.md
 
-## Project Snapshot (2026-02-10)
+## Project Snapshot (2026-02-13)
 
 This repo is the Neutron 2 team F' integration workspace:
 - F' flight software runs on Raspberry Pi.
@@ -18,6 +18,27 @@ This repo is the Neutron 2 team F' integration workspace:
 - Build status:
   - `fprime-util generate -f` passes
   - `fprime-util build` passes
+  - `./tools/cross_build_armhf.sh` passes (validated `arm-hf-linux`)
+  - `./tools/package_armhf_release.sh` passes and produces signed release bundle
+
+### 1b) ARMHF Release Pipeline (Mac -> RPi)
+- Release-grade scripts now live in:
+  - `ArtemisRpiTeensy_N2/tools/cross_build_armhf.sh`
+  - `ArtemisRpiTeensy_N2/tools/package_armhf_release.sh`
+  - `ArtemisRpiTeensy_N2/tools/deploy_armhf_release.sh`
+  - `ArtemisRpiTeensy_N2/tools/smoke_test_pi_release.sh`
+  - `ArtemisRpiTeensy_N2/tools/rollback_armhf_release.sh`
+  - `ArtemisRpiTeensy_N2/tools/release_armhf.sh`
+- Runbook:
+  - `docs/ARMHF_RELEASE_PIPELINE.md`
+- Validated behavior:
+  - Cross-build emits ARM32 ELF (`arm-hf-linux`) binary + matching topology dictionary
+  - Packager creates `releases/release-<timestamp>-<sha>-armhf/` with:
+    - deployment binary
+    - topology dictionary
+    - `SHA256SUMS`
+    - `RELEASE_INFO.txt`
+  - Deploy script activates release atomically on Pi via `active_release` / `previous_release` symlinks.
 
 ### 2) Satellite Teensy (`ArtemisTeensy_N2_Baremetal`)
 - Source of truth:
@@ -56,10 +77,11 @@ This repo is the Neutron 2 team F' integration workspace:
 
 ## Primary TODO
 
-1. Run full HIL end-to-end tests with real `fprime-gds` UART traffic over RF (both directions).
-2. Decide if segment ACK/retry is required for acceptable RF reliability.
-3. Add deterministic packet boundary extraction for uplink beyond simple burst mode.
-4. Build post-MVP mission/service multiplexing only after chain stability.
+1. Run `deploy_armhf_release.sh` + `smoke_test_pi_release.sh` against live Pi host and record first successful remote release ID.
+2. Run full HIL end-to-end tests with real `fprime-gds` UART traffic over RF (both directions).
+3. Decide if segment ACK/retry is required for acceptable RF reliability.
+4. Add deterministic packet boundary extraction for uplink beyond simple burst mode.
+5. Build post-MVP mission/service multiplexing only after chain stability.
 
 ## Important Paths
 
@@ -73,6 +95,8 @@ This repo is the Neutron 2 team F' integration workspace:
   - `docs/GET_STARTED_TESTING.md`
 - Build runbook:
   - `docs/build_runbook.md`
+- ARMHF release runbook:
+  - `docs/ARMHF_RELEASE_PIPELINE.md`
 
 ## Agent Reminders
 
@@ -81,3 +105,6 @@ This repo is the Neutron 2 team F' integration workspace:
   - `. ArtemisRpiTeensy_N2/fprime-venv/bin/activate`
 - Prefer fresh configure before topology/component changes:
   - `fprime-util generate -f`
+- For cross-compiling in `nasafprime/fprime-arm`, do not trust container-default `fprime-tools` version.
+  - Use project-pinned versions from `lib/fprime/requirements.txt`.
+- If container lacks Ninja, generate with `--make`.

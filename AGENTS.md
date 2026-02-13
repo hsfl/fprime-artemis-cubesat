@@ -83,6 +83,14 @@ fprime-util generate -f
 fprime-util build
 ```
 
+## ARMHF Release (Minimal)
+- Use the release-grade cross-compile/deploy flow documented in:
+  - `docs/ARMHF_RELEASE_PIPELINE.md`
+- One-command pipeline entrypoint:
+  - `cd ArtemisRpiTeensy_N2 && ./tools/release_armhf.sh --pi-user <user> --pi-host <host>`
+- Release policy:
+  - copy deployment artifacts only (binary + dictionary + checksums), never the full repo.
+
 ## Run `fprime-gds` over UART (RPi/Operator Side)
 
 Preferred launcher (repo-maintained defaults):
