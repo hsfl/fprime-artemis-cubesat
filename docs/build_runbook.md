@@ -58,3 +58,8 @@ Open dashboard:
 1. Disconnect UART cable while app is running and verify app process remains alive.
 2. Reconnect UART and verify `TeensyLink` telemetry continues updating.
 3. Send malformed frame bytes to Teensy UART and verify framing/CRC counters increase.
+
+## 8) Release-Grade ARMHF Pipeline
+For reproducible Mac-to-RPi deployment (cross-compile + artifact packaging + SSH deploy + rollback), use:
+
+- `docs/ARMHF_RELEASE_PIPELINE.md`
