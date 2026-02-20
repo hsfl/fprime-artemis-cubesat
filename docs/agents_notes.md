@@ -25,12 +25,8 @@ This repo is the Neutron 2 team F' integration workspace:
 - Release-grade scripts now live in:
   - `ArtemisRpiTeensy_N2/tools/cross_build_armhf.sh`
   - `ArtemisRpiTeensy_N2/tools/package_armhf_release.sh`
-  - `ArtemisRpiTeensy_N2/tools/deploy_armhf_release.sh`
-  - `ArtemisRpiTeensy_N2/tools/smoke_test_pi_release.sh`
   - `ArtemisRpiTeensy_N2/tools/rollback_armhf_release.sh`
-  - `ArtemisRpiTeensy_N2/tools/release_armhf.sh`
-- Runbook:
-  - `docs/ARMHF_RELEASE_PIPELINE.md`
+  - Manual deploy + SCP instructions: `rpi_build.instructions`
 - Validated behavior:
   - Cross-build emits ARM32 ELF (`arm-hf-linux`) binary + matching topology dictionary
   - Packager creates `releases/release-<timestamp>-<sha>-armhf/` with:
@@ -38,7 +34,7 @@ This repo is the Neutron 2 team F' integration workspace:
     - topology dictionary
     - `SHA256SUMS`
     - `RELEASE_INFO.txt`
-  - Deploy script activates release atomically on Pi via `active_release` / `previous_release` symlinks.
+  - Manual activation uses `active_release` / `previous_release` symlink pattern.
 
 ### 2) Satellite Teensy (`ArtemisTeensy_N2_Baremetal`)
 - Source of truth:
@@ -77,7 +73,7 @@ This repo is the Neutron 2 team F' integration workspace:
 
 ## Primary TODO
 
-1. Run `deploy_armhf_release.sh` + `smoke_test_pi_release.sh` against live Pi host and record first successful remote release ID.
+1. Run manual SCP + activation + smoke steps in `rpi_build.instructions` against live Pi host and record first successful remote release ID.
 2. Run full HIL end-to-end tests with real `fprime-gds` UART traffic over RF (both directions).
 3. Decide if segment ACK/retry is required for acceptable RF reliability.
 4. Add deterministic packet boundary extraction for uplink beyond simple burst mode.
@@ -96,7 +92,7 @@ This repo is the Neutron 2 team F' integration workspace:
 - Build runbook:
   - `docs/build_runbook.md`
 - ARMHF release runbook:
-  - `docs/ARMHF_RELEASE_PIPELINE.md`
+  - `rpi_build.instructions`
 
 ## Agent Reminders
 

@@ -84,10 +84,11 @@ fprime-util build
 ```
 
 ## ARMHF Release (Minimal)
-- Use the release-grade cross-compile/deploy flow documented in:
-  - `docs/ARMHF_RELEASE_PIPELINE.md`
-- One-command pipeline entrypoint:
-  - `cd ArtemisRpiTeensy_N2 && ./tools/release_armhf.sh --pi-user <user> --pi-host <host>`
+- Use the manual deploy instructions:
+  - `rpi_build.instructions`
+- Build/package artifacts from:
+  - `ArtemisRpiTeensy_N2/tools/cross_build_armhf.sh`
+  - `ArtemisRpiTeensy_N2/tools/package_armhf_release.sh`
 - Release policy:
   - copy deployment artifacts only (binary + dictionary + checksums), never the full repo.
 

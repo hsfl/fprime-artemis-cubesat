@@ -1,0 +1,115 @@
+# RPi Manual Deploy Instructions (No Scripts)
+
+Use this when laptop + Raspberry Pi are on the same Wi-Fi.
+
+## 1) On laptop, go to project and confirm release exists
+
+```bash
+cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+ls -la releases/release-20260213-223835-63e1b5b-armhf
+```
+
+Expected files:
+- `ArtemisRpiTeensyDeployment`
+- `ArtemisRpiTeensyDeploymentTopologyDictionary.json`
+- `SHA256SUMS`
+- `RELEASE_INFO.txt`
+
+## 2) Find Raspberry Pi IP on local Wi-Fi
+
+Try mDNS first:
+
+```bash
+ping -c 1 raspberrypi.local
+```
+
+If that works, use `raspberrypi.local` as host.  
+If not, scan local ARP table:
+
+```bash
+arp -a | grep -i raspberry
+```
+
+If still not found, get your subnet and probe it:
+
+```bash
+ipconfig getifaddr en0
+```
+
+If laptop IP is like `192.168.188.X`, check likely Pi hostnames:
+
+```bash
+for i in {2..254}; do ping -c 1 -W 100 192.168.188.$i >/dev/null 2>&1 && echo "up: 192.168.188.$i"; done
+```
+
+Then test SSH:
+
+```bash
+ssh pi@<PI_IP>
+```
+
+Default student account assumed: `pi` (password is whatever was set on that Pi image).
+
+## 3) Create target folders on Pi
+
+```bash
+ssh pi@<PI_IP> "mkdir -p /home/pi/artemis/releases /home/pi/artemis/current /home/pi/artemis/logs"
+```
+
+## 4) SCP release from laptop to Pi
+
+```bash
+scp -r /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2/releases/release-20260213-223835-63e1b5b-armhf pi@<PI_IP>:/home/pi/artemis/releases/
+```
+
+## 5) Activate that release on Pi
+
+```bash
+ssh pi@<PI_IP> '
+set -e
+BASE=/home/pi/artemis
+REL=$BASE/releases/release-20260213-223835-63e1b5b-armhf
+chmod +x "$REL/ArtemisRpiTeensyDeployment"
+ln -sfn "$REL" "$BASE/active_release"
+ln -sfn "$BASE/active_release/ArtemisRpiTeensyDeployment" "$BASE/current/ArtemisRpiTeensyDeployment"
+ln -sfn "$BASE/active_release/ArtemisRpiTeensyDeploymentTopologyDictionary.json" "$BASE/current/ArtemisRpiTeensyDeploymentTopologyDictionary.json"
+echo release-20260213-223835-63e1b5b-armhf > "$BASE/active_release_name.txt"
+echo "Activated: $(cat "$BASE/active_release_name.txt")"
+'
+```
+
+## 6) (Recommended) Verify checksums on Pi
+
+```bash
+ssh pi@<PI_IP> '
+cd /home/pi/artemis/active_release
+sha256sum -c SHA256SUMS
+'
+```
+
+Expected: `OK` for each file.
+
+## 7) Run the deployment (foreground test)
+
+```bash
+ssh pi@<PI_IP> '/home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0'
+```
+
+Stop with `Ctrl+C`.
+
+## 8) Run in background with log
+
+```bash
+ssh pi@<PI_IP> '
+nohup /home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0 \
+  > /home/pi/artemis/logs/flight.log 2>&1 &
+echo "PID: $!"
+'
+```
+
+Check process/log:
+
+```bash
+ssh pi@<PI_IP> 'pgrep -af ArtemisRpiTeensyDeployment; tail -n 50 /home/pi/artemis/logs/flight.log'
+```
+

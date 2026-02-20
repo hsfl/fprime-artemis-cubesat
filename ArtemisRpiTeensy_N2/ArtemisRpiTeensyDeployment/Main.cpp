@@ -70,8 +70,8 @@ int main(int argc, char* argv[]) {
                 return (option == 'h') ? 0 : 1;
         }
     }
-    // Object for communicating state to the topology
-    ArtemisRpiTeensyDeployment::TopologyState inputs;
+    // TopologyState can be large with subtopology state; keep it off thread stack.
+    static ArtemisRpiTeensyDeployment::TopologyState inputs;
     inputs.uartDevice = uartDevice;
 
     // Setup program shutdown via Ctrl-C
