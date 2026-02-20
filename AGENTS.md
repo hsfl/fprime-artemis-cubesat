@@ -89,6 +89,8 @@ fprime-util build
 - Build/package artifacts from:
   - `ArtemisRpiTeensy_N2/tools/cross_build_armhf.sh`
   - `ArtemisRpiTeensy_N2/tools/package_armhf_release.sh`
+- Pi Zero W note:
+  - current `arm-hf-linux` cross-build output has been observed as `Tag_CPU_arch: v7` and can fail with `Illegal instruction` on `armv6l`; prefer native build on Pi Zero W.
 - Release policy:
   - copy deployment artifacts only (binary + dictionary + checksums), never the full repo.
 

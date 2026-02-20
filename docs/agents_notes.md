@@ -35,6 +35,11 @@ This repo is the Neutron 2 team F' integration workspace:
     - `SHA256SUMS`
     - `RELEASE_INFO.txt`
   - Manual activation uses `active_release` / `previous_release` symlink pattern.
+- Confirmed compatibility finding (2026-02-20):
+  - Target hardware: `Raspberry Pi Zero W Rev 1.1` (`armv6l`)
+  - Cross-built binary reports `Tag_CPU_arch: v7` and crashes on Pi Zero with `Illegal instruction`
+  - Result: current Mac Docker `arm-hf-linux` output is not valid for Pi Zero W runtime
+  - For Pi Zero W, use native build on the Pi as source-of-truth runtime binary
 
 ### 2) Satellite Teensy (`ArtemisTeensy_N2_Baremetal`)
 - Source of truth:
@@ -73,7 +78,7 @@ This repo is the Neutron 2 team F' integration workspace:
 
 ## Primary TODO
 
-1. Run manual SCP + activation + smoke steps in `rpi_build.instructions` against live Pi host and record first successful remote release ID.
+1. Create and document native Pi Zero W build flow (armv6) and record first successful non-crashing runtime on `/dev/null` and `/dev/serial0`.
 2. Run full HIL end-to-end tests with real `fprime-gds` UART traffic over RF (both directions).
 3. Decide if segment ACK/retry is required for acceptable RF reliability.
 4. Add deterministic packet boundary extraction for uplink beyond simple burst mode.
