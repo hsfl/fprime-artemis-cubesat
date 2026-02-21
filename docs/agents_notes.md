@@ -18,28 +18,14 @@ This repo is the Neutron 2 team F' integration workspace:
 - Build status:
   - `fprime-util generate -f` passes
   - `fprime-util build` passes
-  - `./tools/cross_build_armhf.sh` passes (validated `arm-hf-linux`)
-  - `./tools/package_armhf_release.sh` passes and produces signed release bundle
 
-### 1b) ARMHF Release Pipeline (Mac -> RPi)
-- Release-grade scripts now live in:
-  - `ArtemisRpiTeensy_N2/tools/cross_build_armhf.sh`
-  - `ArtemisRpiTeensy_N2/tools/package_armhf_release.sh`
-  - `ArtemisRpiTeensy_N2/tools/rollback_armhf_release.sh`
-  - Manual deploy + SCP instructions: `rpi_build.instructions`
-- Validated behavior:
-  - Cross-build emits ARM32 ELF (`arm-hf-linux`) binary + matching topology dictionary
-  - Packager creates `releases/release-<timestamp>-<sha>-armhf/` with:
-    - deployment binary
-    - topology dictionary
-    - `SHA256SUMS`
-    - `RELEASE_INFO.txt`
-  - Manual activation uses `active_release` / `previous_release` symlink pattern.
+### 1b) Raspberry Pi Build Path
+- Source-of-truth runbook:
+  - `rpi_build.instructions`
 - Confirmed compatibility finding (2026-02-20):
   - Target hardware: `Raspberry Pi Zero W Rev 1.1` (`armv6l`)
-  - Cross-built binary reports `Tag_CPU_arch: v7` and crashes on Pi Zero with `Illegal instruction`
-  - Result: current Mac Docker `arm-hf-linux` output is not valid for Pi Zero W runtime
-  - For Pi Zero W, use native build on the Pi as source-of-truth runtime binary
+  - ARMv7 binaries fail on Pi Zero W with `Illegal instruction`
+  - Use native build on the Pi as source-of-truth runtime binary
 
 ### 2) Satellite Teensy (`ArtemisTeensy_N2_Baremetal`)
 - Source of truth:
@@ -96,7 +82,7 @@ This repo is the Neutron 2 team F' integration workspace:
   - `docs/GET_STARTED_TESTING.md`
 - Build runbook:
   - `docs/build_runbook.md`
-- ARMHF release runbook:
+- Raspberry Pi native build runbook:
   - `rpi_build.instructions`
 
 ## Agent Reminders
@@ -106,6 +92,4 @@ This repo is the Neutron 2 team F' integration workspace:
   - `. ArtemisRpiTeensy_N2/fprime-venv/bin/activate`
 - Prefer fresh configure before topology/component changes:
   - `fprime-util generate -f`
-- For cross-compiling in `nasafprime/fprime-arm`, do not trust container-default `fprime-tools` version.
-  - Use project-pinned versions from `lib/fprime/requirements.txt`.
-- If container lacks Ninja, generate with `--make`.
+- Use project-pinned versions from `lib/fprime/requirements.txt` when creating venvs on target.

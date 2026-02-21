@@ -1,115 +1,111 @@
-# RPi Manual Deploy Instructions (No Scripts)
+# Raspberry Pi Native Build Instructions (Manual)
 
-Use this when laptop + Raspberry Pi are on the same Wi-Fi.
+Use this path for Pi Zero W and other constrained Pi targets.  
+Build directly on the Raspberry Pi, then run locally.
 
-## 1) On laptop, go to project and confirm release exists
-
-```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-ls -la releases/release-20260213-223835-63e1b5b-armhf
-```
-
-Expected files:
-- `ArtemisRpiTeensyDeployment`
-- `ArtemisRpiTeensyDeploymentTopologyDictionary.json`
-- `SHA256SUMS`
-- `RELEASE_INFO.txt`
-
-## 2) Find Raspberry Pi IP on local Wi-Fi
-
-Try mDNS first:
+## 1) Find Raspberry Pi IP (from laptop)
 
 ```bash
 ping -c 1 raspberrypi.local
 ```
 
-If that works, use `raspberrypi.local` as host.  
-If not, scan local ARP table:
+If needed:
 
 ```bash
 arp -a | grep -i raspberry
 ```
 
-If still not found, get your subnet and probe it:
-
-```bash
-ipconfig getifaddr en0
-```
-
-If laptop IP is like `192.168.188.X`, check likely Pi hostnames:
-
-```bash
-for i in {2..254}; do ping -c 1 -W 100 192.168.188.$i >/dev/null 2>&1 && echo "up: 192.168.188.$i"; done
-```
-
-Then test SSH:
+## 2) SSH into Pi
 
 ```bash
 ssh pi@<PI_IP>
 ```
 
-Default student account assumed: `pi` (password is whatever was set on that Pi image).
-
-## 3) Create target folders on Pi
+## 3) Configure UART once on fresh Pi
 
 ```bash
-ssh pi@<PI_IP> "mkdir -p /home/pi/artemis/releases /home/pi/artemis/current /home/pi/artemis/logs"
+sudo raspi-config nonint do_serial_hw 0
+sudo raspi-config nonint do_serial_cons 1
+sudo systemctl disable --now serial-getty@serial0.service || true
+sudo reboot
 ```
 
-## 4) SCP release from laptop to Pi
+SSH back in after reboot.
+
+## 4) Install build dependencies on Pi
 
 ```bash
-scp -r /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2/releases/release-20260213-223835-63e1b5b-armhf pi@<PI_IP>:/home/pi/artemis/releases/
+sudo apt update
+sudo apt install -y git python3 python3-venv python3-pip build-essential cmake
 ```
 
-## 5) Activate that release on Pi
+## 5) Get repo onto Pi
+
+If repo is not already on Pi:
 
 ```bash
-ssh pi@<PI_IP> '
-set -e
-BASE=/home/pi/artemis
-REL=$BASE/releases/release-20260213-223835-63e1b5b-armhf
-chmod +x "$REL/ArtemisRpiTeensyDeployment"
-ln -sfn "$REL" "$BASE/active_release"
-ln -sfn "$BASE/active_release/ArtemisRpiTeensyDeployment" "$BASE/current/ArtemisRpiTeensyDeployment"
-ln -sfn "$BASE/active_release/ArtemisRpiTeensyDeploymentTopologyDictionary.json" "$BASE/current/ArtemisRpiTeensyDeploymentTopologyDictionary.json"
-echo release-20260213-223835-63e1b5b-armhf > "$BASE/active_release_name.txt"
-echo "Activated: $(cat "$BASE/active_release_name.txt")"
-'
+cd /home/pi
+git clone <YOUR_REPO_URL> fprime-artemis-cubesat
 ```
 
-## 6) (Recommended) Verify checksums on Pi
+If already present:
 
 ```bash
-ssh pi@<PI_IP> '
-cd /home/pi/artemis/active_release
-sha256sum -c SHA256SUMS
-'
+cd /home/pi/fprime-artemis-cubesat
+git pull
 ```
 
-Expected: `OK` for each file.
-
-## 7) Run the deployment (foreground test)
+## 6) Create/refresh Python venv for F' tools
 
 ```bash
-ssh pi@<PI_IP> '/home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0'
+cd /home/pi/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+python3 -m venv fprime-venv
+. fprime-venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r lib/fprime/requirements.txt
+```
+
+## 7) Build deployment natively on Pi
+
+```bash
+cd /home/pi/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+. fprime-venv/bin/activate
+fprime-util generate -f
+fprime-util build
+```
+
+## 8) Link current runtime paths
+
+```bash
+cd /home/pi/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+APP="$(find build-artifacts -type f -name ArtemisRpiTeensyDeployment | grep '/Linux/' | head -n 1)"
+DICT="$(find build-artifacts -type f -name ArtemisRpiTeensyDeploymentTopologyDictionary.json | grep '/Linux/' | head -n 1)"
+APP_ABS="$(readlink -f "$APP")"
+DICT_ABS="$(readlink -f "$DICT")"
+mkdir -p /home/pi/artemis/current /home/pi/artemis/logs
+ln -sfn "$APP_ABS" /home/pi/artemis/current/ArtemisRpiTeensyDeployment
+ln -sfn "$DICT_ABS" /home/pi/artemis/current/ArtemisRpiTeensyDeploymentTopologyDictionary.json
+```
+
+## 9) Smoke test (no UART dependency)
+
+```bash
+/home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/null
 ```
 
 Stop with `Ctrl+C`.
 
-## 8) Run in background with log
+## 10) Run against UART
 
 ```bash
-ssh pi@<PI_IP> '
-nohup /home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0 \
-  > /home/pi/artemis/logs/flight.log 2>&1 &
-echo "PID: $!"
-'
+/home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0
 ```
 
-Check process/log:
+## 11) Run in background with logs
 
 ```bash
-ssh pi@<PI_IP> 'pgrep -af ArtemisRpiTeensyDeployment; tail -n 50 /home/pi/artemis/logs/flight.log'
+nohup /home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0 > /home/pi/artemis/logs/flight.log 2>&1 &
+echo "PID: $!"
+tail -n 50 /home/pi/artemis/logs/flight.log
 ```
 

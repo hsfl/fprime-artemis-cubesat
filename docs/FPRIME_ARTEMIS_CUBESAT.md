@@ -383,5 +383,3 @@ Control:
   - https://fprime.jpl.nasa.gov/latest/docs/Svc/Subtopologies/ComFprime/
 - Install/bootstrap:
   - https://fprime.jpl.nasa.gov/latest/docs/getting-started/installing-fprime/
-- Cross-compilation:
-  - https://fprime.jpl.nasa.gov/latest/docs/tutorials/cross-compilation/

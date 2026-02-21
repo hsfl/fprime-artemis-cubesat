@@ -33,6 +33,13 @@ fprime-util generate -f
 fprime-util build
 ```
 
+### 3b) Native Build on Raspberry Pi (preferred)
+Use:
+
+- `rpi_build.instructions`
+
+This path builds directly on the target Pi and avoids architecture mismatch issues on Pi Zero W.
+
 ## 4) Run Deployment
 ```bash
 cd ArtemisRpiTeensy_N2
@@ -48,6 +55,9 @@ cd ArtemisRpiTeensy_N2
 Open dashboard:
 - `http://127.0.0.1:5050`
 
+Local Mac-only closed-loop emulation (no hardware) is documented in:
+- `EMULATION.md`
+
 ## 6) MVP Bring-up Checks
 1. Verify process starts without initialization assertion failures.
 2. Verify Teensy serial log prints relay-ready line.
@@ -59,7 +69,7 @@ Open dashboard:
 2. Reconnect UART and verify `TeensyLink` telemetry continues updating.
 3. Send malformed frame bytes to Teensy UART and verify framing/CRC counters increase.
 
-## 8) Release-Grade ARMHF Pipeline
-For reproducible Mac-to-RPi deployment (cross-compile + artifact packaging + SSH deploy + rollback), use:
+## 8) Raspberry Pi Native Build + Run (Manual)
+For student-friendly setup over local Wi-Fi (find Pi IP + SSH + native build + run), use:
 
-- `docs/ARMHF_RELEASE_PIPELINE.md`
+- `rpi_build.instructions`
