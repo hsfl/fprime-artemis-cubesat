@@ -30,6 +30,8 @@ Current relay milestone:
   - Runbooks and integration notes
 - `docs/agents_notes.md`
   - Current implementation status and next-agent guidance
+- `EMULATION.md`
+  - Local Mac-only closed-loop emulation workflow (no hardware)
 
 ## Build and run
 
