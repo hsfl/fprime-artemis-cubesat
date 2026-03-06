@@ -1,0 +1,106 @@
+flowchart TB
+  classDef board fill:#f7f7f7,stroke:#444,stroke-width:1px,color:#111;
+  classDef payload fill:#ead6bd,stroke:#a9752a,stroke-width:1px,color:#111;
+  classDef obc fill:#b9c9df,stroke:#4d6b95,stroke-width:1px,color:#111;
+  classDef battery fill:#ece3bf,stroke:#978a44,stroke-width:1px,color:#111;
+  classDef eps fill:#e8c0c0,stroke:#9a4f4f,stroke-width:1px,color:#111;
+  classDef antenna fill:#d7cce2,stroke:#7a6190,stroke-width:1px,color:#111;
+
+  subgraph ROW1[" "]
+    direction LR
+
+    subgraph PB["Payload Board"]
+      direction TB
+      CAM["Camera Device"]:::board
+    end
+    class PB payload;
+
+    subgraph OBC["OBC Board"]
+      direction TB
+
+      subgraph OBC_TOP[" "]
+        direction LR
+        TMP_OBC["Temperature Sensor (TMP36FSZ)"]:::board
+        IMU["IMU / Temp. Sensor (BMX160)"]:::board
+      end
+
+      subgraph OBC_MID[" "]
+        direction LR
+        RPI["Raspberry Pi Zero"]:::board
+        TEENSY["Teensy"]:::board
+        RFM["Radio (RF23BP)"]:::board
+      end
+
+      GPS["GPS (S1216F8)"]:::board
+    end
+    class OBC obc;
+
+    subgraph PYB["PyCubed Battery Board"]
+      direction LR
+      TMP_BATT["Temperature Sensor (TMP36FSZ)"]:::board
+      BATTS["Batteries"]:::board
+      HEATER["Heater (KHLVA-0504/10)"]:::board
+    end
+    class PYB battery;
+  end
+
+  subgraph ROW2[" "]
+    direction LR
+    ANT["Antenna Deployment Mechanism"]:::antenna
+
+    subgraph EPS["EPS PDU Board"]
+      direction TB
+
+      subgraph EPS_TOP[" "]
+        direction LR
+        TMP_EPS["Temperature Sensor (TMP36FSZ)"]:::board
+        CTRL["Controller (ATSAMD51J20A-AU)"]:::board
+        PMON["Power Monitor"]:::board
+      end
+
+      SW["Switch Lines"]:::board
+    end
+    class EPS eps;
+  end
+
+  style ROW1 fill:transparent,stroke:transparent
+  style ROW2 fill:transparent,stroke:transparent
+  style OBC_TOP fill:transparent,stroke:transparent
+  style OBC_MID fill:transparent,stroke:transparent
+  style EPS_TOP fill:transparent,stroke:transparent
+
+  CAM -->|"Image"| RPI
+
+  RPI <-->|"Image"| TEENSY
+
+  TMP_OBC <-->|"analog"| TEENSY
+
+  IMU <-->|"orientation"| TEENSY
+
+  RFM <-->|"data"| TEENSY
+
+  GPS <-->|"position"| TEENSY
+
+  TMP_BATT <-->|"Temperature"| TEENSY
+
+  TMP_BATT <-->|"Temperature"| CTRL
+
+  TEENSY <-->|"Main Line"| CTRL
+
+  TEENSY <-->|"Redundant Line"| CTRL
+
+  CTRL <-->|"Power/Batt Health"| PMON
+
+  CTRL <-->|"Temperature"| TMP_EPS
+
+  CTRL -->|"On/Off"| SW
+
+  PMON <-->|"On/Off"| SW
+
+  CTRL --> ANT
+
+  linkStyle 0,1 stroke:#f28e2b,stroke-width:2px;
+  linkStyle 2,3,9 stroke:#4c9be8,stroke-width:2px;
+  linkStyle 5,6,10 stroke:#b58be8,stroke-width:2px;
+  linkStyle 4,7 stroke:#22b14c,stroke-width:2px;
+  linkStyle 8,11,12,13,14 stroke:#e03131,stroke-width:2px;

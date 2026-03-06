@@ -62,6 +62,15 @@ This repo is the Neutron 2 team F' integration workspace:
   - `ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md`
   - `GDS_Teensy/docs/transport_contract.md`
 
+## Architecture Decision (2026-02-26)
+
+- Evaluated running F' on Teensy 4.1 via Zephyr reference as an option.
+- Team decision: keep Teensy nodes baremetal for MVP.
+- Rationale:
+  - Avoid additional Zephyr/F' integration risk during MVP schedule.
+  - Current Teensy role is bridge/transport and does not require on-node F' autonomy.
+  - Final flatsat hardware plan also does not require migrating Teensy nodes to F' at this time.
+
 ## Primary TODO
 
 1. Create and document native Pi Zero W build flow (armv6) and record first successful non-crashing runtime on `/dev/null` and `/dev/serial0`.
