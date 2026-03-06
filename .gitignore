@@ -19,6 +19,9 @@ logs/
 ArtemisRpiTeensy_N2/build-artifacts/
 ArtemisRpiTeensy_N2/build-fprime-*/
 ArtemisRpiTeensy_N2/cmake-build-*/
+ArtemisRpiTeensy_N2/.cross-venv-linux/
+ArtemisRpiTeensy_N2/cross/pi-zero-w/sysroot/
+ArtemisRpiTeensy_N2/cross/pi-zero-w/verify/
 ArtemisRpiTeensy_N2/*-template
 ArtemisRpiTeensy_N2/*.template.cpp
 ArtemisRpiTeensy_N2/*.template.hpp

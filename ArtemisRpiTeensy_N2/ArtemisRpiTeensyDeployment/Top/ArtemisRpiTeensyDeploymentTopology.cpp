@@ -11,6 +11,7 @@
 // Necessary project-specified types
 #include <Fw/Types/MallocAllocator.hpp>
 #include <Drv/LinuxUartDriver/LinuxUartDriver.hpp>
+#include <cstring>
 
 // Public functions for use in main program are namespaced with deployment module ArtemisRpiTeensyDeployment
 // This is also the namespace where the topology components are instantiated by FPP.
@@ -32,6 +33,10 @@ enum TopologyConstants {
     COMM_PRIORITY = 34,
     UART_READ_BUFFER_SIZE = 4096,
 };
+
+bool useLinuxUartDriver(const char* device) {
+    return (device != nullptr) && (std::strcmp(device, "/dev/null") != 0);
+}
 
 /**
  * \brief configure/setup components in project-specific way
@@ -64,7 +69,7 @@ void setupTopology(const TopologyState& state) {
     regCommands();
     // Autocoded configuration. Function provided by autocoder.
     configComponents(state);
-    if (state.uartDevice != nullptr) {
+    if (useLinuxUartDriver(state.uartDevice)) {
         const bool opened = comDriver.open(state.uartDevice,
                                            Drv::LinuxUartDriver::BAUD_115K,
                                            Drv::LinuxUartDriver::NO_FLOW,
@@ -79,7 +84,7 @@ void setupTopology(const TopologyState& state) {
     // Autocoded task kick-off (active components). Function provided by autocoder.
     startTasks(state);
     // Initialize socket communication if and only if there is a valid specification
-    if (state.uartDevice != nullptr) {
+    if (useLinuxUartDriver(state.uartDevice)) {
         // UART driver uses a dedicated receive thread.
         comDriver.start(COMM_PRIORITY, Default::STACK_SIZE);
     }
@@ -103,8 +108,10 @@ void teardownTopology(const TopologyState& state) {
     freeThreads(state);
 
     // Other task clean-up.
-    comDriver.quitReadThread();
-    (void)comDriver.join();
+    if (useLinuxUartDriver(state.uartDevice)) {
+        comDriver.quitReadThread();
+        (void)comDriver.join();
+    }
 
     // Resource deallocation
     cmdSeq.deallocateBuffer(mallocator);

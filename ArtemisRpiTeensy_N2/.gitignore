@@ -11,6 +11,11 @@ releases/
 # Misc
 /venv/
 /fprime-venv/
+/.cross-venv-linux/
+/cross/pi-zero-w/sysroot/
+/cross/pi-zero-w/verify/
+/cross/pi-zero-w/docker/*.tar
+/cross/pi-zero-w/docker/*.tar.gz
 /.idea/
 /.vscode/
 .DS_Store

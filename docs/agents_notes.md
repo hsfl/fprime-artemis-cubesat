@@ -26,6 +26,14 @@ This repo is the Neutron 2 team F' integration workspace:
   - Target hardware: `Raspberry Pi Zero W Rev 1.1` (`armv6l`)
   - ARMv7 binaries fail on Pi Zero W with `Illegal instruction`
   - Use native build on the Pi as source-of-truth runtime binary
+- Cross-build update (2026-03-06):
+  - Docker cross-build is now validated for Pi Zero W
+  - Verified ARMv6 output using `file` and `readelf`
+  - Verified remote smoke test on `/dev/null`
+  - Detailed handoff:
+    - `docs/CROSS_COMPILE_HANDOFF_PI_ZERO_W.md`
+  - Student guide:
+    - `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md`
 
 ### 2) Satellite Teensy (`ArtemisTeensy_N2_Baremetal`)
 - Source of truth:
@@ -73,7 +81,7 @@ This repo is the Neutron 2 team F' integration workspace:
 
 ## Primary TODO
 
-1. Create and document native Pi Zero W build flow (armv6) and record first successful non-crashing runtime on `/dev/null` and `/dev/serial0`.
+1. Record first successful non-crashing runtime on `/dev/serial0` using the real UART path.
 2. Run full HIL end-to-end tests with real `fprime-gds` UART traffic over RF (both directions).
 3. Decide if segment ACK/retry is required for acceptable RF reliability.
 4. Add deterministic packet boundary extraction for uplink beyond simple burst mode.
