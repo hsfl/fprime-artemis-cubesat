@@ -28,6 +28,7 @@ ArtemisRpiTeensy_N2/*.template.hpp
 ArtemisRpiTeensy_N2/fprime-venv/
 
 # Teensy Arduino CLI generated artifacts
+.arduino15/
 ArtemisTeensy_N2_Baremetal/.arduino15/
 ArtemisTeensy_N2_Baremetal/sketchbook/
 ArtemisTeensy_N2_Baremetal/build/

@@ -26,6 +26,14 @@ Use this project with the `fprime-swe` skill and follow these steps exactly.
 
 - Read `README.md` for the top-level architecture and current status.
 - Read `docs/agents_notes.md` for latest implementation details and pending TODO items.
+- Treat the shortened FlatSat FSR end-to-end demo as the current target mission narrative:
+  1. boot into `Base Mode`
+  2. determine mock ground-contact timing with `D2S2` inputs
+  3. downlink live `SOH` telemetry for display to judges
+  4. send a command that schedules data collection after a short delay such as `10` seconds
+  5. run data collection using real or simulated payload data
+  6. downlink science data
+  7. review/analyze science data on the ground PC with `fprime-gds` for the MVP demo; treat `Yamcs` as the longer-term end-goal ground stack
 - Active F' project root is:
   - `ArtemisRpiTeensy_N2`
 - Active baremetal Teensy workspace is:
@@ -121,6 +129,8 @@ Notes:
 - Running `fprime-util new --component` from the project root instead of `Components/`.
 - Not answering the final generator prompts (CMake + impl generation), which leaves partial directories.
 - Forgetting to add deployments to `project.cmake`.
+- Building features that do not directly improve the live end-to-end demo path.
+- Assuming real payload integration is mandatory for the demo when a documented simulated-data fallback is acceptable.
 
 ## Teensy Baremetal Agent Usage Guide
 
@@ -219,6 +229,18 @@ cd GDS_Teensy
    - verify submodule SHA is intentional (`git submodule status --recursive`)
    - verify no build/cache artifacts are staged (`git status --short`)
    - verify remote branch naming is push-compatible (avoid `dev/x` if `dev` branch already exists remotely)
+
+### Demo-First Decision Rule
+- Prefer the smallest implementation that supports the live demo story.
+- Demo-critical visible behaviors take priority over deeper architectural cleanup.
+- The current minimum acceptable demo story is:
+  - nominal bring-up in `Base Mode`
+  - live `SOH` telemetry on the ground display
+  - operator-issued scheduled collection command
+  - data collection after a short delay
+  - science-data downlink
+  - ground-side review or analysis of that science data
+- If a real subsystem is not stable enough, document and use a simulation/fallback path rather than leaving the demo story incomplete.
 
 ### Runtime Smoke Flow (RPi)
 - Binary:

@@ -5,7 +5,9 @@ flowchart LR
   classDef tool fill:#ecfff2,stroke:#14532d,stroke-width:1px,color:#111;
   classDef subsystem fill:#fff2f2,stroke:#7f1d1d,stroke-width:1px,color:#111;
 
-  subgraph RPI["Raspberry Pi (Flight Computer)"]
+  subgraph RPI["Raspberry Pi Zero W Rev 1.1 - Raspberry Pi Lite OS 32 Bit Debian"]
+    %%need to research difference between freertos and ubuntu OS - one for demo and one for flight system architecture%%
+    %% put out into components: EPS, COMMS, THERMAL, GPS, Teensy, Payload, ADCS,  Mission%%
     FSW["ArtemisRpiTeensy_N2 F' Deployment (ArtemisRpiTeensyDeployment)"]:::fw
     LINUXUART["Drv.LinuxUartDriver /dev/serial0"]:::fw
     APP["Custom Components TeensyLink, PingResponder"]:::fw
@@ -50,7 +52,7 @@ flowchart LR
   end
   class N1_PAYLOAD host;
 
-  N1USB -->|"USB RS22"| FSW
+  N1USB -->|"RS422 to USB (2.0)"| FSW
 
   LINUXUART <-->|"Custom UART Frame Protocol"| SATUART
   SATRF <-->|"RF segmented transport"| GRDRF

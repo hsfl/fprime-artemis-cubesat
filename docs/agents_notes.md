@@ -7,6 +7,35 @@ This repo is the Neutron 2 team F' integration workspace:
 - Satellite Teensy provides UART wrapper + RF23BP bridge.
 - Ground Teensy reassembles RF messages to USB and supports simple USB-burst uplink back to RF.
 
+## Demo Target Snapshot (2026-04-07)
+
+The current top-level target is the shortened FlatSat FSR end-to-end demo shown in the team's planning slides. Treat this as the active demonstration narrative when making architecture, implementation, or documentation decisions.
+
+### Demo story to support
+
+1. System boots in `Base Mode`.
+2. Operator uses `D2S2` planning inputs to determine the mock ground-pass contact duration.
+3. During the simulated pass, the satellite remains in base mode and downlinks `SOH`/health telemetry for a live judge-facing display.
+4. Operator sends a command to schedule data collection after a short delay, for example `10` seconds.
+5. Flight software executes a data-collection action using payload data; simulated or temporary payload data is acceptable for the demo if the real payload path is not ready.
+6. After collection, the system transitions into a science downlink path and sends payload/science data to the ground side.
+7. Ground software on the laptop reviews, displays, or analyzes the downlinked science data. `fprime-gds` is the MVP demo tool and default ground interface for this phase. `Yamcs` is the longer-term end-goal ground presentation and analysis stack.
+
+### What matters most for the demo
+
+- A visible `Base Mode` / nominal-state bring-up.
+- Live `SOH` telemetry reaching the ground station.
+- An explicit scheduled command from the operator.
+- A visible state transition into data collection.
+- A visible result payload or science product, even if simulated.
+- A visible science-data review step on the ground PC.
+
+### Compression rule
+
+- Real orbital timing is not the target for this demo.
+- Time between "pass start", scheduled collection, and science downlink may be compressed to fit the live presentation.
+- A `10`-second schedule delay is an acceptable operator-facing placeholder.
+
 ## Current State
 
 ### 1) F' side (`ArtemisRpiTeensy_N2`)
@@ -83,9 +112,12 @@ This repo is the Neutron 2 team F' integration workspace:
 
 1. Record first successful non-crashing runtime on `/dev/serial0` using the real UART path.
 2. Run full HIL end-to-end tests with real `fprime-gds` UART traffic over RF (both directions).
-3. Decide if segment ACK/retry is required for acceptable RF reliability.
-4. Add deterministic packet boundary extraction for uplink beyond simple burst mode.
-5. Build post-MVP mission/service multiplexing only after chain stability.
+3. Implement the minimum demo-state flow for `Base Mode` -> scheduled data collection -> science-data downlink.
+4. Decide and document the payload-data source for the demo: real payload path vs simulated temporary data.
+5. Keep `fprime-gds` as the live MVP demo ground interface and treat `Yamcs` as the post-MVP target presentation/analysis stack.
+6. Decide if segment ACK/retry is required for acceptable RF reliability during the live demo.
+7. Add deterministic packet boundary extraction for uplink beyond simple burst mode if required by the selected demo flow.
+8. Build post-MVP mission/service multiplexing only after chain stability.
 
 ## Important Paths
 
@@ -110,3 +142,5 @@ This repo is the Neutron 2 team F' integration workspace:
 - Prefer fresh configure before topology/component changes:
   - `fprime-util generate -f`
 - Use project-pinned versions from `lib/fprime/requirements.txt` when creating venvs on target.
+- When choosing scope, favor the shortest implementation that makes the end-to-end demo story credible in front of judges.
+- Simulated payload data is acceptable if it unblocks the demo and is documented clearly.
