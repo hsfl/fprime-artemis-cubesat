@@ -24,6 +24,9 @@ Use this project with the `fprime-swe` skill and follow these steps exactly.
 
 ## Current Project Quick Start (Read First)
 
+- Read `docs/SYSTEM_ARCHITECTURE.md` first.
+  - This is the required system-level crosswalk between the Neutron 2 target architecture and the Artemis-based prototype used for the current demo.
+  - Do not continue with subsystem or architecture work until this file has been read.
 - Read `README.md` for the top-level architecture and current status.
 - Read `docs/agents_notes.md` for latest implementation details and pending TODO items.
 - Treat the shortened FlatSat FSR end-to-end demo as the current target mission narrative:
