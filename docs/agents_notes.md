@@ -108,6 +108,33 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   - Current Teensy role is bridge/transport and does not require on-node F' autonomy.
   - Final flatsat hardware plan also does not require migrating Teensy nodes to F' at this time.
 
+## OBC Demo Notes (2026-04-07)
+
+- Treat the Artemis OBC as a split system for the demo:
+  - `Raspberry Pi` = high-level flight/demo logic, payload handling, storage, and ground-facing behavior
+  - `Teensy` = EPS/PDU interface, analog housekeeping, reset/power supervision, and other low-level control
+- Current payload assumption for ideation:
+  - `Neutron 1 Payload Board` connects to the Raspberry Pi through a USB serial adapter
+  - Do not assume the Artemis camera is the active demo payload
+- Demo-oriented recommendation:
+  - strongly consider wiring `RFM23BPS` directly to the Raspberry Pi to remove the extra `RPi -> UART -> Teensy -> radio` bridge path
+  - this better matches the likely long-term direction of wiring the `SatNOGS` radio directly to the Raspberry Pi
+- If `RFM23BPS` is moved Pi-direct:
+  - use Raspberry Pi SPI/GPIO for radio logic/control
+  - do not power the radio from Raspberry Pi header pins
+  - use switched OBC/PDU power for radio power and maintain common ground with the Raspberry Pi
+- Keep the Teensy in the system even if radio moves Pi-direct:
+  - PDU UART/control path
+  - PDU current/power sensing over I2C
+  - analog temperature channels
+  - Pi enable/reset supervision
+- Manual caveat:
+  - some OBC pin tables conflict with the later radio pin mapping, so the physical board should be treated as source of truth before declaring Teensy pins "free"
+- End-of-year demo rule:
+  - prioritize a stable visible story over architecture completeness
+  - acceptable flow is `Base Mode -> live SOH -> scheduled collect -> science product -> downlink -> ground review`
+  - use simulated or fallback payload/science data if it materially improves demo reliability
+
 ## Primary TODO
 
 1. Record first successful non-crashing runtime on `/dev/serial0` using the real UART path.
