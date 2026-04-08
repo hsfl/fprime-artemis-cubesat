@@ -1,0 +1,15 @@
+flowchart LR
+  classDef sat fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px,color:#111;
+  classDef op fill:#e8f0fe,stroke:#355c9a,stroke-width:1px,color:#111;
+
+  A["1. Boot satellite\nBase Mode"]:::sat
+  B["2. Operator uses D2S2 pass assumptions\nfor mock contact window"]:::op
+  C["3. Base Mode downlink\nSOH shown live in fprime-gds"]:::sat
+  D["4. Operator sends schedule command\nexample: collect in 10 sec"]:::op
+  E["5. MissionManager enters\nDataCollectionPending"]:::sat
+  F["6. Payload collection starts\nreal or simulated science data"]:::sat
+  G["7. Science product stored / packaged"]:::sat
+  H["8. ScienceTx mode\nscience data downlinked"]:::sat
+  I["9. Ground review\noperator shows result to judges"]:::op
+
+  A --> B --> C --> D --> E --> F --> G --> H --> I

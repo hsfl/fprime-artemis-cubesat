@@ -1,0 +1,31 @@
+flowchart LR
+  classDef ground fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px,color:#111;
+  classDef link fill:#fff3e0,stroke:#ef6c00,stroke-width:1px,color:#111;
+  classDef sat fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px,color:#111;
+  classDef hw fill:#e8f0fe,stroke:#355c9a,stroke-width:1px,color:#111;
+
+  GDS["fprime-gds\noperator sends command"]:::ground
+  GT["Ground Teensy\nUSB burst -> RF segmentation"]:::hw
+  RF["RF link\nRFM23BP or SatNOGS path"]:::link
+  ST["Satellite Teensy\nRF reassembly -> UART"]:::hw
+  UART["Custom UART framing\nRPi <-> satellite Teensy"]:::link
+  COM["LinuxUartDriver / ComCcsds"]:::sat
+  FSW["F' deployment\ncommand dispatch"]:::sat
+  MISSION["Mission / service component\nhandles command"]:::sat
+  RESP["Events / telemetry / command response"]:::sat
+
+  GDS --> GT
+  GT --> RF
+  RF --> ST
+  ST --> UART
+  UART --> COM
+  COM --> FSW
+  FSW --> MISSION
+  MISSION --> RESP
+  RESP --> FSW
+  FSW --> COM
+  COM --> UART
+  UART --> ST
+  ST --> RF
+  RF --> GT
+  GT --> GDS

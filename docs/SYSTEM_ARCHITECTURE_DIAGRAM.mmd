@@ -1,0 +1,40 @@
+flowchart LR
+  classDef hw fill:#e8f0fe,stroke:#355c9a,stroke-width:1px,color:#111;
+  classDef sw fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px,color:#111;
+  classDef sim fill:#fff3e0,stroke:#ef6c00,stroke-width:1px,color:#111;
+  classDef ground fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px,color:#111;
+
+  subgraph SAT["Neutron 2 FlatSat Demo on Artemis Prototype Hardware"]
+    subgraph OBC["OBC"]
+      RPI["Raspberry Pi Zero W\nF' flight software"]:::sw
+      TEENSY["Teensy 4.1\nbridge / hardware-facing control"]:::hw
+    end
+
+    EPS["EPS\nArtemis EPS / PDU / battery"]:::hw
+    PLD["PLD\nLegacy Neutron 1 Payload Board"]:::hw
+    GPS["GPS\nArtemis kit GPS"]:::hw
+    COMMS["COMMS\nRFM23BP MVP\nSatNOGS later"]:::hw
+    TCS["TCS\nArtemis thermal baseline"]:::hw
+    SM["S&M\nArtemis structure + antenna mechanism"]:::hw
+  end
+
+  D2S2["D2S2\nADCS simulator"]:::sim
+
+  subgraph GROUND["Ground Segment"]
+    GDS["fprime-gds\nMVP interface"]:::ground
+    YAMCS["Yamcs\nfuture ground stack"]:::ground
+    OP["Operator / judges"]:::ground
+  end
+
+  RPI <-->|"UART / commands / telemetry"| TEENSY
+  RPI <-->|"EPS status / control"| EPS
+  RPI <-->|"payload data / commands"| PLD
+  RPI <-->|"GPS data"| GPS
+  RPI <-->|"mode / mission logic"| D2S2
+  TEENSY <-->|"radio path"| COMMS
+  EPS --> TCS
+  SM --> COMMS
+
+  COMMS <-->|"uplink / downlink"| GDS
+  GDS --> OP
+  YAMCS -.-> OP

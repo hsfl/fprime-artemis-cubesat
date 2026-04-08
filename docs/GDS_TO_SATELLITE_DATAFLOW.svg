@@ -1,0 +1,73 @@
+<svg width="1800" height="560" viewBox="0 0 1800 560" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .bg { fill: #f7f8fb; }
+      .title { font: 700 28px "Helvetica Neue", Arial, sans-serif; fill: #152033; }
+      .subtitle { font: 500 14px "Helvetica Neue", Arial, sans-serif; fill: #55627a; }
+      .label { font: 700 16px "Helvetica Neue", Arial, sans-serif; fill: #152033; }
+      .body { font: 500 13px "Helvetica Neue", Arial, sans-serif; fill: #32415c; }
+      .small { font: 600 12px "Helvetica Neue", Arial, sans-serif; fill: #55627a; }
+      .edge { stroke: #51617d; stroke-width: 2.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0L10 5L0 10V0Z" fill="#51617d"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1800" height="560" rx="28"/>
+  <text class="title" x="72" y="72">Basic Command Dataflow</text>
+  <text class="subtitle" x="72" y="102">Ground command path to the satellite and response path back to the operator</text>
+
+  <rect x="70" y="170" width="220" height="110" rx="24" fill="#f3e8fb" stroke="#7a51a0" stroke-width="2"/>
+  <text class="label" x="100" y="206">fprime-gds</text>
+  <text class="body" x="100" y="230">Operator issues</text>
+  <text class="body" x="100" y="248">a command</text>
+
+  <rect x="330" y="170" width="220" height="110" rx="24" fill="#eaf2ff" stroke="#3c659f" stroke-width="2"/>
+  <text class="label" x="360" y="206">Ground Teensy</text>
+  <text class="body" x="360" y="230">USB burst to RF</text>
+  <text class="body" x="360" y="248">segmentation</text>
+
+  <rect x="590" y="170" width="220" height="110" rx="24" fill="#fff1df" stroke="#d67a17" stroke-width="2"/>
+  <text class="label" x="620" y="206">RF Link</text>
+  <text class="body" x="620" y="230">RFM23BP now</text>
+  <text class="body" x="620" y="248">SatNOGS later</text>
+
+  <rect x="850" y="170" width="220" height="110" rx="24" fill="#eaf2ff" stroke="#3c659f" stroke-width="2"/>
+  <text class="label" x="880" y="206">Satellite Teensy</text>
+  <text class="body" x="880" y="230">RF reassembly</text>
+  <text class="body" x="880" y="248">to UART</text>
+
+  <rect x="1110" y="170" width="220" height="110" rx="24" fill="#fff1df" stroke="#d67a17" stroke-width="2"/>
+  <text class="label" x="1140" y="206">Custom UART Framing</text>
+  <text class="body" x="1140" y="230">RPi to satellite</text>
+  <text class="body" x="1140" y="248">Teensy interface</text>
+
+  <rect x="1370" y="170" width="160" height="110" rx="24" fill="#eef6eb" stroke="#4a8a4a" stroke-width="2"/>
+  <text class="label" x="1400" y="206">ComCcsds</text>
+  <text class="body" x="1400" y="230">LinuxUartDriver</text>
+  <text class="body" x="1400" y="248">and transport</text>
+
+  <rect x="1570" y="170" width="160" height="110" rx="24" fill="#eef6eb" stroke="#4a8a4a" stroke-width="2"/>
+  <text class="label" x="1600" y="206">F&apos; Deployment</text>
+  <text class="body" x="1600" y="230">Dispatch and</text>
+  <text class="body" x="1600" y="248">mission handling</text>
+
+  <rect x="620" y="350" width="560" height="110" rx="24" fill="#ffffff" stroke="#d6deeb" stroke-width="2"/>
+  <text class="label" x="650" y="388">Response Path</text>
+  <text class="body" x="650" y="412">Events, telemetry, and command response return through the same chain back to</text>
+  <text class="body" x="650" y="432">`fprime-gds` for operator confirmation and live demo visibility.</text>
+
+  <path class="edge" marker-end="url(#arrow)" d="M290 225H330"/>
+  <path class="edge" marker-end="url(#arrow)" d="M550 225H590"/>
+  <path class="edge" marker-end="url(#arrow)" d="M810 225H850"/>
+  <path class="edge" marker-end="url(#arrow)" d="M1070 225H1110"/>
+  <path class="edge" marker-end="url(#arrow)" d="M1330 225H1370"/>
+  <path class="edge" marker-end="url(#arrow)" d="M1530 225H1570"/>
+
+  <text class="small" x="785" y="155">Command path</text>
+
+  <path class="edge" marker-end="url(#arrow)" d="M1650 280V320C1650 340 1634 356 1614 356H1210C1190 356 1174 372 1174 392"/>
+  <path class="edge" marker-end="url(#arrow)" d="M620 405H330C290 405 240 360 240 280"/>
+  <text class="small" x="1320" y="336">Response wraps back through transport</text>
+</svg>
