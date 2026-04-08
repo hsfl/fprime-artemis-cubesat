@@ -99,6 +99,56 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   - `ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md`
   - `GDS_Teensy/docs/transport_contract.md`
 
+## Local Emulation Findings (2026-04-08)
+
+### Root Cause
+
+- Local GDS was launched with the wrong framing (`fprime`) for this deployment.
+- This deployment is wired through `ComCcsds`; local GDS must use:
+  - `--framing-selection space-packet-space-data-link`
+- Symptom when wrong framing is used:
+  - GUI opens, but charts stay flat/empty
+  - `GDS Error Log` shows endpoint errors (`channels`, `events`, `command_history`, etc.)
+  - transport bytes may still flow, so it can look like link is "alive" but undecodable
+
+### What Was Updated
+
+- `ArtemisRpiTeensy_N2/tools/local_emulation_loop.py`
+  - default framing changed to `space-packet-space-data-link`
+- `ArtemisRpiTeensy_N2/tools/run_gds_uart.sh`
+  - default framing changed to `space-packet-space-data-link`
+  - added explicit `--framing <mode>` override
+- `EMULATION.md`
+  - manual GDS example updated to `space-packet-space-data-link`
+
+### Build + Launch (Known-Good)
+
+1. Build:
+   - `. ArtemisRpiTeensy_N2/fprime-venv/bin/activate`
+   - `cd ArtemisRpiTeensy_N2`
+   - `fprime-util generate -f`
+   - `fprime-util build`
+2. Launch local closed-loop emulation:
+   - `./tools/run_local_emulation.sh`
+3. Open:
+   - `http://127.0.0.1:5050`
+
+### Landmines
+
+- Stale `fprime-gds`/Flask processes can survive interrupted runs and hold old ports/config.
+- If port behavior looks inconsistent (`5050` works, another port fails, or old UI state remains):
+  - kill stale local emulation + GDS processes
+  - relaunch one clean instance only
+- If charts are empty but app logs show active events:
+  - verify framing first; do not assume transport is broken.
+
+### Framing Guidance (Decision Rule)
+
+- `space-packet-space-data-link` is stock F' `ComCcsds` framing, not custom framing.
+- The custom Teensy UART wrapper (`0xD4 0xC3 + len + crc16`) is a separate link-layer mechanism.
+- For demo and local/GDS validation, use `ComCcsds` framing as the primary/default path.
+- Keep custom UART wrapper support only as an optional hardware fallback mode when physical-link behavior requires it.
+
 ## Architecture Decision (2026-02-26)
 
 - Evaluated running F' on Teensy 4.1 via Zephyr reference as an option.

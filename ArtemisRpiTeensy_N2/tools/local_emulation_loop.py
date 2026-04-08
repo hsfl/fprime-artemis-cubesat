@@ -7,10 +7,9 @@ on a single host. It creates two pseudo UART devices:
 - app UART: passed to ArtemisRpiTeensyDeployment (-d ...)
 - gds UART: passed to fprime-gds (--uart-device ...)
 
-The bridge logic mirrors the Teensy-side contracts:
-- UART wrapper parse/build (0xD4 0xC3 + len + payload + crc16)
-- RF segmentation/reassembly (0xA5 + msg_id + seg_idx + seg_count + chunk_len + chunk)
-- Ground uplink raw-burst flush behavior (220-byte max, 8 ms idle flush)
+Supported link modes:
+- direct: raw byte bridge app<->gds (recommended for simple local testing)
+- legacy-wrapper: Teensy-side wrapper/segment emulation
 """
 
 from __future__ import annotations
@@ -357,10 +356,12 @@ class EmulationLoop:
         app_cmd: Optional[list[str]],
         gds_cmd: Optional[list[str]],
         uplink_flush_ms: int,
+        link_mode: str,
     ) -> None:
         self.app_cmd = app_cmd
         self.gds_cmd = gds_cmd
         self.uplink_flush_s = uplink_flush_ms / 1000.0
+        self.link_mode = link_mode
 
         self.stop_requested = False
         self.exit_code = 0
@@ -469,6 +470,11 @@ class EmulationLoop:
 
     def _process_app_to_gds(self, data: bytes, now: float) -> None:
         self.stats.app_uart_bytes_in += len(data)
+        if self.link_mode == "direct":
+            self.stats.gds_bytes_out += len(data)
+            self._queue_write(self.gds_master_fd, data)  # type: ignore[arg-type]
+            return
+
         app_frames = self.app_uart_parser.feed(data, now)
         for frame in app_frames:
             self.stats.app_frames_in += 1
@@ -493,6 +499,12 @@ class EmulationLoop:
 
     def _process_gds_to_app(self, data: bytes, now: float) -> None:
         self.stats.gds_uart_bytes_in += len(data)
+        if self.link_mode == "direct":
+            self.stats.gds_messages_in += 1
+            self.stats.app_bytes_out += len(data)
+            self._queue_write(self.app_master_fd, data)  # type: ignore[arg-type]
+            return
+
         messages = self.gds_burst_aggregator.feed(data, now)
         for message in messages:
             self._process_gds_message_to_app(message, now)
@@ -526,13 +538,14 @@ class EmulationLoop:
                     elif fd == self.gds_master_fd:
                         self._process_gds_to_app(data, now)
 
-                uplink_msg = self.gds_burst_aggregator.poll(now)
-                if uplink_msg is not None:
-                    self._process_gds_message_to_app(uplink_msg, now)
+                if self.link_mode == "legacy-wrapper":
+                    uplink_msg = self.gds_burst_aggregator.poll(now)
+                    if uplink_msg is not None:
+                        self._process_gds_message_to_app(uplink_msg, now)
 
-                self.app_uart_parser.poll_timeout(now)
-                self.ground_reassembler.poll_timeout(now)
-                self.sat_reassembler.poll_timeout(now)
+                    self.app_uart_parser.poll_timeout(now)
+                    self.ground_reassembler.poll_timeout(now)
+                    self.sat_reassembler.poll_timeout(now)
                 self._flush_pending()
         finally:
             self.shutdown()
@@ -662,14 +675,20 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--framing-selection",
-        default="fprime",
-        help='GDS framing selection (default: "fprime")',
+        default="space-packet-space-data-link",
+        help='GDS framing selection (default: "space-packet-space-data-link")',
     )
     parser.add_argument(
         "--uplink-flush-ms",
         type=int,
         default=DEFAULT_UPLINK_FLUSH_MS,
         help=f"Ground USB burst flush timeout in ms (default: {DEFAULT_UPLINK_FLUSH_MS})",
+    )
+    parser.add_argument(
+        "--link-mode",
+        choices=("direct", "legacy-wrapper"),
+        default="direct",
+        help='Byte bridge mode: "direct" (recommended) or "legacy-wrapper" (default: direct)',
     )
     parser.add_argument(
         "--no-app",
@@ -738,11 +757,15 @@ def main() -> int:
         app_cmd=app_cmd,
         gds_cmd=gds_cmd,
         uplink_flush_ms=args.uplink_flush_ms,
+        link_mode=args.link_mode,
     )
 
     print("[emulation] topology:")
-    print("  app (LinuxUartDriver) -> uart wrapper -> RF segment/reassemble -> gds raw bytes")
-    print("  gds raw bytes -> burst packetization -> RF segment/reassemble -> uart wrapper -> app")
+    if args.link_mode == "direct":
+        print("  app raw bytes <-> gds raw bytes (direct local bridge)")
+    else:
+        print("  app (LinuxUartDriver) -> uart wrapper -> RF segment/reassemble -> gds raw bytes")
+        print("  gds raw bytes -> burst packetization -> RF segment/reassemble -> uart wrapper -> app")
     if not args.no_gds:
         print(f"[emulation] open GDS at http://127.0.0.1:{args.gui_port}")
     return loop.run()

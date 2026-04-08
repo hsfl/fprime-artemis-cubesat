@@ -11,6 +11,7 @@ MissionManager::MissionManager(const char* const compName)
     : MissionManagerComponentBase(compName),
       m_currentMode(BASE_MODE),
       m_lastScheduledDelaySeconds(0),
+      m_pingCount(0),
       m_modeHeartbeat(0) {}
 
 MissionManager::~MissionManager() {}
@@ -26,12 +27,19 @@ void MissionManager::run_handler(FwIndexType portNum, U32 context) {
     this->m_modeHeartbeat += 1;
     this->tlmWrite_CurrentMode(this->m_currentMode);
     this->tlmWrite_LastScheduledDelaySeconds(this->m_lastScheduledDelaySeconds);
+    this->tlmWrite_PingCount(this->m_pingCount);
     this->tlmWrite_ModeHeartbeat(this->m_modeHeartbeat);
 }
 
 void MissionManager::ENTER_BASE_MODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     this->m_currentMode = BASE_MODE;
     this->log_ACTIVITY_HI_ModeChanged(this->m_currentMode);
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void MissionManager::PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 token) {
+    this->m_pingCount += 1;
+    this->log_ACTIVITY_LO_Pong(token, this->m_pingCount);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 

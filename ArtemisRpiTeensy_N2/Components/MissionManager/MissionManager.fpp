@@ -17,6 +17,9 @@ module Components {
         @ Enter base mode
         async command ENTER_BASE_MODE
 
+        @ Simple local ping command for manual GDS loop checks
+        async command PING(token: U32)
+
         @ Schedule data collection delay in seconds
         async command SCHEDULE_COLLECTION(delaySeconds: U32)
 
@@ -26,11 +29,17 @@ module Components {
         @ Last requested schedule delay
         telemetry LastScheduledDelaySeconds: U32
 
+        @ Number of pings handled
+        telemetry PingCount: U32
+
         @ Mission manager heartbeat
         telemetry ModeHeartbeat: U32
 
         @ Mission mode transition
         event ModeChanged(mode: U32) severity activity high format "Mission mode changed to {}"
+
+        @ Ping response event
+        event Pong(token: U32, count: U32) severity activity low format "MissionManager pong token={} count={}"
 
         @ Collection scheduling event
         event CollectionScheduled(delaySeconds: U32) severity activity high format "Collection scheduled in {}s"

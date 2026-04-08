@@ -9,6 +9,7 @@ DICT_BASENAME="${DEPLOYMENT_NAME}TopologyDictionary.json"
 PORT="/dev/cu.usbmodem115551201"
 BAUD="115200"
 GUI_PORT="5050"
+FRAMING="space-packet-space-data-link"
 DICT_PATH="${ROOT_DIR}/build-artifacts/Darwin/${DEPLOYMENT_NAME}/dict/${DICT_BASENAME}"
 DRY_RUN="false"
 
@@ -22,6 +23,7 @@ Options:
   --port <path>         UART device path (default: /dev/cu.usbmodem115551201)
   --baud <rate>         UART baud rate (default: 115200)
   --gui-port <port>     GDS web UI port (default: 5050)
+  --framing <mode>      GDS framing mode (default: space-packet-space-data-link)
   --dictionary <path>   Path to deployment dictionary JSON
   --dry-run             Print the resolved fprime-gds command and exit
   -h, --help            Show this help text
@@ -40,6 +42,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --gui-port)
       GUI_PORT="${2:-}"
+      shift 2
+      ;;
+    --framing)
+      FRAMING="${2:-}"
       shift 2
       ;;
     --dictionary)
@@ -90,7 +96,7 @@ CMD=(
   --uart-device "$PORT"
   --uart-baud "$BAUD"
   --gui-port "$GUI_PORT"
-  --framing-selection fprime
+  --framing-selection "$FRAMING"
 )
 
 if [[ "$DRY_RUN" == "true" ]]; then
@@ -104,4 +110,5 @@ echo "  dictionary: $DICT_PATH"
 echo "  port:       $PORT"
 echo "  baud:       $BAUD"
 echo "  gui-port:   $GUI_PORT"
+echo "  framing:    $FRAMING"
 exec "${CMD[@]}"
