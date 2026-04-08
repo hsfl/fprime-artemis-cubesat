@@ -1,0 +1,3614 @@
+﻿Hawaiʻi Space Flight Laboratory 
+
+
+Installation and User’s Manual
+Version 1.0 
+
+
+________________
+
+
+
+
+  
+Artemis CubeSat Kit V1
+
+
+Accessible, low-cost, spaceflight-ready 1U CubeSat
+with educational materials in the public domain.
+
+
+  
+
+________________
+
+
+Hawaiʻi Space Flight Laboratory
+University of Hawaii at Manoa
+1680 East-West Road, POST 501
+Honolulu, HI  96822
+Tel: 808-956-3138 • Fax: 808-956-6322
+Email: info@hsfl.hawaii.edu
+Website: https://sites.google.com/hawaii.edu/artemiscubesatkit/home
+Table of Contents
+1. Preface        3
+1.1. Disclaimer        3
+1.2. Intended Audience        4
+1.3 Technical Support        4
+1.4. Acronyms        5
+2. Introduction        11
+2.1. Avionics        14
+2.1.1. Bill of Materials        14
+2.2. Mechanical        15
+2.3. Software        15
+3. Specifications - Chris        16
+3.1. Testing        16
+3.2. Modes        16
+3.3. Budgets        16
+3.4. System Diagrams        16
+3.4.1. OBC        17
+3.4.2. COMMS        17
+3.4.3. Electrical Power System        18
+3.4.4. Payload        18
+3.4.5. Thermal Control System        19
+3.4.6. Attitude Control System        19
+4. On Board Computer        19
+4.1 Microcontroller:        20
+4.1.1 Teensy 4.1        20
+4.2 Payload Computer:        23
+4.2.1 Raspberry Pi Zero W        23
+4.3 Sensors and Modules:        25
+4.3.1 Adafruit LSM6DS33 + LIS3MDL - 9-DoF IMU with Accel / Gyro / Mag        25
+4.4.1 Adafruit Mini GPS PA1010D Module        26
+4.4.2 Orion A38L GPS        27
+4.4.3 TMP36FSZ Temperature Sensor        27
+4.4.4 Hope RF RFM23BPS Radio        28
+5. Electrical Power System        31
+5.1. PDU        32
+5.1.1. PC104 Header        32
+5.1.2 Connectors        33
+5.1.2.1 PyCubed Battery Board Power Connectors        34
+5.1.2.2. Solar Panel Connectors        35
+5.1.2.3. Breakout Power Connector        36
+5.1.2.4. JTAG Connector        36
+5.1.2.5. Kapton Heater Connector        37
+5.1.2.6. USB-C Connector        38
+5.1.2.7. MicroSD Connector        39
+5.1.2.8. USB Charge Connector        40
+5.1.2.9. Analog Temperature Sensor (Battery Board) Connector        40
+5.1.2.10. Analog Temperature Sensor (Solar Panel Board) Connectors        41
+5.1.2.11. H-Bridges Connectors        42
+5.1.2.12. Insert Before Flight (IBF) Connector        43
+5.1.2.13. Burn Wire Connector        44
+5.1.2.14. Inhibit Switch Connector        45
+5.1.2.15. 12V Regulator Connector        45
+5.1.3. VBatt Filter        46
+5.1.4. 3V3, 5V Bus        47
+5.1.5. H-Bridge Circuits        49
+5.1.6. 3V3, 5V, VBattery Switches        51
+5.1.7. 12V Switch Regulator        56
+5.1.8. Burn Wire Circuit        59
+5.1.9. Microcontroller Unit (MCU)        59
+5.1.10. Temperature, Current & Power Sensors        65
+5.1.11. Solar/Battery Charging Region        68
+5.1.12. Insert Before Flight (IBF) Circuit        71
+5.2. Battery Board        73
+5.2.1 Batteries        74
+5.2.2 Temperature Sensor        74
+5.2.3 Inhibit Switch        75
+5.2.4 Battery holders        75
+5.2.4 2-Cell Li-Ion Protection IC        75
+5.2.5 Connectors        76
+5.3 Solar Panels        76
+5.3.1. Solar Cells        77
+5.3.2. Solar Panels        77
+5.3.3 Torque coils        78
+5.3.4 Temperature Sensor        78
+6. Communications        80
+6.1 Antenna Board        80
+6.1.1. Connectors        80
+6.1.2. Radio Antennas        82
+6.1.3. Burn wire        82
+6.1.4. GPS Antenna        83
+7. Payload        83
+7.1 Camera Board        83
+7.1.1 Components        83
+7.1.2 Connecting the Camera        83
+8. Mechanical        83
+8.1 Structure        84
+8.1.1 Requirements        84
+8.1.2 Structure References        85
+8.1.2.1 Frame Drawings        85
+8.2.1 Manufactured Parts        87
+8.2.1.1 Spacers        87
+8.2.1.2 Rods        88
+8.2.1.3 Antenna        88
+8.3 Hardware        89
+8.3.1 Full Hardware List        89
+8.4 Assembly        89
+9. TCS        90
+9.1 Kapton Heater PLM-203/10-P        90
+10. Hardware Integration - Chris        91
+10.1. Wiring        91
+10.1.1. Molex Connectors        91
+10.1.1.1. On Board Computer        91
+10.1.1.2. Power Distribution Unit        92
+10.1.1.3. Battery Board        93
+10.1.1.4. Solar Panel Board        94
+10.1.1.5. Antenna Board        94
+10.1.1.6. Camera Board        95
+1. Preface
+1.1. Disclaimer
+Please thoroughly read through this document before attempting to assemble and integrate the Artemis CubeSat on your own. The contents of this document is to help ensure the safety of the user, as well as maximize performance of the spacecraft. All information provided is for educational purposes only. Hawaii Space Flight Laboratory and the Artemis team does not condone or warrant misuse of the Artemis CubeSat Kit for personal gain, harm, and illegal activities.
+
+
+Contents of this document have been verified with completeness, accuracy, and usefulness in mind. However, the Hawaii Space Flight Laboratory and the Artemis team assumes no responsibility or liability for injuries or damages caused by the spacecraft. Following the User’s Manual will greatly reduce any risks of this kind. 
+
+
+Contents of this document are subject to change. Please visit the Artemis website for the latest User’s Manual. Please also check the Artemis User’s Manual with the CubeSat Kit version you own. Do not hesitate to contact Hawaii Space Flight Laboratory and the Artemis team for any questions, inquiries, and concerns you may have.
+1.2. Intended Audience
+The Artemis CubeSat Kit is intended for educators and students of the University-level. The goal of Artemis CubeSat Kit is to provide educational institutions with accessibility to a low-cost, spaceflight-ready small-satellite. The kit creates unique opportunities for educators to integrate their curriculum with hands-on project-based learning. The Artemis team created its curriculum with a purpose to enhance university-level students’ STEM and aerospace knowledge. In addition, the Artemis CubeSat is designed to be user-friendly and can be easily assembled and integrated for launch into space. After initial setup and configuration by the end-user, the CubeSat can become operational and begin performing its intended functions.
+
+
+The Artemis CubeSat Kit has the potential to reach a diverse range of audiences. For instance, Project POKE, which is geared towards middle and high school-level students, uses the Artemis CubeSat Kit as the engineering model baseline. Another example is Ke Ao, a 1U CubeSat that is being developed by Team Laniākea, an undergraduate student team at the University of Hawaii at Manoa, in collaboration with the Hawaii Space Flight Laboratory. Ke Ao also uses the Artemis CubeSat Kit as a baseline, but has a distinct mission objective of utilizing machine learning algorithms to capture images of the Hawaiian Islands from space for atmospheric observation purposes.
+1.3 Technical Support
+The foundational concepts, assembly, and integration of the Artemis CubeSat Kit is thoroughly explained in this document. However, the building of a 1U CubeSat may be complex for a new user, or one unfamiliar with the topics. If you encounter any difficulties in understanding the instructions listed in this document or have any technical questions, please do not hesitate to contact the Hawaii Space Flight Laboratory and the Artemis team for assistance. For general conceptual questions, we recommend conducting thorough research on your own and reading the associated Artemis CubeSat Kit textbook. If you are still unable to find the answers you seek, please feel free to reach out to us for further assistance.
+1.4. Acronyms
+There are several terms throughout this document that can be abbreviated for convenience and consistency. If you're looking to gain a deeper understanding of these terms, the Artemis CubeSat Kit textbook is an excellent resource to consider. Below are acronyms and its respective description that the user should familiarize themselves with:
+
+
+General Definitions
+* PCB - Printed Circuit Board
+   * A PCB is a fundamental component of most electronic devices, including the Artemis CubeSat. It serves as a platform to connect and support electronic components, such as resistors, capacitors, and integrated circuits, by routing conductive pathways through layers of non-conductive substrate material.
+   * PCBs come in various shapes and sizes, with an outer diameter (OD) representing the overall size of the board. For example, in the context of a 1U CubeSat, the PCBs have an OD of 100mm x 100mm, as specified by the CubeSat standard.
+   * PCBs can have multiple layers of conductive pathways, and each layer can be interconnected using vias or holes drilled through the board. The number of layers in a PCB depends on the complexity of the system and the number of electronic components that need to be connected. In the case of the Artemis CubeSat, its PCBs use up to 4 layers to accommodate the necessary components and routing.
+* BOM - Bill of Materials
+   * A Bill of Materials (BOM) is an essential document that enumerates all the electronic components, such as ICs, resistors, capacitors, and more, required for the construction of a PCB. Every PCB in the Artemis CubeSat Kit is accompanied by a BOM that outlines the exact quantities, values, and other crucial information about each component. The BOM serves as a reference point for PCB assembly and testing, and can be used to organize component purchases from various vendors.
+* IC - Integrated Circuit
+   * IC is often referred to as a microelectronic circuit, microchip, or chip. It is a fundamental device that is made up of several electronic circuits, which work together as a single unit. The Artemis CubeSat Kit is composed of many ICs.
+
+
+Artemis CubeSat Kit Subsystems
+* COMMs - Communications
+   * The COMMs subsystem is a vital component of the Artemis CubeSat responsible for enabling communication between the satellite and the ground station. Associated with COMMs are the Ground Support Equipment (GSE), radio, and and the radio antenna, which facilitate the transmission and reception of data and commands between the CubeSat and the ground station in space.
+* ADCS - Attitude Determination and Control System
+   * The ADCS is a significant subsystem of the Artemis CubeSat responsible for maintaining the satellite’s orientation or attitude while in space. The ADCS achieves this through a combination of sensors, actuators, and algorithms that work together to determine and regulate the CubeSat’s attitude, ensuring it remains stable and properly aligned with its designated trajectory.
+* EPS - Electrical Power System
+   * The EPS is an important subsystem of the Artemis CubeSat that comprises the power distribution unit (PDU), battery board and batteries, and solar panels and cells, all of which work together to distribute and regulate power throughout the CubeSat.
+* OBC - On-Board Computer
+   * The OBC is a critical subsystem of the Artemis CubeSat, serving as a dedicated board that includes both hardware and software components. Together, these components work in tandem to establish communication with the other subsystems within the satellite. The OBC is programmable and can be configured to monitor and control various functionalities of the small satellite mission.
+* FSW - Flight Software
+   * The FSW is a key software component of the OBC subsystem of the Artemis CubeSat. The FSW plays a vital role in the operation of the CubeSat during its mission in space. Specifically, it facilitates the movement and control of the satellite, ensuring its proper flight trajectory and functioning. As a central component of the OBC, the FSW is responsible for managing and coordinating the various subsystems of the CubeSat, including the COMMs, ADCS, and EPS, among others.
+* PLD - Payload
+   * The Payload (PLD) in the Artemis CubeSat Kit is an important component that carries out the specific mission objectives of the CubeSat. In the case of the Artemis CubeSat Kit, the PLD includes a functional camera with AI feature matching capabilities. This camera can capture images of the Earth, stars, or other objects in space, and the AI feature matching can help identify and track those objects. The PLD can be customized to suit the specific mission needs of the CubeSat, making it a crucial component for a successful space mission.
+* Structure and Mechanisms - S&M
+   * The S&M subsystem plays a critical role in the Artemis CubeSat Kit. It is responsible for designing, developing, and implementing the spacecraft structure and mechanical systems. This includes ensuring that the structure and mechanisms comply with the rigorous requirements of launch vehicles and the harsh space environment. 
+   * The S&M subsystem is also responsible for the design and deployment of the antenna mechanism. The Artemis CubeSat uses a nichrome burn wire for the antenna deployment mechanism, which is a reliable and proven method for small satellite deployments. 
+* Thermal Control System - TCS
+   * The TCS subsystem is responsible for regulating and stabilizing temperature changes within the CubeSat during orbit. This is crucial for ensuring the proper functioning of all the electronic components and systems within the CubeSat. 
+   * In the Artemis CubeSat Kit, the thermal control subsystem is implemented through the use of passive thermal control techniques such as radiation and conduction. The CubeSat's exterior is coated with a specialized material that helps to reflect heat and radiation away from the spacecraft. 
+   * Additionally, the thermal control subsystem includes temperature sensors to monitor and regulate the temperature within the CubeSat. 
+   * In addition, the TCS subsystem in the Artemis CubeSat Kit includes a Kapton Heater attached to the batteries. The Kapton Heater regulates the temperature of the batteries to ensure that they do not get too hot. This is important because if the battery temperature is not regulated, it can affect the performance and lifespan of the battery. The Kapton Heater is a thin and flexible heater made of Kapton material, which is a polyimide film known for its high temperature resistance
+Featured Elements
+* GSE - Ground Support Equipment
+   * GSE refers to the various equipment and tools required to support the operation and maintenance of a 1U CubeSat on the ground. GSE is necessary for tasks such as CubeSat integration, testing, and deployment.
+   * GSE is typically used by the ground station team, who are responsible for communicating with the CubeSat and controlling its operation while it is in orbit. Properly designed and functioning GSE is essential for ensuring that the CubeSat can be operated safely and effectively, and for maximizing the scientific or engineering return of the mission.
+* IMU - Inertial Measurement Unit [ADCS]
+   * The IMU is a crucial device within the OBC that utilizes a combination of sensors to measure and report the CubeSat's orientation, acceleration, and angular velocity. This data is essential for the proper operation of the ADCS subsystem, as it provides the necessary information for determining and maintaining the spacecraft's position and attitude in space.
+* VBATT - Battery Voltage [EPS]
+   * VBatt refers to the power provided by the lithium-ion batteries (Sanyo NCR18650GA), which are housed on the Artemis CubeSat battery board. The batteries are charged by the solar panel. VBATT has a minimum of 6 V and maximum of 7.2 V at any given time. On average, VBATT provides a constant 6.2 V to 6.8 V to the Artemis CubeSat.
+* PDU - Power Distribution Unit [EPS]
+   * The PDU is part of the EPS, and is a board in the Artemis CubeSat Kit. The PDU is responsible for regulating, controlling, and distributing power to the rest of the CubeSat. It includes key features such as a microcontroller (MCU), power buses, and switches, which enable it to take in battery power and regulate it into a suitable voltage supply line for the components.
+* MCU - Microcontroller Unit [EPS]
+   * The MCU is a crucial programmable component located on the PDU. Its primary function is to manage and regulate various circuits within the CubeSat, including communication with other PCBs, data processing, and more.
+* IBF - Insert Before Flight [EPS]
+   * The IBF circuit is a crucial component of the PDU board in a CubeSat. It enables the disconnection and reconnection of power to the satellite by means of an IBF pin. When the pin is inserted, power is supplied, and the CubeSat's electronic components are operational. Conversely, when the IBF pin is disconnected, power is cut off from the CubeSat, and its electronic components are not operational. This feature is essential for the control, testing, and integration of the small satellite before and after it is launched into space.
+* CSI - Camera Serial Interface [PLD]
+   * CSI is a protocol used for communication between a camera module and a host device. In the Artemis CubeSat, the CSI interface is used to connect the Raspberry Pi camera module payload to the OBC. The CSI interface allows for high-speed data transfer between the camera and the processing unit, enabling the capture and processing of high-resolution images or video.
+
+
+Communication Interfaces
+* GPIO - General Purpose Input Output
+   * A GPIO is a digital signal pin that can be programmed by the user. A GPIO does not have any function until it is programmed to work as instructed, such as handling input, output, or both digital signals. For example, a GPIO can be programmed to allow communication between two devices or read digital data from sensors. GPIOs are present in devices such as the MCU.
+* I2C - Inter-Integrated Circuit
+   * I2C is a type of protocol that allows communication between two or more ICs. Generally, it involves one device to act as Master and another device to act as Slave. There can only be one Master, but there can be multiple Slaves. The Master sends data to Slave. The Slave receives the data from Master, and sometimes sends back data to Master. 
+* SDA -  Serial Data Line & SCL - Serial Clock Line
+   * SDA and SCL are the lines for I2C communication. SDA allows for Master and Slave to both send and receive data. SCL carries the clock signal and can only be sent from Master to Slave. In digital circuits, clock signals are used to synchronize and coordinate actions.
+* SPI - Serial Peripheral Interface
+   * SPI is a type of communication, most commonly between microcontrollers (computer) and peripheral IC devices. Peripheral IC devices input data into the microcontroller, and receive the data output from the microcontroller.
+   * There is a SPI Master (microcontroller) and SPI Slave (peripheral IC devices). Similar to I2C, there can only be one Master, but there can be multiple Slaves. 
+   * SPI has four lines of communication:
+      * SCLK (Serial Clock) - Master sends clock signal data to Slave
+      * MOSI (Master Out Slave In) - Master sends data to Slave
+      * MISO (Master In Slave Out) - Slave sends data to Master
+      * CS or SS (Chip Select or Slave Select) - Master sends data to Slave indicating whether data was sent
+* UART - Universal Asynchronous Receiver-Transmitter
+   * UART is a type of protocol that allows direct communication between two devices. There are two lines of communication in UART: TX (Transmit) and RX (Receive).
+   * When data is transmitted from Device 1, it is sent through its TX pin and received by Device 2's RX pin. Similarly, when data is transmitted from Device 2, it is sent through its TX pin and received by Device 1's RX pin.
+   * TX converts parallel data from the controller into a serial form, and sends it to RX. RX will receive the data and convert the serial data back into the parallel data for usage.
+   * UART works differently from I2C and SPI because it does not have a clock signal for synchronization. Therefore, the transmitted and received data behave asynchronously, such that UART adds bits to the beginning and end of a packet (transmitted and received data) that tells it when to synchronize the data. UART can be programmed to work at different speeds.
+Contextual Definitions
+* KCC - Kauai Community College
+   * The Artemis CubeSat Kit is being developed with KCC serving as its ground station for the link budget. For their space missions, end users have the flexibility to choose their own ground station.
+      * What is a Link Budget?
+         * A link budget is a calculation that takes into account all of the gains and losses from the transmitter, the medium that the signal travels through (such as free space, fiber optic cable, or atmosphere), and the receiver. It is used to determine the maximum range of a communication link, or the maximum data rate that can be achieved over a given range. A link budget is an important tool for designing and optimizing communication systems.
+* CSLI - CubeSat Launch Initiative
+   * CSLI is a program run by NASA to provide opportunities for universities, non-profit organizations, and other groups to launch CubeSats into space at low cost. The Artemis CubeSat Kit was designed in accordance with CSLI guidelines, which ensures that the CubeSat meets specific size and weight requirements for launch, as well as technical specifications for communications and power systems.
+________________
+2. Introduction
+The Artemis CubeSat kit comprises three primary subsystems: Avionics, Mechanical, and Software, each carefully designed to address crucial aspects of our comprehensive system.
+
+
+Within the Avionics subsystem, focus revolves around the design, implementation, and rigorous testing of diverse electronic circuit boards residing within the CubeSat. This intricate process ensures that every individual component seamlessly integrates into the cohesive whole, harmonizing to fulfill the system's overarching objectives.
+
+
+The Mechanical subsystem takes charge of the satellite's physical structure, undertaking the crucial task of crafting a robust housing. This protective enclosure is designed to shield and contain all electronic components, meticulously considering the challenges posed by the demanding space environment.
+
+
+Meanwhile, the Software subsystem delves into the operational intricacies of the satellite, covering crucial aspects such as communication with the ground station. This subsystem acts as a vital conduit between the satellite and Earth, orchestrating seamless interaction.
+
+
+In essence, the Artemis CubeSat comprises three interwoven systems: Avionics, Mechanical, and Software. The Avionics system seamlessly integrates key subsystems such as the On-Board Computer System (OBCS), Electrical Power System (EPS), and COMMs (Communications), alongside the Thermal Control System (TCS), Attitude Determination and Control Systems (ADCS), and Payload. The Mechanical system provides a robust structural foundation for the space raft, while the Software component encompasses both the flight software executing on the satellite and the test software, ensuring comprehensive operational capabilities.
+  
+
+Fig. 2.1.a. Artemis CubeSat (no connectors)
+
+
+  
+
+
+
+Fig. 2.1.b. Artemis CubeSat (with solar panel boards mounted)
+
+
+  
+
+Fig. 2.1.c. Artemis CubeSat (Exploded View)
+
+
+
+
+  
+
+Fig. 2.1.e. Artemis CubeSat (Exploded View with Labels)
+
+
+  
+
+Fig. 2.1.f. Artemis CubeSat (Side View with Labels)
+
+
+2.1. Avionics
+
+
+The Artemis CubeSat's Avionics System serves as the central hub for the satellite's intricate operations. Comprising essential subsystems, it includes the Electrical Power System (EPS), On-Board Computer (OBC), and COMMs for communication, along with the Thermal Control System (TCS), Attitude Determination and Control Systems (ADCS), and Payload. The EPS manages power distribution, the OBC coordinates tasks, COMMs ensures communication with Earth, the TCS regulates temperature, the ADCS maintains proper orientation, and the Payload carries mission-specific instruments. This system represents a precisely crafted fusion of technologies, essential for orchestrating the CubeSat's mission in the demanding environment of space.
+
+
+2.1.1. Bill of Materials
+   * On Board Computer
+   * Power Distribution Unit
+   * Battery Board
+   * Solar Panel Board
+   * Antenna Board
+   * Payload Board[a]
+
+
+2.2. Mechanical
+
+
+The Artemis CubeSat, relies on a mechanical subsystem that serves as the backbone of its structural stability and integrity. This pivotal component plays a crucial role throughout the spacecraft's entire lifecycle, navigating through the challenges of harsh launch conditions and the demanding space environment. Tasked with the mechanical design, fabrication, and testing of the CubeSat's frame and housing, this subsystem securely houses internal components.
+
+
+Designed in adherence to the CubeSat standard of small-sized cubic units (U), with dimensions of 10x10x10 cm, the mechanical subsystem incorporates lightweight yet robust and rigid materials, optimizing the limited space available, ensuring the CubeSat's overall functionality.
+
+
+The mechanical subsystem of the Artemis CubeSat goes beyond its role in structural support; it is a key player in ensuring compliance with the specifications of the launch vehicle provider. This is particularly critical, as the CubeSat must endure violent vibrations and loads during launch without compromising the safety of the rocket or other payloads. Rigorous structural and thermal analyses, coupled with extensive testing and qualification procedures, validate the robustness of the mechanical design, guaranteeing the spacecraft's reliability under extreme conditions.
+2.3. Software
+
+
+At its core, this architecture comprises two integral components – the flight software governing the satellite's autonomous operations and the testing software that plays a pivotal role in ensuring the reliability of each subsystem. Together, these components form a cohesive system that not only orchestrates the CubeSat's functions in the vast expanse of space but also undergoes rigorous testing to guarantee its readiness for the complexities of its mission.
+
+
+The flight software emerges as the brain behind the Artemis CubeSat, imbued with the capability to manage a myriad of tasks crucial to the satellite's functioning. From data processing to communication protocols, this software optimally synchronizes the operations of the Avionics subsystem. In doing so, it not only ensures efficiency but also adapts seamlessly to the dynamic space environment.
+
+
+Concurrently, the testing software assumes a critical role during the developmental and pre-flight phases, serving as the litmus test for the CubeSat's reliability. By validating the functionality of each subsystem through a series of rigorous testing scenarios, this software system ensures that the satellite is well-prepared to confront the challenges of its mission.
+The flight software architecture of the Artemis CubeSat has been meticulously designed to efficiently handle and process the extensive data generated by the physical components of the kit. This prowess enables the flight software to collect telemetry, process data, and issue commands to control hardware components, thus facilitating a seamless and autonomous execution of the CubeSat's mission objectives.
+
+
+Delving into the intricacies of Artemis’ testing software, it offers users a valuable toolkit to explore and understand the diverse components of the CubeSat. The on-board computer (OBC) features a Teensy-driven Artemis Arduino library, complete with user-friendly code crafted for testing sensors and other embedded elements. This library, by deconstructing the flight software into individual components, empowers users to rigorously test and evaluate the functionality of different systems and elements, fostering a deeper understanding of their satellite. Facilitating this testing software is the Arduino programming language, a framework rooted in C and C++, utilizing the Arduino IDE for coding Arduino board microcontrollers.
+3. Specifications - Chris
+3.1. Testing
+3.2. Modes
+3.3. Budget[b]s
+3.4. System Diagrams
+This section of the manual describes the major systems of the Artemis CubeSat through system diagrams. A system diagram is a visual model that identifies all major system components and its interactions. For more details on each system’s functionality and implementation, please refer to the latter sections of this manual. 
+
+
+3.4.1. OBC
+  Fig. 3.4.1.a. OBC System Diagram
+
+
+3.4.2. COMMS
+
+
+  
+
+
+
+3.4.3. Electrical Power System
+  
+Fig. 3.4.3.a. Electrical Power System (EPS) System Diagram
+
+
+
+
+3.4.4. Payload
+
+
+  
+
+3.4.5. Thermal Control System
+
+
+  
+
+3.4.6. Attitude Control System
+  
+4. On Board Computer
+
+
+The On-Board Computer (OBC) of the Artemis CubeSat serves as a central nervous system, essential for the satellite's functionality. Comprising a microcontroller, microprocessor, sensors, GPS module, and radio communication module, the OBC is a versatile and adaptable component designed to facilitate effective communication among various satellite subsystems.
+Embedded within the Artemis CubeSat, the OBC is a blend of both hardware and software. Its programming enables it to monitor the satellite's health and regulate mission-critical functionalities. Equipped with general-purpose features, it allows end-users immediate deployment while offering the flexibility for redesign and reprogramming to suit specific mission requirements.
+Functionally, the OBC is the linchpin connecting sensor- and data-related components within the Artemis CubeSat. Current and temperature sensors provide essential data on voltage flow and temperature, while programmable devices, including the Teensy 4.1, Raspberry Pi Zero, flight GPS, IMU, and modular radio, enable control over the satellite's actions and behaviors.
+The Teensy 4.1, which collects data and communicates commands to the Power Distribution Unit (PDU) microcontroller. This communication stream facilitates the seamless activation or deactivation of various components, demonstrating the OBC's crucial role in managing the satellite's operations.
+
+
+4.1 Microcontroller: 
+4.1.1 Teensy 4.1
+
+
+The Teensy 4.1 is a powerful and compact microcontroller board designed for those seeking high-performance capabilities in a small form factor. Developed by PJRC, the Teensy 4.1 builds upon the success of its predecessors, offering a significant upgrade in terms of processing power and features.
+
+
+At the heart of the Teensy 4.1 is a 600 MHz ARM Cortex-M7 processor, providing a substantial boost in computational capabilities compared to earlier models. This increased clock speed opens up a wide range of possibilities for demanding applications, making it suitable for embedded system projects. 
+
+
+With a generous amount of RAM (8 MB) and Flash memory (2 MB), the Teensy 4.1 provides ample space for storing code and handling data-intensive tasks. The board also boasts a variety of connectivity options, including USB, I2C, SPI, and multiple serial ports, allowing for seamless integration with a plethora of sensors, displays, and other peripherals.
+
+
+One standout feature of the Teensy 4.1 is its compatibility with the Arduino development environment, making it accessible to a broad community of developers familiar with Arduino programming. Additionally, its compact size, measuring just 2.4 x 0.7 inches, makes it suitable for projects with space constraints.
+
+
+Function: Integrated Spacecraft Controller. Low power mode microcontroller. Collects data from all sensors and controls almost all aspects of the satellite. 
+
+
+
+
+Pin
+	Connection
+	Description
+	Pin 
+	
+
+	Description
+	GND
+	GND
+	GND - Ground
+	Vin
+	5V_BUS
+	PDU’s 5V Power Line (5V Bus) 
+	0
+	UART4_RXD
+	PDU UART_2 RX
+	GND
+	GND
+	GND - Ground
+	1
+	UART4_TXD
+	PDU UART_2 TX
+	3V3
+	+3V3_VCC
+	3V3
+	2
+	T_GPIO2
+	Teensy GPIO 2
+	23
+	AIN6
+	Solar Input 4 Temperature Sensor
+	3
+	T_GPIO3
+	Teensy GPIO 3
+	22
+	AIN5
+	Solar Input 3 Temperature Sensor
+	4
+	T_GPIO4
+	Teensy GPIO 4
+	21
+	AIN4
+	Solar Input 2 Temperature Sensor
+	5
+	T_GPIO5
+	Teensy GPIO 5
+	20
+	AIN3
+	Solar Input 1 Temperature Sensor
+	6
+	T_GPIO6
+	Teensy GPIO 6
+	19
+	I2C2_SCL
+	IMU I2C SCL
+	7
+	RADIO_RESET
+	Modular Radio Reset GPIO
+	18
+	I2C2_SDA
+	IMU I2C SDA
+	8
+	DIO0
+	Modular Radio DIO0
+	17
+	SCL1_I2C
+	Raspberry Pi I2C SDA
+	9
+	NC
+	No Connection
+	16
+	SDA1_I2C
+	Raspberry Pi I2C SCL
+	10
+	T_CS
+	Teensy Chip Select
+	15
+	AIN1
+	PDU Temperature Sensor
+	11
+	SPI0_MOSI
+	Raspberry Pi SPI MOSI
+	14
+	AIN0
+	OBC Temperature Sensor
+	12
+	SPI0_MISO
+	Raspberry Pi SPI MISO
+	13
+	SPI0_SCLK
+	Raspberry Pi SPI SCLK
+	3V3
+	+3V3_VCC
+	3V3
+	GND
+	GND
+	GND - Ground
+	24
+	I2C1_SCL
+	Teensy I2C Bus SCL
+	41
+	AIN2
+	PyCubed Battery Board Temperature Sensor
+	25
+	I2C1_SDA
+	Teensy I2C Bus SDA
+	40
+	NC
+	No Connection
+	26
+	SPI1_D1
+	Modular Radio SPI D1
+	39
+	SPI1_D0
+	Modular Radio SPI  D0
+	27
+	SPI1_SCLK
+	Modular Radio SPI SCLK
+	38
+	SPI1_CS1
+	Modular Radio SPI CS1
+	28
+	UART5_TXD
+	GPS UART TX
+	37
+	NC
+	No Connection
+	29
+	UART5_RXD
+	GPS UART RX
+	36
+	RPI_ENABLE
+	Raspberry Pi Enable GPIO
+	30
+	NC
+	No Connection
+	35
+	UART2_TXD
+	External UART TX (Breakout)
+	31
+	NC
+	No Connection
+	34
+	UART2_RXD
+	External UART RX (Breakout)
+	32
+	NC
+	No Connection
+	33
+	GPS RSTN
+	GPS RSTN GPIO
+	Teensy 4.1 Pin Configuration
+
+  
+
+4.2 Payload Computer:
+4.2.1 Raspberry Pi Zero W
+
+
+The Raspberry Pi Zero W is a compact and versatile single-board computer that has gained widespread popularity for its small form factor and impressive capabilities. Designed by the Raspberry Pi Foundation, the Zero W offers a cost-effective solution for various projects.
+
+
+At the core of the Raspberry Pi Zero W is a Broadcom BCM2835 SoC with a single-core ARM1176JZF-S CPU running at 1 GHz. Despite its modest processing power compared to more advanced models in the Raspberry Pi lineup, the Zero W is well-suited for a variety of tasks. One of the standout features of the Zero W is its wireless connectivity. The "W" in its name stands for wireless, and it comes equipped with built-in Wi-Fi (802.11n) and Bluetooth 4.0, providing seamless connectivity for IoT projects, home automation, and other wireless applications.
+
+
+The board is remarkably compact, measuring just 2.6 x 1.2 inches, making it ideal for projects with limited space. Despite its size, the Raspberry Pi Zero W retains many of the capabilities of its larger counterparts, including a mini HDMI port for video output, a micro-USB port for power and data, a micro-SD card slot for storage, and a 40-pin GPIO header for interfacing with external devices.
+
+
+The Raspberry Pi Zero W is compatible with the extensive Raspberry Pi ecosystem, including the Raspbian operating system and a vast array of software and hardware peripherals. 
+
+
+Function: High processing power computer, used to interface with the Raspberry Pi Camera and end-user payloads
+
+
+
+
+1
+	
+
+	RPI 5V PWR In
+	2
+	3
+	SDA1 I2C
+	
+
+	4
+	5
+	SCL1 I2C
+	
+
+	6
+	7
+	
+
+	UART6 RX
+	8
+	9
+	
+
+	UART6 TX
+	10
+	11
+	GPIO17
+	
+
+	12
+	13
+	GPIO27
+	
+
+	14
+	15
+	GPIO22
+	GPIO23
+	16
+	17
+	
+
+	GPIO24
+	18
+	19
+	SPIO MOSI
+	
+
+	20
+	21
+	SPIO MISO
+	GPIO25
+	22
+	23
+	SPIO SCLK
+	SPIO CEO N
+	24
+	25
+	
+
+	SPIO CE1 N
+	26
+	27
+	
+
+	
+
+	28
+	29
+	
+
+	
+
+	30
+	31
+	
+
+	
+
+	32
+	33
+	
+
+	
+
+	34
+	35
+	
+
+	
+
+	36
+	37
+	
+
+	
+
+	38
+	39
+	GND
+	
+
+	40
+	         Raspberry Pi W Pin Configuration 
+
+
+
+
+  
+
+4.3 Sensors and Modules:
+4.3.1 Adafruit LSM6DS33 + LIS3MDL - 9-DoF IMU with Accel / Gyro / Mag
+This is a 9 Degrees of Freedom (DoF) Inertial Measurement Unit (IMU) that includes an accelerometer, a gyroscope, and a magnetometer. This sensor is crucial for the satellite's attitude determination system.
+
+
+Artemis CubeSat specifics: Powered by Teensy 3V3 and communicates via I2C communication with Teensy.
+
+
+Key Specifications:
+   * Accelerometer Full Scale: ±2/±4/±8/±16 g
+   * Gyroscope Full Scale: ±125/±250/±500/±1000/±2000 dps
+   * Magnetometer Full Scale: ±4/±8/±12/±16 gauss
+   * Operating Voltage: 1.71 V to 3.6 V
+
+
+
+
+  
+
+
+
+4.3.1 Adafruit Mini GPS PA1010D Module
+The Adafruit Mini GPS PA1010D module is a compact and highly sensitive GPS unit that allows the satellite to determine its position in orbit with high accuracy.
+
+
+Artemis Cubesat specifics: 
+   * Non flight GPS 
+   * COCOM Restricted: GPS Disabled if traveling faster than 1200 mph or higher than 65,000 feet 
+   * Powered by Teensy 3V3
+   * UART communication with Teensy
+
+
+Key Specifications:
+   * Receiver Type: 72-channel u-blox M8 engine
+   * Navigation Update Rate: up to 10 Hz
+   * Horizontal Position Accuracy: 2.5m CEP
+   * Operating Voltage: 3.0 - 5.5V
+  
+
+4.3.2 Orion A38L GPS
+The Orion A38L is a highly compact, low-power GPS module designed for small satellites. It can provide reliable positioning data in a variety of conditions.
+
+
+Artemis CubeSat specifics: 
+   * Not COCOM Restricted
+   * Powered by Teensy 3V3
+   * UART communication with Teensy
+   * GPS utilizes Serial7 on the Teensy
+   * RXD0 (pin 42): UART input
+   * Connected to pin 29 on the Teensy
+   * TXD0 (pin 44): UART output
+   * Connected to pin 28 on the Teensy
+
+
+Key Specifications:
+   * Channels: 72
+   * Sensitivity: -167 dBm
+   * Horizontal Position Accuracy: 2.0 m CEP
+   * Time to First Fix: Cold starts: 26s
+   * Operating Voltage: 3.0 - 4.2V
+
+
+Functional Flow:
+   1. Startup
+   * When the CubeSat powers on, Pin 18 supplies regulated 3.3V from the EPS.
+   * Pin 2 (VBATT) is already powered by the Teensy, preserving RTC and SRAM.
+   * If VBATT retains the previous state, the GPS performs a hot start (faster fix).
+   * If VBATT was unpowered, it performs a cold start (slower fix).
+   2. Reset Logic
+   * Pin 1 (RSTN) is controlled by Teensy GPIO 33.
+   * If needed, the Teensy can pull this pin low to reset the GPS module.
+   * Useful for watchdog recovery or reinitialization during flight.
+   3. Signal Acquisition
+   * Pin 32 (ANT_ receives GNSS signals via an external antenna connected through an MCX cable. 
+   * The Orion A39L internally amplifies and filters these signals, then begins satellite acquisition and tracking.
+   * Once locked it calculates position, velocity, and time using onboard algorithms.
+   4. Data Transmission
+   * Pin 44 (TXDO) sends GNSS data to Teensy via UART5_RX (Pin 29).
+   * Pin 42 (RXD0) received configuration commands from Teensy via UART5_TX (Pin 28).
+   * Data includes position (latitude, longitude, altitude), velocity (speed, heading), time (UTC, fix timestamp)
+   * Teensy parses this data and can log it.
+
+
+
+
+
+
+4.3.3 TMP36FSZ Temperature Sensor
+The TMP36FSZ is a low voltage, precision centigrade temperature sensor. It provides a voltage output that is linearly proportional to the Celsius temperature.
+
+
+Key Specifications:
+   * Accuracy: ±1°C at 25°C
+   * Scale Factor: 10 mV/°C
+   * Operating Voltage: 2.7 V to 5.5 V
+
+
+  
+
+
+
+The temperature sensor is powered by the PDU’s 3V3 BUS, which is connected to the OBC via the PC 104 Header. There are several temperature sensors throughout the Artemis CubeSat:
+   * 1 on the OBC (AIN0 - Analog Input 0)
+   * 1 on the PDU (AIN1 - Analog Input 1)
+   * 1 on the Battery Board (AIN2 - Analog Input 2)
+   * 4 on the Solar Panel Boards (AIN3 to AIN6 - Analog Input 3 to 6)
+   * 1 on each Solar Panel Board
+
+
+Pin
+	Signal
+	Description
+	1
+	VOUT
+	Voltage Out
+	2
+	NC
+	No Connection
+	3
+	NC
+	No Connection
+	4
+	GND
+	Ground
+	5
+	+3V3_VCC
+	3V3 Bus from PDU
+	6
+	NC
+	No Connection
+	7
+	NC
+	No Connection
+	8
+	+3V3_VCC
+	3V3 Bus from PDU
+	
+
+4.3.4 Hope RF RFM23BPS Radio
+The Hope RF RFM23BPS is a high power, highly flexible, highly integrated, low cost wireless ISM RF transceiver module. This module ensures extended range and improved link performance, making it ideal for satellite communication. The RFM23BPS is a high power, modular radio intended for spaceflight on the Artemis CubeSat Kit. The RFM23BPS radio transmits in either FSK, GFSK, or OOK; we intend to transmit in either FSK or GFSK.  Transmission up to 125kbs is possible with the RFM23BPS, however, we intend to transmit at 2kbs to ensure transmission reliability. The Artemis team chose the RFM23BPS radio because it can transmit at +30dBm (1W) and because it uses the non-proprietary GFSK modulation scheme. The RFM23BPS is controlled by the Teensy 4.1 through Serial Peripheral Interface (SPI). The radio software is powered by RadioHead library, and comes included with the teensyduino package. 
+
+
+Key Specifications:
+   * Frequency Range: 433/868/915MHz ISM bands
+   * Sensitivity: –120 dBm
+   * Output power: +30 dBm Max
+   * Low Power Consumption: 25 mA receive, 550 mA @ +30 dBm transmit
+   * Data Rate: 0.123 to 256 kbps
+   * Modulation: FSK, GFSK, and OOK
+   * Power Supply: 3.3 to 6 V
+   * Temperature Range: –40 to +85 °C
+   * Features: Digital RSSI, Wake-up timer, Auto-frequency calibration (AFC), Power-on-reset (POR), Antenna diversity and TR switch control, Configurable packet handler, Preamble detector, TX and RX 64 byte FIFOs, Low battery detector, Temperature sensor and 8-bit ADC, Integrated voltage regulators, Frequency hopping capability, On-chip crystal tuning​.
+
+
+The RFM23BPS radio requires three fundamental components for its operation: a power supply, a digital connection to a controller like the Teensy 4.1, and an antenna.
+
+
+The power requirements are straightforward, requiring both a hot feed of 3.3V or 5V and a grounding connection. This supplies the energy that the radio needs to carry out its functions.
+The second requirement is a digital communication line to a controller, which is achieved through a SPI (Serial Peripheral Interface) connection to a Teensy 4.1. This interface typically incorporates four connections - the serial data in, serial data out, clock, and chip select. However, in the case of the RFM23 radio, an additional four digital pins are utilized, totalling eight pins for the connection. These include the interrupt, radio reset, TXon, and RXon pins. Of these, the interrupt pin is crucial, for without it, the radio is incapable of receiving messages.
+
+
+OBC version 4.24 pinouts 
+	
+
+	Teensy 
+	RFM23BPS
+	GND 
+	GND
+	26
+	SDI (serial data in == MOSI)
+	27
+	SCK (clock) 
+	30
+	RX_ON (must be low in RX mode and high in TX mode) 
+	31
+	TX_ON
+	32
+	GPIO_0 (labeled SDN on Eagle) 
+	37
+	SDN 
+	38
+	NSEL 
+	39
+	SDO (serial data out == MISO) 
+	40
+	NIRQ (interrupt) 
+	No connection
+	Ant (must be connected to even a makeshift antenna) 
+	
+
+
+
+The routing configuration for the RFM23 and RFM69 radios is illustrated in the accompanying diagram. The blue squares denote the solder pads, interconnected by the blue lines symbolizing the routes. The position for the RFM69HCW is indicated by the red square, whereas the purple square represents the location for the RFM23BPS.
+
+
+For RFM23BPS modules: The TX_ON and RX_ON pins control the radio’s power amplifiers and must be set manually in your driver code:
+        •        To transmit: Set TX_ON = LOW, RX_ON = HIGH
+        •        To receive: Set TX_ON = HIGH, RX_ON = LOW
+These pins use active-low logic—setting a pin LOW turns that amplifier ON. Failure to configure these pins will result in severely degraded performance.​​​​​​​​​​​​​​​​
+
+
+A noteworthy detail is that both radios share the rightmost set of solder pads, implying that only one radio can be mounted on the board at any given moment. The shared solder pads also mean the power pad remains the same for both radios, leading to a bit of a conundrum.
+The RFM23BPS operates at 5V to transmit at full power, although it can also function at a reduced transmission power level using 3V3. In contrast, the RFM69HCW exclusively operates on 3V3. Per the manufacturer's datasheet, exposing the RFM69HCW to 5V can cause irreversible damage.
+
+
+To circumvent this power supply issue, we've integrated resistors, indicated by the red circle, to provide a versatile solution. These resistors allow the user to select the appropriate power supply for the radio, thereby catering to both potential requirements. However, it's crucial to avoid populating both simultaneously as it would inadvertently connect a 5V power supply to a 3V3 power supply, creating a problematic scenario.
+
+
+In the OBC version 4.24, two zero-ohm resistors establish a connection between the radio and either the 3.3V switch or the 3.3V bus. However, it's worth noting that the labeling on the board itself is misleading. Specifically, in the OBC version 4.24, the resistor denoted as 5V is, in fact, the 3V3 switch 2. The resistor for the 3V3 bus, thankfully, carries the correct label.
+
+
+
+
+For OBC Version 4.23, there is a hardware issue where the 5V bus is not connected at all. We can confirm the 3V3 bus works to turn on the radio. The RFM23BPS will operate safely at 3.3 V, but its Power Amplifier output falls from +30 dBm to roughly +17–20 dBm (50–100 mW), so you’ll lose range compared to a 5 V supply. For in-room bench testing over a few meters, that reduced power is still more than sufficient if you maintain proper antenna spacing, common grounding, and a stable 3.3 V regulator. 
+
+
+We recommend employing the 3V3 switch to power the radio, as this facilitates manual resets during flight. It's important for users to keep in mind that when the kit is activated, 3V3 switch 2 might require manual activation via the pdu_comm program in the Artemis-Cubesat Arduino Library. This is a crucial step to ensure the efficient operation of the system.
+
+
+If testing the radio via the artemis-cubesat examples of radio_receive_test.ino/radio_send_test.ino ensure that ANTJ15 is plugged into the OBC J12 so that the radio is properly initialized. 
+
+
+
+
+  
+
+sz
+5. Electrical Power System
+
+
+The Electrical Power System (EPS) serves as a critical foundation within the Artemis CubeSat, seamlessly integrating essential components to efficiently manage and regulate power throughout its operation in orbit. Comprising the Power Distribution Unit (PDU), Batteries with their dedicated battery board, and Solar Panels with multiple solar cells, the EPS is designed to generate, store, and distribute power to various subsystems within the CubeSat.
+
+
+At the heart of the EPS lies the Power Distribution Unit (PDU), a key orchestrator responsible for redirecting and utilizing VBattery (VBATT). The Batteries and Battery Board, featuring Sanyo NCR18650GA batteries as the primary power source in the form of VBATT, play a central role in supplying power to the CubeSat during its orbit. Simultaneously, the Solar Panels harness electromagnetic radiation from the sun, converting it into electrical energy through their solar cells. This energy is then utilized to recharge the batteries, ensuring a continuous and reliable power supply.
+
+
+In orbit, the batteries take center stage, delivering VBATT to power the CubeSat, while the PDU efficiently manages the distribution of this power across diverse systems within the satellite. The Solar Panels, with their adept solar cells, contribute to the rejuvenation of the batteries by converting solar energy into electrical energy during the satellite's journey through space.
+The cohesive functioning of these EPS components exemplifies meticulous design and integration, forming vital working circuits that collaboratively contribute to the overall functionality of the Artemis CubeSat. In essence, the Electrical Power System stands as a testament to precision engineering, ensuring an uninterrupted power supply for the successful execution of the CubeSat's mission.
+
+
+5.1. PDU
+
+
+The PDU is responsible for the regulation, control, and distribution of power within the CubeSat. The PDU not only interacts with and establishes connections to other subsystems, but it allows the subsystems to remain powered and functional. The PDU has the most amount of components compared to the rest of the Artemis CubeSat’s PCBs, thus making it one of the most complex subsystems. In the following sections, the components of the PDU, organized by category of its type, are explored.
+5.1.1. PC104 Header
+
+
+The function of the PC104 Header is to connect power and communication lines to other boards in Artemis CubeSat that also have a PC 104 Header. For instance, the Teensy 4.1 on the OBC has a I2C connection that the PDU uses. In order for the OBC and PDU board to share the I2C connection, a PC 104 Header is used. Each PC 104 Header consists of 2 headers, and 52 pins per header. The notation is HX-YZ, where X is the header number (either 1 or 2) and YZ is the pin number (from 1 to 52). The name of a connection may differ depending on the board. However, the connections are one and the same. For example, OBC PC 104 Header H1-1 (Header 1, Pin 1) is connected to UART4_RXD whereas the PDU PC 104 Header H1-1 is connected to UART2_RXD. These connections have different names but are the same lines.
+
+
+​​  
+All of the PC 104 Header connections in the Artemis CubeSat Kit can be found here. Fig. 5.1.1.2. shows the PC 104 Header Connections and its respective header and pin. 
+
+
+  
+
+
+
+  
+
+
+
+Fig. 5.1.1.2. Artemis CubeSat Kit V2 - PC 104 Header Connections.
+
+5.1.2 Connectors
+
+
+The function of the connectors is to connect power and communication lines to external components in the Artemis CubeSat, or those that do not have PC 104 Headers. For instance, the Antenna, Battery Board, and Solar Panel Boards do not have a PC 104 Header so Molex Connectors are used. The major connector devices used are Molex Connectors, which provide pin and socket interconnection. A wire is attached to the soldered Molex Connector on the PCB and the external source, which creates a link between the two. The four main connectors used in the PDU are:
+
+
+   * 503763-0291: 2-Pin Molex Connector
+   * 503763-0491: 4-Pin Molex Connector
+   * 503763-0591: 5-Pin Molex Connector
+   * 503763-0691: 6-Pin Molex Connector
+
+
+Other connectors include a USB-C Connector and MicroSD Card Connector, both of which are for the end-user. More information on these connectors can be found in Section 5.1.2.6. and Section 5.1.2.7, respectively. 
+In the following subsections, the following is used as a brief summary of its passage:
+   * PCB Board’s X-Pin Molex Connector x(Amount of Connectors) (Name of Connectors on PCB Board) →  External Source’s X-Pin Molex Connector x(Amount of Connectors) (Name of Connectors on External Source)
+5.1.2.1 PyCubed Battery Board Power Connectors 
+
+
+Two 2-Pin Molex Connectors (503763-0291) are used for the PyCubed Battery Board Power Connectors. The first 2-Pin Molex Connector connects to the PyCubed Battery Board’s VBattery, while the second connects to the PyCubed Battery Board’s VBattery Charge. Recall that VBattery is the power provided by the Samsung 35E 18650 Battery, and VBattery Charge refers to the Solar Panel power that is used to recharge VBatt. More information on the PyCubed Battery Board system can be found in Section 5.2.
+
+
+   * PDUs 2-Pin Molex Connector x2 (J16, J17) → PyCubed Battery Board’s 4-Pin Molex Connector x1 (J9)
+   * Connect PDUs J16 to PyCubed Battery Board’s J9
+
+
+Pin
+	Signal
+	Description
+	1
+	PY_VBATT
+	Voltage from PyCubed Battery Board
+	2
+	GND
+	Ground
+	Table 5.1.2.1.a. PDUs J16 Pin Configuration
+
+
+Pin
+	Signal
+	Description
+	1
+	PACK+
+	Voltage from PyCubed Battery Board (Positive)
+	2
+	PACK-
+	Voltage from PyCubed Battery Board (Negative)
+	3
+	PACK+
+	Voltage from PyCubed Battery Board (Positive)
+	4
+	PACK-
+	Voltage from PyCubed Battery Board (Negative)
+	Table 5.1.2.1.b. PyCubed Battery Board’s J9 Pin Configuration
+
+
+   * Connect PDUs J17 to PyCubed Battery Board’s J9 (See Table 5.1.2.2.)
+
+
+Pin
+	Signal
+	Description
+	1
+	BATT_CHRG
+	Power to Charge Batteries
+	2
+	GND
+	Ground
+	Table 5.1.2.1.c. PDUs J17 Pin Configuration
+5.1.2.2. Solar Panel Connectors
+
+
+Six 2-Pin Molex Connectors (503763-0291) are used for the Solar Panel Connectors. Four of the 2-Pin Molex Connectors connect to each Solar Panel Board’s Solar Power Input. There are four solar panel boards, so each solar power input represents each face. The other two 2-Pin Molex Connectors are used for easier end-user accessibility. More information on the Solar Panel Board system can be found in Section 5.3.
+
+
+   * PDUs 2-Pin Molex Connector x6 (J1, J2, J3, J4, J5, J6)  → Solar Panel Board x4 4-Pin Molex Connector x1 (J2) 
+   * Connect PDUs J1-J4 to each Solar Panel Board’s J2 (4-Pin Molex Connector)
+
+
+Pin
+	Signal
+	Description
+	1
+	SOLAR_IN
+	Solar Power Input
+	2
+	GND
+	Ground
+	Table 5.1.2.2.a. PDUs J1-J4 Pin Configuration
+
+
+Pin
+	Signal
+	Description
+	1
+	VCC
+	Solar Power Input
+	2
+	VCC
+	Solar Power Input
+	3
+	GND
+	Ground
+	4
+	GND
+	Ground
+	Table 5.1.2.2.b. Solar Panel Board 1-4’s J2 Pin Configuration
+5.1.2.3. Breakout Power Connector
+
+
+One 4-Pin Molex Connector (503763-0491) is used for the Breakout Power Connectors. The Breakout Power Connector is for end-user use. It includes 3V3 power line from the PDUs 3V3 Switch #1 and the 5V power line from the PDUs 5V Switch #3.
+
+
+   * PDUs 4-Pin Molex Connector x1 (J9) → PDUs 3V3 Switch #1 and PDUs 5V Switch #3 (for End-User)
+
+
+Pin
+	Signal
+	Description
+	1
+	SW_3V3_1
+	3V3 switch 1
+	2
+	GND
+	Ground
+	3
+	SW_5V_3
+	5V switch 3
+	4
+	GND
+	Ground
+	Table 5.1.2.3.a. PDUs J9 Pin Configuration
+5.1.2.4. JTAG Connector
+
+
+One 6-Pin Molex Connector (503763-0691) is used for the JTAG Connector. JTAG is a useful hardware tool that allows for computer and ICs communication. The JTAG Connector is used for programming and debugging the PDUs microprocessor (U14). Once programmed, the lines of the JTAG Connector are connected to the Antenna Board, where it controls certain aspects and actions of the Antenna. Serial Wire Clock (SWCLK) is interchangeable with JTAG’s Test Clock (TCK), which synchronizes the internal state of the machine. Serial Wire Data I/O (SWDIO) is interchangeable with Test Mode Select (TMS), which samples the data signal to determine the next state. More information on programming the JTAG via J-Link can be found in Section 8.4.5.1.[c]
+
+
+   * PDUs 6-Pin Molex Connector x1 (J27) → Antenna Board’s VRTREF (3V3 Bus), JTAG’s TMS (SWDIO), JTAG’s TCK (SWCLK) lines 
+
+
+Pin
+	Signal
+	Description
+	1
+	BUS_3V3
+	3V3 Bus
+	2
+	GND
+	Ground
+	3
+	SWDIO
+	Serial Wire Data I/O (JTAG’s TMS)
+	4
+	SWCLK
+	Serial Wire Clock (JTAG’s TCK)
+	5
+	GND
+	Ground
+	6
+	Reset
+	PDU Microprocessor and WatchDog Timer’s Programmable Reset
+	Table 5.1.2.4.a. PDUs J27 Pin Configuration
+
+
+Pin
+	Signal
+	Description
+	1
+	GND
+	Ground
+	2
+	TCK
+	Test Clock (SWCLK)
+	3
+	TMS
+	Test Mode Select (SWDIO)
+	4
+	VRTREF
+	3V3 Power or VCC
+	Table 5.1.2.4.b. Antenna Board’s J6 Pin Configuration
+5.1.2.5. Kapton Heater Connector 
+
+
+One 68016-202HLF is used for the Kapton Heater Connector. The Kapton Heater, also known as the polyimide heater, is useful in aerospace environments due to its precise heating distribution, strength, and ability to conform onto the surface of the PCB without changing shape when subject to rapid temperature changes. The Kapton Heater is attached to 68016-202HLF on the PDU, which is connected to PDUs 5V Switch #2. This means that the Kapton Heater utilizes the 5V power line. The Kapton Heater Tape is strapped to the batteries on the PyCubed Battery Board to maintain voltage in extreme heat environments. More information on the Kapton Heater can be found in Section 7.10.
+
+
+   * PDUs 68016-202HLF x1 (J28) → Kapton Tape Heater is strapped to PyCubed Battery Board’s Batteries 
+
+
+Pin
+	Signal
+	Description
+	1
+	SW_5V_2
+	5V Switch #2
+	2
+	GND
+	Ground
+	Table 5.1.2.5.a. PDUs J28 Pin Configuration
+5.1.2.6. USB-C Connector
+
+
+One USB-C Receptacle Connector (UJ31-CH-G1-SMT-TR) is used for the USB-C Connector. The USB-C Connector is connected to the USB (Universal Serial Bus) and contains UART lines. Its purpose is to enable UART programming for the end-user via USB. Additionally, the end-user can change the design to implement any needs that require the USB-C.
+   * PDU’s UJ31-CH-G1-SMT-TR x1 (J11) → USB (Computer or other source)
+
+
+Pin
+	Signal
+	Description
+	1
+	GND
+	Ground
+	2
+	UART2_RXD
+	Uart 2 Receive (UART)
+	3
+	NC
+	No Connect
+	4
+	VBUS
+	Voltage Bus
+	5
+	USB_CC1
+	USB Configuration Channel 1
+	6
+	USB_D+
+	USB Data +
+	7
+	USB_D-
+	USB Data -
+	8
+	NC
+	No Connect
+	9
+	VBUS
+	Voltage Bus
+	10
+	NC
+	No Connect
+	11
+	UART2_TXD
+	Uart 2 Transmit (UART)
+	12
+	GND
+	Ground
+	Table 5.1.2.6.a. PDUs J11 Pin Configuration
+5.1.2.7. MicroSD Connector
+
+
+One MicroSD Memory Card Connector (503182-1852) is used for the MicroSD Connector. A MicroSD memory card can be inserted into the MicroSD Connector slot for end-user programming and storing additional amounts of information. The MicroSD Connector has SD SPI lines, which can be programmed by the microprocessor by the end-user.
+
+
+   * PDUs Molex 503182-1852 x1 (J20) → MicroSD Card 
+
+
+Pin
+	Signal
+	Description
+	1
+	NC
+	No Connect
+	2
+	SD_CS
+	SD Chip Select (SPI)
+	3
+	SD_MOSI
+	SD Master Out Slave In (SPI)
+	4
+	BUS_3V3
+	3V3 Bus
+	5
+	SD_SCK
+	SD Serial Clock (SPI)
+	6
+	GND
+	Ground
+	7
+	SD_MISO
+	SD Multiple Input Single Output (SPI)
+	8
+	NC
+	No Connect
+	Table 5.1.2.7.a. PDUs J20 Pin Configuration
+5.1.2.8. USB Charge Connector
+
+
+One 2-Pin Molex Connector (503763-0291) is used for the USB Charge Connector. The USB Charge Connector is connected to the Antenna Board’s VCC_BATT. The purpose of the USB Charge is to allow the end-user to charge the Artemis CubeSat via USB from a computer. The power supplied is 5V. The end-user may also change the design to implement any needs that require a USB charge line.
+
+
+   * PDUs 2-Pin Molex Connector x1 (J12) → Antenna Board’s 2-Pin Molex Connector x1 (J8) 
+
+
+Pin
+	Signal
+	Description
+	1
+	5V_USB_CHRG
+	5V USB Charge
+	2
+	GND
+	Ground
+	Table 5.1.2.8.a. PDUs J12 Pin Configuration
+
+
+Pin
+	Signal
+	Description
+	1
+	GND
+	Ground
+	2
+	VCC_BATT
+	5V 
+	Table 5.1.2.8.b. Antenna Board’s J8 Pin Configuration
+
+
+5.1.2.9. Analog Temperature Sensor (Battery Board) Connector
+
+
+One 2-Pin Molex Connector (503763-0291) is used for the Analog Temperature Sensor (Battery Board) Connector. The Analog Temperature Sensor on the Battery Board (U2) has Analog Input 2 (AIN2) that is connected to Battery Board’s 2-Pin Molex Connector (J11), which is then connected to the PDU via the 2-Pin Molex Connector (J19) and OBC Teensy’s Pin 41 via PC 104 Header (H1-4), respectively. More information on the Analog Temperature Sensor (Battery Board) can be found in Section 5.2.3.
+
+
+   * PDUs 2-Pin Molex Connector x1 (J19) → Battery Board’s 2-Pin Molex Connector x1 (J11) → OBC Teensy’s Pin 41 via PC 104 Header (H1-4)
+
+
+Pin
+	Signal
+	Description
+	1
+	BUS_3V3
+	3V3 Bus
+	2
+	AIN2
+	Analog Input 2
+	Table 5.1.2.9.a. PDUs J19 Pin Configuration
+
+
+
+
+Pin
+	Signal
+	Description
+	1
+	AIN2
+	Analog Input 2
+	2
+	VS
+	3V3 Voltage Source
+	Table 5.1.2.9.b. Battery Board’s J11 Pin Configuration
+5.1.2.10. Analog Temperature Sensor (Solar Panel Board) Connectors
+
+
+Four 2-Pin Molex Connectors (503763-0291) are used for the Analog Temperature Sensor (Solar Panel Board) Connector. The Analog Temperature Sensor on the Solar Panel Board (U2) has Analog Input X (AINX), where X is 3-6, which is connected to each Solar Panel Board’s 2-Pin Molex Connector (J3). Recall there are 4 Solar Panel Boards. Then, J3 is connected to PDUs 2-Pin Molex Connectors (J22, J23, J24, J25), which is then connected to the OBC Teensy’s Pins 20-23 via PC 104 Header (H1-5 to H1-8), respectively. More information on the Analog Temperature Sensor (Solar Panel Board) can be found in Section 5.3.4.
+
+
+   * Each Solar Panel Board’s 2 Pin Molex Connector (J3) → PDUs 2 Pin Molex Connector (J22, J23, J24, J25) → OBC Teensy’s Pins 20-23 via PC 104 Header (H1-5 to H1-8)
+   * AIN3 - J22, located at Upper Left - Top Side of PDU Board
+   * AIN4 - J23, located at Lower Right - Bottom Side of PDU Board
+   * AIN5 - J24, located at Lower Left - Top Side of PDU Board
+   * AIN6 - J25, located at Upper Right - Top Side of PDU Board)
+
+
+Pin
+	Signal
+	Description
+	1
+	BUS_3V3
+	3V3 Bus
+	2
+	AINX
+	Analog Input X
+	Table 5.1.2.10.a. PDUs J22 - J25 Pin Configuration
+
+
+Pin
+	Signal
+	Description
+	1
+	VS+
+	3V3 Voltage Source
+	2
+	VOUT
+	VOUT corresponds to Analog Input X (AINX) for each Solar Panel Face 
+	Table 5.1.2.10.b. Each Solar Panel Board’s J3 Pin Configuration
+5.1.2.11. H-Bridges Connectors
+
+
+Two 4-Pin Molex Connectors (503763-0491) are used for the H-Bridges Connector. Each 4-Pin Molex Connector is connected to H-Bridge Device 1 and 2 (U1, U2), respectively. The output of the H-Bridges are shown in Tables 5.1.2.11.a. and 5.1.2.11.b. These outputs are the input to the Solar Panel Board’s torque coils. Recall there are four solar panel boards used in the Artemis CubeSat Kit. More information on the H-Bridge can be found in Section 5.1.4.
+
+
+   * PDUs 4-Pin Molex Connector x2 (J7, J8) → Each Solar Panel Board’s 2-Pin Molex Connector x1 (J1)
+
+
+Pin
+	Signal
+	Description
+	1
+	TORQUE1_1A
+	Output of H-Bridge Device 1 (U1). 5V torque coil input to Solar Panel Board 1.
+	2
+	TORQUE2_1B
+	Output of H-Bridge Device 1 (U1). 5V torque coil input to Solar Panel Board 2.
+	3
+	TORQUE3_2B
+	Output of H-Bridge Device 1 (U1). 5V torque coil input to Solar Panel Board 3.
+	4
+	TORQUE4_2A
+	Output of H-Bridge Device 1 (U1). 5V torque coil input to Solar Panel Board 4.
+	Table 5.1.2.11.a. PDUs J7 Pin Configuration
+
+
+Pin
+	Signal
+	Description
+	1
+	TORQUE1_3A
+	Output of H-Bridge Device 2 (U2). 5V torque coil input to Solar Panel Board 1.
+	2
+	TORQUE2_3B
+	Output of H-Bridge Device 2 (U2). 5V torque coil input to Solar Panel Board 2.
+	3
+	TORQUE3_4B
+	Output of H-Bridge Device 2 (U2). 5V torque coil input to Solar Panel Board 3.
+	4
+	TORQUE4_4A
+	Output of H-Bridge Device 2 (U2). 5V torque coil input to Solar Panel Board 4.
+	Table 5.1.2.11.b. PDUs J8 Pin Configuration
+
+
+Pin
+	Signal
+	Description
+	1
+	N$1
+	Output of H-Bridge Device X (UX) - X A. 5V torque coil input to each Solar Panel Board.
+	2
+	N$1
+	Output of H-Bridge Device X (UX) - X B. 5V torque coil input to each Solar Panel Board.
+	Table 5.1.2.11.c. Each Solar Panel Board’s J1 Pin Configuration
+5.1.2.12. Insert Before Flight (IBF) Connector
+
+
+One 2-Pin Molex Connector (503763-0291) is used for the Insert Before Flight (IBF) Connector. Recall that the IBF allows for power to be disconnected and reconnected to the CubeSat through the use of an IBF pin. More information on the IBF can be found in Section 5.1.12. The PDUs 2-Pin Molex Connector (J15) connects to the Antenna Board’s 2-Pin Molex Connector (J5). 
+
+
+   * PDUs 2-Pin Molex Connector x1 (J15) → Antenna Board’s 2-Pin Molex Connector x1 (J5)
+
+
+Pin
+	Signal
+	Description
+	1
+	PY_VBATT
+	Voltage from Pycubed Battery Board
+	2
+	IBF_SW
+	Insert Before Flight Switch
+	Table 5.1.2.12.a. PDUs J15 Pin Configuration
+
+
+Pin
+	Signal
+	Description
+	1
+	IBF2
+	InsertBefore Flight Switch 2
+	2
+	IBF1
+	InsertBefore Flight Switch 1
+	Table 5.1.2.12.b. PDUs J5 Pin Configuration
+5.1.2.13. Burn Wire Connector
+
+
+Two 2-Pin Molex Connectors (503763-0291) are used for the Burn Wire Connector. The burn wire circuit on the PDU is a release mechanism that deploys the antenna. Further explanation of the Burn Wire Circuit can be found in Section 5.1.8. The PDUs two 2-Pin Molex Connectors (J13, J14) are connected to the Antenna Board’s 2-Pin Molex Connector (J9).
+   * PDUs 2-Pin Molex Connector x2 (J13, J14) → Antenna Board’s 2-Pin Molex Connector x1 (J9)
+
+
+Pin
+	Signal
+	Description
+	1
+	GND
+	Ground
+	2
+	VBURN1
+	Burn Wire Voltage 2
+	Table 5.1.2.13.a. PDUs J13 Pin Configuration
+
+
+Pin
+	Signal
+	Description
+	1
+	GND
+	Ground
+	2
+	VBURN2
+	Burn Wire Voltage 2
+	Table 5.1.2.13.b. PDUs J14 Pin Configuration
+
+
+Pin
+	Signal
+	Description
+	1
+	VCC_BURN
+	Burn Wire on Antenna Board
+	2
+	GND
+	Ground
+	Table 5.1.2.13.c. Antenna Board’s J9 Pin Configuration
+5.1.2.14. Inhibit Switch Connector
+
+
+One 4-Pin Molex Connector is used for the Inhibit Switch Connector. The Inhibit Switch connects to the Deployment Switches (D2MQ-4L-105-1) on the structure rails of the Artemis CubeSat. The purpose of the inhibit switch is to act as a safety measure that completely shuts off power to the satellite through the usage of deployment switches. Similar to the Insert Before Flight (IBF), the inhibit switch can inhibit (or shut off) power to the satellite. While the IBF is mainly used for testing purposes and its pin is inserted before flight, the inhibit switch prevents power from flowing through until actual deployment of the Artemis CubeSat’s launch into space. More information on the deployment switches can be found in Section 7.4.
+
+
+   * PDUs 4-Pin Molex Connector x1 (J18) → Artemis CubeSat’s Deployment Switches
+   * One deployment switch located at each corner of the CubeSat’s structure rails
+
+
+Pin
+	Signal
+	Description
+	1
+	INH_SW1_COM
+	Inhibit Switch COM - Solder to NC
+	2
+	GND
+	Ground
+	3
+	INH_SW1_NC
+	Inhibit Switch NC - Solder to COM
+	4
+	GND
+	Ground
+	Table 5.1.2.14.a. PDUs J18 Pin Configuration
+5.1.2.15. 12V Regulator Connector
+
+
+One 4-Pin Molex Connector is used for the 12V Regulator. The 5V power line generated by the 5V Switch #4 is inputted into the 12V Regulator Circuit, which outputs 12V from the 12V Switch #1. A more thorough detail on how the 12V Regulator Circuit works can be found in Section 5.1.6. The purpose of the 12V Regulator Connector is to give the end-user access to a significantly larger power line – 12V, compared to the smaller 3V3, 5V, VBattery. The end-user may also change the design to implement any needs that require a 12V power line.
+
+
+   * PDUs 4-Pin Molex Connector x1 (J10) → End-user use
+
+
+Pin
+	Signal
+	Description
+	1
+	12V_SW1
+	12V switch 1
+	2
+	12V_SW1
+	12V switch 1
+	3
+	GND
+	Ground
+	4
+	GND
+	Ground
+	Table 5.1.2.15.a. PDUs J10 Pin Configuration
+5.1.3. VBatt Filter
+
+
+The function of the VBatt Filter is to remove (filter) noise from the raw VBattery power line. The result of the VBatt Filter is a filtered, sustainable, and usable battery voltage that is subsequently used to power the CubeSat’s load, e.g. all other devices in the CubeSat. The VBatt Filter implements a simple, passive low pass filter, e.g. a Resistor-Capacitor (R-C) circuit. The low-pass filter is first-order since it only uses one reactive component, in this case, one capacitor. 
+The inputted voltage, VBatt, should roughly equal the output voltage, VBatt, with the only difference being the output voltage has significantly less noise than the inputted raw voltage, as shown in Fig. 5.1.3.a. Assuming the pin in the insert before flight (IBF) is removed (Section 5.1.12) and the deployment switch is on (Section 7.4), VBatt will always be on and range between a minimum of 6V and maximum of 7.2V. 
+The resistor and capacitor were calculated based on the fact the cut-off frequency was 10 kHz. If they choose to do so, the end-user may choose a different cut-off frequency, and calculate new resistor and capacitor values based on Equation 5.1.3.a.
+  
+
+Fig. 5.1.3.a. VBatt Filter System
+
+
+Equation 5.1.3.a: 
+
+
+
+
+5.1.4. 3V3, 5V Bus
+
+
+The 3V3 and 5V Bus are the main power sources for several components and circuits in the CubeSat (e.g. the switches). The Bus uses a switching regulator to convert input VBattery (from the batteries) to output 3V3 and 5V, respectively. The main functions of a switching regulator are as follows:
+   1. Convert input voltage into a desired voltage, which is then supplied to certain circuits.
+   2. Control whether the supplied circuit is switched on or off. 
+
+
+In this case, the switching regulator device’s enable pin is set to high so the Bus is always on, assuming the CubeSat is powered on.
+
+
+   * 3V3 Bus
+   * LT8609AEMSE#PBF x1 (U21)
+   * Converts input VBatt to output 3V3
+   * Always enabled
+
+
+Pin
+	Signal
+	Description
+	1
+	BST
+	
+
+	2
+	SW
+	
+
+	3
+	INTVCC
+	
+
+	4
+	RT
+	
+
+	5
+	GND
+	Ground
+	6
+	BUS_3V3_FB
+	
+
+	7
+	BUS_3V3_TRSS
+	
+
+	8
+	BUS_3V3_PG
+	
+
+	9
+	VBATT
+	Battery Voltage
+	10
+	BUS_3V3_VIN_EN
+	
+
+	11
+	GND
+	Ground
+	                Table 5.1.4.a. 3V3 Bus (U21) Pin Configuration
+
+
+   * 5V Bus
+   * LT8609AEMSE#PBF x1 (U22)
+   * Converts input VBatt to output 5V
+   * Always enabled
+
+
+Pin
+	Signal
+	Description
+	1
+	BST
+	
+
+	2
+	SW
+	
+
+	3
+	INTVCC
+	
+
+	4
+	RT
+	
+
+	5
+	GND
+	Ground
+	6
+	BUS_5V_FB
+	
+
+	7
+	BUS_5V_TRSS
+	
+
+	8
+	BUS_5V_PG
+	
+
+	9
+	VBATT
+	Battery Voltage
+	10
+	BUS_5V_VIN_EN
+	
+
+	11
+	GND
+	Ground
+	                 Table 5.1.4.b. 5V Bus (U22) Pin Configuration
+
+
+  
+
+Fig. 5.1.4.a. 3V3, 5V Bus Device (LT8609AEMSE#PBF)
+
+
+5.1.5. H-Bridge Circuits
+
+
+The function of the H-Bridge Circuits is to change the polarization in order to control the current direction of the torque coils on the Solar Panel Boards. Polarization refers to the orientation (direction and magnitude) of a vibrating electric field, or a wave’s oscillation.  It is an attribute of electromagnetic radiation. The H-Bridge is powered by the 3V3 Bus, which is always on when the CubeSat is turned on. 
+
+
+The importance of the H-Bridge circuits is that it controls the torque coils on the Solar Panel Boards, which aid in the CubeSat’s movement in orbit. There are two torque coils on each solar panel board, with each orienting in opposite directions. When the CubeSat is on and the H-Bridge is powered by the 3V3 Bus, the PDUs Microcontroller sends a digital signal to the H-Bridge Circuit, which tells it how much each torque coil on the solar panel board has to move in order to reach the desired position. The H-Bridge Circuit then outputs a certain amount of current to the torque coils, where the amount of current is related to how much the respective torque coils need to move the CubeSat. When the current direction is changed, the torque coils will cause the CubeSat to slowly move into the correct position as programmed. 
+
+
+   * H-Bridge Circuit Key Components
+   * DRV8847PWPR x2 (U1, U2)
+   * PDU v2’s Microcontroller (Input) → H-Bridge → Torque (Output) via 4-Pin Molex Connector
+
+
+Pin
+	Signal
+	Description
+	1
+	SLEEP1
+	Sleep Mode Input 1
+	2
+	TORQUE_1A
+	1A Torque Current
+	3
+	ISEN12
+	Full-Bridge-12 Sense
+	4
+	TORQUE_1B
+	1B Torque Current
+	5
+	TORQUE_2B
+	2B Torque Current
+	6
+	ISEN34
+	Full-Bridge-34 Sense
+	7
+	TORQUE_2A
+	2A Torque Current
+	8
+	FAULT1
+	Fault Indication Pin 1
+	9
+	IN3
+	Half-Bridge Input 3
+	10
+	IN4
+	Half-Bridge Input 4
+	11
+	TRQ1
+	Torque Current Scalar 1
+	12
+	BUS_5V
+	5V Bus
+	13
+	GND
+	Ground
+	14
+	MODE
+	Operating Mode
+	15
+	IN2
+	Half-Bridge Input 2
+	16
+	IN1
+	Half-Bridge Input 1
+	                   Table 5.1.5.a. H-Bridge Device 1 (U1) Pin Configuration
+
+
+Pin
+	Signal
+	Description
+	1
+	SLEEP2
+	Sleep Mode Input 2
+	2
+	TORQUE_3A
+	3A Torque Current
+	3
+	ISEN12
+	Full-Bridge-12 Sense
+	4
+	TORQUE_3B
+	3B Torque Current
+	5
+	TORQUE_4B
+	4B Torque Current
+	6
+	ISEN34
+	Full-Bridge-34 Sense
+	7
+	TORQUE_4A
+	4A Torque Current
+	8
+	FAULT2
+	Fault Indication Pin 2
+	9
+	IN7
+	Half-Bridge Input 7
+	10
+	IN8
+	Half-Bridge Input 8
+	11
+	TRQ2
+	Torque Current Scalar 2
+	12
+	BUS_5V
+	5V Bus
+	13
+	GND
+	Ground
+	14
+	MODE
+	Operating Mode
+	15
+	IN6
+	Half-Bridge Input 6
+	16
+	IN5
+	Half-Bridge Input 5
+	               Table 5.1.5.b. H-Bridge Device 2 (U2) Pin Configuration
+  
+
+Fig. 5.1.5.a. H-Bridge Device (DRV8847PWPR)
+
+
+
+5.1.6. 3V3, 5V, VBattery Switches
+
+
+The switch regulator has two primary functions:
+   1. Convert input voltage into a desired voltage, which is then supplied to certain circuits.
+   2. Control whether the supplied circuit is switched on or off.
+
+
+Switches are useful implementations because some devices on the CubeSat should not always be on during certain durations of the satellite mission. For example, breakout power refers to power that is connected to another component outside the PCB. Its usage is mostly for the end-user, and there may be moments one does not want the breakout power to be on.
+
+
+There are two 3V3 switches. The switches are supplied by the 3V3 Bus and output usable 3.3V (3V3). It is controlled by the PDUs microprocessor. Each switch has a purpose: 
+   1. Provide 3V3 breakout power for the end-user.
+   2. Provide an available 3V3 switch the end-user can program and utilize.
+
+
+There are four 5V switches. The switches are supplied by the 5V Bus and output usable 5V. It is controlled by the PDUs microprocessor. Each switch has a purpose: 
+   1. Provide 5V power to the Raspberry Pi Zero on the OBC. Recall the Raspberry Pi Zero aids in the controls on the satellite.
+   2. Provide 5V power to the Kapton Heater. Recall the Kapton Heater maintains voltage in extreme heat environments.
+   3. Provide an available 5V switch the end-user can program and utilize.
+   4. Provide 5V power to the 12V Switch Regulator. The 12V Switch Regulator circuit converts the input 5V to output 12V for the end-user to program and utilize.
+There is one VBatt switch. The switch is supplied by the filtered VBatt and output usable VBatt. It is controlled by the PDUs microprocessor. Its purpose is to provide an available VBatt switch the end-user can program and utilize.
+
+
+There is one depletion MOSFET for the 5V Switch #1, which provides power to the Raspberry Pi Zero on the OBC. The purpose of the depletion MOSFET is to drain any excess current between the switch turning on and off. For instance, when the 5V Switch #1 turns off, there remains some current in the circuit. The depletion MOSFET works to get rid of any leftover current in order to decrease the risk of performance degradation.
+
+
+   * 3V3 Switches
+   * LTC1477CS8 x 2 (U3, U9)
+   * Breakout Power for End-User
+   * N/A purpose for End-User to program and utilize
+
+
+Pin
+	Signal
+	Description
+	1
+	SW_3V3_X
+	3V3 Switch X
+	2
+	BUS_3V3
+	3V3 Bus
+	3
+	BUS_3V3
+	3V3 Bus
+	4
+	SW_3V3_ENX
+	3V3 Bus Engage X (Controlled by Microprocessor)
+	5
+	GND
+	Ground
+	6
+	VIN3
+	Voltage in (No Connection)
+	7
+	BUS_3V3
+	3V3 Bus
+	8
+	SW_3V3_X
+	3V3 Switch X
+	      Table 5.1.6.a. 3V3 Switch (U3, U9) Pin Configuration
+
+
+   * 5V Switches 
+   * LTC1477CS8 x 4 (U4, U5, U6, U7)
+   * Raspberry Pi Zero on OBC
+   * Kapton Heater
+   * Breakout Power for End-User
+   * 12V Switch Regulator
+
+
+Pin
+	Signal
+	Description
+	1
+	SW_5V_X
+	5V Switch X
+	2
+	BUS_5V
+	5V Bus
+	3
+	BUS_5V
+	5V Bus
+	4
+	SW_5V_ENX
+	5V Switch Engage X (Controlled by Microprocessor)
+	5
+	GND
+	Ground
+	6
+	VIN3
+	Voltage In (No Connection)
+	7
+	BUS_5V
+	5V Bus
+	8
+	SW_5V_X
+	5V Switch X
+	          Table 5.1.6.b. 5V Switch (U4, U5, U6, U7) Pin Configuration
+
+
+  
+
+           Fig. 5.1.6.a. 3V3, 5V Switch Device (LTC1477CS8)
+
+
+   * VBattery Switch 
+   * MIC2514YM5-TR x1 (U16)
+   * N/A purpose for End-User to program and utilize
+
+
+Pin
+	Signal
+	Description
+	1
+	SW_VBATT_EN
+	Battery Voltage Switch Engage (Controlled by Microprocessor)
+	2
+	GND
+	Ground
+	3
+	VBATT
+	Battery Voltage
+	4
+	SW_VBATT
+	Battery Voltage Switch 
+	5
+	NC
+	No Connection
+	                               Table 5.1.6.c. VBatt Switch (U16) Pin Configuration
+
+
+
+
+  
+
+                Fig. 5.1.6.b. VBattery Switch Device (MIC2514YM5-TR)
+
+
+   * Depletion MOSFET
+   * LND01K1-G x1 (U35)
+   * Deplete excess current remaining when 5V Switch #1 (for Raspberry Pi Zero on OBC) is turned from on to off
+
+
+Pin
+	Signal
+	Description
+	1
+	NC
+	No Connection
+	2
+	SW_5V_EN1
+	Gate - 5V Switch Engage 1 (Controlled by Microprocessor)
+	3
+	NC
+	No Connection
+	4
+	N$60
+	Drain - connected to pull-up resistor (10k) to GND
+	5
+	SW_5V_1
+	Source - 5V Switch 1
+	                            Table. 5.1.6.d. Depletion MOSFET (U35) Pin Configuration
+
+
+  
+
+Fig. 5.1.6.c. Depletion MOSFET Device (LND01K1-G)
+
+
+5.1.7. 12V Switch Regulator
+The 12V switch regulator, similar to the previous section, has two primary functions:
+   1. Convert input voltage into a desired voltage, which is then supplied to certain circuits.
+   2. Control whether the supplied circuit is switched on or off.
+
+
+Unlike the 3V3, 5V, VBatt switches, whose input voltage is the same as its output j-tagvoltage, the 12V Switch Regulator utilizes two devices to convert input 5V to output 12V. The input is the 5V Switch #4, which is powered by the 5V Bus and controlled by the microprocessor. 
+
+
+There are two major devices that make up the 12V Switch Regulator circuit. The first device, LT8390EFE#PBF, converts the 5V input of the 5V Switch #4 and outputs a usable 15V. The second device, LT8609AEMSE#PBF, converts the usable 15V to 12V. The 12V power is for end-user usage. Both devices are always enabled, but do not work unless the 5V Switch #4 supplies the first device with power.
+
+
+   * 12V Switch Regulator Device 1 
+   * LT8390EFE#PBF x1  (U13)
+   * Converts input 5V of 5V Switch #4 to output 15 V
+   * Always enabled
+
+
+Pin
+	Signal
+	Description
+	1
+	BG1
+	
+
+	2
+	BST1
+	
+
+	3
+	SW1
+	
+
+	4
+	TG1
+	
+
+	5
+	LSP
+	
+
+	6
+	LSN
+	
+
+	7
+	VIN
+	
+
+	8
+	INTVCC
+	
+
+	9
+	EN/UVLO
+	
+
+	10
+	TEST
+	
+
+	11
+	LOADEN
+	
+
+	12
+	VREF
+	
+
+	13
+	
+
+	
+
+	14
+	ISP
+	
+
+	15
+	ISN
+	
+
+	16
+	ISMON
+	
+
+	17
+	SW_12V_PGOOD[d]
+	
+
+	18
+	SS
+	
+
+	19
+	SW_12V_FB
+	
+
+	20
+	VC
+	
+
+	21
+	RT
+	
+
+	22
+	GND
+	
+
+	23
+	
+
+	
+
+	24
+	VOUT
+	
+
+	25
+	TG2
+	
+
+	26
+	SW2
+	
+
+	27
+	BST2
+	
+
+	28
+	BG2
+	
+
+	29
+	GND
+	
+
+	     Table 5.1.7.a. 12V Switch Reg. Device 1 (U13) Pin Configuration
+
+
+   * 12V Switch Regulator Device 2 
+   * LT8609AEMSE#PBF x1 (U8)
+   * Converts input 15V to usable 12V for End-User
+   * Always enabled
+
+
+Pin
+	Signal
+	Description
+	1
+	BST
+	
+
+	2
+	SW
+	
+
+	3
+	PG
+	
+
+	4
+	FB
+	
+
+	5
+	SYNC
+	
+
+	6
+	FB
+	
+
+	7
+	TRSS
+	
+
+	8
+	PG
+	
+
+	9
+	VIN
+	
+
+	10
+	EN
+	
+
+	11
+	GND
+	
+
+	Table 5.1.7.b. 12V Switch Reg. Device 1 (U8) Pin Configuration
+
+
+  
+
+Fig. 5.1.7.a. 12V Switch Device 1 (LT8390EFE#PBF)
+________________
+   * 12V Switch Connector
+   * 6-Pin Molex Connector x1 (J10) → 12V Power for End-User
+
+
+Pin
+	Signal
+	Description
+	1
+	12V_SW1
+	12V Switch 1
+	2
+	12V_SW1
+	12V Switch 1
+	3
+	GND
+	Ground
+	4
+	GND
+	Ground
+	5
+	GND
+	Ground
+	6
+	GND
+	Ground
+	Table 5.1.7.c. 12V Switch Reg. Device 1 (U8) Pin Configuration
+5.1.8. Burn Wire Circuit
+
+
+The burn wire circuit is a CubeSat deployment mechanism. Prior to deployment, the antenna is bent (not creased) and tied to the structure of the CubeSat by the burn wire, or a fishing line. The burn wire circuit is powered by VBatt and controlled by the PDUs microprocessor. When it is time for deployment, the CubeSat is turned on, such that VBatt is flowing throughout the CubeSat, and the PDUs microprocessor sends a digital signal to the burn wire circuit, indicating it is time for the circuit to turn on. The burn wire circuit outputs a high voltage, which is connected to a molex connector. The molex connector links together the high voltage and the burn wire located externally surrounding the CubeSat. The high voltage then heats up the burn wire tied around the antenna and structure of the small satellite. When the burn wire is heated high enough, the wire will burn, and the antenna is deployed. For more information on the fundamentals and functionality of the Burn Wire Circuit, please see this Burn Wire Circuit lab.
+
+5.1.9. Microcontroller Unit (MCU)
+
+
+The function of the microcontroller unit (MCU) is to control several circuits and its functionality throughout the CubeSat. It communicates with the rest of the PCBs, processes data, and more. The end-user may also expand upon the instructions and program the MCU to obtain their desired controls. The MCU is powered by the 3V3 Bus and outputs several digital signals to circuits in order to control their aspects, for instance, when certain circuits should turn on or off. 
+
+
+The WatchDog Timer was implemented to reset the MCU at certain intervals in order to continue MCU performance. It auto generates a system reset in the case the PDU is stalled. The LED was implemented to visually show when the MCU is turned on and able to communicate with the rest of the CubeSat.
+
+
+   * Microcontroller Unit (MCU)
+   * ATSAME51N19A-AF x1 (U14)
+   * Notes: This device is of same family of PyCubed Main v04’s Microcontroller but has 100 pins instead of 64
+                                  
+Fig. 5.1.9.a. MCU Device (ATSAME51N19A-AF)
+
+
+Pin
+	Signal
+	Description
+	1
+	CCO_0
+	Factory “Clock Cal Output 0” – spare clock-out you can feed to test gear; not used in-flight.
+	2
+	CC0_1
+	Second calibrated clock-out; same idea as CCO_0 (kept free for lab debug).
+	3
+	
+
+	
+
+	4
+	
+
+	
+
+	5
+	
+
+	
+
+	6
+	
+
+	
+
+	7
+	
+
+	
+
+	8
+	
+
+	
+
+	9
+	
+
+	
+
+	10
+	
+
+	
+
+	11
+	GND
+	Board ground reference.
+	12
+	VDD
+	3 V core rail coming from the always-on 3 V3 bus.
+	13
+	
+
+	
+
+	14
+	
+
+	
+
+	15
+	
+
+	
+
+	16
+	
+
+	
+
+	17
+	
+
+	
+
+	18
+	
+
+	
+
+	19
+	
+
+	
+
+	20
+	
+
+	
+
+	21
+	
+
+	
+
+	22
+	
+
+	
+
+	23
+	
+
+	
+
+	24
+	GND
+	Board ground reference.
+	25
+	VDD
+	3 V core rail.
+	26
+	
+
+	
+
+	27
+	
+
+	
+
+	28
+	
+
+	
+
+	29
+	
+
+	
+
+	30
+	VDD
+	3 V core rail.
+	31
+	GND
+	Board ground reference.
+	32
+	
+
+	
+
+	33
+	
+
+	
+
+	34
+	
+
+	
+
+	35
+	
+
+	
+
+	36
+	SHDN
+	“Shutdown” line that lets the MCU disable the battery-charger buck (LTC4012) during safe-mode or ground ops. Pulling high turns the charger off.
+	37
+	5V_BURN
+	Sense / supply feed that lets firmware confirm the 5 V rail needed for burn-wire firing is present.
+	38
+	GND
+	Board ground reference.
+	39
+	VDD
+	3 V core rail.
+	40
+	SLEEP1
+	“SLEEP 1” input on H-bridge U1; low = coil driver active, high = coil driver low-power sleep.
+	41
+	IN1
+	H-bridge U1 half-bridge-1 control (torque coil 1).
+	42
+	IN2
+	H-bridge U1 half-bridge-2 control (torque coil 1).
+	43
+	TRQ1
+	Torque-current‐scalar bit for H-bridge U1 (selects 100 % / 50 % coil current).
+	44
+	IN4
+	H-bridge U1 half-bridge-4 control (torque coil 2).
+	45
+	IN3
+	H-bridge U1 half-bridge-3 control (torque coil 2).
+	46
+	SD_MOSI
+	SPI-MOSI out to the on-board µSD card socket
+	47
+	SD_SCK
+	SPI-clock to µSD.
+	48
+	SD_MISO
+	SPI-MISO in from µSD.
+	49
+	BURN2_EN
+	High-side gate that energises the backup burn-wire MOSFET (BURN 2).
+	50
+	GND
+	Board ground reference.
+	51
+	VDD
+	3 V core rail.
+	52
+	FAULT2
+	Fault output from H-bridge U2 (over-current / over-temp on coils 3-4).
+	53
+	FAULT1
+	Fault output from H-bridge U1 (coils 1-2).
+	54
+	SLEEP2
+	Sleep pin on H-bridge U2 (coils 3-4).
+	55
+	IN5
+	H-bridge U2 half-bridge-5 control (torque coil 3).
+	56
+	IN6
+	H-bridge U2 half-bridge-6 control (torque coil 3).
+	57
+	TRQ2
+	Torque-current scalar for H-bridge U2.
+	58
+	IN8
+	H-bridge U2 half-bridge-8 control (torque coil 4).
+	59
+	IN7
+	H-bridge U2 half-bridge-7 control (torque coil 4).
+	60
+	
+
+	
+
+	61
+	
+
+	
+
+	62
+	GND
+	
+
+	63
+	VDD
+	
+
+	64
+	SW_3V3_EN1
+	Enable for the 3 V3 break-out switch (#1).
+	65
+	SW_3V3_EN2
+	Enable for the spare 3 V3 switch (#2).
+	66
+	SW_5V_EN2
+	Enable for the 5 V Kapton-heater switch (#2).
+	67
+	SW_5V_EN1
+	Enable for the 5 V Raspberry-Pi power switch (#1).
+	68
+	UART2_TXD
+	MCU → Teensy/OBC asynchronous console (SERCOM3-PAD0).
+	69
+	UART2_RXD
+	Teensy/OBC → MCU console input (SERCOM3-PAD1).
+	70
+	CHRG
+	“CHRG” status from the LTC4012 battery charger – low = batteries are charging.
+	71
+	LED
+	Drives the front-panel status LED (steady = MCU alive, blink-codes for faults).
+	72
+	
+
+	
+
+	73
+	
+
+	
+
+	74
+	USB_D-
+	
+
+	75
+	USB_D+
+	
+
+	76
+	GND
+	
+
+	77
+	VDD
+	
+
+	78
+	SW_5V_EN4
+	
+
+	79
+	SW_5V_EN4
+	
+
+	80
+	SW_VBATT_EN
+	
+
+	81
+	
+
+	
+
+	82
+	
+
+	
+
+	83
+	
+
+	
+
+	84
+	
+
+	
+
+	85
+	
+
+	
+
+	86
+	
+
+	
+
+	87
+	SD_CS
+	Chip-select for µSD card.
+	88
+	RESET
+	External reset input; held low by the J-TAG header when programming.
+	89
+	VDDCORE
+	Internal 1 V core-reg output (decoupling only).
+	90
+	GND
+	
+
+	91
+	VSW
+	Internal switch-cap supply node (decouple only).
+	92
+	VDD
+	
+
+	93
+	SWCLK
+	SW-D clock – primary programming/debug line.
+	94
+	SWDIO
+	SW-D data – primary programming/debug line.
+	95
+	WDT_WDI
+	Hardware watchdog “kick” coming from the external MAX16998; MCU must toggle this.
+	96
+	BURN1_EN
+	Gate that energises the primary burn-wire MOSFET (BURN 1).
+	97
+	
+
+	
+
+	98
+	
+
+	
+
+	99
+	
+
+	
+
+	100
+	
+
+	
+
+	Table. 5.1.9.a. MCU Pin Configuration
+
+
+   * WatchDog Timer
+   * MAX16998AAUA+T x1 (U17)
+   * Resets MCU at certain intervals
+  
+Fig. 5.1.9.b. Watchdog Timer Device (MAX16998AAUA+T)
+
+
+      * LED
+      * LED_1655 x1 (D2)
+      * Lights up when MCU is powered on
+                                  
+Fig. 5.1.9.c. Watchdog Timer Device (LED_1655)
+5.1.10. Temperature, Current & Power Sensors
+
+
+The function of the sensors is to record and detect changes within the PCB and output a response to those changes. The two main sensors featured on the PDU are the:
+      1. Temperature Sensor - which provides information on the temperature of the PCB.
+      2. Current and Power Sensors - which provide information on the current and power (voltage) flowing through the PCBs. 
+
+
+The temperature sensor input is the 3V3 Bus. The temperature sensor output is an analog signal, which is used for temperature control. There are several temperature sensors throughout the Artemis CubeSat:
+      * 1 on the OBC (AIN0 - Analog Input 0)
+      * 1 on the PDU (AIN1 - Analog Input 1)
+      * 1 on the Battery Board (AIN2 - Analog Input 2)
+      * 4 on the Solar Panel Boards (AIN3 to AIN6 - Analog Input 3 to 6)
+      * 1 on each Solar Panel Board
+
+
+Each temperature sensor’s analog output is connected to OBC’s Teensy 4.1, which sends commands to devices in response to temperature changes. For instance, if the temperature sensor detects that a PCB is too high in temperature then it may turn off some devices on that PCB. When the temperature is back in an operable acceptable range, the Teensy will turn the devices back on.
+
+
+The current and power sensor input is the 3V3 Bus. The current and power sensor output is I2C data depicting the current and power (voltage) flowing through the PCBs. There are several current and power sensors on the PDU:
+      * 1 measures current and power for VBatt, which supplies the primary power to PDUs load
+      * 1 measures current and power for each Solar Panel Board Input. Recall there are four solar panel boards so there will be four current and power sensors in total.
+
+
+Each current and power sensor’s I2C line is connected to OBC’s Teensy 4.1, which sends commands to devices in response to current and power changes. For example, if the current and power sensor reads the current going across some component is not ideal, the Teensy may shut off some devices to allow time for a reset to occur, then turn back on the devices when the current had time to stabilize.
+
+
+      * Analog Temperature Sensor on the PDU
+      * TMP36FSZ x1 (U18)
+      * Connected to AIN1
+Pin
+	Signal
+	Description
+	1
+	VOUT
+	Voltage Out
+	2
+	NC
+	No Connection
+	3
+	NC
+	No Connection
+	4
+	GND
+	Ground
+	5
+	BUS_3V3
+	3V3 Bus
+	6
+	NC
+	No Connection
+	7
+	NC
+	No Connection
+	8
+	BUS_3V3
+	3V3 Bus
+	Table. 5.1.10.a. PDU Analog Temperature Sensor Pin Configuration
+  
+
+Fig. 5.1.10.a. PDU Analog Temperature Sensor Device (TMP36FSZ)
+
+
+
+
+      * Current and Power Sensor on the PDU
+      * INA219BIDR x1 (U15, U30, U31, U32, U33)
+
+
+Pin
+	Signal
+	Description
+	1
+	A1
+	Digital Input
+	2
+	A0
+	Digital Output
+	3
+	I2C1_SDA
+	SDA - Serial Data
+	4
+	I2C1_SCL
+	SCL - Serial Clock
+	5
+	BUS_3V3
+	VS - Voltage Source
+	6
+	GND
+	Ground
+	7
+	VIN-
+	Analog Output
+	8
+	VIN+
+	Analog Input
+	Table. 5.1.10.b. PDU Current and Power Sensor Pin Configuration
+(U15 - VBatt; U30 to U33 - Solar Panel Input X)
+
+
+Device
+	A1
+	A0
+	Slave Address
+	U30 - Solar Input 1
+	GND
+	GND
+	1000000
+	U31 - Solar Input 2
+	GND
+	BUS_3V3
+	1000001
+	U32 - Solar Input 3
+	GND
+	I2C1_SDA
+	1000010
+	U33 - Solar Input 4
+	GND
+	I2C1_SCL
+	1000011
+	U15 - VBatt
+	BUS_3V3
+	GND
+	1000100
+	Table 5.1.10.c. INA219 Address Pins (A1, A0) and Slave Addresses
+(Reference to Table 1 of INA219BIDR Datasheet pg. 14)
+
+
+  
+
+Fig. 5.1.10.b. PDU Current and Power Sensor Device (INA219BIDR)
+5.1.11. Solar/Battery Charging Region 
+
+
+The function of the battery charger controller is to harness the solar power from the solar panel boards and charge the batteries. The LTC4012IUF#PBF is the primary device of the battery charger controller and features. It utilizes a synchronous buck converter, also known as a step-down converter. This means it steps down the voltage and draws less current from the solar panel input to the Li-ion batteries. The battery charger controller is compatible with 2-cell series Li-ion and Li-polymer batteries. Choosing R1 to 169k and R2 to 28.4 based on Figure 5 and Table 2 of the LTC4012IUF#PBF datasheet, the output voltage was adjusted to 8.4 V.
+      * Battery Charging Device 
+      * LTC4012IUF#PBF x1 (U20)
+
+
+Pin 
+	Signal 
+	Description
+	1
+	CLN
+	
+
+	2
+	CLP
+	
+
+	3
+	INFET
+	
+
+	4
+	DCIN
+	
+
+	5
+	NC
+	ACP has No Connection
+	6
+	SHDN
+	Shutdown connected to MCU
+	7
+	CHRG
+	MCU sends signal to CHRG, indicating the battery charger controller is on
+	8
+	NC
+	ICL has no Connection
+	9
+	VFB
+	Programmed to output 8.4 V
+	10
+	FBDIV
+	Programmed to output 8.4 V
+	11
+	BATT_CHRG
+	Battery Charging Line to VBATT
+	12
+	ITH
+	Simple RC Circuit
+	13
+	PROG
+	Programmed to 
+	14
+	CSN
+	
+
+	15
+	CSP
+	
+
+	16
+	BGATE
+	
+
+	17
+	INTVDD
+	
+
+	18
+	SW
+	
+
+	19
+	TGATE
+	
+
+	20
+	BOOST
+	
+
+	21
+	GND
+	
+
+	Table 5.1.11.a. Battery Charger Controller Pin Configuration
+
+
+  
+
+Fig. 5.1.11.a. 
+  
+
+
+
+      * Solar Cell Inhibit Switch Connectors
+      * PDUs 4-Pin Molex Connector x1 (J18) → Artemis CubeSat’s Deployment Switches
+      * One deployment switch located at each corner of the CubeSat’s structure rails 
+      * More information can be found previously in Section 5.1.2.14.
+
+
+Pin
+	Signal
+	Description
+	1
+	INH_SW1_COM
+	Inhibit Switch COM - Solder to NC
+	2
+	GND
+	Ground
+	3
+	INH_SW1_NC
+	Inhibit Switch NC - Solder to COM
+	4
+	GND
+	Ground
+	Table 5.1.11.a. PDUs J18 Pin Configuration
+5.1.12. Insert Before Flight (IBF) Circuit
+
+
+For PDU v2.2, the RBF is now IBF (insert before flight) which only consists of a simple switch. 
+
+
+The IBF Circuit is a safety mechanism that allows for battery power to be disconnected and reconnected to the CubeSat through the use of a IBF pin. When the pin is connected to the CubeSat, there is a closed circuit so power flows through and the CubeSat does function. When the pin is removed, power does not flow through the CubeSat, and its respective electronic components are turned off. IBF is an important element because it is used for the control, testing, and integration of the small satellite when not in space.
+  Fig. 5.1.12. RBF (now IBF) Schematic
+        
+The BF circuit consists of two N-Channel MOSFETs, U10 and U24. To understand how the IBF works, the following characteristics of MOSFETs should be reviewed:
+      1. If a high voltage flows through the gate of a MOSFET, then the source and drain behaves as a short circuit
+      2. If no or little voltage flows through the gate of a MOSFET, then the source and drain behaves as an open circuit
+
+
+The IBF circuit has two main cases:
+      1. IBF Pin Inserted
+      1. J15’s Pin 1 and 2 are not connected
+      2. 0V flows through U10’s Gate Pin (Pin 1)
+      3. U10’s Source Pin (Pin 2) and Drain Pin (Pin 3) are open circuits
+      4. There is a high voltage flowing across U10’s Source Pin (Pin 2) and U24’s Gate Pin (Pin 1)
+      5. U24’s Source Pin (Pin 2) and Drain Pin (Pin 3) are a short circuit, meaning the connections are one and the same
+      6. Result is the Battery Power from the PyCubed Battery Board is the same power source that is supplied to the CubeSat load. Therefore, EPS system and hence, CubeSat are powered on
+      2. IBF Pin Removed
+      1. J15’s Pin 1 and 2 are shorted together and connected
+      2. A high voltage flows through U10’s Gate Pin (Pin 1)
+      3. U10’s Source Pin (Pin 2) and Drain Pin (Pin 3) are shorted together
+      4. There is a no voltage flowing across U10’s Source Pin (Pin 2) and U24’s Gate Pin (Pin 1)
+      5. U24’s Source Pin (Pin 2) and Drain Pin (Pin 3) are an open circuit, meaning the connection was not made.
+      6. Result is the Battery Power from the PyCubed Battery Board is not connected to the power source that is supplied to the CubeSat load. Therefore, the EPS system and hence, CubeSat are not powered on.
+  
+
+Fig. 5.1.12.a. Visual Representation of Scenarios of IBF Circuit
+5.2. Battery Board
+
+
+The battery board in the Artemis CubeSat plays a crucial role in ensuring reliable power supply for various satellite subsystems. It serves as the primary energy storage and distribution unit, enabling sustained operations and supporting critical functions such as communication, data collection, and payload experiments.
+
+
+Our battery board is designed to meet the demanding requirements of CubeSat missions, offering a balance between power capacity, size constraints, and safety considerations. By incorporating advanced technologies and adhering to industry standards, we have developed a robust solution that optimizes power management, enhances mission longevity, and simplifies integration processes.
+5.2.1 Batteries
+Four Samsung 18650-35E Lithium Ion Batteries
+      * 3500mAh nominal capacity
+      * 3.6V nominal voltage
+      * Charging/Power connectors
+      * Used for charging batteries or powering satellite
+      * Molex 2 Pin Molex Connector x2 (J7, J8)
+      * Molex 4 Pin Molex Connector x1 (J9)                
+      * Cell Holders
+      * 4 soldered on 18650 cell holders on the bottom of the board
+      * 2 addition spaces on the top of the board for a total of 6 18650 cell holders
+      * Comparison of Samsung 18650-35E to AA batteries 
+      * 18650: 8-10 times the power output of AA
+      * 18650: 3.6V
+      * 18650: 18mm diameter, 65mm length 
+      * AA: 1.5V
+      * AA: 14.5mm diameter, 50.5mm length
+5.2.2 Temperature Sensor
+      * Analog Temperature Sensor
+      * TMP36FSZ x1  (U2)
+      * Molex 2 Pin Molex Connector x1 → PDU (J11)
+
+
+Pin
+	Signal
+	Description
+	1
+	VOUT
+	Voltage Out
+	2
+	
+
+	
+
+	3
+	
+
+	
+
+	4
+	GND
+	Ground
+	5
+	BUS_3V3
+	3V3 Bus
+	6
+	
+
+	
+
+	7
+	
+
+	
+
+	8
+	BUS_3V3
+	3V3 Bus
+	
+
+  
+24
+5.2.3 Inhibit Switch
+Function: Prevent power from flowing through the satellite while inside the launcher.
+      * Molex 2 Pin Molex Connector x1 → Deployment Switch (J10)
+5.2.4 Battery holders
+2 in series, 3 in parallel, Lithium-ion pack for CubeSat designs
+      * Fits 18650 cells
+      * Meets maximum capacity requirements of common CubeSat integrators
+      * Uses components with radiation testing heritage
+      * R5460x2xx
+      * Over-charge
+      * Over-discharge
+      * Short-circuit
+      * Excess discharge-current
+      * Excess charge-current
+5.2.4 2-Cell Li-Ion Protection IC
+Function: Protects batteries from over-charge, over-discharge, short-circuit, and excess charge-current.
+      * R5460N233AF x1 (U1)
+
+
+Pin
+	Signal
+	Description
+	1
+	VOUT
+	Voltage Out
+	2
+	
+
+	
+
+	3
+	
+
+	
+
+	4
+	GND
+	Ground
+	5
+	BUS_3V3
+	3V3 Bus
+	6
+	
+
+	
+
+	7
+	
+
+	
+
+	8
+	BUS_3V3
+	3V3 Bus
+	5.2.5 Connectors
+      * Power
+      * J7, J8: 2-pin connector
+      * Pin 1 - power
+      * Pin 2 - ground
+      * J9: 4-pin connector
+      * Pins 1 and 3 - power
+      * Pins 2 and 4 - ground
+      * Deployment switch connector
+      * Shuts off battery power to satellite when not shorted
+      * J10: 2-pin connector
+      * Pin 1 - voltage (from power connectors)
+      * Pin 2 - PACK+ (from battery)
+      * Temperature sensor connector
+      * J11: 2-pin connector
+      * Pin 1 - data
+      * Pin 2 - power
+
+
+5.3 Solar Panels
+
+
+Among these critical subsystems, solar panels play a crucial role in powering CubeSats and ensuring their long-duration operation in the harsh environment of space. Solar panels, also referred to as solar arrays or photovoltaic (PV) arrays, harness the energy of the sun and convert it into electrical power. This renewable energy source allows CubeSats to operate autonomously, collect data, communicate with ground stations, and execute their mission objectives.
+
+
+The Artemis CubeSat’s solar panels contain embedded torque coils which are strategically placed within the structure of the solar panels. These coils generate magnetic fields when electric currents pass through them, thereby exerting torque on the satellite. By selectively activating and modulating the currents in these coils, precise control over the satellite's attitude can be achieved.
+
+
+The integration of torque coils within the solar panel structure offers several advantages for CubeSat missions. Firstly, it eliminates the need for separate mechanical components such as reaction wheels or magnetic torquers, reducing the overall mass, volume, and complexity of the satellite. This compact design is particularly beneficial for CubeSats, where stringent constraints on size, weight, and power are imposed.
+
+
+Furthermore, embedding torque coils in the solar panels improves the utilization of available space in the satellite, as the solar panels serve a dual purpose by both generating power and contributing to attitude control. This integration enhances the overall efficiency and functionality of CubeSat missions, allowing for a more optimized use of resources.
+
+
+5.3.1. Solar Cells
+
+
+Function: Charge the batteries from the power of the Sun.
+
+
+      * KXOB25-O5X3F-TR x30
+      * 2.07V Open Circuit Voltage
+      * 19.5mA Short Circuit Current
+
+
+  
+
+5.3.2. Solar Panels
+
+
+      * 30 total cells
+      * 6 branches connected in parallel
+      * 5 cells per branch
+      * Max output per Solar Panel
+      * 10.35 V
+      * 110.4 mA
+      * 1.142 W
+      * 4 Pin Molex Connector x1 → PDU (J2)
+
+  
+5.3.3 Torque coils
+
+
+Function: React with Earth’s magnetic field to change the orientation of the satellite.
+
+
+Two torque coils inside each solar panel:
+         * Number of turns: 60 turns 
+         * Resistance of the wire: 35.8 ohms
+         * Supply voltage to the coils: 5V
+         * Voltage range of coils: 3.3V - 5V
+         * Power of a single coil: 0.7 W
+         * Calculated Magnetic Moment: 1.22 *10^-2 Am^2
+         * Tentative torque generated: 2.43*10^-6 N*m  
+         * Coils are connected in parallel 
+5.3.4 Temperature Sensor
+
+
+         * TMP36FSZ x1  (U1)
+
+
+Pin
+	Signal
+	Description
+	1
+	VOUT
+	Voltage Out
+	2
+	
+
+	
+
+	3
+	
+
+	
+
+	4
+	GND
+	Ground
+	5
+	BUS_3V3
+	3V3 Bus
+	6
+	
+
+	
+
+	7
+	
+
+	
+
+	8
+	BUS_3V3
+	3V3 Bus
+	
+
+
+
+         * 2 Pin Molex Connector x1 → PDU (J3)
+
+
+  
+________________
+
+6. Communications
+6.1 Antenna Board
+The antenna board sits at the top of the Artemis Cubesat Kit and houses the kit’s radio antenna and GPS antenna. It plays a pivotal role in facilitating reliable communication, data transmission, and reception between the satellite and ground stations. 
+6.1.1. Connectors
+Function: Ground Support Equipment. Used to interact with components inside the satellite while it is fully constructed
+         * Insert Before Fight
+         * 2 Pin Molex Connector x2 (J1, J5)
+         * Connect J5 to PDU J15
+         * When J1 is shorted, the power to the satellite will be shut off
+
+
+Pin
+	Signal
+	Description
+	1
+	IBF1
+	Remove Before Flight 1
+	2
+	IBF2
+	Remove Before Flight 2
+	
+
+         * PDU Programmer
+         * 5 Pin Molex Connector x5 (J2, J6)
+         * Connect J6 to PDU J27
+         * Used to program the PDU Microcontroller
+
+
+Pin
+	Signal
+	Description
+	1
+	VTREF
+	Voltage Reference
+	2
+	GND
+	Ground
+	3
+	TMS
+	Test Mode Select
+	4
+	TCK
+	Test Clock
+	5
+	RESET
+	Reset
+	
+
+         * Ethernet
+         * 4 Pin Molex connector x2 (J3, J7)
+         * Ethernet connector (J16)
+         * Connect J7 to OBC J10
+         * Ethernet connector for the Teensy
+
+
+Pin
+	Signal
+	Description
+	1
+	RX-
+	Receive -
+	2
+	RX+
+	Receive +
+	3
+	TX-
+	Transmit -
+	4
+	TX+
+	Transmit +
+	
+
+         * Battery Charging
+         * 2 Pin Molex connector x2 (J4, J8)
+         * Connect J8 to PDU J12
+         * Used to charge batteries
+
+
+Pin
+	Signal
+	Description
+	1
+	GND
+	Ground
+	2
+	VCC_BATT
+	Voltage Common Collector Battery
+	
+
+         * Micro USB
+         * 4 Pin molex connector x2 (J14, J15)
+         * Micro USB connector (J17)
+         * Connect J15 to Teensy Micro USB
+
+
+Pin
+	Signal
+	Description
+	1
+	5V
+	5V Power
+	2
+	D-
+	Data -
+	3
+	D+
+	Data +
+	4
+	GND
+	Ground
+	
+
+         * Burn wire
+         * 2 Pin Molex connector  (J9)
+         * Connect J9 to PDU J13 (burn 1) or J14 (burn 2)
+
+
+Pin
+	Signal
+	Description
+	1
+	VCC_BURN
+	Burn Voltage
+	2
+	GND
+	Ground
+	
+
+         * Radio Antenna
+         * MCX antenna connector x2 - MCX-J-P-H-RA-TH1 (J13, J10)
+         * Connect J13 or J10 to OBC J1
+         * GPS Antenna
+         * MCX antenna connector - MCX-J-P-H-RA-TH1 (J12)
+         * Connect J12 to OBC J9
+         * U.FL GPS antenna connector (J11)
+         * Connect J11 to GPS Antenna
+6.1.2. Radio Antennas
+Function: Allows CubeSat to send/receive data and commands.
+         * UHF monopole antenna
+         * Made from 1095 spring steel
+         * Dimensions: 0.0040" Thick, 1/2" Wide, 177.8 mm long 
+         * Antenna board can hold two radio antennas
+         * Antennas are attached to the board by two PEEK pan head phillips 6-32 thread, ¼” long screws
+         * Antenna 1 connected to J10 MCX connector
+         * Antenna 2 connected to J13 MCX connector
+6.1.3. Burn wire
+Function: Aids in antenna deployment
+         * Nichrome burn wire
+         * Antenna is wrapped around CubeSat and secured to the burn wire with fishing line
+         * Current is sent through the burn wire, heating it up
+         * The fishing line breaks, and the antenna is deployed
+6.1.4. GPS Antenna
+Function: Acquires signal for GPS
+         * [Part number][e]
+7. Payload
+7.1 Camera Board 
+The 3D Printed Camera Board is a custom-designed board specifically created for the Artemis CubeSat. It is printed out of a low outgassing plastic and it features a Raspberry Pi Camera Module 2, allowing for high-quality image and video capture in a compact form factor. 
+7.1.1 Components
+         * 3D Printed Camera Board 
+         * Raspberry Pi Camera Module 2
+         * Sony IMX219 8-megapixel sensor 
+         * Fixed focus lens on-board
+         * Capable of 3280 x 2464 pixel static images
+         * Supports 1080p30, 720p60 and 640x480p90 video
+         * Size 25mm x 23mm x 9mm
+         * Weight just over 3g
+         * Screws and nuts for mounting
+7.1.2 Connecting the Camera
+The flex cable inserts into the connector located on the Raspberry Pi. To open the connector, pull the tabs on the top of the connector upwards. The flex cable should be inserted firmly into the connector, with care taken not to bend the flex at too acute an angle. To close the connector, push the top part of the connector down, while holding the flex cable in place.
+8. Mechanical
+The Artemis CubeSat, relies on a mechanical subsystem that serves as the backbone of its structural stability and integrity. This pivotal component plays a crucial role throughout the spacecraft's entire lifecycle, navigating through the challenges of harsh launch conditions and the demanding space environment. Tasked with the mechanical design, fabrication, and testing of the CubeSat's frame and housing, this subsystem securely houses internal components.
+
+
+Designed in adherence to the CubeSat standard of small-sized cubic units (U), with dimensions of 10x10x10 cm, the mechanical subsystem incorporates lightweight yet robust and rigid materials, optimizing the limited space available, ensuring the CubeSat's overall functionality.
+
+
+The mechanical subsystem of the Artemis CubeSat goes beyond its role in structural support; it is a key player in ensuring compliance with the specifications of the launch vehicle provider. This is particularly critical, as the CubeSat must endure violent vibrations and loads during launch without compromising the safety of the rocket or other payloads. Rigorous structural and thermal analyses, coupled with extensive testing and qualification procedures, validate the robustness of the mechanical design, guaranteeing the spacecraft's reliability under extreme conditions.
+
+
+8.1 Structure
+
+
+The structure was designed in house using the Computer Aided Design (CAD) software Solidworks.
+8.1.1 Requirements
+
+
+Requirement #
+	Description
+	3.
+	The CubeSat kit components shall include all necessary components such that the CubeSat can function passively in space.
+	3.6
+	The CubeSat structure shall be contained within 1U and offer flexibility in mounting components internally
+	3.6.1
+	The CubeSat kit structure shall remain inside a 10 x 10 x 11.35 cm +/- 0.1mm volume while undeployed
+	3.6.2
+	All four protruding corners on the top and bottom of the main body of the CubeSat shall not exceed a height of 6.75mm, shall have a minimum length and width of 6mm, and shall have a surface area of 6.5mm x 6.5mm, per NASA CLSI requirements
+	3.6.3
+	There shall be a minimum of 20mm from the CubeSat surface to the top of the corners along the Z direction per NASA CSLI Requirements
+	3.6.4
+	The four edges of the CubeSat along the Z direction shall have a hardness greater than or equal to Rockwell C 65-70 per NASA CSLI Requirements
+	3.6.5
+	The overall structure shall withstand 1200N between two XY planes applied in the Z direction, per NASA CSLI Requirements
+	3.6.6
+	The maximum mass of the entire CubeSat Kit shall not exceed 1.33kg per NASA CSLI Requirements
+	3.6.7
+	The center of gravity shall be within 2cm of its geometric center relative to the Z direction, per NASA CSLI Requirements
+	
+
+8.1.2 Structure References
+8.1.2.1 Frame Drawings
+
+
+  
+
+  
+
+  
+
+
+
+
+
+  
+
+8.2.1 Manufactured Parts
+8.2.1.1 Spacers
+
+
+4.5mm OD  M3  aluminum spacers are purchased from McMaster Carr in 3mm, 5mm, 12mm, and 20mm lengths. Spacers are placed on the structure rods in order to separate the boards from one another. Spacers are put through structure rods to separate boards.
+
+
+
+
+  
+
+8.2.1.2 Rods
+
+
+3 mm OD  2.2mm ID 316 stainless steel tubing is used for the structure rods. Each kit uses 4x  97.4 mm long rods with 0.45mm thread cut ¼” deep on each end. Slide in rods through the top section and secure using 8x  M2.5  0.45mm thread  6mm long 90° countersink flat head screws. A screw goes on both ends of each rod to prevent the rods from sliding out of the structure. Refer to V1 Kit Assembly Tutorial for assembly instructions.
+8.2.1.3 Antenna
+
+
+The antenna is cut from ½” wide  0.0040” thick  1095 spring steel. It is attached to the antenna board using 2x  6-32 thread ¼” long pan head screws, 2x  0.38” OD  0.15” ID plastic washers, and 2x  6-32 hex nuts. 
+  
+
+
+
+
+
+
+
+8.3 Hardware
+
+
+8.3.1 Full Hardware List        
+8.4 Assembly
+
+
+Refer to V1 Kit Assembly Tutorial for full assembly instructions.
+
+
+To conduct accurate testing, it is essential to torque the screws on the structure according to specifications. The torque values needed for vibe testing are outlined in the following table.
+
+
+Vibe Table Testing Torque
+	
+
+	Screw
+	Torque Needed (Nm)
+	oz-in
+	Frame Screws
+	1.15
+	
+
+	Rod Screws
+	2.7
+	
+
+	Solar Panel Screws
+	0.5
+	70.8
+	Camera Board Screws
+	0.5
+	70.8
+	Antenna Board Screws
+	0.5
+	70.8
+	Raspberry Pi Camera Screws
+	0.5
+	70.8
+	Deployment Screws
+	1.15
+	
+
+	GPS Screws
+	1.03
+	
+
+	IMU screws
+	1.03
+	
+
+	Raspberry Pi Zero Screws
+	1.03
+	
+
+	9. TCS
+In the harsh environment of outer space, maintaining the optimal temperature range for electronic components is crucial to ensure the functionality and longevity of these small satellites. This is where the thermal control system steps in, acting as the guardian of temperature regulation on a CubeSat. Designed to tackle the challenges posed by extreme temperature fluctuations, limited power, and confined space, the thermal control system plays a vital role in ensuring the mission's success.
+
+
+9.1 Kapton Heater PLM-203/10-P
+The Artemis CubeSat incorporates the Kapton Heater PLM-203/10-P, a compact and vacuum-safe heating device measuring 2" x 3". Powered by a 5 V line, this heater consumes 1.7 W of energy. The heater is strategically positioned atop the battery pack to ensure optimal thermal management.
+
+
+The PLM-203/10-P is a part of the PLM-Series of polyimide flexible heaters manufactured by Kapton. These heaters are designed to be used in various environments and hard-to-reach places due to their increased flexibility and chemical resistivity​. The PLM-203/10-P model specifically has a width of 2 inches, a length of 3 inches, and is self-adhesive with a watt density of 10 W/in^2​.
+
+
+Specifications
+Performance Ratings
+         * Maximum Operating Temperature: 232°C (450°F)
+         * Minimum Operating Temperature: -57°C (-71°F)
+         * Non-magnetic heating element
+         * Watt densities: 10 W/in^2​
+Physical Size and Construction Limitations
+         * Width: 2 inches
+         * Length: 3 inches
+         * Thickness: 0.01 inches
+         * Wire length tolerance: ±0.4 inches​
+
+
+Construction
+The PLM-203/10-P is made with a thin metal foil (0.001"), usually a nickel base alloy, as the resistance element. The resistance pattern to be etched is designed in CAD and transferred to the foil, which is laminated to the insulating substrate. The element/substrate is then processed through an acid spray to produce the desired resistance pattern. The top layer is then added and laminated. Lead wires are attached to the heater and insulated epoxy cement. The heater can deliver uniform heat profiles with higher watt densities, providing longer operating heater life. It can also be zoned with distributed wattage or separate heating circuits to compensate for load variations​.
+
+
+Special Features
+         * Polyimide strain relief and insulation
+         * Optional pressure-sensitive adhesive models available
+         * Non-magnetic heating element​
+10. Hardware Integration - Chris
+10.1. Wiring
+10.1.1. Molex Connectors
+         * 503763-0291
+         * 2 pin
+         * 503763-0491
+         * 4 pin
+         * 503763-0591
+         * 5 pin
+         * 503763-0691
+         * 6 pin
+10.1.1.1. On Board Computer
+         * J1 to Antenna Board J10 or J13
+         * Radio antenna connector
+         * J2 for end user use
+         * Teensy UART breakout
+         * J3 for end user use
+         * Teensy GPIO Breakout
+         * J4 for end user use
+         * Teensy CS Breakout
+         * J5 for end user use
+         * Teensy I2C Breakout
+         * J6 for end user use
+         * Raspberry Pi I2C Breakout
+         * J7 for end user use
+         * Raspberry Pi GPIO Breakout
+         * J8 for end user use
+         * Raspberry Pi SPI Breakout
+         * J9 to Antenna Board J12
+         * Micro USB
+         * J10 to Antenna Board J7
+         * Teensy Ethernet
+         * J11 for end user use
+         * Teensy Test
+         * J12 for end user use
+         * Teensy USB Dev
+         * J13 for end user use
+         * Teensy USB Host
+         * J14 to Adafruit GPS on Antenna Board
+         * Adafruit GPS Connection
+10.1.1.2. Power Distribution Unit
+         * J1 to solar panel 1 J2
+         * Power from solar panel
+         * J2 to solar panel 2 J2
+         * Power from solar panel
+         * J3 to solar panel 3 J2
+         * Power from solar panel
+         * J4 to Solar Panel 4 J2
+         * Power from solar panel
+         * J5 to solar panel J2
+         * extra Power from solar panel
+         * J6 to solar panel J2
+         * extra Power from solar panel
+         * J7 to solar panel 1 and 2 J1
+         * Torque coil power
+         * J8 to solar panel 3 and 4 J1
+         * Torque coil power
+         * J9 for end user use
+         * 3v3 and 5v breakout power
+         * J10 for end user use
+         * 12V switch output
+         * J12 to Antenna Board J8
+         * External USB battery charging
+         * J13 to Antenna Board J9
+         * Burnwire 1
+         * J14 to Antenna Board J9
+         * Burnwire 2 (backup)
+         * J15 to Antenna Board J5
+         * Remove before flight
+         * J16 to Battery Board J9
+         * VBATT (power satellite)
+         * J17 to Battery Board J9
+         * Battery charging
+         * J18 to deployment switches
+         * J19 to Solar Panel 2 J3
+         * Solar Panel temperature sensor
+         * J22 to Solar Panel 1 J3
+         * Solar Panel temperature sensor
+         * J23 to Battery Board J11
+         * Battery Board temperature sensor
+         * J24 to Solar Panel 3 J3
+         * Solar Panel temperature sensor
+         * J25 to Solar Panel 4 J3
+         * Solar Panel temperature sensor
+10.1.1.3. Battery Board
+         * J7 for end user use
+         * Power output
+         * J8 for end user use
+         * Power output
+         * J9 to PDU J16 and J17
+         * Battery charging and powering of satellite
+         * 4 pin on battery board split into two 2 pins on PDU
+         * J10 to deployment switch
+         * J11 to PDU J23
+         * Battery Board temperature sensor
+10.1.1.4. Solar Panel Board
+         * J1 to PDU J7 or J8
+         * Solar panel boards 1 and 2 to J7
+         * Solar panel boards 3 and 4 to J8
+         * Two 2 pins on solar panel boards to one 4 pin on PDU
+         * J2 to PDU J1, J2, J3, J4
+         * Solar panel board 1 to J1
+         * Solar panel board 2 to J2
+         * Solar panel board 3 to J3
+         * Solar panel board 4 to J4
+         * J3 to PDU J19, J22, J24 or J25
+         * Solar panel board 1 to J22
+         * Solar panel board 2 to J19
+         * Solar panel board 3 to J24
+         * Solar panel board 4 to J25
+10.1.1.5. Antenna Board
+         * J1 to external
+         * Remove Before Flight
+         * Shorted connector
+         * J2 to external
+         * PDU JTAG programmer
+         * J3 to external
+         * Teensy Ethernet
+         * J4 to external
+         * USB battery charging
+         * J5 to PDU J15
+         * Remove Before Flight
+         * J6 to PDU J27
+         * PDU JTAG Programmer
+         * J7 to OBC J10
+         * Teensy Ethernet
+         * J8 to PDU J12
+         * USB battery charging
+         * J9 to PDU J13 or J14
+         * Burnwire 1 (J13) or 2 (J14)
+         * J10 to OBC J1
+         * Radio Antenna
+         * J11 to external gps antenna
+         * GPS Antenna
+         * J12 to OBC J9
+         * GPS Antenna
+         * J13 to external
+         * Teensy Micro USB
+         * J14 to external
+         * Teensy Micro USB
+         * J15 to Teensy Micro USB
+         * Teensy Micro USB
+10.1.1.6. Camera Board
+         * Camera to Raspberry Pi Zero via Cable
+
+
+
+
+[a]Update these
+[b]Finish this
+[c]this is missing - probably this doc https://docs.google.com/document/d/1mCISQ2FT9NdC7M1yRxyKPuSgM1M17ViQa_bvZ7Jp-Uk/edit?tab=t.0
+[d]TODO: check if this is wired up to MCU
+[e]add this
