@@ -32,8 +32,21 @@ module ArtemisRpiTeensyDeployment {
     instance timer
     instance comDriver
     instance cmdSeq
-    instance teensyLink
-    instance pingResponder
+    instance teensyTransportService
+    instance missionManager
+    instance scienceManager
+    instance sohManager
+    instance commsManager
+    instance epsService
+    instance payloadService
+    instance adcsService
+    instance gpsService
+    instance storageService
+    instance epsAdapterArtemis
+    instance payloadAdapterN1Legacy
+    instance adcsAdapterD2S2
+    instance gpsAdapterArtemis
+    instance commsAdapterTeensyRfm23
 
   # ----------------------------------------------------------------------
   # Pattern graph specifiers
@@ -109,11 +122,20 @@ module ArtemisRpiTeensyDeployment {
       rateGroup1.RateGroupMemberOut[2] -> systemResources.run
       rateGroup1.RateGroupMemberOut[3] -> ComCcsds.comQueue.run
       rateGroup1.RateGroupMemberOut[4] -> ComCcsds.aggregator.timeout
-      rateGroup1.RateGroupMemberOut[5] -> teensyLink.run
+      rateGroup1.RateGroupMemberOut[5] -> teensyTransportService.run
+      rateGroup1.RateGroupMemberOut[6] -> missionManager.run
+      rateGroup1.RateGroupMemberOut[7] -> scienceManager.run
+      rateGroup1.RateGroupMemberOut[8] -> sohManager.run
+      rateGroup1.RateGroupMemberOut[9] -> commsManager.run
 
       # Rate group 2
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup2] -> rateGroup2.CycleIn
       rateGroup2.RateGroupMemberOut[0] -> cmdSeq.schedIn
+      rateGroup2.RateGroupMemberOut[1] -> epsService.run
+      rateGroup2.RateGroupMemberOut[2] -> payloadService.run
+      rateGroup2.RateGroupMemberOut[3] -> adcsService.run
+      rateGroup2.RateGroupMemberOut[4] -> gpsService.run
+      rateGroup2.RateGroupMemberOut[5] -> storageService.run
 
       # Rate group 3
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup3] -> rateGroup3.CycleIn
@@ -129,6 +151,47 @@ module ArtemisRpiTeensyDeployment {
       # Command Sequencer
       cmdSeq.comCmdOut -> CdhCore.cmdDisp.seqCmdBuff
       CdhCore.cmdDisp.seqCmdStatus -> cmdSeq.cmdResponseIn
+    }
+
+    connections MissionFlow {
+      missionManager.collectionRequestOut -> scienceManager.requestIn
+      scienceManager.payloadRequestOut -> payloadService.requestIn
+      payloadService.statusOut -> scienceManager.payloadStatusIn
+      scienceManager.scienceProductOut -> storageService.requestIn
+      storageService.downlinkReadyOut -> commsManager.scienceReadyIn
+      commsManager.downlinkRequestOut -> storageService.downlinkRequestIn
+    }
+
+    connections ServiceAdapterBindings {
+      epsService.adapterRequestOut -> epsAdapterArtemis.requestIn
+      epsAdapterArtemis.statusOut -> epsService.adapterStatusIn
+
+      payloadService.adapterRequestOut -> payloadAdapterN1Legacy.requestIn
+      payloadAdapterN1Legacy.statusOut -> payloadService.adapterStatusIn
+
+      adcsService.adapterRequestOut -> adcsAdapterD2S2.requestIn
+      adcsAdapterD2S2.statusOut -> adcsService.adapterStatusIn
+
+      gpsService.adapterRequestOut -> gpsAdapterArtemis.requestIn
+      gpsAdapterArtemis.statusOut -> gpsService.adapterStatusIn
+
+      commsManager.adapterRequestOut -> commsAdapterTeensyRfm23.requestIn
+      commsAdapterTeensyRfm23.statusOut[0] -> commsManager.adapterStatusIn
+      commsAdapterTeensyRfm23.statusOut[1] -> teensyTransportService.adapterStatusIn
+    }
+
+    connections TransportFlow {
+      teensyTransportService.linkStatusOut -> commsManager.linkStatusIn
+    }
+
+    connections SoHInputs {
+      epsService.sohStatusOut -> sohManager.statusIn[0]
+      payloadService.sohStatusOut -> sohManager.statusIn[1]
+      adcsService.sohStatusOut -> sohManager.statusIn[2]
+      gpsService.sohStatusOut -> sohManager.statusIn[3]
+      storageService.sohStatusOut -> sohManager.statusIn[4]
+      commsManager.sohStatusOut -> sohManager.statusIn[5]
+      teensyTransportService.sohStatusOut -> sohManager.statusIn[6]
     }
 
     connections ArtemisRpiTeensyDeployment {
