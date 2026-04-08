@@ -64,10 +64,39 @@ Stop all processes with `Ctrl-C` in the launcher terminal.
 
 If all three checks pass, the local command/telemetry/event loop is working for basic manual demo validation.
 
-## Optional quick extra check
+## Demo Walkthrough: `CollectionScheduled` (10s)
 
-- Send `MissionManager.SCHEDULE_COLLECTION` with `10`
-- Expect `MissionManager.CollectionScheduled` and downstream activity/events from science/storage path
+Use this when you want to demonstrate the timed collection story in GDS.
+
+1. Start emulation and open `http://127.0.0.1:5050`.
+2. In **Commanding**, send `SCHEDULE_COLLECTION` on `missionManager` (or `ArtemisRpiTeensyDeployment.missionManager`) with argument `10`.
+3. Confirm in **Command History**:
+   - command response is `OK`
+4. Confirm immediate updates in **Events**:
+   - `ArtemisRpiTeensyDeployment.missionManager.ModeChanged` (`mode=1`)
+   - `ArtemisRpiTeensyDeployment.missionManager.CollectionScheduled` (`delay=10`)
+   - `ArtemisRpiTeensyDeployment.scienceManager.CollectionTriggered` (`delay=10`)
+5. Confirm immediate updates in **Channels/Charts**:
+   - `ArtemisRpiTeensyDeployment.missionManager.CurrentMode` becomes `1`
+   - `ArtemisRpiTeensyDeployment.missionManager.LastScheduledDelaySeconds` becomes `10`
+   - `ArtemisRpiTeensyDeployment.scienceManager.PendingDelaySeconds` starts at `10`
+6. Wait about 10 seconds and confirm collection activity in **Events**:
+   - `ArtemisRpiTeensyDeployment.payloadService.PayloadCollectionForwarded`
+   - `ArtemisRpiTeensyDeployment.payloadService.PayloadStatusUpdated`
+   - `ArtemisRpiTeensyDeployment.scienceManager.ScienceProductReady`
+   - `ArtemisRpiTeensyDeployment.storageService.ScienceStored`
+7. Confirm post-collection state in **Channels/Charts**:
+   - `ArtemisRpiTeensyDeployment.scienceManager.PendingDelaySeconds` reaches `0`
+   - `ArtemisRpiTeensyDeployment.scienceManager.CollectionCount` increments
+   - `ArtemisRpiTeensyDeployment.storageService.StoredProducts` increments
+   - `ArtemisRpiTeensyDeployment.commsManager.PendingScienceBytes` becomes nonzero
+
+Optional follow-on command:
+
+- Send `REQUEST_SCIENCE_DOWNLINK` on `commsManager`
+- Expect `ArtemisRpiTeensyDeployment.commsManager.DownlinkRequested` and `ArtemisRpiTeensyDeployment.storageService.DownlinkPrepared`
+
+If chart lines do not move, verify the chart is not paused (toggle play/pause in the chart widget).
 
 ## Useful options
 
