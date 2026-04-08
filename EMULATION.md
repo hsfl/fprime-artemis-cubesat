@@ -95,8 +95,19 @@ Optional follow-on command:
 
 - Send `REQUEST_SCIENCE_DOWNLINK` on `commsManager`
 - Expect `ArtemisRpiTeensyDeployment.commsManager.DownlinkRequested` and `ArtemisRpiTeensyDeployment.storageService.DownlinkPrepared`
+- Current behavior is handshake-only (events/channels), not a real file transfer in GDS `#Downlink`.
 
 If chart lines do not move, verify the chart is not paused (toggle play/pause in the chart widget).
+
+## Next Step: Real File Downlink Path
+
+Current `REQUEST_SCIENCE_DOWNLINK` validates command/event flow only. To finish end-user downlink UX in `http://127.0.0.1:5050/#Downlink`, implement and wire a real `Svc::FileDownlink` transfer path.
+
+Done criteria:
+
+1. Triggering science downlink causes an actual file transfer session.
+2. GDS `#Downlink` shows active/progress/completed file entries.
+3. Downloaded file exists on the laptop and matches expected test content.
 
 ## Useful options
 

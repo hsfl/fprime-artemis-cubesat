@@ -195,6 +195,10 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 6. Decide if segment ACK/retry is required for acceptable RF reliability during the live demo.
 7. Add deterministic packet boundary extraction for uplink beyond simple burst mode if required by the selected demo flow.
 8. Build post-MVP mission/service multiplexing only after chain stability.
+9. Complete real file downlink path for the science demo flow:
+   - current `REQUEST_SCIENCE_DOWNLINK` path is handshake-only (events/channels)
+   - wire an actual `Svc::FileDownlink` transfer for science products
+   - pass criteria: file transfer visible in GDS `#Downlink`, file can be downloaded locally, content/size matches expectation
 
 ## Important Paths
 
