@@ -21,7 +21,7 @@ class CommsAdapter_TeensyRfm23 final : public CommsAdapter_TeensyRfm23ComponentB
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void requestIn_handler(FwIndexType portNum, U32 key) override;
 
-    void updateLinkModel();
+    void applyTransportPoll(U32 pollKey);
     U32 toStatusKey() const;
 
     U32 m_lastRequestKey;

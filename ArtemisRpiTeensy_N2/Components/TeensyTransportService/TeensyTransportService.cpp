@@ -6,7 +6,10 @@ TeensyTransportService::TeensyTransportService(const char* const compName)
     : TeensyTransportServiceComponentBase(compName),
       m_linkHeartbeat(0),
       m_uplinkFrames(0),
-      m_downlinkFrames(0) {}
+      m_downlinkFrames(0),
+      m_lastDownlinkFrames(0),
+      m_lastProgressHeartbeat(0),
+      m_linkState(LinkState::DOWN) {}
 
 TeensyTransportService::~TeensyTransportService() {}
 
@@ -19,16 +22,17 @@ void TeensyTransportService::run_handler(FwIndexType portNum, U32 context) {
     static_cast<void>(portNum);
     static_cast<void>(context);
     this->m_linkHeartbeat += 1;
+    this->updateLinkState();
 
     this->tlmWrite_LinkHeartbeat(this->m_linkHeartbeat);
     this->tlmWrite_UplinkFrames(this->m_uplinkFrames);
     this->tlmWrite_DownlinkFrames(this->m_downlinkFrames);
 
     if (this->isConnected_linkStatusOut_OutputPort(0)) {
-        this->linkStatusOut_out(0, this->m_linkHeartbeat);
+        this->linkStatusOut_out(0, static_cast<U32>(this->m_linkState));
     }
     if (this->isConnected_sohStatusOut_OutputPort(0)) {
-        this->sohStatusOut_out(0, this->m_linkHeartbeat);
+        this->sohStatusOut_out(0, static_cast<U32>(this->m_linkState));
     }
 }
 
@@ -36,6 +40,10 @@ void TeensyTransportService::adapterStatusIn_handler(FwIndexType portNum, U32 ke
     static_cast<void>(portNum);
     this->m_uplinkFrames += 1;
     this->m_downlinkFrames = key;
+    if (this->m_downlinkFrames > this->m_lastDownlinkFrames) {
+        this->m_lastDownlinkFrames = this->m_downlinkFrames;
+        this->m_lastProgressHeartbeat = this->m_linkHeartbeat;
+    }
 }
 
 void TeensyTransportService::LINK_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
@@ -47,8 +55,36 @@ void TeensyTransportService::RESET_COUNTERS_cmdHandler(FwOpcodeType opCode, U32 
     this->m_linkHeartbeat = 0;
     this->m_uplinkFrames = 0;
     this->m_downlinkFrames = 0;
+    this->m_lastDownlinkFrames = 0;
+    this->m_lastProgressHeartbeat = 0;
+    this->m_linkState = LinkState::DOWN;
     this->log_ACTIVITY_LO_CountersReset();
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void TeensyTransportService::updateLinkState() {
+    if (this->m_linkHeartbeat <= 2U) {
+        this->m_linkState = LinkState::ACQUIRING;
+        return;
+    }
+
+    if (this->m_downlinkFrames == 0U) {
+        if (this->m_uplinkFrames <= 2U) {
+            this->m_linkState = LinkState::ACQUIRING;
+        } else {
+            this->m_linkState = LinkState::DOWN;
+        }
+        return;
+    }
+
+    const U32 staleTicks = this->m_linkHeartbeat - this->m_lastProgressHeartbeat;
+    if (staleTicks > 80U) {
+        this->m_linkState = LinkState::DOWN;
+    } else if (staleTicks > 20U) {
+        this->m_linkState = LinkState::DEGRADED;
+    } else {
+        this->m_linkState = LinkState::LOCKED;
+    }
 }
 
 }  // namespace Components

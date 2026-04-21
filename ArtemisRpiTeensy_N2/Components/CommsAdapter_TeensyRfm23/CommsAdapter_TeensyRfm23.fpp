@@ -20,19 +20,19 @@ module Components {
         @ Number of processed adapter requests
         telemetry RequestCount: U32
 
-        @ Current modeled link state (0=down, 1=acquiring, 2=locked, 3=degraded)
+        @ Current link state from Teensy transport poll contract (0=down, 1=acquiring, 2=locked, 3=degraded)
         telemetry LinkState: U32
 
-        @ Synthetic RF RSSI estimate in dBm
+        @ RF RSSI estimate derived from current link state
         telemetry RssiDbm: I32
 
-        @ Synthetic RF receive packet counter
+        @ RF receive packet counter estimate
         telemetry RfRxPackets: U32
 
-        @ Synthetic RF transmit packet counter
+        @ RF transmit packet counter estimate
         telemetry RfTxPackets: U32
 
-        @ Synthetic RF transmit drop counter
+        @ RF transmit drop counter estimate
         telemetry RfTxDrops: U32
 
         @ Request handling event

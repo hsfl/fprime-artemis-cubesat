@@ -19,7 +19,9 @@ void CommsManager::run_handler(FwIndexType portNum, U32 context) {
     static_cast<void>(context);
 
     if (this->isConnected_adapterRequestOut_OutputPort(0)) {
-        this->adapterRequestOut_out(0, this->m_linkState + 1);
+        const U32 normalizedLink = (this->m_linkState <= 3U) ? this->m_linkState : 0U;
+        // Adapter poll key contract: 1=down, 2=acquiring, 3=locked, 4=degraded
+        this->adapterRequestOut_out(0, normalizedLink + 1U);
     }
     if (this->isConnected_sohStatusOut_OutputPort(0)) {
         this->sohStatusOut_out(0, this->m_linkState);

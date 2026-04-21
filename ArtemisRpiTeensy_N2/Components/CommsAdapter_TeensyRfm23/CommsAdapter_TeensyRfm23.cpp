@@ -25,7 +25,7 @@ void CommsAdapter_TeensyRfm23::requestIn_handler(FwIndexType portNum, U32 key) {
     this->m_requestCount += 1;
 
     const LinkState previousState = this->m_linkState;
-    this->updateLinkModel();
+    this->applyTransportPoll(key);
 
     const U32 linkStatus = this->toStatusKey();
 
@@ -53,32 +53,55 @@ void CommsAdapter_TeensyRfm23::requestIn_handler(FwIndexType portNum, U32 key) {
     }
 }
 
-void CommsAdapter_TeensyRfm23::updateLinkModel() {
+void CommsAdapter_TeensyRfm23::applyTransportPoll(U32 pollKey) {
     this->m_rfTxPackets += 1U;
 
-    if (this->m_requestCount < 4U) {
-        this->m_linkState = LinkState::ACQUIRING;
-        this->m_rssiDbm = -112 + static_cast<I32>(this->m_requestCount % 4U);
-        return;
+    switch (pollKey) {
+        case 1U:
+            this->m_linkState = LinkState::DOWN;
+            break;
+        case 2U:
+            this->m_linkState = LinkState::ACQUIRING;
+            break;
+        case 3U:
+            this->m_linkState = LinkState::LOCKED;
+            break;
+        case 4U:
+            this->m_linkState = LinkState::DEGRADED;
+            break;
+        default:
+            // Unknown poll keys are treated as degraded to make framing/config issues visible.
+            this->m_linkState = LinkState::DEGRADED;
+            this->m_rfTxDrops += 1U;
+            break;
     }
 
-    if ((this->m_requestCount % 89U) == 0U) {
-        this->m_linkState = LinkState::DOWN;
+    if (this->m_linkState == LinkState::DOWN) {
         this->m_rssiDbm = -120;
-        this->m_rfTxDrops += 1U;
+        if ((this->m_requestCount % 6U) == 0U) {
+            this->m_rfTxDrops += 1U;
+        }
         return;
     }
 
-    if ((this->m_requestCount % 17U) == 0U) {
-        this->m_linkState = LinkState::DEGRADED;
+    if (this->m_linkState == LinkState::ACQUIRING) {
+        this->m_rssiDbm = -111 + static_cast<I32>(this->m_requestCount % 4U);
+        if ((this->m_requestCount % 5U) == 0U) {
+            this->m_rfRxPackets += 1U;
+        }
+        return;
+    }
+
+    if (this->m_linkState == LinkState::DEGRADED) {
         this->m_rssiDbm = -97 + static_cast<I32>(this->m_requestCount % 3U);
         this->m_rfRxPackets += 1U;
-        this->m_rfTxDrops += 1U;
+        if ((this->m_requestCount % 3U) == 0U) {
+            this->m_rfTxDrops += 1U;
+        }
         return;
     }
 
-    this->m_linkState = LinkState::LOCKED;
-    this->m_rssiDbm = -74 + static_cast<I32>(this->m_requestCount % 6U);
+    this->m_rssiDbm = -76 + static_cast<I32>(this->m_requestCount % 6U);
     this->m_rfRxPackets += 3U;
 }
 

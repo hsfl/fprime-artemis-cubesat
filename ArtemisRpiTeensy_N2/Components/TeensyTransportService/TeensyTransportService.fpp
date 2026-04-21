@@ -14,7 +14,7 @@ module Components {
         @ Adapter status input
         sync input port adapterStatusIn: Svc.Ping
 
-        @ Link status output to CommsManager
+        @ Link status output to CommsManager (0=down, 1=acquiring, 2=locked, 3=degraded)
         output port linkStatusOut: Svc.Ping
 
         @ Status output to SoH manager
