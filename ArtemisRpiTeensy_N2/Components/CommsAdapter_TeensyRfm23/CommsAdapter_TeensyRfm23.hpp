@@ -11,11 +11,26 @@ class CommsAdapter_TeensyRfm23 final : public CommsAdapter_TeensyRfm23ComponentB
     ~CommsAdapter_TeensyRfm23();
 
   private:
+    enum class LinkState : U32 {
+        DOWN = 0,
+        ACQUIRING = 1,
+        LOCKED = 2,
+        DEGRADED = 3,
+    };
+
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void requestIn_handler(FwIndexType portNum, U32 key) override;
 
-    static constexpr U32 STATUS_OFFSET = 500;
+    void updateLinkModel();
+    U32 toStatusKey() const;
+
     U32 m_lastRequestKey;
+    U32 m_requestCount;
+    LinkState m_linkState;
+    I32 m_rssiDbm;
+    U32 m_rfRxPackets;
+    U32 m_rfTxPackets;
+    U32 m_rfTxDrops;
 };
 
 }  // namespace Components

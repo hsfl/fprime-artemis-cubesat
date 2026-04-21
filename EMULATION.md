@@ -55,6 +55,9 @@ Stop all processes with `Ctrl-C` in the launcher terminal.
    - `MissionManager.ModeHeartbeat`
    - `MissionManager.PingCount`
    - `TeensyTransportService.LinkHeartbeat`
+   - `GpsAdapter_Artemis.FixState`
+   - `CommsAdapter_TeensyRfm23.LinkState`
+   - `CommsAdapter_TeensyRfm23.RfRxPackets`
 4. Confirm `ModeHeartbeat` and `LinkHeartbeat` increment continuously.
 5. Send command `MissionManager.PING` with a token (example `42`).
 6. Confirm:
@@ -63,6 +66,19 @@ Stop all processes with `Ctrl-C` in the launcher terminal.
    - telemetry `MissionManager.PingCount` increments
 
 If all three checks pass, the local command/telemetry/event loop is working for basic manual demo validation.
+
+## Adapter Telemetry Expectations (GPS + RFM23)
+
+When the adapter model path is active, expect:
+
+- `ArtemisRpiTeensyDeployment.gpsAdapterArtemis.FixState` to move through:
+  - acquiring (`1`) early in runtime
+  - mostly `3` (3D fix) with occasional `2` (2D) and rare `0` (dropout)
+- `ArtemisRpiTeensyDeployment.commsAdapterTeensyRfm23.LinkState` to move through:
+  - acquiring (`1`) at startup
+  - mostly `2` (locked) with occasional `3` (degraded) and rare `0` (down)
+- `ArtemisRpiTeensyDeployment.commsAdapterTeensyRfm23.RfRxPackets` to monotonically increase.
+- `ArtemisRpiTeensyDeployment.teensyTransportService.DownlinkFrames` to follow that receive-packet counter.
 
 ## Demo Walkthrough: `CollectionScheduled` (10s)
 

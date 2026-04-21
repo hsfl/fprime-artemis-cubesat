@@ -11,11 +11,24 @@ class GpsAdapter_Artemis final : public GpsAdapter_ArtemisComponentBase {
     ~GpsAdapter_Artemis();
 
   private:
+    enum class FixState : U32 {
+        NO_FIX = 0,
+        ACQUIRING = 1,
+        FIX_2D = 2,
+        FIX_3D = 3,
+    };
+
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void requestIn_handler(FwIndexType portNum, U32 key) override;
 
-    static constexpr U32 STATUS_OFFSET = 400;
+    void updateFixModel();
+    U32 toStatusKey() const;
+
     U32 m_lastRequestKey;
+    U32 m_requestCount;
+    FixState m_fixState;
+    U32 m_satellitesTracked;
+    U32 m_fixQualityScore;
 };
 
 }  // namespace Components
