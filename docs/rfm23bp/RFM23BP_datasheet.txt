@@ -1,17 +1,17 @@
-RFM23BP ISM Transceiver Module Datasheet - Text Extract
+# RFM23BP ISM Transceiver Module Datasheet
 
 Source PDF: https://www.hoperf.com/uploads/RFM23BPdatasheet_1695351296.pdf
 Original PDF title: Microsoft Word - RFM23BP20120502.doc
 PDF version shown in source: V2.0
 Extraction tool: pdftotext -layout -enc UTF-8
 Extraction date: 2026-04-20 Pacific/Honolulu
+Cleanup date: 2026-04-21 Pacific/Honolulu
 
-Notes:
+## Notes
 - This file is a text extraction of the vendor datasheet for repo-local search and reference.
 - Layout-sensitive tables and register maps should still be verified against the original PDF before hardware decisions.
 
-                                                                             R F M 2 3 BP
-R F M 2 3 BP I S M T R A N S C E I V E R M O D U L E                                                   V2.0
+RFM23BP ISM Transceiver Module V2.0
 Features
    Frequency Range                        Wake-up timer
      433/868/915MHz ISM bands             Auto-frequency calibration (AFC)
@@ -29,8 +29,6 @@ Features
    Digital RSSI                           On-chip crystal tuning
                                           16-PIN SMD package
 Applications                              Low cost
-
-
 
    Remote control                          Remote meter reading
    Home security & alarm                   Remote keyless entry
@@ -52,7 +50,7 @@ battery detector, 64 byte TX/RX FIFOs, automatic packet handling, and preamble
 detection reduce overall current consumption and allow the use of lower-cost
 system MCUs. An integrated temperature sensor, general purpose ADC, power-
 on-reset (POR), and GPIOs further reduce overall system cost and size.
-The RFM23BP digital receive archit ecture features a high-performance ADC
+The RFM23BP digital receive architecture features a high-performance ADC
 and DSP based modem which performs demodulation, filtering, and packet
 handling for increased flexibility and performance. The direct digital transmit
 modulation and automatic PA power ramping ensure precise transmit modulation
@@ -61,95 +59,64 @@ including FCC, ETSI.
 An easy-to-use calculator is provided to quickly configure the radio settings,
 simplifying customer's system design and reducing time to market.
 
+## Table of Contents
 
+1. Electrical Specifications - page 4
+2. Functional Description - page 11
+2.1. Operating Modes - page 13
+3. Controller Interface - page 14
+3.1. Serial Peripheral Interface (SPI) - page 14
+3.2. Operating Mode Control - page 16
+3.3. Interrupts - page 19
+3.4. System Timing - page 20
+3.5. Frequency Control - page 21
+4. Modulation Options - page 28
+4.1. Modulation Type - page 28
+4.2. Modulation Data Source - page 29
+5. Internal Functional Blocks - page 33
+5.1. RX LNA - page 33
+5.2. RX I-Q Mixer - page 33
+5.3. Programmable Gain Amplifier - page 33
+5.4. ADC - page 33
+5.5. Digital Modem - page 33
+5.6. Synthesizer - page 34
+5.7. Power Amplifier - page 35
+5.8. Crystal Oscillator - page 36
+5.9. Regulators - page 36
+6. Data Handling and Packet Handler - page 37
+6.1. RX and TX FIFOs - page 37
+6.2. Packet Configuration - page 38
+6.3. Packet Handler TX Mode - page 39
+6.4. Packet Handler RX Mode - page 39
+6.5. Data Whitening, Manchester Encoding, and CRC - page 42
+6.6. Preamble Detector - page 42
+6.7. Preamble Length - page 43
+6.8. Invalid Preamble Detector - page 43
+6.9. Synchronization Word Configuration - page 43
+6.10. Receive Header Check - page 44
+6.11. TX Retransmission and Auto TX - page 44
+7. RX Modem Configuration - page 45
+7.1. Modem Settings for FSK and GFSK - page 45
+8. Auxiliary Functions - page 46
+8.1. Smart Reset - page 46
 
+8.2. Microcontroller Clock - page 47
+8.3. General Purpose ADC - page 48
+8.4. Temperature Sensor - page 49
+8.5. Low Battery Detector - page 51
+8.6. Wake-Up Timer and 32 kHz Clock Source - page 52
+8.7. Low Duty Cycle Mode - page 54
+8.8. GPIO Configuration - page 55
+8.9. Antenna Diversity - page 56
+8.10. RSSI and Clear Channel Assessment - page 57
+9. Reference Design - page 58
+10. Register Table and Descriptions - page 59
+11. Pin Descriptions: RFM23BP - page 60
+12. Mechanical Dimension: RFM23BP - page 61
+13. Ordering Information - page 62
+Contact Information - page 62
 
-1 Tel: +86-755-82973805        Fax: +86-755-82973550       E-mail: sales@hoperf.com http://www.hoperf.com     1
-
-
---- Page Break ---
-
-                                                                                                         RFM23BP
-TA B L E O F C O N T E N TS
-
-
-Section                                                                                                                           Page
-1. Electrical Specifications . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .4
-2. Functional Description . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11
-      2.1. Operating Modes . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 13
-3. Controller Interface . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14
-      3.1. Serial Peripheral Interface (SPI) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14
-      3.2. Operating Mode Control . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
-      3.3. Interrupts . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19
-      3.4. System Timing . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20
-      3.5. Frequency Control . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
-4. Modulation Options . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 28
-      4.1. Modulation Type . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 28
-      4.2. Modulation Data Source . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .29
-5. Internal Functional Blocks . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
-      5.1. RX LNA . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
-      5.2. RX I-Q Mixer . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
-      5.3. Programmable Gain Amplifier . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
-      5.4. ADC . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
-      5.5. Digital Modem . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
-      5.6. Synthesizer . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 34
-      5.7. Power Amplifier . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 35
-      5.8. Crystal Oscillator . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
-      5.9. Regulators . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
-6. Data Handling and Packet Handler . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 37
-      6.1. RX and TX FIFOs . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 37
-      6.2. Packet Configuration . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .38
-      6.3. Packet Handler TX Mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .39
-      6.4. Packet Handler RX Mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .39
-      6.5. Data Whitening, Manchester Encoding, and CRC . . . . . . . . . . . . . . . . . . . . . . . . . . 42
-      6.6. Preamble Detector . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 42
-      6.7. Preamble Length . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 43
-      6.8. Invalid Preamble Detector . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 43
-      6.9. Synchronization Word Configuration . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 43
-      6.10. Receive Header Check . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 44
-      6.11. TX Retransmission and Auto TX . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 44
-7. RX Modem Configuration . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 45
-      7.1. Modem Settings for FSK and GFSK . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 45
-8. Auxiliary Functions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 46
-      8.1. Smart Reset . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 46
-
-
-
-
-    Tel: +86-755-82973805           Fax: +86-755-82973550            E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                                           2
-
-
---- Page Break ---
-
-RFM23BP
-     8.2. Microcontroller Clock . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 47
-     8.3. General Purpose ADC . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .48
-     8.4. Temperature Sensor . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .49
-     8.5. Low Battery Detector . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 51
-     8.6. Wake-Up Timer and 32 kHz Clock Source . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 52
-     8.7. Low Duty Cycle Mode . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 54
-     8.8. GPIO Configuration . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 55
-     8.9. Antenna Diversity . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 56
-     8.10. RSSI and Clear Channel Assessment . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 57
-9. Reference Design . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .58
-10. Register Table and Descriptions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .59
-11. Pin Descriptions: RFM23BP . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .60
-12. Mechanical Dimension:RFM23BP. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .61
-13. Ordering Information.. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .62
-    Contact Information . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .62
-
-
-
-
-       Tel: +86-755-82973805         Fax: +86-755-82973550          E-mail: sales@hoperf.com http://www.hoperf.com
-3
-
-
---- Page Break ---
-
-                                                                                                  RFM23BP
-1. Electrical Specifications
+## 1. Electrical Specifications
 
 Table 1. DC Characteristics
 
@@ -172,25 +139,9 @@ RX Mode Current           IRX                                                   
 TX Mode Current
 —RFM23BP                ITX_+Max                   txpow[2:0] = 110 (+30 dBm)                     —     550   —     mA
 
-
                          ITX_+Min
                                                     txpow[2:0] = 001 (TBD dBm)                    —     TBD   —     mA
 
-
-
-
-   Tel: +86-755-82973805        Fax: +86-755-82973550         E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                         4
-
-
-
-
-                                                                                                                         -4-
-
-
---- Page Break ---
-
-  RFM23BP
 Table 2. Synthesizer AC Electrical Characteristics
        Parameter            Symbol                  Conditions                Min     Typ     Max     Units
 
@@ -199,8 +150,6 @@ Table 2. Synthesizer AC Electrical Characteristics
                               FSYN                  868MHz band               848              888      MHZ
  Range—RFM23BP
                                                     915MHz band               901               929     MHz
-
-
 
 Synthesizer Frequency       FRES-LB         433MHz Band                        —     156.25    —        Hz
 Resolution
@@ -218,15 +167,6 @@ Phase Noise                  Lφ(fM)                 ΔF = 10 kHz               
                                                     ΔF = 1 MHz                 —      –115     —      dBc/Hz
                                                     ΔF = 10 MHz                —      –130     —      dBc/Hz
 
-
-
-
-   Tel: +86-755-82973805    Fax: +86-755-82973550    E-mail: sales@hoperf.com http://www.hoperf.com
-
-
---- Page Break ---
-
-                                                                                      RFM23BP
 Table 3. Receiver AC Electrical Characteristics
        Parameter             Symbol                   Conditions                    Min   Typ    Max    Units
                                                      433MHz band                    413          453    MHz
@@ -252,12 +192,8 @@ RX Sensitivity                PRX_2                  (BER < 0.1%)               
 
 RX Channel Bandwidth           BW                                                   2.6   —      620    kHz
 
-                                                        -6-
-
-
 BER Variation vs Power       PRX_RES           Up to +5 dBm Input Level             —      0     0.1    ppm
 Level
-
 
 RSSI Resolution              RESRSSI                                                —     ±0.5    —      dB
 ±1-Ch Offset Selectivity     C/I1-CH   Desired Ref Signal 3 dB above sensitivity,   —     –31     —      dB
@@ -271,17 +207,6 @@ Blocking at 8 MHz Offset     8MBLOCK                                            
 Image Rejection               ImREJ        Rejection at the image frequency.        —     –30     —      dB
                                                       IF=937 kHz
 Spurious Emissions           POB_RX1            Measured at RX pins                 —      —     –54    dBm
-
-
-
-
-   Tel: +86-755-82973805     Fax: +86-755-82973550     E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                              6
-
-
---- Page Break ---
-
-RFM23BP
 
 Table 4. Transmitter AC Electrical Characteristics
         Parameter            Symbol                Conditions                Min     Typ     Max    Units
@@ -311,18 +236,7 @@ Spurious Emissions
                              POB-TX1            POUT = +30 dBm,               —       —      –30    dBc
                                                Frequencies <1 GHz
 
-
                              POB-TX2    1–12.75 GHz, excluding harmonics      —       —      –36    dBc
-
-
-
-
-     Tel: +86-755-82973805    Fax: +86-755-82973550    E-mail: sales@hoperf.com http://www.hoperf.com 7
-
-
---- Page Break ---
-
-                                                                                            RFM23BP
 
 Table 5. Auxiliary Block Specifications
         Parameter            Symbol              Conditions                  Min      Typ    Max   Units
@@ -347,9 +261,6 @@ Purpose ADC Conversion
 Time
 30 MHz XTAL Start-Up time     t30M                                            —       600     —     µs
 
-
-
-
 30 MHz XTAL Cap              30MRES                                           —        97     —      fF
 Resolution
 
@@ -360,17 +271,6 @@ using 32 kHz XTAL
 Internal RC Oscillator
 POR Reset Time                tPOR                                            —        16     —     ms
 Software Reset Time           tsoft                                           —       100     —     µs
-
-
-
-
-    Tel: +86-755-82973805   Fax: +86-755-82973550      E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                          8
-
-
---- Page Break ---
-
-RFM23BP
 
 Table 6. Digital IO Specifications (SDO, SDI, SCLK, nSEL, and nIRQ)
             Parameter              Symbol                     Conditions                 Min       Typ   Max   Units
@@ -383,9 +283,6 @@ Input Current                           IIN                   0<VIN< VDD        
 Logic High Level Output                VOH           IOH<1 mA source, VDD=1.8 V        VDD – 0.6   —     —      V
 Voltage
 Logic Low Level Output Voltage         VOL             IOL<1 mA sink, VDD=1.8 V           —        —     0.6    V
-
-
-
 
 Table 7. GPIO Specifications (GPIO_0, GPIO_1, and GPIO_2)
             Parameter                   Symbol                 Conditions                Min       Typ   Max   Units
@@ -407,17 +304,6 @@ Logic High Level Output Voltage           VOH              IOH< IOmax source,   
 Logic Low Level Output Voltage            VOL                IOL< IOmax sink,             —        —     0.6    V
                                                                VDD=1.8 V
 
-
-
-
-       Tel: +86-755-82973805      Fax: +86-755-82973550            E-mail: sales@hoperf.com http://www.hoperf.com
-9
-
-
---- Page Break ---
-
-                                                                                               RFM23BP
-
 Table 8. Absolute Maximum Ratings
                                        Parameter                                                   Value             Unit
 VDD to GND                                                                                       –0.3, +8.3            V
@@ -436,17 +322,7 @@ Note: Stresses beyond those listed under “Absolute Maximum Ratings” may caus
       device reliability. Power Amplifier may be damaged if switched on without proper load or termination connected. TX
       matching network design will influence TX VRF-peak on TX output pin. Caution: ESD sensitive device.
 
-
-
-
-  Tel: +86-755-82973805        Fax: +86-755-82973550         E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                             10
-
-
---- Page Break ---
-
-                                                                                       RFM23BP
-2. Functional Description
+## 2. Functional Description
 HopeRF's RFM23BP are highly integrated,low cost,433/868/915MHz wireless ISM transceivers module .
 The wide operating voltage range of 3.3–6V and low current consumption makes theRFM23BP
 an ideal solution for battery powered applications.
@@ -471,17 +347,7 @@ microcontroller. Three configurable general purpose I/Os are available. A comple
 functions is shown in
  "8. Auxiliary Functions"and includes microcontroller clock output, Antenna Diversity, POR, and various interrupts.
 
-
-
-
-  Tel: +86-755-82973805     Fax: +86-755-82973550      E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                11
-
-
---- Page Break ---
-
-                                                                                    RFM23BP
-2.1. Operating Modes
+### 2.1. Operating Modes
 The RFM23BP provides several operating modes which can be used to optimize the power consumption for a
 given application. Depending upon the system communication protocol, an optimal trade-off between the radio
 wake time and power consumption can be achieved.
@@ -516,18 +382,9 @@ TRANSMIT                          ON          X           X           ON       O
  RECEIVE                          ON          X           X           ON       ON     OFF      ON     18.5 mA
 *Note: Using RFM23BP at +30 dBm using recommended reference design.
 
+## 3. Controller Interface
 
-
-
-   Tel: +86-755-82973805       Fax: +86-755-82973550   E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                               13
-
-
---- Page Break ---
-
-RFM23BP
-3. Controller Interface
-3.1. Serial Peripheral Interface (SPI)
+### 3.1. Serial Peripheral Interface (SPI)
 The RFM23BP communicates with the host MCU over a standard 3-wire SPI interface: SCLK, SDI, and nSEL.
 The host MCU can read data from the device on the SDO output pin. A SPI transaction is a 16-bit sequence which
 consists of a Read-Write (R/W) select bit, followed by a 7-bit address field (ADDR), and an 8-bit data field (DATA)
@@ -541,7 +398,6 @@ SCLK rate is flexible with a maximum rate of 10 MHz.
                          MSB                                                                    LSB
 
                SDI        RW A6 A5 A4 A3 A2 A1 A0 D7 D6 D5 D4 D3 D2 D1 D0 xx xx RW A7
-
 
            SCLK
 
@@ -573,27 +429,14 @@ read from the selected register will be available on the SDO output pin. The REA
 After the READ function is completed the SDO pin will remain at either a logic 1 or logic 0 state depending on the
 last data bit clocked out (D0). When nSEL goes high the SDO output pin will be pulled high by internal pullup.
 
-
-
-
-      Tel: +86-755-82973805      Fax: +86-755-82973550      E-mail: sales@hoperf.com http://www.hoperf.com
-14
-
-
---- Page Break ---
-
-                                                                                                                 RFM23BP
-
                           First Bit                                                                         Last Bit
                              RW                                   D7     D6    D5    D4    D3    D2    D1    D0
                   SDI        =0 A6    A5 A4 A3 A2 A1 A0           =X     =X    =X    =X    =X    =X    =X    =X
-
 
                   SCLK
 
                                                             First Bit                                        Last Bit
                  SDO                                              D7 D6 D5 D4 D3                 D2 D1 D0
-
 
                   nSEL
 
@@ -608,12 +451,9 @@ latched into the RFM23BP every eight SCLK cycles.
                 RW                              D7     D6   D5   D4     D3    D2    D1    D0    D7    D6    D5    D4   D3   D2   D1    D0
    SDI          =1 A6    A5 A4 A3 A2 A1 A0      =X     =X   =X   =X     =X    =X    =X    =X    =X    =X    =X    =X   =X   =X   =X    =X
 
-
    SCLK
 
-
    nSEL
-
 
                                       Figure 5. SPI Timing—Burst Write Mode
 
@@ -621,27 +461,16 @@ latched into the RFM23BP every eight SCLK cycles.
                 RW                              D7     D6   D5   D4     D3    D2    D1    D0
    SDI          =0 A6    A5 A4 A3 A2 A1 A0      =X     =X   =X   =X     =X    =X    =X    =X
 
-
    SCLK
 
                                            First Bit
   SDO                                           D7 D6 D5 D4 D3                D2 D1 D0          D7 D6 D5 D4 D3              D2 D1 D0
 
-
    nSEL
 
                                       Figure 6. SPI Timing—Burst Read Mode
 
-
-
-
-   Tel: +86-755-82973805        Fax: +86-755-82973550            E-mail: sales@hoperf.com http://www.hoperf.com                                  15
-
-
---- Page Break ---
-
-RFM23BP
-3.2. Operating Mode Control
+### 3.2. Operating Mode Control
 There are four primary states in the RFM23BP radio state machine:SHUTDOWN, IDLE, TX, and RX (see
 Figure 7). The SHUTDOWN state completely shuts down the radio to minimize current consumption. There are five
 different configurations/options for the IDLE state which can be selected to optimize the chip to the applications
@@ -657,20 +486,12 @@ register space. The LPLDO has extremely low quiescent current consumption but li
 it is used only in the IDLE-STANDBY and IDLE-SLEEP modes. The main digital regulator is automatically enabled
 in all other modes.
 
-
-
                                                       SSH
                                                         HUUTTDDOW
                                                                 WNN
 
-
-
-
                                                         LEID
                                                            *
-
-
-
 
                               TX                                                       RX
                                             *Five Different Options for IDLE
@@ -694,78 +515,65 @@ in all other modes.
                    TX State                    NA              200 µs          550 mA @ +30 dBm
                    RX State                  200 µs              NA                18.5 mA
 
-
-
-
-      Tel: +86-755-82973805        Fax: +86-755-82973550        E-mail: sales@hoperf.com http://www.hoperf.com
-16
-
-
---- Page Break ---
-
-                                                                                      RFM23BP
-3.2.1. SHUTDOWN State
+#### 3.2.1. SHUTDOWN State
 The SHUTDOWN state is the lowest current consumption state of the device with nominally less than 15 nA of
 current consumption. The shutdown state may be entered by driving the SDN pin high. The SDN pin
 should be held low in all states except the SHUTDOWN state. In the SHUTDOWN state, the contents of the
 registers are lost and there is no SPI access.
 When the chip is connected to the power supply, a POR will be initiated after the falling edge of SDN.
-3.2.2. IDLE State
+
+#### 3.2.2. IDLE State
 There are five different modes in the IDLE state which may be selected by "Register 07h. Operating Mode and
 Function Control 1". All modes have a tradeoff between current consumption and response time to TX/RX mode.
 This tradeoff is shown in Table 11. After the POR event, SWRESET, or exiting from the SHUTDOWN state the chip
 will default to the IDLE-READY mode. After a POR event the interrupt registers must be read to properly enter the
 SLEEP, SENSOR, or STANDBY mode and to control the 32 kHz clock correctly.
-3.2.2.1. STANDBY Mode
+
+##### 3.2.2.1. STANDBY Mode
 STANDBY mode has the lowest current consumption of the five IDLE states with only the LPLDO enabled to
 maintain the register values. In this mode the registers can be accessed in both read and write mode. The
 STANDBY mode can be entered by writing 0h to "Register 07h. Operating Mode and Function Control 1". If an
 interrupt has occurred (i.e., the nIRQ pin = 0) the interrupt registers must be read to achieve the minimum current
 consumption. Additionally, the ADC should not be selected as an input to the GPIO in this mode as it will cause
 excess current consumption.
-3.2.2.2. SLEEP Mode
+
+##### 3.2.2.2. SLEEP Mode
 In SLEEP mode the LPLDO is enabled along with the Wake-Up-Timer, which can be used to accurately wake-up
 the radio at specified intervals. See "8.6. Wake-Up Timer and 32 kHz Clock Source for more information
-on the Wake -Up-Timer. SLEEP mode is entered by setting enwt = 1 (40h) in "Register 07h. Operating
+on the Wake-Up-Timer. SLEEP mode is entered by setting enwt = 1 (40h) in "Register 07h. Operating
 Mode and Function Control 1". If an interrupt has occurred (i.e., the nIRQ pin = 0) the interrupt registers must be
 read to achieve the minimum current consumption. Also, the ADC should not be selected as an input to the GPIO
 in this mode as it will cause excess current consumption.
-3.2.2.3. SENSOR Mode
+
+##### 3.2.2.3. SENSOR Mode
 In SENSOR mode either the Low Battery Detector, Temperature Sensor, or both may be enabled in addition to the
 LPLDO and Wake-Up-Timer. The Low Battery Detector can be enabled by setting enlbd = 1 in "Register 07h.
 Operating Mode and Function Control 1". See "8.4. Temperature Sensor" and "8.5. Low Battery
 Detector" for more information on these features. If an interrupt has occurred (i.e., the nIRQ pin = 0)
 the interrupt registers must be read to achieve the minimum current consumption.
-3.2.2.4. READY Mode
+
+##### 3.2.2.4. READY Mode
 READY Mode is designed to give a fast transition time to TX mode with reasonable current consumption. In this
 mode the Crystal oscillator remains enabled reducing the time required to switch to TX or RX mode by eliminating
 the crystal start-up time. READY mode is entered by setting xton = 1 in "Register 07h. Operating Mode and
 Function Control 1". To achieve the lowest current consumption state the crystal oscillator buffer should be
 disabled in “Register 62h. Crystal Oscillator Control and Test.” To exit READY mode, bufovr (bit 1) of this register
 must be set back to 0.
-3.2.2.5. TUNE Mode
+
+##### 3.2.2.5. TUNE Mode
 In TUNE mode the PLL remains enabled in addition to the other blocks enabled in the IDLE modes. This will give
 the fastest response to TX mode as the PLL will remain locked but it results in the highest current consumption.
 This mode of operation is designed for frequency hopping spread spectrum systems (FHSS). TUNE mode is
 entered by setting pllon = 1 in "Register 07h. Operating Mode and Function Control 1". It is not necessary to set
 xton to 1 for this mode, the internal state machine automatically enables the crystal oscillator.
 
-
-
-
-   Tel: +86-755-82973805     Fax: +86-755-82973550      E-mail: sales@hoperf.com http://www.hoperf.com           17
-
-
---- Page Break ---
-
-RFM23BP
-3.2.3. TX State
+#### 3.2.3. TX State
 The TX state may be entered from any of the IDLE modes when the txon bit is set to 1 in "Register 07h. Operating
 Mode and Function Control 1". A built-in sequencer takes care of all the actions required to transition between
 states from enabling the crystal oscillator to ramping up the PA. The following sequence of events will occur
 automatically when going from STANDBY mode to TX mode by setting the txon bit.
 1. Enable the main digital LDO and the Analog LDOs.
-2. Start up crystal oscillator and wait until ready (controlled byan internal timer).
+2. Start up crystal oscillator and wait until ready (controlled by an internal timer).
 3. Enable PLL.
 4. Calibrate VCO (this action is skipped when the vcocal bit is “0”, default value is “1”).
 5. Wait until PLL settles to required transmit frequency (controlled by an internal timer).
@@ -773,7 +581,8 @@ automatically when going from STANDBY mode to TX mode by setting the txon bit.
 7. Transmit packet.
 Steps in this sequence may be eliminated depending on which IDLE mode the chip is configured to prior to setting
 the txon bit. By default, the VCO and PLL are calibrated every time the PLL is enabled.
-3.2.4. RX State
+
+#### 3.2.4. RX State
 The RX state may be entered from any of the IDLE modes when the rxon bit is set to 1 in "Register 07h. Operating
 Mode and Function Control 1". A built-in sequencer takes care of all the actions required to transition from one of
 the IDLE modes to the RX state. The following sequence of events will occur automatically to get the chip into RX
@@ -788,7 +597,8 @@ mode when going from STANDBY mode to RX mode by setting the rxon bit:
 Depending on the configuration of the radio all or some of the following functions will be performed automatically by
 the digital modem: AGC, AFC (optional), update status registers, bit synchronization, packet handling (optional)
 including sync word, header check, and CRC.
-3.2.5. Device Status
+
+#### 3.2.5. Device Status
 
 Add R/W Function/Description          D7       D6       D5            D4       D3       D2    D1       D0      POR Def.
 
@@ -796,17 +606,7 @@ Add R/W Function/Description          D7       D6       D5            D4       D
 
 The operational status of the chip can be read from "Register 02h. Device Status".
 
-
-
-
-      Tel: +86-755-82973805      Fax: +86-755-82973550          E-mail: sales@hoperf.com http://www.hoperf.com
-18
-
-
---- Page Break ---
-
-                                                                                                      RFM23BP
-3.3. Interrupts
+### 3.3. Interrupts
 The RFM23BP is capable of generating an interrupt signal when certain events occur. The chip notifies the
 microcontroller that an interrupt event has occurred by setting the nIRQ output pin LOW = 0. This interrupt signal
 will be generated when any one (or more) of the interrupt events (corresponding to the Interrupt Status bits) shown
@@ -827,16 +627,7 @@ Add R/W Function/Descript            D7         D6           D5           D4    
 
 06 R/W      Interrupt Enable 2    enswdet enpreaval enpreainval         enrssi      enwut   enlbd     enchiprdy    enpor        01h
 
-
-
-
-   Tel: +86-755-82973805         Fax: +86-755-82973550          E-mail: sales@hoperf.com http://www.hoperf.com                        19
-
-
---- Page Break ---
-
-RFM23BP
-3.4. System Timing
+### 3.4. System Timing
 The system timing for TX and RX modes is shown in Figures 8 and 9. The figures demonstrate transitioning from
 STANDBY mode to TX or RX mode through the built-in sequencer of required steps. The user only needs to
 program the desired mode, and the internal sequencer will properly transition the part from its current mode.
@@ -845,9 +636,6 @@ settling of the VCO. The PLL TS time is for the settling time of the PLL, which 
 total time for PLL T0, PLL CAL, and PLL TS under all conditions is 200 µs. Under certain applications, the PLL T0
 time and the PLL CAL may be skipped for faster turn-around time. Contact applications support if faster turnaround
 time is desired.
-
-
-
 
                                                                                                                                                                                                                                                                        PA RAMP DOWN
                                                                                                                                                            PRE PA RAMP
@@ -860,77 +648,44 @@ time is desired.
 
               600us
 
-
-
-
                                                                                                                                                                          Configurable 5-20us, Recommend 5us
                                                                                     50us, May be skipped
-
-
-
 
                                                                                                                    Configurable 0-310us, Recommend 100us
                                                                                                                                                             6us, Fixed
 
-
-
-
                                            Configurable 0-70us, Default = 50us
                                                                                                                                                                                                                                                                Configurable 5-20us, Recommend 5us
 
-
-
-
                                                                                                                                                                                                               Figure 8. TX Timing
-
-
 
                                 PLL T0                                             PLL CAL                  PLLTS
           XTAL Settling
                                                                                                                                                                                                                                      RX Packet
              Time
 
-
                600us
-
-
-
 
                           Configurable 0-70us, Default =50us
                                                                                  50us, May be skipped
 
-
-
-
                                                                                                             Configurable 0-310us, Recommend 100us
-
-
-
 
                                                                                                                                                                                                               Figure 9. RX Timing
 
-
-
-       Tel: +86-755-82973805                                                                               Fax: +86-755-82973550                                                                                         E-mail: sales@hoperf.com http://www.hoperf.com
-20
-
-
---- Page Break ---
-
-                                                                                           RFM23BP
-3.5. Frequency Control
+### 3.5. Frequency Control
 For calculating the necessary frequency register settings it is recommended that customers use
 the HOPERF Register Calculator worksheet (in Microsoft Excel) available on the product website.
 These methods offer a simple method to quickly determi ne the correct settings based on the
 application requirements. The following information can be used to calculated these values manually.
-3.5.1. Frequency Programming
+
+#### 3.5.1. Frequency Programming
 In order to receive or transmit an RF signal, the desired channel frequency, fcarrier, must be programmed into the
 RFM23BP. The carrier frequency is generated by a Fractional-N Synthesizer, using 10 MHz both as the
 reference frequency and the clock of the (3rd order) ΔΣ modulator. This modulator uses modulo 64000
 accumulators. This design was made to obtain the desired frequency resolution of the synthesizer. The overall
 division ratio of the feedback loop consist of an integer part (N) and a fractional part (F).In a generic sense, the
 output frequency of the synthesizer is as follows:
-
 
                                                f OUT = 10MHz × ( N + F )
 
@@ -944,7 +699,6 @@ determine the fractional component. The equation for selection of the carrier fr
                                        f carrier = 10MHz × (hbsel + 1) × ( N + F )
                                                                                 fc[15 : 0]
                               f TX = 10MHz * (hbsel + 1) * ( fb[4 : 0] + 24 +              )
-                                                                                 64000
 Add R/W Function/Description           D7           D6         D5       D4       D3            D2      D1     D0     POR Def.
  73   R/W     Frequency Offset 1      fo[7]        fo[6]      fo[5]    fo[4]    fo[3]          fo[2]   fo[1] fo[0]     00h
 
@@ -970,15 +724,6 @@ After selection of the fb (N) the fractional component may be solved with the fo
                             fc[15 : 0] = ⎜                    − fb[4 : 0] − 24 ⎟ * 64000
                                          ⎝ 10MHz * (hbsel + 1)                 ⎠
 fb and fc are the actual numbers stored in the corresponding registers.
-
-
-Tel: +86-755-82973805       Fax: +86-755-82973550           E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                             21
-
-
---- Page Break ---
-
- RFM23BP
 
                                      Table 12. Frequency Band Selection
 
@@ -1023,16 +768,7 @@ Tel: +86-755-82973805       Fax: +86-755-82973550           E-mail: sales@hoperf
  architecture; therefore, no frequency reprogramming is required when using the same TX frequency and switching
  between RX/TX modes.
 
-
-
-
-Tel: +86-755-8297380 Fax: +86-755-8297355 E-mail: sales@hoperf.com http://www.hoperf.com                     22
-
-
---- Page Break ---
-
-                                                                                            RFM23BP
-3.5.2. Easy Frequency Programming for FHSS
+#### 3.5.2. Easy Frequency Programming for FHSS
 While Registers 73h–77h may be used to program the carrier frequency of the RFM23BP, it is often easier to
 think in terms of “channels” or “channel numbers” rather than an absolute frequency value in Hz. Also, there may
 be some timing-critical applications (such as for Frequency Hopping Systems) in which it is desirable to change
@@ -1058,14 +794,15 @@ Add R/W       Function/Description        D7       D6       D5       D4       D3
  7A     R/W    Frequency Hopping Step    fhs[7]   fhs[6]   fhs[5]   fhs[4]   fhs[3]   fhs[2]   fhs[1]   fhs[0]      00h
                         Size
 
-3.5.3. Automatic State Transition for Frequency Change
+#### 3.5.3. Automatic State Transition for Frequency Change
 If registers 79h or 7Ah are changed in either TX or mode, the state machine will automatically transition the chip
 back to TUNE, change the frequency, and automatically go back to either TX or RX. This feature is useful to reduce
 the number of SPI commands required in a Frequency Hopping System. This in turn reduces microcontroller
 activity, reducing current consumption. The exception to this is during TX FIFO mode. If a frequency change is
 initiated during a TX packet, then the part will complete the current TX packet and will only change the frequency
 for subsequent packets.
-3.5.4. Frequency Deviation
+
+#### 3.5.4. Frequency Deviation
 The peak frequency deviation is configurable from ±0.625 to ±320 kHz. The Frequency Deviation (Δf) is controlled
 by the Frequency Deviation Register (fd), address 71 and 72h, and is independent of the carrier frequency setting.
 When enabled, regardless of the setting of the hbsel bit (high band or low band), the resolution of the frequency
@@ -1077,31 +814,11 @@ from the nominal center channel carrier frequency by ±Δf:
                                     fd[8 : 0] =          Δf = peak deviation
                                                 625Hz
 
-
-
-
-      Tel: +86-755-82973805   Fax: +86-755-82973550        E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                          23
-
-
---- Page Break ---
-
-RFM23BP
-
-
-
-
                                                                    f
-
-
-
 
                                     Frequency
                                                 fcarrier
                                                                                            Time
-
-
-
 
                                           Figure 10. Frequency Deviation
 The previous equation should be used to calculate the desired frequency deviation. If desired, frequency
@@ -1114,17 +831,7 @@ Add R/W     Function/Description                D7         D6          D5       
 
  72   R/W     Frequency Deviation         fd[7]            fd[6]   fd[5]         fd[4]   fd[3]    fd[2]   fd[1]   fd[0]     20h
 
-
-
-
-      Tel: +86-755-82973805    Fax: +86-755-82973550                        E-mail: sales@hoperf.com http://www.hoperf.com
-24
-
-
---- Page Break ---
-
-                                                                                                  RFM23BP
-3.5.5. Frequency Offset Adjustment
+#### 3.5.5. Frequency Offset Adjustment
 When the AFC is disabled the frequency offset can be adjusted manually by fo[9:0] in registers 73h and 74h. It is
 not possible to have both AFC and offset as internally they share the same register. The frequency offset
 adjustment and the AFC both are implemented by shifting the Synthesizer Local Oscillator frequency. This register
@@ -1146,7 +853,7 @@ Add R/W      Function/Description         D7           D6      D5       D4      
  73    R/W       Frequency Offset        fo[7]     fo[6]       fo[5]   fo[4]     fo[3]    fo[2]   fo[1]   fo[0]   00h
  74    R/W       Frequency Offset                                                                 fo[9]   fo[8]   00h
 
-3.5.6. Automatic Frequency Control (AFC)
+#### 3.5.6. Automatic Frequency Control (AFC)
 All AFC settings can be easily obtained from the settings calculator. This is the recommended method to program
 all AFC settings. This section is intended to describe the operation of the AFC in more detail to help understand the
 trade-offs of using AFC.The receiver supports automatic frequency control (AFC) to compensate for frequency
@@ -1157,18 +864,8 @@ disabled. When the AFC is enabled, the received signal will be centered in the p
 optimal sensitivity and selectivity over a wider range of frequency offsets up to 0.35 times the IF bandwidth. The
 trade-off of receiver sensitivity (at 1% PER) versus carrier offset and the impact of AFC are illustrated in Figure 11.
 
-
-
-
                      Figure 11. Sensitivity at 1% PER vs. Carrier Frequency Offset
 
-      Tel: +86-755-82973805    Fax: +86-755-82973550         E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                     25
-
-
---- Page Break ---
-
-RFM23BP
 When AFC is enabled, the preamble length needs to be long enough to settle the AFC. In general, one byte of
 preamble is sufficient to settle the AFC. Disabling the AFC allows the preamble to be shortened from 40 bits to 32
 bits. Note that with the AFC disabled, the preamble length must still be long enough to settle the receiver and to
@@ -1203,17 +900,7 @@ following formula:
                             AFC disabled       Freq Offset Register     Freq Offset Register
                             AFC enabled               AFC               Freq Offset Register
 
-
-
-
-       Tel: +86-755-82973805       Fax: +86-755-82973550       E-mail: sales@hoperf.com http://www.hoperf.com
-26
-
-
---- Page Break ---
-
-                                                                                                                                                          RFM23BP
-3.5.7. TX Data Rate Generator
+#### 3.5.7. TX Data Rate Generator
 The data rate is configurable between 0.123–256 kbps. For data rates below 30 kbps the ”txdtrtscale” bit in register
 70h should be set to 1. When higher data rates are used this bit should be set to 0.
 The TX date rate is determined by the following formula in kbps:
@@ -1221,7 +908,6 @@ The TX date rate is determined by the following formula in kbps:
                                                             txdr[ 15:0 ] × 1 MHz
                                              DR_TX (kbps) = ---------------------------------------------------
                                                                    16 + 5 × t xd tr ts cale
-                                                               2
 
                                                                                                      16 + 5 × t xd tr ts cale
                                                                                       ×2
@@ -1229,7 +915,6 @@ The TX date rate is determined by the following formula in kbps:
                                                  ---------------------------------------------------------------------------------------
                                                                                                                                        -
                                                                                      1 MHz
-
 
 For data rates higher than 100 kbps, Register 58h should be changed from its default of 80h to C0h. Non-optimal
 modulation and increased eye closure will result if this setting is not made for data rates higher than 100 kbps. The
@@ -1242,17 +927,9 @@ Add R/W Function/Description               D7                   D6              
 
  6F   R/W       TX Data Rate 0         txdr[7]              txdr[6]             txdr[5]             txdr[4]              txdr[3]           txdr[2]    txdr[1]   txdr[0]     3Dh
 
+## 4. Modulation Options
 
-
-
-   Tel: +86-755-82973805      Fax: +86-755-82973550                                 E-mail: sales@hoperf.com http://www.hoperf.com                                                27
-
-
---- Page Break ---
-
-RFM23BP
-4. Modulation Options
-4.1. Modulation Type
+### 4.1. Modulation Type
 The RFM23BP           supports three different modulation options: Gaussian Frequency Shift Keying (GFSK),
 Frequency Shift Keying (FSK), and On-Off Keying (OOK). GFSK is the recommended modulation type as it
 provides the best performance and cleanest modulation spectrum. Figure 12 demonstrates the difference between
@@ -1269,64 +946,40 @@ obtain an unmodulated carrier signal by setting modtyp[1:0] = 00.
                                                       10                                                                    FSK
                                                       11             GFSK (enable TX Data CLK when direct mode is used)
 
-
                           TX Modulation Time Domain Waveforms -- FSK vs. GFSK                                        TX Modulation Spectrum -- FSK vs GFSK (Continuous PRBS)
                            1.5                                                                                        -20
 
                            1.0
 
-
-
-
                                                                                                   ModSpectrum_FSK
      SigData_FSK[0,::]
-                                                                                                                      -40
                            0.5
 
                            0.0                                                                                        -60
 
                           -0.5
-                                                                                                                      -80
                           -1.0
 
                           -1.5                                                                                       -100
                            1.0                                                                                        -20
 
-
-
-
      SigData_GFSK[0,::]                                                                           ModSpectrum_GFSK
                            0.5                                                                                        -40
 
-
                            0.0                                                                                        -60
 
-
                           -0.5                                                                                        -80
-
 
                           -1.0                                                                                       -100
                                  0   50   100   150   200   250   300   350   400   450   500                           -250    -200   -150   -100     -50      0        50     100     150   200   250
                                                         time, usec                                                                                           freq, KHz
 
-
                                                                                                                                DataRate         TxDev               BT_Filter         ModIndex
                                                                                                                                   64000.0            32000.0                  0.5             1.0
 
-
                                                                      Figure 12. FSK vs GFSK Spectrums
 
-
-
-
-               Tel: +86-755-82973805                          Fax: +86-755-82973550                                  E-mail: sales@hoperf.com http://www.hoperf.com
-28
-
-
---- Page Break ---
-
-                                                                                           RFM23BP
-4.2. Modulation Data Source
+### 4.2. Modulation Data Source
 The RFM23BP may be configured to obtain its modulation data from one of three different sources: FIFO mode,
 Direct Mode, and from a PN9 mode. In Direct Mode, the TX modulation data may be obtained from several
 different input pins. These options are set through the dtmod[1:0] field in "Register 71h. Modulation Mode Control
@@ -1337,15 +990,13 @@ Add R/W Function/Description             D7       D6      D5        D4       D3 
  71     R/W        Modulation Mode     trclk[1] trclk[0] dtmod[1] dtmod[0] eninv fd[8] modtyp[1] modtyp[0]         00h
                       Control 2
 
-
-
       dtmod[1:0]                                               Data Source
          00          Direct Mode using TX/RX Data via GPIO pin (GPIO configuration required)
          01          Direct Mode using TX/RX Data via SDI pin (only when nSEL is high)
          10          FIFO Mode
          11          PN9 (internally generated)
 
-4.2.1. FIFO Mode
+#### 4.2.1. FIFO Mode
 In FIFO mode, the transmit and receive data is stored in integrated FIFO register memory. The FIFOs are
 accessed via "Register 7Fh. FIFO Access," and are most efficiently accessed with burst read/write operation as
 discussed in "3.1. Serial Peripheral Interface (SPI)" .
@@ -1378,14 +1029,7 @@ bit [4]) is not set. When the rxmpk bit is set, the part will not exit the RX st
 but will remain in RX mode. The microcontroller will need to decide on the appropriate subsequent action,
 depending upon information such as an interrupt generated by CRC, packet valid, or preamble detect.
 
-
-   Tel: +86-755-82973805       Fax: +86-755-82973550       E-mail: sales@hoperf.com http://www.hoperf.com                29
-
-
---- Page Break ---
-
-RFM23BP
-4.2.2. Direct Mode
+#### 4.2.2. Direct Mode
 For legacy systems that perform packet handling within an MCU or other baseband chip, it may not be desirable to
 use the FIFO. For this scenario, a Direct Mode is provided which bypasses the FIFOs entirely.
 In TX direct mode, the TX modulation data is applied to an input pin of the chip and processed in "real time" (i.e.,
@@ -1411,7 +1055,8 @@ within the RX Modem change their operation for optimized performance over the re
 required that a Sync word be present in the packet in RX Direct mode; however, if the Sync word is absent then the
 skipsyn bit in SPI Register 33h must be set, or else the bit timing and tracking function within the RX Modem will
 not be configured for optimum performance.
-4.2.2.1. Direct Synchronous Mode
+
+##### 4.2.2.1. Direct Synchronous Mode
 In TX direct mode, the chip may be configured for synchronous or asynchronous modes of modulation. In direct
 synchronous mode, the RFIC is configured to provide a TX Clock signal as an output to the external device that is
 providing the TX Data stream. This TX Clock signal is a square wave with a frequency equal to the programmed
@@ -1423,7 +1068,8 @@ Clock signal. The TX Data bits supplied by the external source are transmitted d
 internally for later transmission).
 All modulation types (FSK/GFSK/OOK) are valid in TX direct synchronous mode. As will be discussed in the next
 section, there are limits on modulation types in TX direct asynchronous mode.
-4.2.2.2. Direct Asynchronous Mode
+
+##### 4.2.2.2. Direct Asynchronous Mode
 In TX direct asynchronous mode, the RFIC no longer controls the data rate of the TX Data input stream. Instead,
 the data rate is controlled only by the external TX Data source; the RFIC simply accepts the data applied to its TX
 Data input pin, at whatever rate it is supplied. This means that there is no longer a need for a TX Clock output
@@ -1437,21 +1083,12 @@ stream at its maximum possible oversampling rate. This allows the chip to accura
 edge transitions without prior knowledge of the data rate. (Of course, it is still necessary to program the desired
 peak frequency deviation.)
 
-
-     Tel: +86-755-82973805      Fax: +86-755-82973550       E-mail: sales@hoperf.com http://www.hoperf.com
-30
-
-
---- Page Break ---
-
-                                                                                                                                                RFM23BP
 Only FSK and OOK modulation types are valid in TX Direct Asynchronous Mode; GFSK modulation is not available
 in asynchronous mode. This is because the RFIC does not have knowledge of the supplied data rate, and thus
 cannot determine the appropriate Gaussian lowpass filter function to apply to the incoming data.
 One advantage of this mode that it saves a microcontroller pin because no TX Clock output function is required.
 The primary disadvantage of this mode is the increase in occupied spectral bandwidth with FSK (as compared to
 GFSK).
-
 
                                                                                                          nIRQ
 
@@ -1469,7 +1106,6 @@ GFSK).
 
                                       NC                                                     NC
 
-
                                                       GPIO_0    GPIO_1             VR_DIG
                                                                                                                      GPIO configuration
                                                ANT1                       GPIO_2
@@ -1479,16 +1115,11 @@ GFSK).
                                                                                                                      GP1 : TX DATA clock output
                                                                                                          nRES        GP2 : TX DATA input
 
-
-
-
                                       DataCLK
 
                                      MOD(Data)
 
-
                                     Figure 13. Direct Synchronous Mode Example
-
 
                                                                                                          nIRQ
 
@@ -1514,14 +1145,11 @@ GFSK).
                                                                                                                      GP2 : TX DATA input
                                                                                                          nRES
 
-
-
-
                                      MOD(Data)
 
-
                                     Figure 14. Direct Asynchronous Mode Example
-4.2.2.3. Direct Mode using SPI or nIRQ Pins
+
+##### 4.2.2.3. Direct Mode using SPI or nIRQ Pins
 In certain applications it may be desirable to minimize the connections to the microcontroller or to preserve the
 GPIOs for other uses. For these cases it is possible to use the SPI pins and nIRQ as the modulation clock and
 data. The SDO pin can be configured to be the data clock by programming trclk = 10. If the nSEL pin is LOW then
@@ -1531,17 +1159,6 @@ or 06h, then the nIRQ pin can also be used as the TX/RX data clock.
 The SDI pin can be configured to be the data source in both RX and TX modes if dtmod[1:0] = 01. In a similar
 fashion, if nSEL is LOW the pin will function as SPI data-in. If nSEL is HIGH then in TX mode it will be the data to
 
-
-
-  Tel: +86-755-82973805            Fax: +86-755-82973550                                           E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                                                               31
-
-                                                                                                    30
-
-
---- Page Break ---
-
-RFM23BP
 be modulated and transmitted. In RX mode it will be the received demodulated data. Figure 15 demonstrates using
 SDI and SDO as the TX/RX data and clock:
 
@@ -1549,39 +1166,26 @@ SDI and SDO as the TX/RX data and clock:
                                                        TX mode                                                  RX mode
                                           command                      command                   command                    command
 
-
-
  nSEL
 
-
   SDI        SPI input   don’t care       SPI input    MOD input       SPI input    don’t care   SPI input    Data output   SPI input
-
 
                                                        Data CLK                                               Data CLK
  SDO        SPI output   don’t care       SPI output                   SPI output   don’t care   SPI output                 SPI output
                                                         Output                                                 Output
 
-
                                        Figure 15. Microcontroller Connections
 If the SDO pin is not used for data clock then it may be programmed to be the interrupt function (nIRQ) by
 programming Reg 0Eh bit 3.
-4.2.3. PN9 Mode
+
+#### 4.2.3. PN9 Mode
 In this mode the TX Data is generated internally using a pseudorandom (PN9 sequence) bit generator. The primary
 purpose of this mode is for use as a test mode to observe the modulated spectrum without having to provide data.
 
-
-
-
-        Tel: +86-755-82973805         Fax: +86-755-82973550        E-mail: sales@hoperf.com http://www.hoperf.com
-32
-
-
---- Page Break ---
-
-                                                                                       RFM23BP
-5. Internal Functional Blocks
+## 5. Internal Functional Blocks
 This section provides an overview some of the key blocks of the internal radio architecture.
-5.1. RX LNA
+
+### 5.1. RX LNA
 The LNA provides gain with a noise figure low enough to suppress the noise of t he following stages.
 The LNA has one step of gain control which is controlled by the analog gain control (AGC) algorithm.
 The AGC algorithm adjusts the gain of the LNA and PGA so the receiver can handle signal levels fr om
@@ -1589,23 +1193,26 @@ om sensitivity to +5 dBm with optimal performance.
 For the RFM23BP, The direct tie is used, The lna_sw bit in “Register 6Dh. TX Power” must be
 set.
 
-5.2. RX I-Q Mixer
+### 5.2. RX I-Q Mixer
 The output of the LNA is fed internally to the input of the receive mixer. The receive mixer is implemented as an I-Q
 mixer that provides both I and Q channel outputs to the programmable gain amplifier. The mixer consists of two
 double-balanced mixers whose RF inputs are driven in parallel, local oscillator (LO) inputs are driven in quadrature,
 and separate I and Q Intermediate Frequency (IF) outputs drive the programmable gain amplifier. The receive LO
 signal is supplied by an integrated VCO and PLL synthesizer operating between 240–960 MHz. The necessary
 quadrature LO signals are derived from the divider at the VCO output.
-5.3. Programmable Gain Amplifier
+
+### 5.3. Programmable Gain Amplifier
 The programmable gain amplifier (PGA) provides the necessary gain to boost the signal level into the dynamic
 range of the ADC. The PGA must also have enough gain switching to allow for large input signals to ensure a
 linear RSSI range up to –20 dBm. The PGA has steps of 3 dB which are controlled by the AGC algorithm in the
 digital modem.
-5.4. ADC
+
+### 5.4. ADC
 The amplified IQ IF signals are digitized using an Analog-to-Digital Converter (ADC), which allows for low current
 consumption and high dynamic range. The bandpass response of the ADC provides exceptional rejection of out of
 band blockers.
-5.5. Digital Modem
+
+### 5.5. Digital Modem
 Using high-performance ADCs allows channel filtering, image rejection, and demodulation to be performed in the
 digital domain, resulting in reduced area while increasing flexibility. The digital modem performs the following
 functions:
@@ -1625,15 +1232,6 @@ support bandwidths ranging from 620 kHz down to 2.6 kHz. A large variety of data
 from 0.123 up to 256 kbps. The AGC algorithm is implemented digitally using an advanced control loop optimized
 for fast response time.
 
-
-
-  Tel: +86-755-82973805     Fax: +86-755-82973550      E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                  33
-
-
---- Page Break ---
-
-RFM23BP
 The configurable preamble detector is used to improve the reliability of the sync-word detection. The sync-word
 detector is only enabled when a valid preamble is detected, significantly reducing the probability of false detection.
 The received signal strength indicator (RSSI) provides a measure of the signal strength received on the tuned
@@ -1655,7 +1253,8 @@ digital modulation values to be summed with the fractional input to the sigma-de
 approach results in highly accurate resolution of the frequency deviation. A Gaussian filter is implemented to
 support GFSK, considerably reducing the energy in the adjacent channels. The default bandwidth-time product
 (BT) is 0.5 for all programmed data rates, but it may not be adjusted to other values.
-5.6. Synthesizer
+
+### 5.6. Synthesizer
 An integrated Sigma Delta (ΣΔ) Fractional-N PLL synthesizer capable of operating from 240–960 MHz is provided
 Using a ΣΔ synthesizer has many advantages; it provides flexibility in choosing data rate, deviation, channel
 frequency, and channel spacing. The transmit modulation is applied directly to the loop in the digital domain
@@ -1667,7 +1266,6 @@ channel spacing in the range from 240–960 MHz with a frequency resolution of 1
 can be programmed between ±1–320 kHz. These parameters may be adjusted via registers as shown in "3.5.
 Frequency Control".
 
-
                                                                                                        TX
                 Fref = 10 M                                                            Selectable
                               PFD        CP            LPF                                             RX
@@ -1675,34 +1273,20 @@ Frequency Control".
 
                                                                          VCO
 
-
-
-
                                                                 N
-
-
-
 
                                              TX              Delta-
                                           Modulation         Sigma
-
 
                                  Figure 16. PLL Synthesizer Block Diagram
 The reference frequency to the PLL is 10 MHz. The PLL utilizes a differential L-C VCO, with integrated on-chip
 inductors. The output of the VCO is followed by a configurable divider which will divide down the signal to the
 desired output frequency band. The modulus of the variable divide-by-N divider stage is controlled dynamically by
 
-
-      Tel: +86-755-82973805     Fax: +86-755-82973550                 E-mail: sales@hoperf.com http://www.hoperf.com
-34
-
-
---- Page Break ---
-
-                                                                                         RFM23BP
 the output from the Δ-Σ modulator. The tuning resolution is sufficient to tune to the commanded frequency with a
 maximum accuracy of 312.5 Hz anywhere in the range between 240–960 MHz.
-5.6.1. VCO
+
+#### 5.6.1. VCO
 The output of the VCO is automatically divided down to the correct output frequency depending on the hbsel and
 fb[4:0] fields in "Register 75h. Frequency Band Select." In receive mode, the LO frequency is automatically shifted
 downwards by the IF frequency of 937.5 kHz, allowing transmit and receive operation on the same frequency. The
@@ -1710,7 +1294,8 @@ VCO integrates the resonator inductor and tuning varactor, so no external VCO co
 The VCO uses a capacitance bank to cover the wide frequency range specified. The capacitance bank will
 automatically be calibrated every time the synthesizer is enabled. In certain fast hopping applications this might not
 be desirable so the VCO calibration may be skipped by setting the appropriate register.
-5.7. Power Amplifier
+
+### 5.7. Power Amplifier
 The RFM23BP contains an internal integrated power amplifier(PA) capable of transmitting at output levels between –
 1 and +30 dBm. The PA design is single-ended and is implemented as a two stage class fcc amplifier with a
 high efficiency when transmitting at maximum power. The PA efficiency can only be optimized at one power level.
@@ -1719,7 +1304,8 @@ will not remain constant. The PA output is ramped up and down to prevent unwante
 For the RFM23BP, The direct tie is used, The lna_sw bit in “Register 6Dh. TX Power” must be
 set.
                    .
-5.7.1. Output Power Selection
+
+#### 5.7.1. Output Power Selection
 The output power is configurable in 3 dB steps with the txpow[2:0] field in "Register 6Dh. TX Power." Extra output
 power can allow the use of a cheaper smaller antenna, greatly reducing the overall BOM cost. The higher power
 setting of the chip achieves maximum possible range, but of course comes at the cost of higher TX current
@@ -1729,8 +1315,6 @@ Contact HOPERF Support for help in evaluating this tradeoff.
 Add R/W Function/D            D7         D6         D5          D4         D3       D2        D1        D0       POR
         escription                                                                                               Def.
 6D    R/W    TX Power     papeakval papeaken papeaklv[1] papeaklv[0] lna_sw txpow[2]       txpow[1]   txpow[0]   18h
-
-
 
                                      txpow[2:0]           RFM23BP Output Power
                                          000                     TBD
@@ -1742,16 +1326,7 @@ Add R/W Function/D            D7         D6         D5          D4         D3   
                                          110                    +29dBm
                                          111                    +30dBm
 
-
-
-
-     Tel: +86-755-82973805     Fax: +86-755-82973550       E-mail: sales@hoperf.com http://www.hoperf.com          35
-
-
---- Page Break ---
-
-RFM23BP
-5.8. Crystal Oscillator
+### 5.8. Crystal Oscillator
 The RFM23BP includes an integrated 30 MHz crystal oscillator with a fast start-up time of less than 600 Es. A
 parallel resonant 30MHz crystal is used on the module. The design is differential with the required
 crystal load capacitance integrated on-chip to minimize the number of external components.
@@ -1768,7 +1343,6 @@ The typical value of the total on-chip capacitance Cint can be calculated as fol
 
                                  Cint = 1.8 pF + 0.085 pF x xlc[6:0] + 3.7 pF x xtalshift
 
-
 Note that the coarse shift bit xtalshift is not binary with xlc[6:0]. The total load capacitance Cload seen by the crystal
 can be calculated by adding the sum of all external parasitic PCB capacitances Cext to Cint. If the maximum value
 of Cint (16.3 pF) is not sufficient, an external capacitor can be added for exact tuning.
@@ -1781,53 +1355,34 @@ the GPIO pins for use as the System Clock. In this fashion, only one crystal osc
 system and the BOM cost is reduced. The available clock frequencies and GPIO configuration are discussed
 further in "8.2. Microcontroller Clock" .
 
-
-
-
 Add R/W Function/Description               D7         D6       D5       D4       D3       D2       D1       D0      POR Def.
 
  09   R/W     Crystal Oscillator Load    xtalshift   xlc[6]   xlc[5]   xlc[4]   xlc[3]   xlc[2]   xlc[1]   xlc[0]     7Fh
                    Capacitance
 
-5.9. Regulators
+### 5.9. Regulators
 There are a total of six regulators integrated onto the RF M23BPS . With the exception of the digital regulator, all
 regulators are designed to operate with only internal decoupling. All regulators are designed to operate with an
 input supply voltage from +3.3 to +6V. A supply voltage should only be connected to the VDD pins.
 
-
-
-
-      Tel: +86-755-82973805        Fax: +86-755-82973550       E-mail: sales@hoperf.com http://www.hoperf.com
-36
-
-
---- Page Break ---
-
-                                                                                       RFM23BP
-6. Data Handling and Packet Handler
+## 6. Data Handling and Packet Handler
 The internal modem is designed to operate with a packet including a 10101... preamble structure. To configure the
 modem to operate with packet formats without a preamble or other legacy packet structures contact customer
 support.
-6.1. RX and TX FIFOs
+
+### 6.1. RX and TX FIFOs
 Two 64 byte FIFOs are integrated into the chip, one for RX and one for TX, as shown in Figure 17. "Register 7Fh.
 FIFO Access" is used to access both FIFOs. A burst write, as described in "3.1. Serial Peripheral Interface (SPI)"
 to address 7Fh will write da ta to the TX FIFO. A burst read from address 7Fh will read data from the RX FIFO.
 
-
                                     TX FIFO                           RX FIFO
-
-
 
                                                                                        RX FIFO Almost Full
               TX FIFO Almost Full                                                          Threshold
                   Threshold
 
-
-
-
             TX FIFO Almost Empty
                   Threshold
-
 
                                          Figure 17. FIFO Thresholds
 The TX FIFO has two programmable thresholds. An interrupt event occurs when the data in the TX FIFO reaches
@@ -1842,16 +1397,6 @@ power states. When TX is initiated, it will transmit the number of bytes program
 (Reg 3Eh). When the packet ends, the chip will return to the state specified in register 07h. For example, if 08h is
 written to address 07h then the chip will return to the STANDBY state. If 09h is written then the chip will return to
 the READY state.
-
-
-
-
- Tel: +86-755-82973805       Fax: +86-755-82973550     E-mail: sales@hoperf.com http://www.hoperf.com             37
-
-
---- Page Break ---
-
-RFM23BP
 
 Add R/W Function/D                          D7                                    D6     D5           D4           D3         D2         D1           D0       POR
         escription                                                                                                                                             Def.
@@ -1877,7 +1422,8 @@ Both the TX and RX FIFOs may be cleared or reset with the ffclrtx and ffclrrx bi
 setting the Interrupt Enabled bits in "Register 05h. Interrupt Enable 1" and “Register 06h. Interrupt Enable 2.” If the
 interrupts are not enabled the function will not generate an interrupt on the nIRQ pin but the bits will still be read
 correctly in the Interrupt Status registers.
-6.2. Packet Configuration
+
+### 6.2. Packet Configuration
 When using the FIFOs, automatic packet handling may be enabled for TX mode, RX mode, or both. "Register 30h.
 Data Access Control" through “Register 4Bh. Received Packet Length” control the configuration, status, and
 decoded RX packet data for Packet Handling. The usual fields for network communication (such as preamble,
@@ -1890,14 +1436,9 @@ The general packet structure is shown in Figure 18. The length of each field is 
 pattern is always a series of alternating ones and zeroes, starting with a zero. All the fields have programmable
 lengths to accommodate different applications. The most common CRC polynominals are available for selection.
 
-
-
-
                                                                   Packet Length
                                 Sync Word         TX Header
             Preamble                                                                                       Data                             CRC
-
-
 
             1-512 B ytes    1-4 Bytes
                                                                                                                                             0 or 2
@@ -1906,28 +1447,14 @@ lengths to accommodate different applications. The most common CRC polynominals 
                                                                     0 or 1 Byte
                                                                                                                                             Bytes
 
-
-
-
                                                                                   Figure 18. Packet Structure
 An overview of the packet handler configuration registers is shown in Table 13.
 
-
-
-
-      Tel: +86-755-82973805                      Fax: +86-755-82973550                               E-mail: sales@hoperf.com http://www.hoperf.com
-38
-
-
---- Page Break ---
-
-                                                                                                                    RFM23BP
-6.3. Packet Handler TX Mode
+### 6.3. Packet Handler TX Mode
 If the TX packet length is set the packet handler will send the number of bytes in the packet length field before
 returning to IDLE mode and asserting the packet sent interrupt. To resume sending data from the FIFO the
 microcontroller needs to command the chip to re-enter TX mode. Figure 19 provides an example transaction where
 the packet length is set to three bytes.
-
 
                                               }
                                    D a ta 1
@@ -1944,18 +1471,20 @@ the packet length is set to three bytes.
                                    D a ta 8       T h is w ill be s ent in the third tra ns m iss ion
                                    D a ta 9
                                Figure 19. Multiple Packets in TX Packet Handler
-6.4. Packet Handler RX Mode
-6.4.1. Packet Handler Disabled
+
+### 6.4. Packet Handler RX Mode
+
+#### 6.4.1. Packet Handler Disabled
 When the packet handler is disabled certain fields in the received packet are still required. Proper modem
 operation requires preamble and sync when the FIFO is being used, as shown in Figure 20. Bits after sync will be
 treated as raw data with no qualification. This mode allows for the creation of a custom packet handler when the
 automatic qualification parameters are not sufficient. Manchester encoding is supported but data whitening, CRC,
 and header checks are not.
 
-
                 Preamble                      SYNC                                                  DATA
                Figure 20. Required RX Packet Structure with Packet Handler Disabled
-6.4.2. Packet Handler Enabled
+
+#### 6.4.2. Packet Handler Enabled
 When the packet handler is enabled, all the fields of the packet structure need to be configured. Register contents
 are used to construct the header field and length information encoded into the transmitted packet when
 transmitting. The receive FIFO can be configured to handle packets of fixed or variable length with or without a
@@ -1974,32 +1503,15 @@ packets are enabled. Figure 22 demonstrates the operation of fixed packet length
                      Data
                                  Length                                                    0              1     0          1
 
-
-
                                   Data
                                                                                                                H
                                                                                                                                H
                                   FIFO
                                                                                            L                   L
 
-
-
                                                                           Data            Data       Data     Data        Data
 
-
-
-
                                Figure 21. Multiple Packets in RX Packet Handler
-
-
-
-   Tel: +86-755-82973805        Fax: +86-755-82973550                 E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                                   39
-
-
---- Page Break ---
-
-RFM23BP
 
           Initial state                     PK 1 OK                     PK 2 OK                 PK 3                   PK 4 OK
                                                                                                ERROR
@@ -2024,22 +1536,9 @@ RFM23BP
                                                                                                           CRC                       Pointer
                                                                                                           error
 
-
-
            63                          63                          63                        63                        63
 
                           Figure 22. Multiple Packets in RX with CRC or Header Error
-
-
-
-
-     Tel: +86-755-82973805             Fax: +86-755-82973550                    E-mail: sales@hoperf.com http://www.hoperf.com
-40
-
-
---- Page Break ---
-
-                                                                                                                               RFM23BP
 
                                              Table 13. Packet Handler Registers
 Add   R/W   Function/Description            D7           D6               D5        D4           D3           D2              D1          D0         POR Def.
@@ -2072,17 +1571,7 @@ Add   R/W   Function/Description            D7           D6               D5    
 4A     R       Received Header 0          rxhd[7]      rxhd[6]       rxhd[5]      rxhd[4]      rxhd[3]      rxhd[2]       rxhd[1]       rxhd[0]         —
 4B     R     Received Packet Length      rxplen[7]    rxplen[6]     rxplen[5]    rxplen[4]    rxplen[3]    rxplen[2]     rxplen[1]     rxplen[0]        —
 
-
-
-
- Tel: +86-755-82973805              Fax: +86-755-82973550                  E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                                                             41
-
-
---- Page Break ---
-
-RFM23BP
-6.5. Data Whitening, Manchester Encoding, and CRC
+### 6.5. Data Whitening, Manchester Encoding, and CRC
 Data whitening can be used to avoid extended sequences of 0s or 1s in the transmitted data stream to achieve a
 more uniform spectrum. When enabled, the payload data bits are XORed with a pseudorandom sequence output
 from the built-in PN9 generator. The generator is initialized at the beginning of the payload. The receiver recovers
@@ -2104,14 +1593,12 @@ Manchester encoding is done and also the use of the Manchester invert (enmaniv) 
                                                                                                   CRC
                                                                                              (Over data only)
 
-
                                                        Header/                PK
                              Preamble           Sync                        Length
                                                                                                     Data            CRC
                                                        Address
 
                Figure 23. Operation of Data Whitening, Manchester Encoding, and CRC
-
 
                                                                                                      Data before Manchester
 
@@ -2122,9 +1609,6 @@ Manchester encoding is done and also the use of the Manchester invert (enmaniv) 
 
                                                                                                      Data after Machester ( manppol = 1, enmaninv = 1)
 
-
-
-
                                                                                                      Data before Manchester
 
       0    0     0      0       0       0   0      0   0           0          0        1        0
@@ -2134,10 +1618,9 @@ Manchester encoding is done and also the use of the Manchester invert (enmaniv) 
 
                                                                                                      Data after Machester ( manppol = 0, enmaninv = 1)
 
-
-
                                         Figure 24. Manchester Coding Example
-6.6. Preamble Detector
+
+### 6.6. Preamble Detector
 The RFM23BP has integrated automatic preamble detection. The preamble length is configurable from 1–256
 bytes using the prealen[7:0] field in "Register 33h. Header Control 2" and "Register 34h. Preamble Length", as
 described in “6.2. Packet Configuration”. The preamble detection threshold, preath[4:0] as set in "Register 35h.
@@ -2150,14 +1633,7 @@ sync word length plus four bits and will start after a non-preamble pattern is r
 detection. The preamble detector output may be programmed onto one of the GPIO or read in the interrupt status
 registers.
 
-      Tel: +86-755-82973805            Fax: +86-755-82973550             E-mail: sales@hoperf.com http://www.hoperf.com
-42
-
-
---- Page Break ---
-
-                                                                                       RFM23BP
-6.7. Preamble Length
+### 6.7. Preamble Length
 The preamble detection threshold determines the number of valid preamble bits the radio must receive to qualify a
 valid preamble. The preamble threshold should be adjusted depending on the nature of the application. The
 required preamble length threshold will depend on when receive mode is entered in relation to the start of the
@@ -2191,14 +1667,15 @@ support for further details.
 Note: The recommended preamble length and preamble detection threshold listed above are to achieve 0% PER. They may
       be shortened when occasional packet errors are tolerable.
 
-6.8. Invalid Preamble Detector
+### 6.8. Invalid Preamble Detector
 When scanning channels in a frequency hopping system it is desirable to determine if a channel is valid in the
 minimum amount of time. The preamble detector can output an invalid preamble detect signal. which can be used
 to identify the channel as invalid. After a configurable time set in Register 60h[7:4], an invalid preamble detect
 signal is asserted indicating an invalid channel. The period for evaluating the signal for invalid preamble is defined
 as (inv_pre_th[3:0] x 4) x Bit Rate Period. The preamble detect and invalid preamble detect signals are available in
 "Register 03h. Interrupt/Status 1" and “Register 04h. Interrupt/Status 2.”
-6.9. Synchronization Word Configuration
+
+### 6.9. Synchronization Word Configuration
 The synchronization word length for both TX and RX can be configured in Reg 33h, synclen[1:0]. The expected or
 transmitted sync word can be configured from 1 to 4 bytes as defined below:
    synclen[1:0] = 00—Expected/Transmitted Synchronization Word (sync word) 3.
@@ -2210,19 +1687,11 @@ transmitted sync word can be configured from 1 to 4 bytes as defined below:
 The sync is transmitted or expected in the following sequence: sync 3→sync 2→sync 1→sync 0. The sync word
 values can be programmed in Registers 36h–39h. After preamble detection, the part will search for sync for a fixed
 
-
-
-  Tel: +86-755-82973805      Fax: +86-755-82973550       E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                   43
-
-
---- Page Break ---
-
-RFM23BP
 period of time. If a sync is not recognized in this period, a timeout will occur, and the search for preamble will be re-
 initiated. The timeout period after preamble detections is defined as the value programmed into the sync word
 length plus four additional bits.
-6.10. Receive Header Check
+
+### 6.10. Receive Header Check
 The header check is designed to support 1–4 bytes and broadcast headers. The header length needs to be set in
 register 33h, hdlen[2:0]. The headers to be checked need to be set in register 32h, hdch[3:0]. For instance, there
 can be four bytes of header in the packet structure but only one byte of the header is set to be checked (i.e.,
@@ -2235,13 +1704,11 @@ broadcast header check the value may be either “FFh” or the value stored in 
 equivalent of the header check for Header 3 is shown in Figure 25. A similar logic check will be done for Header 2,
 Header 1, and Header 0 if enabled.
 
-
                                                  Example for Header 3
                          rxhd[31:24]
                                           BIT
                                                            Equivalence
                                           WISE             comparison
-
 
                    hden[31:24]                                =
 
@@ -2257,10 +1724,9 @@ Header 1, and Header 0 if enabled.
                                              =
                          rxhd[31:24]                hdch[3]
 
-
-
                                                   Figure 25. Header
-6.11. TX Retransmission and Auto TX
+
+### 6.11. TX Retransmission and Auto TX
 The RFM23BP is capable of automatically retransmitting the last packet loaded in the TX FIFO. Automatic
 retransmission is set by entering the TX state with the txon bit without reloading the TX FIFO. This feature is useful
 for beacon transmission or when retransmission is required due to the absence of a valid acknowledgement. Only
@@ -2272,40 +1738,22 @@ state when the TX FIFO almost full threshold is exceeded. Packets will be transm
 packet length. To stop transmitting, clear the packet sent or TX FIFO almost empty interrupts must be cleared by
 reading register.
 
-
-
-
-      Tel: +86-755-82973805       Fax: +86-755-82973550       E-mail: sales@hoperf.com http://www.hoperf.com
-44
-
-
---- Page Break ---
-
-                                                                                    RFM23BP
-7. RX Modem Configuration
+## 7. RX Modem Configuration
 A Microsoft Excel (WDS) parameter calculator or Wireless Development Suite (WDS) calculator is provided to
 determine the proper settings for the modem. The calculator can be found on www.hoperf.com or on the CD
 provided with the demo kits. An application note is available to describe how to use the calculator and to provide
 advanced descriptions of the modem settings and calculations.
-7.1. Modem Settings for FSK and GFSK
+
+### 7.1. Modem Settings for FSK and GFSK
 The modem performs channel selection and demodulation in the digital domain. The channel filter bandwidth is
 configurable from 2.6 to 620 kHz. The receiver data-rate, modulation index, and bandwidth are set via registers
 1C–25h. The modulation index is equal to 2 times the peak deviation divided by the data rate (Rb).
 When Manchester coding is disabled, the required channel filter bandwidth is calculated as BW = 2Fd + Rb where
 Fd is the frequency deviation and Rb is the data rate.
 
+## 8. Auxiliary Functions
 
-
-
- Tel: +86-755-82973805     Fax: +86-755-82973550      E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                               45
-
-
---- Page Break ---
-
-RFM23BP
-8. Auxiliary Functions
-8.1. Smart Reset
+### 8.1. Smart Reset
 The RFM23BP contains an enhanced integrated SMART RESET or POR circuit. The POR circuit contains both a
 classic level threshold reset as well as a slope detector POR. This reset circuit was designed to produce a
 reliable reset signal under any circumstances. Reset will be initiated if any of the following conditions occur:
@@ -2349,17 +1797,7 @@ The reset will initialize all registers to their default values. The reset signa
 the microcontroller by using the default setting for GPIO_0. The inverted reset signal is available by default on
 GPIO_1.
 
-
-
-
-      Tel: +86-755-82973805      Fax: +86-755-82973550       E-mail: sales@hoperf.com http://www.hoperf.com
-46
-
-
---- Page Break ---
-
-                                                                                                   RFM23BP
-8.2. Microcontroller Clock
+### 8.2. Microcontroller Clock
 The 30 MHz crystal oscillator frequency is divided down internally and may be output to the microcontroller through
 GPIO2. This feature is useful to lower BOM cost by using only one crystal in the system. The system clock
 frequency is selectable from one of 8 options, as shown below. Except for the 32.768 kHz option, all other
@@ -2370,8 +1808,6 @@ clock signal with a frequency of 1 MHz.
 Add R/W        Function/Description             D7       D6      D5         D4       D3       D2       D1      D0      POR Def.
 
  0A   R/W     Microcontroller Output Clock                      clkt[1]    clkt[0]   enlfc   mclk[2] mclk[1] mclk[0]     06h
-
-
 
                                              mclk[2:0]         Clock Frequency
                                                000                    30 MHz
@@ -2409,15 +1845,7 @@ as the interrupt is read the state machine will then move to the selected mode. 
 will not be achieved until the interrupt is read. For instance, if the chip is commanded to SLEEP mode but an
 interrupt has occurred the 30 MHz XTAL will not be disabled until the interrupt has been cleared.
 
-
-
-  Tel: +86-755-82973805       Fax: +86-755-82973550           E-mail: sales@hoperf.com http://www.hoperf.com                   47
-
-
---- Page Break ---
-
-RFM23BP
-8.3. General Purpose ADC
+### 8.3. General Purpose ADC
 An 8-bit SAR ADC is integrated for general purpose use, as well as for digitizing the on-chip temperature sensor
 reading. Registers 0Fh "ADC Configuration", 10h "Sensor Offset" and 4Fh "Amplifier Offset" can be used to
 configure the ADC operation.
@@ -2461,11 +1889,9 @@ dependent offset voltage can be added using soffs[3:0] in register 10h.
                           VDD / 2
                           VBG (1.2V)                                                            …
 
-
                                                                                              adcref [1:0]
 
                                        Figure 27. General Purpose ADC Architecture
-
 
 Add      R/W   Function/Description                     D7                   D6             D5               D4            D3              D2             D1        D0       POR Def.
 
@@ -2475,16 +1901,7 @@ Add      R/W   Function/Description                     D7                   D6 
 
     11    R         ADC Value                       adc[7]                  adc[6]         adc[5]           adc[4]     adc[3]            adc[2]         adc[1]    adc[0]        —
 
-
-
-
-48        Tel: +86-755-82973805                Fax: +86-755-82973550                              E-mail: sales@hoperf.com http://www.hoperf.com
-
-
---- Page Break ---
-
-                                                                                                                RFM23BP
-8.4. Temperature Sensor
+### 8.4. Temperature Sensor
 An integrated on-chip analog temperature sensor is available. The temperature sensor will be automatically
 enabled when the temperature sensor is selected as the input of the ADC or when the analog temp voltage is
 selected on the analog test bus. The temperature sensor value may be digitized using the general-purpose ADC
@@ -2504,7 +1921,6 @@ Add R/W Function/Description                D7           D6           D5        
                    Sensor Control
 
  13     R/W Temperature Value Offset      tvoffs[7]    tvoffs[6]    tvoffs[5]   tvoffs[4]   tvoffs[3]   tvoffs[2]   tvoffs[1]   tvoffs[0]     00h
-
 
                                        Table 16. Temperature Sensor Range
          entoff       tsrange[1]       tsrange[0]          Temp. range               Unit               Slope                   ADC8 LSB
@@ -2528,57 +1944,21 @@ The different ranges for the temperature sensor and ADC8 are demonstrated in Fig
 may be translated to a temperature reading by ADC8Value x ADC8 LSB + Lowest Temperature in Temp Range.
 For instance for a tsrange = 00, Temp = ADC8Value x 0.5 – 64.
 
-
-
-
- Tel: +86-755-82973805          Fax: +86-755-82973550              E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                                                    49
-
-
---- Page Break ---
-
- RFM23BP
-
                                     Temperature Measurement with ADC8
 
-                       300
-
-
-                       250
-
-
-                       200
                                                                                                S ens or Range 0
-
 
            ADC Value
                                                                                                S ens or Range 1
-                       150
                                                                                                S ens or Range 2
                                                                                                S ens or Range 3
-                       100
 
-
-                       50
-
-
-                         0
                              -40   -20        0        20      40          60   80   100
                                                   Temperat ure [Celsius]
 
-
                                          Figure 28. Temperature Ranges using ADC8
 
-
-
-
-50   Tel: +86-755-82973805               Fax: +86-755-82973550      E-mail: sales@hoperf.com http://www.hoperf.com
-
-
---- Page Break ---
-
-                                                                                           RFM23BP
-8.5. Low Battery Detector
+### 8.5. Low Battery Detector
 A low battery detector (LBD) with digital read-out is integrated into the chip. A digital threshold may be programmed
 into the lbdt[4:0] field in "Register 1Ah. Low Battery Detector Threshold." When the digitized battery voltage
 reaches this threshold an interrupt will be generated on the nIRQ pin to the microcontroller. The microcontroller can
@@ -2616,16 +1996,7 @@ readings are required.
                                             30                3.15–3.2
                                             31                  > 3.2
 
-
-
-
-   Tel: +86-755-82973805      Fax: +86-755-82973550       E-mail: sales@hoperf.com http://www.hoperf.com                     51
-
-
---- Page Break ---
-
-RFM23BP
-8.6. Wake-Up Timer and 32 kHz Clock Source
+### 8.6. Wake-Up Timer and 32 kHz Clock Source
 The chip contains an integrated wake-up timer which can be used to periodically wake the chip from SLEEP mode.
 The wake-up timer runs from the internal 32.768 kHz RC Oscillator. The wake-up timer can be configured to run
 when in SLEEP mode. If enwt = 1 in "Register 07h. Operating Mode and Function Control 1" when entering SLEEP
@@ -2634,7 +2005,6 @@ the expiration of this period an interrupt will be generated on the nIRQ pin if 
 microcontroller will then need to verify the interrupt by reading the Registers 03h–04h, "Interrupt Status 1 & 2". The
 wake-up timer value may be read at any time by the wtv[15:0] read only registers 17h–18h.
 The formula for calculating the Wake-Up Period is the following:
-
 
                                                            4 × M × 2R
                                               WUT =                   ms
@@ -2673,68 +2043,38 @@ connected to this pin with the XTAL physically located as close to the pin as po
 all internal functions such as WUT, micro-controller clock, and LDC mode will use the 32 kHz XTAL and not the
 32 kHz RC oscillator.
 
-
-
-
-      Tel: +86-755-82973805    Fax: +86-755-82973550          E-mail: sales@hoperf.com http://www.hoperf.com
-52
-
-
---- Page Break ---
-
-                                                                                      RFM23BP
-
                                                    Interrupt Enable enwut = 1 ( Reg 06h)
 
     WUT Period
   GPIOX = 00001
 
-
-
-
         nIRQ
-
-
 
        SPI Interrupt
          Read
 
-
-
       Chip State
 
          Sleep          Ready              Sleep              Ready           Sleep           Ready     Sleep
-
 
                        1.5 mA                                1.5 mA                          1.5 mA
        Current
      Consumption
                                           1 uA                                1 uA                     1 uA
 
-
-
-
                                                      Interrupt Enable enwut = 0( Reg 06h)
 
     WUT Period
  GPIOX = 00001
 
-
-
-
         nIRQ
-
-
 
        SPI Interrupt
          Read
 
-
       Chip State
 
                                                    Sleep
-
-
 
        Current
      Consumption
@@ -2742,17 +2082,7 @@ all internal functions such as WUT, micro-controller clock, and LDC mode will us
 
                                   Figure 29. WUT Interrupt and WUT Operation
 
-
-
-
-Tel: +86-755-82973805           Fax: +86-755-82973550      E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                53
-
-
---- Page Break ---
-
-RFM23BP
-8.7. Low Duty Cycle Mode
+### 8.7. Low Duty Cycle Mode
 The Low Duty Cycle Mode is available to automatically wake-up the receiver to check if a valid signal is available.
 The basic operation of the low duty cycle mode is demonstrated in the figure below. If a valid preamble or sync
 word is not detected the chip will return to sleep mode until the beginning of a new WUT period. If a valid preamble
@@ -2766,28 +2096,14 @@ below:
                                     TLDC      = ldc [ 7 : 0 ] ×            ms
                                                                   32 . 768
 
-
-
-
                                       Figure 30. Low Duty Cycle Mode
 
-
-
-
-      Tel: +86-755-82973805     Fax: +86-755-82973550      E-mail: sales@hoperf.com http://www.hoperf.com
-54
-
-
---- Page Break ---
-
-                                                                                                RFM23BP
-8.8. GPIO Configuration
+### 8.8. GPIO Configuration
 Three general purpose IOs (GPIOs) are available. Numerous functions such as specific interrupts, TRSW control,
 Microcontroller Output, etc. can be routed to the GPIO pins as shown in the tables below. When in Shutdown mode
 all the GPIO pads are pulled low.
 Note: The ADC should not be selected as an input to the GPIO in standby or sleep modes and will cause excess current con-
       sumption.
-
 
 Add R/W Function/Des             D7           D6           D5         D4          D3     D2      D1      D0       POR Def.
           cription
@@ -2817,17 +2133,7 @@ strength and current capability of the GPIO by changing the driver size. Special
 drive strength and loading on GPIO2 when the microcontroller clock is used. Excess loading or inadequate drive
 may contribute to increased spurious emissions.
 
-
-
-
-  Tel: +86-755-82973805       Fax: +86-755-82973550          E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                          55
-
-
---- Page Break ---
-
-RFM23BP
-8.9. Antenna Diversity
+### 8.9. Antenna Diversity
 To mitigate the problem of frequency-selective fading due to multi-path propagation, some transceiver systems use
 a scheme known as antenna diversity. In this scheme, two antennas are used. Each time the transceiver enters RX
 mode the receive signal strength from each antenna is evaluated. This evaluation process takes place during the
@@ -2850,7 +2156,6 @@ Add R/W Function/Description            D7        D6        D5      D4       D3 
  08    R/W     Operating & Function   antdiv[2] antdiv[1] antdiv[0] rxmpk   autotx    enldm ffclrrx   ffclrtx     00h
                     Control 2
 
-
                                       Table 17. Antenna Diversity Control
      antdiv[2:0]                      RX/TX State                                     Non RX/TX State
                          GPIO Ant1                GPIO Ant2                 GPIO Ant1                 GPIO Ant2
@@ -2863,17 +2168,7 @@ Add R/W Function/Description            D7        D6        D5      D4       D3 
         110         Antenna Diversity Algorithm in Beacon Mode                    0                         0
         111         Antenna Diversity Algorithm in Beacon Mode                    1                         1
 
-
-
-
-       Tel: +86-755-82973805       Fax: +86-755-82973550     E-mail: sales@hoperf.com http://www.hoperf.com
-56
-
-
---- Page Break ---
-
-                                                                                                                                              RFM23BP
-8.10. RSSI and Clear Channel Assessment
+### 8.10. RSSI and Clear Channel Assessment
 Received signal strength indicator (RSSI) is an estimate of the signal strength in the channel to which the receiver
 is tuned. The RSSI value can be read from an 8-bit register with 0.5 dB resolution per bit. Figure 31 demonstrates
 the relationship between input power level and RSSI value. The absolute value of the RSSI will change slightly
@@ -2890,60 +2185,26 @@ Add R/W                Function/Description                        D7          D
 
  27    R/W      RSSI Threshold for Clear Channel Indicator       rssith[7]   rssith[6]   rssith[5]   rssith[4]   rssith[3]   rssith[2]   rssith[1]   rssith[0]       00h
 
-
 For CCA, threshold is programmed into rssith[7:0] in "Register 27h. RSSI Threshold for Clear Channel Indicator."
 After the RSSI is evaluated in the preamble, a decision is made if the signal strength on this channel is above or
 below the threshold. If the signal strength is above the programmed threshold then the RSSI status bit, irssi, in
 "Register 04h. Interrupt/Status 2" will be set to 1. The RSSI status can also be routed to a GPIO line by configuring
 the GPIO configuration register to GPIOx[3:0] = 1110.
 
-
                                                                   RSSI vs Input Power
 
-                250
-
-
-                200
-
-
-                150
-
          RSSI
-                100
 
-
-                50
-
-
-                 0
                   -120               -100                  -80               -60                -40                 -20                   0                     20
                                                                                In Pow [dBm]
 
                                                 Figure 31. RSSI Value vs. Input Power
 
-
-
-
-  Tel: +86-755-82973805                 Fax: +86-755-82973550                      E-mail: sales@hoperf.com http://www.hoperf.com                                          57
-
-
---- Page Break ---
-
-RFM23BP
-9. Reference Design
+## 9. Reference Design
 
                         Figure32A.RFM23BP Reference Design Schematic
 
-
-
-
-58   Tel: +86-755-82973805   Fax: +86-755-82973550   E-mail: sales@hoperf.com http://www.hoperf.com
-
-
---- Page Break ---
-
-      RFM23BP
-      10. Register Table and Descriptions
+## 10. Register Table and Descriptions
 
                                                              Table 18. Register Descriptions
 Add    R/W          Function/Desc                                                                        Data                                                            POR
@@ -3006,15 +2267,6 @@ Add    R/W          Function/Desc                                               
 2F                                                                                  Reserved
 30     R/W        Data Access Control           enpacrx            lsbfrst       crcdonly      skip2ph           enpactx        encrc         crc[1]        crc[0]       8Dh
 
-
-
-
-      59        Tel: +86-755-82973805               Fax: +86-755-82973550                     E-mail: sales@hoperf.com http://www.hoperf.com
-
-
---- Page Break ---
-
-                                                                                                                           RFM23BP
                                                  Table 18. Register Descriptions (Continued)
 Add     R/W          Function/Desc                                                                  Data                                                             POR
                                                      D7              D6              D5           D4           D3             D2            D1           D0         Default
@@ -3076,16 +2328,8 @@ Add     R/W          Function/Desc                                              
  7E     R/W         RX FIFO Control              Reserved        Reserved       rxafthr[5]    rxafthr[4]    rxafthr[3]    rxafthr[2]    rxafthr[1]    rxafthr[0]         37h
  7F     R/W          FIFO Access                  fifod[7]        fifod[6]        fifod[5]      fifod[4]      fifod[3]      fifod[2]      fifod[1]      fifod[0]          —
 
+## 11. Pin Descriptions: RFM23BP
 
-
-
-          Tel: +86-755-82973805                 Fax: +86-755-82973550             E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                                                                    60
-
-
---- Page Break ---
-
-R F M 2 3 BP
        VCC          S       +3.3 to +6 V supply voltage. The recommended VCC supply voltage is +5V.
 
        GND          S       Ground reference.
@@ -3123,40 +2367,18 @@ R F M 2 3 BP
                     I       Tx ON select input pin, When RFM23BP is TX state,TX_ON should be = 0, RX_ON
       TX_ON
                             should be = 1
-                    I       Rx ON select input pin, When RFM2 3BPS is RX state,RX_ON should be = 0, TX_ON
+                    I       Rx ON select input pin, When RFM23BPS is RX state,RX_ON should be = 0, TX_ON
       RX_ON
                             should be = 1
 
-
-
        ANT          I/O     RF signal output/input.(50 OHM output /input Impedance)
 
+## 12. Mechanical Dimension: RFM23BP
 
-
-
-   Tel: +86-755-82973805    Fax: +86-755-82973550             E-mail: sales@hoperf.com http://www.hoperf.com
-                                                                                                                                 60
-
-
---- Page Break ---
-
- RFM23BP
-12.2 Mechanical Dimension:RFM23BP
+### 12.2. Mechanical Dimension: RFM23BP
                                            SMD PACKAGE（S2）
 
-
-
-
-     Tel: +86-755-82973805   Fax: +86-755-82973550   E-mail: sales@hoperf.com http://www.hoperf.com
-61
-
-
---- Page Break ---
-
-                                                                                                  RFM23BP
-
-
-
+## 13. Ordering Information and Contact Information
 
                                                     This document may contain preliminary information and is subject to change by
                                                     Hope Microelectronics without notice. Hope Microelectronics assumes no
@@ -3167,18 +2389,7 @@ Tel:   86-755-82973805                              The products described in th
 Fax: 86-755-82973550                                implantation or other direct life support applications where malfunction may
 Email: sales@hoperf.com                             result in the direct physical harm or injury to persons. NO WARRANTIES OF
          trade@hoperf.com                           ANY KIND, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-Website: http://www.hoperf.com                      OF MECHANTABILITY OR FITNESS FOR A ARTICULAR PURPOSE, ARE
+Website: http://www.hoperf.com                      OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ARE
          http://hoperf.en.alibaba.com               OFFERED IN THIS DOCUMENT.
 
-
                                                     ©2011, HOPE MICROELECTRONICS CO.,LTD. All rights reserved.
-
-
-
-
-       Tel: +86-755-82973805            Fax: +86-755-82973550         E-mail: sales@hoperf.com               http://www.hoperf.com
-                                                                                                                                           62
-
-
---- Page Break ---
-
