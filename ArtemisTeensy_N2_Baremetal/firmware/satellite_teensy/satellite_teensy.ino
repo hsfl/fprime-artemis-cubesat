@@ -16,7 +16,10 @@ static constexpr uint32_t UART_BAUD = 115200;
 
 LinkCounters g_linkCounters;
 Rf23Driver g_rfDriver(RADIO_CS, RADIO_INT, RADIO_RX_ON_PIN, RADIO_TX_ON_PIN);
-RelayConfig g_relayConfig;
+// Transparent bridge mode for HIL:
+// - raw UART bytes from Pi are RF-relayed as payload
+// - RF-reassembled bytes are emitted raw to Pi UART
+RelayConfig g_relayConfig{true, false, false, false, 8};
 RelayUartRf g_relay(Serial2, g_rfDriver, g_linkCounters, g_relayConfig);
 
 void setup() {
@@ -35,7 +38,7 @@ void setup() {
   g_relay.begin();
 
   if (radioOk) {
-    Serial.println("[ArtemisTeensy] Relay bridge ready (UART frame + RF segmentation)");
+    Serial.println("[ArtemisTeensy] Relay bridge ready (raw UART byte tunnel + RF segmentation)");
   } else {
     Serial.println("[ArtemisTeensy] RF23 init failed; relay running without RF");
   }
