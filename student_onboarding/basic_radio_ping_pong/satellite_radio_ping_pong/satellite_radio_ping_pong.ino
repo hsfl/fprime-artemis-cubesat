@@ -1,24 +1,20 @@
 #include <Arduino.h>
-#include <RH_RF22.h>
-#include <RHHardwareSPI1.h>
+#include "../../../../ArtemisTeensy_N2_Baremetal/firmware/libs/rf23bp/artemis_rf23bp.hpp"
 #include <stdio.h>
 #include <string.h>
 
 namespace {
 
-constexpr int RADIO_CS = 38;
-constexpr int RADIO_INT = 40;
-constexpr uint8_t RADIO_RX_ON_PIN = 30;
-constexpr uint8_t RADIO_TX_ON_PIN = 31;
 constexpr uint8_t LED_PIN = 13;
-
-constexpr float RADIO_FREQ_MHZ = 433.0f;
 constexpr uint32_t SERIAL_BAUD = 115200;
-constexpr uint32_t TX_COMPLETE_TIMEOUT_MS = 250;
+constexpr uint16_t TX_COMPLETE_TIMEOUT_MS = 250;
 constexpr size_t RADIO_MAX_LEN = RH_RF22_MAX_MESSAGE_LEN;
 constexpr char SATELLITE_PONG[] = "pong from satellite";
 
-RH_RF22 g_radio(RADIO_CS, RADIO_INT, hardware_spi1);
+constexpr artemis::rf23bp::RadioPins kRadioPins{};
+constexpr artemis::rf23bp::RadioProfile kRadioProfile{};
+
+RH_RF22 g_radio(kRadioPins.cs_pin, kRadioPins.irq_pin, hardware_spi1);
 uint8_t g_rxBuffer[RADIO_MAX_LEN];
 char g_txBuffer[RADIO_MAX_LEN];
 
@@ -39,65 +35,27 @@ void printPayload(const uint8_t* data, uint8_t len) {
   Serial.print('"');
 }
 
-void setAmpReceive() {
-  digitalWrite(RADIO_RX_ON_PIN, LOW);
-  digitalWrite(RADIO_TX_ON_PIN, HIGH);
-  delayMicroseconds(300);
-}
-
-void setAmpTransmit() {
-  digitalWrite(RADIO_RX_ON_PIN, HIGH);
-  digitalWrite(RADIO_TX_ON_PIN, LOW);
-  delayMicroseconds(300);
-}
-
 bool isPingPacket(const uint8_t* data, uint8_t len) {
   return len == 1 && (data[0] == 'g' || data[0] == 'G');
 }
 
 bool initRadio() {
-  pinMode(RADIO_RX_ON_PIN, OUTPUT);
-  pinMode(RADIO_TX_ON_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
-  //NEVER set the cs pin only for init for radiohead library but like it breaks the amplifier why?
-  setAmpReceive();
-
-  SPI1.end();
-  delay(20);
-  SPI1.setMISO(39);
-  SPI1.setMOSI(26);
-  SPI1.setSCK(27);
-  SPI1.begin();
-  delay(10);
-
-  if (!g_radio.init()) {
-    return false;
-  }
-  if (!g_radio.setFrequency(RADIO_FREQ_MHZ)) {
-    return false;
-  }
-
-  g_radio.setModemConfig(RH_RF22::GFSK_Rb125Fd125);
-  g_radio.setTxPower(RH_RF22_RF23BP_TXPOW_30DBM);
-  g_radio.setModeRx();
-  return true;
+  return artemis::rf23bp::initRadio(g_radio, kRadioPins, kRadioProfile, &Serial);
 }
 
 bool sendPacket(const char* text) {
   const uint8_t len = static_cast<uint8_t>(strlen(text));
-  setAmpTransmit();
-  const bool sent = g_radio.send(reinterpret_cast<const uint8_t*>(text), len);
-  const bool txDone = sent && static_cast<RHGenericDriver&>(g_radio).waitPacketSent(TX_COMPLETE_TIMEOUT_MS);
-  setAmpReceive();
-  g_radio.setModeRx();
-  return sent && txDone;
+  return artemis::rf23bp::sendPacket(
+      g_radio, kRadioPins, kRadioProfile,
+      reinterpret_cast<const uint8_t*>(text), len, TX_COMPLETE_TIMEOUT_MS);
 }
 
-void handlePacket(const uint8_t* data, uint8_t len) {
+void handlePacket(const uint8_t* data, uint8_t len, int16_t rssiDbm) {
   Serial.print("[satellite] rx len=");
   Serial.print(len);
   Serial.print(" rssi=");
-  Serial.print(g_radio.lastRssi());
+  Serial.print(rssiDbm);
   Serial.print(" payload=");
   printPayload(data, len);
   Serial.println();
@@ -142,8 +100,10 @@ void setup() {
 
 void loop() {
   uint8_t len = sizeof(g_rxBuffer) - 1;
-  if (g_radio.available() && g_radio.recv(g_rxBuffer, &len)) {
+  int16_t lastRssiDbm = 0;
+  if (artemis::rf23bp::receivePacket(g_radio, kRadioPins, kRadioProfile, g_rxBuffer,
+                                     &len, &lastRssiDbm)) {
     g_rxBuffer[len] = '\0';
-    handlePacket(g_rxBuffer, len);
+    handlePacket(g_rxBuffer, len, lastRssiDbm);
   }
 }

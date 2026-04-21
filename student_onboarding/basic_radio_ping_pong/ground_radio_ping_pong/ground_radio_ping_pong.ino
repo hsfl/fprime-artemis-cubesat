@@ -1,28 +1,24 @@
 #include <Arduino.h>
-#include <RH_RF22.h>
-#include <RHHardwareSPI1.h>
+#include "../../../../ArtemisTeensy_N2_Baremetal/firmware/libs/rf23bp/artemis_rf23bp.hpp"
 #include <stdio.h>
 #include <string.h>
 
 namespace {
 
-constexpr int RADIO_CS = 38;
-constexpr int RADIO_INT = 40;
-constexpr uint8_t RADIO_RX_ON_PIN = 30;
-constexpr uint8_t RADIO_TX_ON_PIN = 31;
 constexpr uint8_t LED_PIN = 13;
 
-constexpr float RADIO_FREQ_MHZ = 433.0f;
 constexpr uint32_t SERIAL_BAUD = 115200;
 constexpr uint32_t LOOP_INTERVAL_MS = 2000;
 constexpr uint32_t RESPONSE_WAIT_MS = 1000;
-constexpr uint32_t TX_COMPLETE_TIMEOUT_MS = 500;
+constexpr uint16_t TX_COMPLETE_TIMEOUT_MS = 500;
 constexpr size_t RADIO_MAX_LEN = RH_RF22_MAX_MESSAGE_LEN;
 constexpr char SATELLITE_PONG[] = "pong from satellite";
 
-RH_RF22 g_radio(RADIO_CS, RADIO_INT, hardware_spi1);
+constexpr artemis::rf23bp::RadioPins kRadioPins{};
+constexpr artemis::rf23bp::RadioProfile kRadioProfile{};
+
+RH_RF22 g_radio(kRadioPins.cs_pin, kRadioPins.irq_pin, hardware_spi1);
 uint8_t g_rxBuffer[RADIO_MAX_LEN];
-char g_txBuffer[RADIO_MAX_LEN];
 uint32_t g_sequence = 0;
 unsigned long g_nextTxAt = 0;
 
@@ -43,59 +39,17 @@ void printPayload(const uint8_t* data, uint8_t len) {
   Serial.print('"');
 }
 
-void setAmpReceive() {
-  digitalWrite(RADIO_RX_ON_PIN, LOW);
-  digitalWrite(RADIO_TX_ON_PIN, HIGH);
-  delayMicroseconds(300);
-}
-
-void setAmpTransmit() {
-  digitalWrite(RADIO_RX_ON_PIN, HIGH);
-  digitalWrite(RADIO_TX_ON_PIN, LOW);
-  delayMicroseconds(300);
-}
-
 bool sendBytesToSatellite(const uint8_t* data, uint8_t len, unsigned long timeoutMs = TX_COMPLETE_TIMEOUT_MS) {
   digitalWrite(LED_PIN, HIGH);
-  setAmpTransmit();
-  const bool queued = g_radio.send(data, len);
-  bool sent = false;
-  if (queued) {
-    sent = static_cast<RHGenericDriver&>(g_radio).waitPacketSent(timeoutMs);
-  }
+  const bool sent = artemis::rf23bp::sendPacket(g_radio, kRadioPins, kRadioProfile, data, len,
+                                                 static_cast<uint16_t>(timeoutMs));
   digitalWrite(LED_PIN, LOW);
-  setAmpReceive();
-  g_radio.setModeRx();
-  return queued && sent;
+  return sent;
 }
 
 bool initRadio() {
-  pinMode(RADIO_RX_ON_PIN, OUTPUT);
-  pinMode(RADIO_TX_ON_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
-  //wtf dont set the cs pin?
-
-  setAmpReceive();
-
-  SPI1.end();
-  delay(20);
-  SPI1.setMISO(39);
-  SPI1.setMOSI(26);
-  SPI1.setSCK(27);
-  SPI1.begin();
-  delay(10);
-
-  if (!g_radio.init()) {
-    return false;
-  }
-  if (!g_radio.setFrequency(RADIO_FREQ_MHZ)) {
-    return false;
-  }
-
-  g_radio.setModemConfig(RH_RF22::GFSK_Rb125Fd125);
-  g_radio.setTxPower(RH_RF22_RF23BP_TXPOW_30DBM);
-  g_radio.setModeRx();
-  return true;
+  return artemis::rf23bp::initRadio(g_radio, kRadioPins, kRadioProfile, &Serial);
 }
 
 bool isExpectedPong(const uint8_t* data, uint8_t len) {
@@ -119,12 +73,14 @@ bool sendPing(uint32_t seq) {
 
   while (millis() - waitStart < RESPONSE_WAIT_MS) {
     uint8_t len = sizeof(g_rxBuffer) - 1;
-    if (g_radio.available() && g_radio.recv(g_rxBuffer, &len)) {
+    int16_t packetRssiDbm = 0;
+    if (artemis::rf23bp::receivePacket(g_radio, kRadioPins, kRadioProfile, g_rxBuffer,
+                                       &len, &packetRssiDbm)) {
       g_rxBuffer[len] = '\0';
       Serial.print("[ground] rx len=");
       Serial.print(len);
       Serial.print(" rssi=");
-      Serial.print(g_radio.lastRssi());
+      Serial.print(packetRssiDbm);
       Serial.print(" payload=");
       printPayload(g_rxBuffer, len);
       Serial.println();
