@@ -115,7 +115,7 @@ Script defaults:
 Useful overrides:
 ```bash
 ./tools/run_gds_uart.sh --port /dev/cu.usbmodemXXXX --baud 115200
-./tools/run_gds_uart.sh --gui-port 5060
+./tools/run_gds_uart.sh --gui-port 5050
 ./tools/run_gds_uart.sh --dictionary /abs/path/to/TopologyDictionary.json
 ./tools/run_gds_uart.sh --dry-run
 ```
