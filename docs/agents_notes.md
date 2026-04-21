@@ -72,7 +72,10 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   - `firmware/satellite_teensy/src/link_protocol.hpp`
   - `firmware/satellite_teensy/src/link_counters.hpp`
 - Transport behavior:
-  - RPi<->Teensy UART uses custom framing (`0xD4 0xC3 + len + crc16`)
+  - Default HIL path is transparent raw-byte bridge:
+    - RPi UART raw bytes -> RF segment transport -> ground USB raw bytes
+    - ground USB raw bytes -> RF segment transport -> RPi UART raw bytes
+  - UART wrapper mode (`0xD4 0xC3 + len + crc16`) remains optional fallback only
   - UART payload max now `220` bytes
   - RF uses segmented message transport (`msg_id`, `seg_idx`, `seg_count`, `chunk_len`)
 - Build status:
@@ -93,11 +96,26 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 ## Important Clarification: Framing
 
 - End-to-end payload is still opaque F' bytes.
-- Satellite UART framing is custom and remains required on the RPi<->satellite link.
+- Endpoints (GDS and F' app) use `ComCcsds` framing (`space-packet-space-data-link`).
+- Teensy bridge default for HIL is transport-only and should not add an extra UART frame format in the main path.
 - RF transport is now segmented and reassembled before UART egress.
 - Contract documentation:
   - `ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md`
   - `GDS_Teensy/docs/transport_contract.md`
+
+## HIL Framing Alignment (2026-04-15)
+
+- Root issue:
+  - ground Teensy was in raw mode while satellite Teensy was still defaulting to framed UART mode.
+- Fix applied:
+  - `ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/satellite_teensy.ino`
+  - relay config now matches ground bridge for raw-byte tunnel mode:
+    - `RelayConfig{true, false, false, false, 8}`
+- Intended runtime contract:
+  - laptop `fprime-gds` UART plugin sends raw bytes
+  - ground Teensy relays raw bytes over RF segments
+  - satellite Teensy reassembles and forwards raw bytes to RPi UART
+  - RPi F' deployment handles the CCSDS/space-packet framing at endpoint level
 
 ## Local Emulation Findings (2026-04-08)
 
@@ -149,6 +167,109 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - For demo and local/GDS validation, use `ComCcsds` framing as the primary/default path.
 - Keep custom UART wrapper support only as an optional hardware fallback mode when physical-link behavior requires it.
 
+## Laptop GDS <-> Ground Teensy USB Debug Chain (2026-04-20)
+
+### Scope
+
+- This section is for the `GDS_Teensy` debug sketch:
+  - `GDS_Teensy/firmware/gds_usb_raw_dump/gds_usb_raw_dump.ino`
+- Goal is quick validation of both directions:
+  - `fprime-gds -> Teensy` uplink bytes (visible as `U0[...]`)
+  - `Teensy -> fprime-gds` downlink bytes (visible as `D1[...]` or `RS[...]`)
+
+### Known-good GDS launch
+
+- Use GUI port `5050` and `ComCcsds` framing:
+  - `fprime-gds -n --dictionary <...TopologyDictionary.json> --communication-selection uart --uart-device /dev/cu.usbmodemXXXX --uart-baud 115200 --uart-skip-port-check --framing-selection space-packet-space-data-link --gui-port 5050`
+- Wrong framing (`fprime`) reproduces classic failure signature:
+  - GDS pages load, but channels/events endpoints error and charts remain flat.
+
+### Critical landmine: stale Arduino upload artifact
+
+- Root cause seen during debug:
+  - `arduino-cli upload` was reusing old build artifacts, so new replay bytes were not actually flashed.
+- Reliable fix:
+  1. compile with explicit `--build-path`
+  2. upload using the same `--build-path` (or `--input-dir` that points to that folder)
+- Known-good command pattern from `GDS_Teensy`:
+  - `export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"`
+  - `arduino-cli compile --clean --fqbn teensy:avr:teensy41:usb=serial2 --build-path build/arduino-cli-gds-usb-raw-dump firmware/gds_usb_raw_dump`
+  - `arduino-cli upload -v --fqbn teensy:avr:teensy41:usb=serial2 -p /dev/cu.usbmodemXXXX --build-path "$PWD/build/arduino-cli-gds-usb-raw-dump" firmware/gds_usb_raw_dump`
+- If behavior does not match edited sketch bytes, assume stale artifact first.
+
+### What to expect in GUI and logs
+
+- `GDS -> Teensy` path proven when sending any command (for example `missionManager.PING`) and seeing `U0[...]` hex lines on `SerialUSB1`.
+- `Teensy -> GDS` requires actual downlink bytes:
+  - from `Serial1` passthrough (`D1[...]`) or
+  - from replay injector (`RS[...]`) in the debug sketch.
+- Replay mode is static captured telemetry, not command-aware:
+  - do not expect a deterministic `MissionManager.Pong` token match from replay alone.
+  - expect decoded events/channels from the captured stream (for example version/comms/link events).
+
+### Quick failure triage
+
+1. If `U0[...]` appears but GDS events/channels stay empty:
+   - problem is downlink source (no valid bytes returning), not uplink.
+2. If downlink bytes are present but GDS shows endpoint errors:
+   - verify `--framing-selection space-packet-space-data-link`.
+3. If edited sketch behavior does not change after upload:
+   - rebuild and upload with the same explicit build directory.
+4. If port behavior is inconsistent:
+   - stop stale `fprime-gds` or emulation processes and relaunch one clean instance on `5050`.
+5. If using `usb=serial2` and two `/dev/cu.usbmodem*` ports appear:
+   - one port is GDS data (`Serial`), the other is debug monitor (`SerialUSB1`); verify by checking where `U0[...]` lines appear.
+
+## Adapter MVP Update (2026-04-15)
+
+### What changed
+
+- `GpsAdapter_Artemis` is no longer a static `+400` key offset stub.
+  - It now models a deterministic GPS fix state machine and emits:
+    - `FixState` (`0=no-fix`, `1=acquiring`, `2=2D`, `3=3D`)
+    - `SatellitesTracked`
+    - `FixQualityScore`
+    - `RequestCount`
+  - `statusOut` now reports normalized fix-state keys (`0..3`), so `GpsService.GpsFixState` is chart-friendly.
+- `CommsAdapter_TeensyRfm23` is no longer a static `+500` key offset stub.
+  - It now models deterministic RFM23 link behavior and emits:
+    - `LinkState` (`0=down`, `1=acquiring`, `2=locked`, `3=degraded`)
+    - `RssiDbm`
+    - `RfRxPackets`
+    - `RfTxPackets`
+    - `RfTxDrops`
+    - `RequestCount`
+  - Output port behavior is now split intentionally:
+    - `statusOut[0]` -> normalized link state for `CommsManager`
+    - `statusOut[1]` -> `RfRxPackets` snapshot for `TeensyTransportService` downlink counter visibility
+
+### Why this was needed
+
+- Static offset stubs produced unrealistic telemetry values and made chart interpretation weak.
+- Demo path needed visibly changing, semantically meaningful telemetry for GPS and comms subsystems without breaking current topology wiring.
+
+### Demo-visible channels/events to watch
+
+- GPS:
+  - `ArtemisRpiTeensyDeployment.gpsAdapterArtemis.FixState`
+  - `ArtemisRpiTeensyDeployment.gpsAdapterArtemis.SatellitesTracked`
+  - `ArtemisRpiTeensyDeployment.gpsAdapterArtemis.FixQualityScore`
+  - `ArtemisRpiTeensyDeployment.gpsService.GpsFixState`
+  - Event: `ArtemisRpiTeensyDeployment.gpsAdapterArtemis.FixStateChanged`
+- Comms:
+  - `ArtemisRpiTeensyDeployment.commsAdapterTeensyRfm23.LinkState`
+  - `ArtemisRpiTeensyDeployment.commsAdapterTeensyRfm23.RssiDbm`
+  - `ArtemisRpiTeensyDeployment.commsAdapterTeensyRfm23.RfRxPackets`
+  - `ArtemisRpiTeensyDeployment.commsManager.LinkState`
+  - `ArtemisRpiTeensyDeployment.teensyTransportService.DownlinkFrames`
+  - Event: `ArtemisRpiTeensyDeployment.commsAdapterTeensyRfm23.LinkStateChanged`
+
+### Remaining gap (important)
+
+- These two adapters are now mission-meaningful but still model-driven.
+- They are not yet parsing live hardware status lines (for example Teensy `#LINK_STATUS` response fields or raw GPS sentence/fix data).
+- Full hardware-backed adapter ingestion remains a follow-on item after the MVP demo chain is stable.
+
 ## Architecture Decision (2026-02-26)
 
 - Evaluated running F' on Teensy 4.1 via Zephyr reference as an option.
@@ -185,6 +306,22 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   - acceptable flow is `Base Mode -> live SOH -> scheduled collect -> science product -> downlink -> ground review`
   - use simulated or fallback payload/science data if it materially improves demo reliability
 
+## RPi-Teensy Service Path Decision (2026-04-15)
+
+- Keep the existing `RPi <-> Teensy` UART path dedicated to raw `ComCcsds` packets only.
+- Do not inject custom Teensy service RPC/control bytes into that same UART CCSDS stream for MVP.
+- For Teensy-owned PDU telemetry/control (for example analog temperatures, INA219 current/power, switch commands), use a sideband bus between Raspberry Pi and Teensy.
+- Recommended sideband for MVP: `I2C` (`RPi` master, `Teensy` slave with a small register/command map).
+- Acceptable alternates if wiring or latency requires it:
+  - `SPI` sideband
+  - `GPIO` handshake/interrupt line in addition to `I2C`/`SPI`
+- Manual caveat remains in force:
+  - pin naming/labeling in the Artemis manual has conflicts; verify against board wiring/continuity before final pin assignment.
+- F' integration implication:
+  - keep `LinuxUartDriver` for the CCSDS link
+  - add service-facing adapter/driver path separately (for example `LinuxI2cDriver`) when implementing real Teensy/PDU ingestion
+- If no extra sideband wiring is available, defer to post-MVP single-UART multiplexing only after the CCSDS chain is stable.
+
 ## Primary TODO
 
 1. Record first successful non-crashing runtime on `/dev/serial0` using the real UART path.
@@ -192,7 +329,8 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 3. Implement the minimum demo-state flow for `Base Mode` -> scheduled data collection -> science-data downlink.
 4. Decide and document the payload-data source for the demo: real payload path vs simulated temporary data.
 5. Keep `fprime-gds` as the live MVP demo ground interface and treat `Yamcs` as the post-MVP target presentation/analysis stack.
-6. Decide if segment ACK/retry is required for acceptable RF reliability during the live demo.
+6. Add minimal segment ACK/retry for RF relay reliability after transparent raw-byte path is stable.
+   - MVP target: command uplink delivery confidence and reduced telemetry burst loss during demo.
 7. Add deterministic packet boundary extraction for uplink beyond simple burst mode if required by the selected demo flow.
 8. Build post-MVP mission/service multiplexing only after chain stability.
 9. Complete real file downlink path for the science demo flow:
