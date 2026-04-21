@@ -13,13 +13,16 @@ static constexpr uint8_t RPI_ENABLE_PIN = 36;
 static constexpr uint8_t TEENSY_LED_PIN = 13;
 
 static constexpr uint32_t UART_BAUD = 115200;
+static constexpr uint16_t RAW_UART_FLUSH_MS = 8;
+static constexpr uint8_t UPLINK_QUEUE_DEPTH = 8;
+static constexpr uint8_t DOWNLINK_QUEUE_DEPTH = 8;
 
 LinkCounters g_linkCounters;
 Rf23Driver g_rfDriver(RADIO_CS, RADIO_INT, RADIO_RX_ON_PIN, RADIO_TX_ON_PIN);
 // Transparent bridge mode for HIL:
 // - raw UART bytes from Pi are RF-relayed as payload
 // - RF-reassembled bytes are emitted raw to Pi UART
-RelayConfig g_relayConfig{true, false, false, false, 8};
+RelayConfig g_relayConfig{true, false, false, false, RAW_UART_FLUSH_MS, UPLINK_QUEUE_DEPTH, DOWNLINK_QUEUE_DEPTH};
 RelayUartRf g_relay(Serial2, g_rfDriver, g_linkCounters, g_relayConfig);
 
 void setup() {

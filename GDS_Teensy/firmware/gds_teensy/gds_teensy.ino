@@ -11,10 +11,18 @@ static constexpr uint8_t RADIO_RX_ON_PIN = 30;
 static constexpr uint8_t RADIO_TX_ON_PIN = 31;
 
 static constexpr uint32_t USB_UART_BAUD = 115200;
+static constexpr uint16_t RAW_UART_FLUSH_MS = 8;
+static constexpr uint8_t UPLINK_QUEUE_DEPTH = 8;
+static constexpr uint8_t DOWNLINK_QUEUE_DEPTH = 8;
 
 LinkCounters g_linkCounters;
 Rf23Driver g_rfDriver(RADIO_CS, RADIO_INT, RADIO_RX_ON_PIN, RADIO_TX_ON_PIN);
-RelayUartRf g_relay(Serial, g_rfDriver, g_linkCounters, RelayConfig{true, false, false, false, 8});
+// Demo bridge mode:
+// - read raw CCSDS bytes from laptop GDS on USB Serial
+// - aggregate and segment over RF
+// - reassemble RF return traffic and write raw back to GDS
+RelayConfig g_relayConfig{true, false, false, false, RAW_UART_FLUSH_MS, UPLINK_QUEUE_DEPTH, DOWNLINK_QUEUE_DEPTH};
+RelayUartRf g_relay(Serial, g_rfDriver, g_linkCounters, g_relayConfig);
 
 void setup() {
   // USB serial to laptop GDS.

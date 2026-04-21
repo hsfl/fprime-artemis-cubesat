@@ -28,11 +28,26 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
       m_reassemblyLen(0),
       m_lastSegmentMs(0),
       m_rawUartLen(0),
-      m_lastRawUartByteMs(0) {
+      m_lastRawUartByteMs(0),
+      m_uplinkHead(0),
+      m_uplinkTail(0),
+      m_uplinkCount(0),
+      m_downlinkHead(0),
+      m_downlinkTail(0),
+      m_downlinkCount(0) {
   memset(m_framePayload, 0, sizeof(m_framePayload));
   memset(m_commandBuffer, 0, sizeof(m_commandBuffer));
   memset(m_reassemblyBuf, 0, sizeof(m_reassemblyBuf));
   memset(m_rawUartBuf, 0, sizeof(m_rawUartBuf));
+  memset(m_uplinkQueue, 0, sizeof(m_uplinkQueue));
+  memset(m_downlinkQueue, 0, sizeof(m_downlinkQueue));
+
+  if (m_config.uplinkQueueDepth == 0 || m_config.uplinkQueueDepth > MAX_QUEUE_DEPTH) {
+    m_config.uplinkQueueDepth = 8;
+  }
+  if (m_config.downlinkQueueDepth == 0 || m_config.downlinkQueueDepth > MAX_QUEUE_DEPTH) {
+    m_config.downlinkQueueDepth = 8;
+  }
 }
 
 void RelayUartRf::begin() {
@@ -58,6 +73,8 @@ void RelayUartRf::poll() {
   }
 
   flushRfToUart();
+  serviceUplinkQueue();
+  serviceDownlinkQueue();
 }
 
 void RelayUartRf::processUartByte(uint8_t b) {
@@ -74,7 +91,7 @@ void RelayUartRf::processUartByte(uint8_t b) {
 
 void RelayUartRf::processRawUartByte(uint8_t b) {
   if (m_rawUartLen >= sizeof(m_rawUartBuf)) {
-    sendPayloadOverRf(m_rawUartBuf, m_rawUartLen);
+    enqueueUplinkMessage(m_rawUartBuf, m_rawUartLen);
     m_rawUartLen = 0;
   }
 
@@ -82,7 +99,7 @@ void RelayUartRf::processRawUartByte(uint8_t b) {
   m_lastRawUartByteMs = millis();
 
   if (m_rawUartLen >= sizeof(m_rawUartBuf)) {
-    sendPayloadOverRf(m_rawUartBuf, m_rawUartLen);
+    enqueueUplinkMessage(m_rawUartBuf, m_rawUartLen);
     m_rawUartLen = 0;
   }
 }
@@ -94,7 +111,7 @@ void RelayUartRf::flushRawUartIfStale() {
 
   const uint32_t now = millis();
   if ((now - m_lastRawUartByteMs) >= m_config.rawUartFlushMs) {
-    sendPayloadOverRf(m_rawUartBuf, m_rawUartLen);
+    enqueueUplinkMessage(m_rawUartBuf, m_rawUartLen);
     m_rawUartLen = 0;
   }
 }
@@ -224,7 +241,7 @@ void RelayUartRf::handleCompletedFrame() {
     return;
   }
 
-  sendPayloadOverRf(m_framePayload, m_frameLength);
+  enqueueUplinkMessage(m_framePayload, m_frameLength);
 }
 
 bool RelayUartRf::sendUartFrame(const uint8_t* payload, uint16_t length) {
@@ -383,11 +400,7 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
 
   if (segIdx + 1 == segCount) {
     m_counters.rfRxMessages += 1;
-    if (m_config.uartOutputFramed) {
-      sendUartFrame(m_reassemblyBuf, m_reassemblyLen);
-    } else {
-      sendRawToUart(m_reassemblyBuf, m_reassemblyLen);
-    }
+    enqueueDownlinkMessage(m_reassemblyBuf, m_reassemblyLen);
     resetReassembly(false, false);
   }
 }
@@ -428,7 +441,7 @@ void RelayUartRf::emitLinkStatus() {
   const int n =
       snprintf(statusLine,
                sizeof(statusLine),
-               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu\\n",
+               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu up_q_drops=%lu down_q_drops=%lu\\n",
                static_cast<unsigned long>(m_counters.uartRxBytes),
                static_cast<unsigned long>(m_counters.uartTxBytes),
                static_cast<unsigned long>(m_counters.rfRxPackets),
@@ -443,10 +456,77 @@ void RelayUartRf::emitLinkStatus() {
                static_cast<unsigned long>(m_counters.rfReassemblyTimeouts),
                static_cast<unsigned long>(m_counters.rfReassemblyDrops),
                static_cast<unsigned long>(m_counters.rfOversizeDrops),
-               static_cast<unsigned long>(m_counters.rfTxDrops));
+               static_cast<unsigned long>(m_counters.rfTxDrops),
+               static_cast<unsigned long>(m_counters.uplinkQueueDrops),
+               static_cast<unsigned long>(m_counters.downlinkQueueDrops));
 
   if (n > 0) {
     m_linkIo.write(reinterpret_cast<const uint8_t*>(statusLine), static_cast<size_t>(n));
     m_counters.uartTxBytes += static_cast<uint32_t>(n);
   }
+}
+
+bool RelayUartRf::enqueueUplinkMessage(const uint8_t* payload, uint16_t length) {
+  if (length == 0 || length > link_protocol::FRAME_MAX_PAYLOAD) {
+    m_counters.rfOversizeDrops += 1;
+    return false;
+  }
+
+  if (m_uplinkCount >= m_config.uplinkQueueDepth) {
+    m_counters.uplinkQueueDrops += 1;
+    return false;
+  }
+
+  QueueEntry& entry = m_uplinkQueue[m_uplinkHead];
+  entry.length = length;
+  memcpy(entry.payload, payload, length);
+  m_uplinkHead = static_cast<uint8_t>((m_uplinkHead + 1) % m_config.uplinkQueueDepth);
+  m_uplinkCount = static_cast<uint8_t>(m_uplinkCount + 1);
+  return true;
+}
+
+bool RelayUartRf::enqueueDownlinkMessage(const uint8_t* payload, uint16_t length) {
+  if (length == 0 || length > link_protocol::FRAME_MAX_PAYLOAD) {
+    m_counters.rfOversizeDrops += 1;
+    return false;
+  }
+
+  if (m_downlinkCount >= m_config.downlinkQueueDepth) {
+    m_counters.downlinkQueueDrops += 1;
+    return false;
+  }
+
+  QueueEntry& entry = m_downlinkQueue[m_downlinkHead];
+  entry.length = length;
+  memcpy(entry.payload, payload, length);
+  m_downlinkHead = static_cast<uint8_t>((m_downlinkHead + 1) % m_config.downlinkQueueDepth);
+  m_downlinkCount = static_cast<uint8_t>(m_downlinkCount + 1);
+  return true;
+}
+
+void RelayUartRf::serviceUplinkQueue() {
+  if (m_uplinkCount == 0) {
+    return;
+  }
+
+  QueueEntry& entry = m_uplinkQueue[m_uplinkTail];
+  sendPayloadOverRf(entry.payload, entry.length);
+  m_uplinkTail = static_cast<uint8_t>((m_uplinkTail + 1) % m_config.uplinkQueueDepth);
+  m_uplinkCount = static_cast<uint8_t>(m_uplinkCount - 1);
+}
+
+void RelayUartRf::serviceDownlinkQueue() {
+  if (m_downlinkCount == 0) {
+    return;
+  }
+
+  QueueEntry& entry = m_downlinkQueue[m_downlinkTail];
+  if (m_config.uartOutputFramed) {
+    sendUartFrame(entry.payload, entry.length);
+  } else {
+    sendRawToUart(entry.payload, entry.length);
+  }
+
+  m_downlinkTail = static_cast<uint8_t>((m_downlinkTail + 1) % m_config.downlinkQueueDepth);
+  m_downlinkCount = static_cast<uint8_t>(m_downlinkCount - 1);
 }

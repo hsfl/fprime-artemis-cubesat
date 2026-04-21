@@ -2,8 +2,7 @@
 #define ARTEMIS_TEENSY_RF23_DRIVER_HPP
 
 #include <Arduino.h>
-#include <RH_RF22.h>
-#include <RHHardwareSPI1.h>
+#include <artemis_rf23bp.hpp>
 
 class Rf23Driver {
  public:
@@ -15,14 +14,13 @@ class Rf23Driver {
   bool send(const uint8_t* data, uint8_t len);
 
  private:
-  void setAmpReceive();
-  void setAmpTransmit();
-
   int m_csPin;
   int m_irqPin;
   uint8_t m_rxOnPin;
   uint8_t m_txOnPin;
   RH_RF22 m_radio;
+  artemis::rf23bp::RadioPins m_radioPins;
+  artemis::rf23bp::RadioProfile m_radioProfile;
 };
 
 #endif

@@ -13,6 +13,8 @@ struct RelayConfig {
   bool enableCommandMode = true;
   bool uartInputFramed = true;
   uint16_t rawUartFlushMs = 8;
+  uint8_t uplinkQueueDepth = 8;
+  uint8_t downlinkQueueDepth = 8;
 };
 
 class RelayUartRf {
@@ -54,6 +56,17 @@ class RelayUartRf {
 
   uint16_t crc16Ccitt(const uint8_t* data, uint16_t len) const;
   void emitLinkStatus();
+  bool enqueueUplinkMessage(const uint8_t* payload, uint16_t length);
+  bool enqueueDownlinkMessage(const uint8_t* payload, uint16_t length);
+  void serviceUplinkQueue();
+  void serviceDownlinkQueue();
+
+  static constexpr uint8_t MAX_QUEUE_DEPTH = 16;
+
+  struct QueueEntry {
+    uint16_t length;
+    uint8_t payload[link_protocol::FRAME_MAX_PAYLOAD];
+  };
 
   Stream& m_linkIo;
   Rf23Driver& m_rf;
@@ -83,6 +96,16 @@ class RelayUartRf {
   uint8_t m_rawUartBuf[link_protocol::FRAME_MAX_PAYLOAD];
   uint16_t m_rawUartLen;
   uint32_t m_lastRawUartByteMs;
+
+  QueueEntry m_uplinkQueue[MAX_QUEUE_DEPTH];
+  uint8_t m_uplinkHead;
+  uint8_t m_uplinkTail;
+  uint8_t m_uplinkCount;
+
+  QueueEntry m_downlinkQueue[MAX_QUEUE_DEPTH];
+  uint8_t m_downlinkHead;
+  uint8_t m_downlinkTail;
+  uint8_t m_downlinkCount;
 };
 
 #endif
