@@ -11,9 +11,9 @@ static constexpr uint8_t RADIO_RX_ON_PIN = 30;
 static constexpr uint8_t RADIO_TX_ON_PIN = 31;
 
 static constexpr uint32_t USB_UART_BAUD = 115200;
-static constexpr uint16_t RAW_UART_FLUSH_MS = 8;
-static constexpr uint8_t UPLINK_QUEUE_DEPTH = 8;
-static constexpr uint8_t DOWNLINK_QUEUE_DEPTH = 8;
+static constexpr uint16_t RAW_UART_FLUSH_MS = 12;
+static constexpr uint8_t UPLINK_QUEUE_DEPTH = 32;
+static constexpr uint8_t DOWNLINK_QUEUE_DEPTH = 32;
 
 LinkCounters g_linkCounters;
 Rf23Driver g_rfDriver(RADIO_CS, RADIO_INT, RADIO_RX_ON_PIN, RADIO_TX_ON_PIN);

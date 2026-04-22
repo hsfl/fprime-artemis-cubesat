@@ -13,8 +13,8 @@ struct RelayConfig {
   bool enableCommandMode = true;
   bool uartInputFramed = true;
   uint16_t rawUartFlushMs = 8;
-  uint8_t uplinkQueueDepth = 8;
-  uint8_t downlinkQueueDepth = 8;
+  uint8_t uplinkQueueDepth = 16;
+  uint8_t downlinkQueueDepth = 16;
 };
 
 class RelayUartRf {
@@ -61,7 +61,7 @@ class RelayUartRf {
   void serviceUplinkQueue();
   void serviceDownlinkQueue();
 
-  static constexpr uint8_t MAX_QUEUE_DEPTH = 16;
+  static constexpr uint8_t MAX_QUEUE_DEPTH = 32;
 
   struct QueueEntry {
     uint16_t length;

@@ -43,10 +43,10 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
   memset(m_downlinkQueue, 0, sizeof(m_downlinkQueue));
 
   if (m_config.uplinkQueueDepth == 0 || m_config.uplinkQueueDepth > MAX_QUEUE_DEPTH) {
-    m_config.uplinkQueueDepth = 8;
+    m_config.uplinkQueueDepth = 16;
   }
   if (m_config.downlinkQueueDepth == 0 || m_config.downlinkQueueDepth > MAX_QUEUE_DEPTH) {
-    m_config.downlinkQueueDepth = 8;
+    m_config.downlinkQueueDepth = 16;
   }
 }
 

@@ -42,8 +42,9 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - Deployment uses Linux UART transport (`Drv.LinuxUartDriver`) on `/dev/serial0`.
 - Main runtime binary accepts `-d <uart_device>`.
 - MVP custom components in deployment:
-  - `Components/TeensyLink`
   - `Components/PingResponder`
+  - `Components/CommsAdapter_TeensyRfm23`
+  - `Components/TeensyTransportService`
 - Build status:
   - `fprime-util generate -f` passes
   - `fprime-util build` passes
@@ -77,6 +78,11 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
     - ground USB raw bytes -> RF segment transport -> RPi UART raw bytes
   - UART wrapper mode (`0xD4 0xC3 + len + crc16`) remains optional fallback only
   - UART payload max now `220` bytes
+  - Queue-backed relay path enabled for burst tolerance:
+    - `RAW_UART_FLUSH_MS = 12`
+    - `UPLINK_QUEUE_DEPTH = 32`
+    - `DOWNLINK_QUEUE_DEPTH = 32`
+    - relay max queue cap `MAX_QUEUE_DEPTH = 32`
   - RF uses segmented message transport (`msg_id`, `seg_idx`, `seg_count`, `chunk_len`)
 - Build status:
   - `./tools/arduino-cli/build.sh` passes for `teensy:avr:teensy41`
@@ -89,7 +95,11 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - Behavior:
   - Receives RF segments and reassembles full message bytes
   - Streams reassembled bytes directly to USB serial (`Serial`) for laptop GDS UART input
-  - Also packetizes raw USB byte bursts (`8 ms` idle flush or `220`-byte full buffer) for simple uplink
+  - Packetizes raw USB byte bursts (`12 ms` idle flush or `220`-byte full buffer) for uplink
+  - Queue-backed relay path enabled for burst tolerance:
+    - `UPLINK_QUEUE_DEPTH = 32`
+    - `DOWNLINK_QUEUE_DEPTH = 32`
+    - relay max queue cap `MAX_QUEUE_DEPTH = 32`
 - Build status:
   - `./tools/arduino-cli/build.sh` passes for `teensy:avr:teensy41`
 
@@ -110,7 +120,7 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - Fix applied:
   - `ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/satellite_teensy.ino`
   - relay config now matches ground bridge for raw-byte tunnel mode:
-    - `RelayConfig{true, false, false, false, 8}`
+    - `RelayConfig{true, false, false, false, RAW_UART_FLUSH_MS, UPLINK_QUEUE_DEPTH, DOWNLINK_QUEUE_DEPTH}`
 - Intended runtime contract:
   - laptop `fprime-gds` UART plugin sends raw bytes
   - ground Teensy relays raw bytes over RF segments
@@ -219,6 +229,51 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
    - stop stale `fprime-gds` or emulation processes and relaunch one clean instance on `5050`.
 5. If using `usb=serial2` and two `/dev/cu.usbmodem*` ports appear:
    - one port is GDS data (`Serial`), the other is debug monitor (`SerialUSB1`); verify by checking where `U0[...]` lines appear.
+
+## Queue Buffering Update (2026-04-21)
+
+### What changed
+
+- Mirrored queue-backed raw relay behavior on both Teensy projects:
+  - `GDS_Teensy/firmware/gds_teensy/src/relay_uart_rf.*`
+  - `ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/relay_uart_rf.*`
+- Queues now decouple:
+  - `UART -> RF` (uplink queue)
+  - `RF -> UART` (downlink queue)
+- Both sketches now use the same generous demo defaults:
+  - `RAW_UART_FLUSH_MS = 12`
+  - `UPLINK_QUEUE_DEPTH = 32`
+  - `DOWNLINK_QUEUE_DEPTH = 32`
+
+### Why this matters
+
+- Prevents immediate drops during short command/telemetry bursts when one side is briefly busy.
+- Keeps the raw `ComCcsds` tunnel model unchanged while improving burst handling.
+
+### Debug/observability
+
+- `#LINK_STATUS` now includes queue drop counters:
+  - `up_q_drops`
+  - `down_q_drops`
+- If either counter increments during demo traffic, first response is:
+  1. reduce offered traffic burst rate, or
+  2. increase flush window slightly (for example `12 -> 16 ms`) to improve batching.
+
+### Build verification (known-good)
+
+1. Ground Teensy:
+   - `cd GDS_Teensy`
+   - `./tools/arduino-cli/build.sh`
+2. Satellite Teensy:
+   - `cd ArtemisTeensy_N2_Baremetal`
+   - `./tools/arduino-cli/build.sh`
+
+### Memory landmine
+
+- Queue buffers consume `RAM`, not flash.
+- Approximate queue payload RAM per Teensy relay:
+  - `2 queues * 32 entries * (220-byte payload + 2-byte length) ~= 14.2 KB`
+- Teensy 4.1 remains within RAM headroom with this profile (validated by successful builds), but do not increase queue depth blindly without re-checking RAM report.
 
 ## Adapter MVP Update (2026-04-15)
 
