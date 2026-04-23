@@ -123,7 +123,7 @@ Useful overrides:
 Notes:
 - On macOS, port `5000` may already be occupied by Control Center/AirPlay Receiver. Use non-5000 GUI ports (default script port is `5050`).
 - If using raw CLI instead of script, pass UART args explicitly:
-  - `fprime-gds -n --communication-selection uart --uart-device <device> --uart-baud 115200 --framing-selection fprime`
+  - `fprime-gds -n --communication-selection uart --uart-device <device> --uart-baud 115200 --framing-selection space-packet-space-data-link`
 
 ## Common Pitfalls
 - Running generators without a build cache.

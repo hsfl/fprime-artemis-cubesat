@@ -3,8 +3,9 @@
 Baremetal Teensy relay workspace for satellite-side RF23BP <-> UART bridging.
 
 ## Scope
-- RPi <-> satellite Teensy uses custom UART wrapper (`0xD4 0xC3 + len + crc16`).
-- UART payload carries opaque F' bytes.
+- Nominal MVP/HIL mode is a transparent raw-byte tunnel between RPi UART and RF transport.
+- RPi <-> satellite Teensy UART carries raw `ComCcsds` / space-packet bytes from the F' endpoint.
+- Custom UART wrapper mode (`0xD4 0xC3 + len + crc16`) is legacy/fallback only and is not part of the nominal path.
 - RF link uses segmented transport (`msg_id/seg_idx/seg_count/chunk_len`).
 - Supports reassembly on receive before writing to local UART.
 
@@ -22,7 +23,7 @@ cd ArtemisTeensy_N2_Baremetal
 
 ## Source Layout
 - `firmware/satellite_teensy/satellite_teensy.ino`: top-level sketch.
-- `firmware/satellite_teensy/src/relay_uart_rf.*`: UART wrapper parsing + RF segmentation/reassembly.
+- `firmware/satellite_teensy/src/relay_uart_rf.*`: transparent raw-byte relay plus fallback UART wrapper parsing and RF segmentation/reassembly.
 - `firmware/satellite_teensy/src/rf23_driver.*`: RF23BP wrapper.
 - `firmware/satellite_teensy/src/link_protocol.hpp`: framing constants.
 - `firmware/satellite_teensy/src/link_counters.hpp`: observability counters.

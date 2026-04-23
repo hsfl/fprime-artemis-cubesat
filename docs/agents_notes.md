@@ -4,8 +4,9 @@
 
 This repo is the Neutron 2 team F' integration workspace:
 - F' flight software runs on Raspberry Pi.
-- Satellite Teensy provides UART wrapper + RF23BP bridge.
-- Ground Teensy reassembles RF messages to USB and supports simple USB-burst uplink back to RF.
+- Satellite Teensy provides transparent raw-byte UART tunnel mode plus RF23BP segmentation/reassembly.
+- Ground Teensy reassembles RF messages to USB raw bytes and supports simple USB-burst uplink back to RF.
+- Legacy UART wrapper mode remains fallback-only.
 
 ## Demo Target Snapshot (2026-04-07)
 

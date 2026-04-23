@@ -10,7 +10,7 @@ flowchart LR
     %% put out into components: EPS, COMMS, THERMAL, GPS, Teensy, Payload, ADCS,  Mission%%
     FSW["ArtemisRpiTeensy_N2 F' Deployment (ArtemisRpiTeensyDeployment)"]:::fw
     LINUXUART["Drv.LinuxUartDriver /dev/serial0"]:::fw
-    APP["Custom Components TeensyLink, PingResponder"]:::fw
+    APP["Custom Components MissionManager, ScienceManager, SohManager, TeensyTransportService"]:::fw
     FSW --> APP
     FSW --> LINUXUART
   end
@@ -18,7 +18,7 @@ flowchart LR
 
   subgraph SAT["Satellite Teensy (Baremetal)"]
     SATFW["ArtemisTeensy_N2_Baremetal satellite_teensy.ino"]:::fw
-    SATUART["UART Wrapper 0xD4 0xC3 + len + crc16"]:::link
+    SATUART["Transparent raw-byte UART tunnel"]:::link
     SATRF["RF23BP Segmenter/Reassembler msg_id/seg_idx/seg_count"]:::link
     PDU["PDU Subsystem"]:::subsystem
     TEMP["Temp Sensors"]:::subsystem
@@ -54,6 +54,6 @@ flowchart LR
 
   N1USB -->|"RS422 to USB (2.0)"| FSW
 
-  LINUXUART <-->|"Custom UART Frame Protocol"| SATUART
+  LINUXUART <-->|"Raw ComCcsds / space-packet bytes"| SATUART
   SATRF <-->|"RF segmented transport"| GRDRF
   GRDUSB <-->|"USB serial"| GDS
