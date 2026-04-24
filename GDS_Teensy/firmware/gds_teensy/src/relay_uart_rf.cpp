@@ -21,6 +21,8 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
       m_commandIndex(0),
       m_lastFrameByteMs(0),
       m_nextMsgId(0),
+      m_seenRxMsgId(false),
+      m_lastRxMsgId(0),
       m_reassemblyActive(false),
       m_expectedMsgId(0),
       m_expectedSegIndex(0),
@@ -90,7 +92,11 @@ void RelayUartRf::processUartByte(uint8_t b) {
 }
 
 void RelayUartRf::processRawUartByte(uint8_t b) {
-  if (m_rawUartLen >= sizeof(m_rawUartBuf)) {
+  uint16_t rawChunkLimit = m_config.rawUartChunkBytes;
+  if (rawChunkLimit == 0 || rawChunkLimit > link_protocol::FRAME_MAX_PAYLOAD) {
+    rawChunkLimit = link_protocol::RF_SEGMENT_MAX_DATA;
+  }
+  if (m_rawUartLen >= rawChunkLimit) {
     enqueueUplinkMessage(m_rawUartBuf, m_rawUartLen);
     m_rawUartLen = 0;
   }
@@ -98,7 +104,7 @@ void RelayUartRf::processRawUartByte(uint8_t b) {
   m_rawUartBuf[m_rawUartLen++] = b;
   m_lastRawUartByteMs = millis();
 
-  if (m_rawUartLen >= sizeof(m_rawUartBuf)) {
+  if (m_rawUartLen >= rawChunkLimit) {
     enqueueUplinkMessage(m_rawUartBuf, m_rawUartLen);
     m_rawUartLen = 0;
   }
@@ -111,6 +117,11 @@ void RelayUartRf::flushRawUartIfStale() {
 
   const uint32_t now = millis();
   if ((now - m_lastRawUartByteMs) >= m_config.rawUartFlushMs) {
+    if (m_config.rawUartChunkBytes > link_protocol::RF_SEGMENT_MAX_DATA) {
+      m_counters.framingDrops += 1;
+      m_rawUartLen = 0;
+      return;
+    }
     enqueueUplinkMessage(m_rawUartBuf, m_rawUartLen);
     m_rawUartLen = 0;
   }
@@ -309,7 +320,7 @@ bool RelayUartRf::sendPayloadOverRf(const uint8_t* payload, uint16_t length) {
     memcpy(&rfPacket[link_protocol::RF_SEGMENT_HEADER_LEN], payload + sent, chunkLen);
 
     const uint8_t rfLen = static_cast<uint8_t>(link_protocol::RF_SEGMENT_HEADER_LEN + chunkLen);
-    if (!m_rf.send(rfPacket, rfLen)) {
+    if (!sendRfPacketWithAck(rfPacket, rfLen, msgId, segIdx)) {
       m_counters.rfTxDrops += 1;
       return false;
     }
@@ -317,10 +328,74 @@ bool RelayUartRf::sendPayloadOverRf(const uint8_t* payload, uint16_t length) {
     sent = static_cast<uint16_t>(sent + chunkLen);
     m_counters.rfTxPackets += 1;
     m_counters.rfTxSegments += 1;
+
+    if (segIdx + 1 < segCount) {
+      delay(link_protocol::RF_INTER_SEGMENT_GAP_MS);
+    }
   }
 
   m_counters.rfTxMessages += 1;
   return true;
+}
+
+bool RelayUartRf::sendRfPacketWithAck(const uint8_t* packet, uint8_t packetLen, uint8_t msgId, uint8_t segIdx) {
+  for (uint8_t attempt = 0; attempt <= link_protocol::RF_ACK_RETRIES; attempt++) {
+    if (!m_rf.send(packet, packetLen)) {
+      return false;
+    }
+    if (waitForAck(msgId, segIdx)) {
+      return true;
+    }
+    m_counters.rfAckTimeouts += 1;
+    if (attempt < link_protocol::RF_ACK_RETRIES) {
+      m_counters.rfRetries += 1;
+    }
+  }
+  return false;
+}
+
+bool RelayUartRf::waitForAck(uint8_t msgId, uint8_t segIdx) {
+  const uint32_t startMs = millis();
+  uint8_t rfBuffer[link_protocol::RF_PACKET_MAX_LEN] = {0};
+
+  while ((millis() - startMs) < link_protocol::RF_ACK_TIMEOUT_MS) {
+    while (m_rf.available()) {
+      uint8_t rfLen = static_cast<uint8_t>(sizeof(rfBuffer));
+      if (m_rf.recv(rfBuffer, &rfLen) && rfLen > 0) {
+        if (isAckPacket(rfBuffer, rfLen, msgId, segIdx)) {
+          m_counters.rfAckRx += 1;
+          return true;
+        }
+        m_counters.rfRxPackets += 1;
+        processRfSegment(rfBuffer, rfLen);
+      }
+    }
+  }
+  return false;
+}
+
+bool RelayUartRf::isAckPacket(const uint8_t* packet, uint8_t packetLen, uint8_t msgId, uint8_t segIdx) const {
+  return packetLen == link_protocol::RF_SEGMENT_HEADER_LEN &&
+         packet[0] == link_protocol::RF_SEGMENT_MAGIC &&
+         packet[1] == msgId &&
+         packet[2] == link_protocol::RF_ACK_SEGMENT_INDEX &&
+         packet[3] == segIdx &&
+         packet[4] == 0;
+}
+
+bool RelayUartRf::sendAck(uint8_t msgId, uint8_t segIdx) {
+  uint8_t ackPacket[link_protocol::RF_SEGMENT_HEADER_LEN] = {
+      link_protocol::RF_SEGMENT_MAGIC,
+      msgId,
+      link_protocol::RF_ACK_SEGMENT_INDEX,
+      segIdx,
+      0,
+  };
+  const bool ok = m_rf.send(ackPacket, sizeof(ackPacket));
+  if (ok) {
+    m_counters.rfAckTx += 1;
+  }
+  return ok;
 }
 
 void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
@@ -338,6 +413,10 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
   const uint8_t segIdx = packet[2];
   const uint8_t segCount = packet[3];
   const uint8_t chunkLen = packet[4];
+
+  if (segIdx == link_protocol::RF_ACK_SEGMENT_INDEX) {
+    return;
+  }
 
   if (segCount == 0 || segIdx >= segCount) {
     m_counters.framingDrops += 1;
@@ -365,11 +444,19 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
       return;
     }
 
+    if (m_seenRxMsgId && static_cast<uint8_t>(m_lastRxMsgId + 1) != msgId) {
+      m_counters.rfMsgIdGaps += 1;
+    }
     m_reassemblyActive = true;
     m_expectedMsgId = msgId;
     m_expectedSegIndex = 0;
     m_expectedSegCount = segCount;
     m_reassemblyLen = 0;
+  }
+
+  if (msgId == m_expectedMsgId && segCount == m_expectedSegCount && segIdx < m_expectedSegIndex) {
+    sendAck(msgId, segIdx);
+    return;
   }
 
   if (msgId != m_expectedMsgId || segCount != m_expectedSegCount || segIdx != m_expectedSegIndex) {
@@ -397,9 +484,12 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
   m_expectedSegIndex = static_cast<uint8_t>(m_expectedSegIndex + 1);
   m_lastSegmentMs = now;
   m_counters.rfRxSegments += 1;
+  sendAck(msgId, segIdx);
 
   if (segIdx + 1 == segCount) {
     m_counters.rfRxMessages += 1;
+    m_seenRxMsgId = true;
+    m_lastRxMsgId = msgId;
     enqueueDownlinkMessage(m_reassemblyBuf, m_reassemblyLen);
     resetReassembly(false, false);
   }
@@ -441,7 +531,7 @@ void RelayUartRf::emitLinkStatus() {
   const int n =
       snprintf(statusLine,
                sizeof(statusLine),
-               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu up_q_drops=%lu down_q_drops=%lu\\n",
+               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu rf_msg_id_gaps=%lu rf_ack_rx=%lu rf_ack_tx=%lu rf_retries=%lu rf_ack_timeouts=%lu up_q_drops=%lu down_q_drops=%lu\\n",
                static_cast<unsigned long>(m_counters.uartRxBytes),
                static_cast<unsigned long>(m_counters.uartTxBytes),
                static_cast<unsigned long>(m_counters.rfRxPackets),
@@ -457,6 +547,11 @@ void RelayUartRf::emitLinkStatus() {
                static_cast<unsigned long>(m_counters.rfReassemblyDrops),
                static_cast<unsigned long>(m_counters.rfOversizeDrops),
                static_cast<unsigned long>(m_counters.rfTxDrops),
+               static_cast<unsigned long>(m_counters.rfMsgIdGaps),
+               static_cast<unsigned long>(m_counters.rfAckRx),
+               static_cast<unsigned long>(m_counters.rfAckTx),
+               static_cast<unsigned long>(m_counters.rfRetries),
+               static_cast<unsigned long>(m_counters.rfAckTimeouts),
                static_cast<unsigned long>(m_counters.uplinkQueueDrops),
                static_cast<unsigned long>(m_counters.downlinkQueueDrops));
 

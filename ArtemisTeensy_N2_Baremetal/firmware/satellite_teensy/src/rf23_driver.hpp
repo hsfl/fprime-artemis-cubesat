@@ -2,7 +2,7 @@
 #define ARTEMIS_TEENSY_RF23_DRIVER_HPP
 
 #include <Arduino.h>
-#include <artemis_rf23bp.hpp>
+#include "artemis_rf23bp.hpp"
 
 class Rf23Driver {
  public:

@@ -419,3 +419,336 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - Use project-pinned versions from `lib/fprime/requirements.txt` when creating venvs on target.
 - When choosing scope, favor the shortest implementation that makes the end-to-end demo story credible in front of judges.
 - Simulated payload data is acceptable if it unblocks the demo and is documented clearly.
+
+## Session Handoff (2026-04-23)
+
+### Pi Zero W cross-build and versioning
+
+- Revalidated Pi Zero W cross-build locally in Docker with ARMv6 verification.
+- `docs/CROSS_COMPILE_HANDOFF_PI_ZERO_W.md` remains the source-of-truth rationale for sysroot/runtime object handling.
+- Updated script:
+  - `ArtemisRpiTeensy_N2/tools/docker_cross_compile_pi_zero_w.sh`
+- Script updates applied:
+  - added `--local-only` mode (skip SSH deploy/smoke and reuse local sysroot)
+  - changed container mount to repo root (`/repo`) so F' version generation can see real git metadata
+  - switched venv creation to `python3 -m venv --clear` to avoid stale shebang path issues after mount-path changes
+- Result:
+  - binary remains ARMv6-compatible (`Tag_CPU_arch: v6KZ`, `Tag_FP_arch: VFPv2`)
+  - runtime version events no longer fall back to `v3.5.0`; they now report framework from git (`v4.2.1-*`)
+
+### Pi SSH + deployment status
+
+- Pi reachable and verified at:
+  - host alias: `artemis-pi`
+  - host/IP: `pi@192.168.0.152` (`raspberrypi.local`)
+  - architecture: `armv6l`
+- New deployment + dictionary copied to:
+  - `/home/pi/artemis/cross/ArtemisRpiTeensyDeployment`
+  - `/home/pi/artemis/cross/ArtemisRpiTeensyDeploymentTopologyDictionary.json`
+- Current symlinks updated:
+  - `/home/pi/artemis/current/ArtemisRpiTeensyDeployment`
+  - `/home/pi/artemis/current/ArtemisRpiTeensyDeploymentTopologyDictionary.json`
+
+### Auto-start on boot (RPi)
+
+- Created and enabled systemd unit:
+  - `/etc/systemd/system/artemis-fprime.service`
+- Configured boot command:
+  - `/home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0`
+- Service state at handoff:
+  - `enabled`
+  - `active (running)`
+  - live telemetry/event logs visible via journald
+- Useful checks on Pi:
+  - `sudo systemctl status artemis-fprime.service --no-pager -l`
+  - `sudo journalctl -u artemis-fprime.service -f`
+
+### Smoke launch evidence on Pi
+
+- Executed both with `timeout 8s` directly on Pi:
+  - `/dev/null` smoke
+  - `/dev/serial0` smoke
+- Both returned status `124` (expected timeout), with active logs emitted.
+- Log files:
+  - `/home/pi/artemis/logs/smoke_null_20260423_115931.log`
+  - `/home/pi/artemis/logs/smoke_serial0_20260423_115931.log`
+- `/dev/serial0` smoke included version and subsystem events, including:
+  - `FrameworkVersion : [v4.2.1-dirty]`
+  - `ProjectVersion : [546f0fc-dirty]`
+  - ongoing EPS/ADCS/GPS/COMMS activity
+
+### Teensy IDE include fix (header resolution)
+
+Problem seen in Arduino IDE for both Teensy sketches:
+- `fatal error: artemis_rf23bp.hpp: No such file or directory`
+
+Fix approach for IDE compatibility:
+- keep `artemis_rf23bp.hpp` local to each sketch `src/` directory
+- include with quotes (`"artemis_rf23bp.hpp"`) instead of angle brackets
+
+Files updated:
+- Ground Teensy:
+  - `GDS_Teensy/firmware/gds_teensy/src/rf23_driver.hpp`
+  - `GDS_Teensy/firmware/gds_teensy/src/artemis_rf23bp.hpp` (added)
+- Satellite Teensy:
+  - `ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/rf23_driver.hpp`
+  - `ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/artemis_rf23bp.hpp` (added)
+
+Build verification at handoff:
+- `GDS_Teensy` compile succeeds
+- `ArtemisTeensy_N2_Baremetal` satellite compile succeeds
+
+### Immediate next step
+
+- Proceed with full HIL validation using current flashed firmware and live `/dev/serial0` service on Pi.
+- Use:
+  - `docs/build_runbook.md`
+  - `docs/GDS_TEENSY_RUNBOOK.md`
+
+## Session Handoff (2026-04-23, HIL debug)
+
+### Startup/boot duplicate fixed on Pi
+
+- Root cause of double-start was two enabled services launching F':
+  - `artemis-fprime.service` (intended)
+  - `artemis-cross.service` (duplicate path)
+- Actions taken on Pi:
+  - disabled/stopped `artemis-cross.service`
+  - kept `artemis-fprime.service` enabled as single startup path
+  - restarted `artemis-fprime.service`
+- Confirmed runtime command:
+  - `/home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0`
+- Confirmed process state after fix:
+  - one `ArtemisRpiTeensyDeployment` process only
+
+### HIL/RF-chain status (current blocker)
+
+- Pi app is healthy and logs continuously, but comms path is unstable/failing end-to-end:
+  - repeated `commsManager LinkStateUpdated ... 0`
+  - repeated `commsAdapterTeensyRfm23 RequestHandled ... status=0`
+- After duplicate-start fix, link briefly showed up (`LinkStateUpdated ... 1`, `status=1`) right after restart, then returned to failure behavior.
+- Direct serial probe on Pi while service stopped captured no UART bytes during sample window (`/dev/serial0` read = 0 bytes in probe run).
+- Net result for next HIL session:
+  - treat RF/UART chain as current failure point, not F' process bring-up.
+  - debug should focus on physical link path and Teensy-side relay/radio chain stability.
+
+## Session Handoff (2026-04-24, RF/GDS HIL debug)
+
+### USB/SSH mapping confirmed
+
+- Satellite Teensy:
+  - `/dev/cu.usbmodem115502201`
+  - physical Teensy upload port: `usb:100000`
+  - current sketch role: satellite bridge, Pi data on `Serial2`, USB `Serial` debug counters
+- Ground station Teensy:
+  - `/dev/cu.usbmodem115551201` = GDS data stream (`Serial`)
+  - `/dev/cu.usbmodem115551203` = debug stream (`SerialUSB1`)
+  - physical Teensy upload port: `usb:1100000`
+- Raspberry Pi:
+  - SSH alias: `artemis-pi`
+  - host/IP: `192.168.0.152`
+  - key in `~/.ssh/config`: `~/.ssh/id_ed25519_artemis_pi`
+  - verified active service:
+    - `artemis-fprime.service`
+    - runtime command: `/home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0`
+
+### Important upload lesson
+
+- Do not upload by `/dev/cu.usbmodem*` when both Teensys are connected; Arduino CLI may auto-search and choose the wrong Teensy.
+- Use the physical Teensy ports from `arduino-cli board list`:
+  - ground: `-p usb:1100000`
+  - satellite: `-p usb:100000`
+- Use explicit build directories to avoid stale artifacts:
+  - ground debug: `GDS_Teensy/build/arduino-cli-gds-teensy-debug`
+  - satellite debug: `ArtemisTeensy_N2_Baremetal/build/arduino-cli-satellite-debug`
+
+### Firmware debug instrumentation added
+
+- Ground `gds_teensy.ino` now supports `usb=serial2`:
+  - `Serial` remains byte-clean for `fprime-gds`
+  - `SerialUSB1` prints periodic bridge counters and RF init status
+- Satellite `satellite_teensy.ino` now prints periodic bridge counters on USB `Serial`.
+- Relay debug counters used:
+  - `uart_rx`, `uart_tx`
+  - `rf_rx_pkt`, `rf_tx_pkt`
+  - `rf_rx_msg`, `rf_tx_msg`
+  - `rf_rx_seg`, `rf_tx_seg`
+  - `rf_tx_drops`, `rf_reasm_drops`
+  - `up_q_drops`, `down_q_drops`
+
+### RF bridge findings
+
+- Ground RF init reports OK:
+  - `[GDS_Teensy] RF23 bridge ready (raw USB byte tunnel + RF segmentation)`
+- Satellite RF bridge reports OK when boot text is captured.
+- Ground-to-satellite uplink was proven with a raw test burst:
+  - writing `CODX-UPLINK-TEST\n` to ground data port incremented:
+    - ground `uart_rx`
+    - ground `rf_tx_pkt/msg/seg`
+    - satellite `rf_rx_pkt/msg/seg`
+    - satellite `uart_tx`
+- Satellite-to-ground downlink was proven with live F' bytes:
+  - satellite `uart_rx` and `rf_tx_*` continuously increment
+  - ground `rf_rx_*` and `uart_tx` continuously increment
+- F' command path was proven:
+  - sent `ArtemisRpiTeensyDeployment.missionManager.PING --arguments 4242`
+  - Pi journald showed:
+    - `OpCode 0x10006001 dispatched`
+    - `MissionManager pong token=4242 count=1`
+    - `OpCode 0x10006001 completed`
+
+### Remaining blocker
+
+- `fprime-gds` still prints repeated:
+  - `[WARNING] Checksum validation failed.`
+- This means the MVP command uplink is working and the raw bridge moves bytes both ways, but GDS-visible clean decode is not yet stable.
+- Earlier ground counters showed `rf_reasm_drops` during continuous telemetry when 220-byte raw UART batches were segmented into multiple RF packets.
+- Mitigations tried:
+  - added `RF_INTER_SEGMENT_GAP_MS = 8`
+  - changed raw UART batching to flush at `RF_SEGMENT_MAX_DATA` so each relay message fits in one RF packet
+- After single-packet raw chunks, short counter windows showed clean RF movement with no `rf_reasm_drops`, but GDS checksum warnings still appeared.
+
+### Current root-cause hypothesis
+
+- Highest-probability remaining causes:
+  1. byte loss/reordering still occurs under sustained downlink load even when debug windows look clean
+  2. `fprime-gds` is decoding a stream that starts mid-frame and is not resynchronizing cleanly
+  3. transport chunking is byte-stream transparent in concept, but the current RF relay lacks a stronger stream-order/ack layer and can silently lose RF packets
+- The next test should be byte-level, not just counter-level:
+  - capture bytes near Pi UART output and ground USB input for the same interval
+  - compare length/order/content
+  - if bytes differ, root cause is RF/Teensy transport integrity
+  - if bytes match, root cause is GDS framing/config or dictionary/runtime mismatch
+
+### Root-cause update after gap-counter instrumentation
+
+- Added `rf_msg_id_gaps` to both Teensy relay counters to detect missing whole RF messages.
+- This catches the failure mode that `rf_reasm_drops` misses after raw chunks were reduced to one RF packet each.
+- Result from live downlink:
+  - satellite side showed continuous `uart_rx` and `rf_tx_msg`
+  - ground side showed `rf_msg_id_gaps=2` by `rf_rx_msg=91`
+  - `rf_reasm_drops=0`
+- Interpretation:
+  - full RF packets/messages are being lost over the RF hop
+  - GDS checksum failures are expected when even one RF packet is lost, because the CCSDS byte stream is no longer exact
+  - current transparent RF tunnel is not reliable enough for clean `fprime-gds` telemetry without either reduced traffic, stronger RF settings, or ACK/retry
+
+### Framing observation
+
+- Raw ground bytes repeatedly show CCSDS-looking TM header candidates with dictionary SCID `68` and VCID `1`.
+- GDS warning source is the CCSDS space-data-link CRC path, not the generic F Prime `0xDEADBEEF` framer.
+- A quick `--frame-size 51` test did not fix decode; the stronger evidence is now packet loss via `rf_msg_id_gaps`.
+
+### MVP status in plain terms
+
+- Basically there for command uplink and Pi-side command execution.
+- Not done for the judge-facing MVP until `fprime-gds` cleanly decodes telemetry/events without checksum spam.
+- Most likely MVP unblocker:
+  - add minimal RF ACK/retry or
+  - throttle downlink to a tiny command-response/heartbeat stream that can survive the current packet-loss rate.
+
+## Session Handoff Update (2026-04-24, RF ACK/retry + small TM frames)
+
+### What changed
+
+- Added minimal RF ACK/retry to both Teensy relays.
+- Reduced demo downlink pressure in F Prime topology by disabling most periodic subsystem/service telemetry runs.
+- Cross-compiled and deployed Pi Zero W ARM build to `/home/pi/artemis/cross`.
+- Reduced F Prime CCSDS TM frame config for RF MVP:
+  - `ComCfg.TmFrameFixedSize = 128`
+  - `FW_COM_BUFFER_MAX_SIZE = 96`
+  - `FW_LOG_STRING_MAX_SIZE = 80`
+- Added satellite Teensy `Serial2` RX buffer:
+  - `RPI_UART_RX_BUFFER_SIZE = 4096`
+- Changed satellite raw UART batching to collect full 128-byte CCSDS TM frames before RF send:
+  - `CCSDS_TM_FRAME_BYTES = 128`
+- Fixed RF ACK semantics:
+  - old ACK was message-level but sender waited after every RF segment
+  - new ACK includes `msgId + segIdx`
+  - receiver ACKs each accepted segment
+
+### Current verified state
+
+- Pi service starts cleanly with deployed cross-compiled binary.
+- Local dictionary confirms:
+  - `ComCfg.TmFrameFixedSize = 128`
+- Raw ground capture after per-segment ACK shows valid 128-byte TM frames:
+  - valid CRC frame offsets observed at `0, 135, 270, ...`
+  - the extra 7 bytes between frames look like partial TM headers and still need cleanup
+- `fprime-gds` now receives real frames:
+  - GDS prints APID sequence warnings, which means it is decoding some space packets
+  - GDS still prints checksum warnings due to residual partial fragments/loss
+- Command MVP path still works:
+  - sent `missionManager.PING --arguments 4244`
+  - Pi journal showed `MissionManager pong token=4244 count=1`
+  - command dispatched and completed
+
+### Current root cause
+
+- The original blocker was not only bandwidth.
+- Main transport bug found:
+  - 128-byte TM frames span 3 RF packets at 44 useful RF bytes/packet
+  - previous ACK/retry waited after every segment but only ACKed at whole-message completion
+  - this broke multi-segment reassembly and caused partial frame leakage/truncation
+- After per-segment ACK, full valid 128-byte TM frames reach the ground.
+- Remaining issue:
+  - partial 7-byte TM header fragments are still interleaved between valid frames
+  - likely caused by stale/partial raw UART batching or failed multi-segment sends dropping an in-progress frame
+
+### Next best step
+
+- Clean up the residual 7-byte partial fragments before calling GDS done:
+  - on satellite raw UART input, discard partial stale chunks when `rawUartChunkBytes == 128` instead of flushing them
+  - only enqueue exactly 128-byte downlink frames
+  - keep ground uplink behavior at small raw chunks for TC command stream
+- Then rerun:
+  - raw capture CRC scan for only 128-byte valid frames with no 7-byte fragments
+  - `fprime-gds`
+  - `missionManager.PING`
+
+### Follow-up result
+
+- Implemented the stale-partial cleanup:
+  - when fixed-frame raw chunking is enabled (`rawUartChunkBytes > RF_SEGMENT_MAX_DATA`), stale partial chunks are dropped and counted as `framingDrops`
+  - ground default small-chunk uplink behavior is unchanged
+- Rebuilt and reflashed both Teensys sequentially:
+  - ground: `usb:1100000`
+  - satellite: `usb:100000`
+- Raw ground capture after cleanup:
+  - captured exactly one 128-byte frame
+  - CRC scan found `valid128_count=1` at offset `0`
+  - no extra 7-byte TM header fragment in that sample
+- Final GDS smoke:
+  - launched GDS on GUI port `5051`
+  - no checksum warnings observed in the final sample window
+  - GDS still prints APID sequence warnings, which means it is decoding frames but packet loss/sequence discontinuities remain
+- Final command smoke:
+  - sent `missionManager.PING --arguments 4245`
+  - Pi journal showed `MissionManager pong token=4245 count=1`
+  - command dispatched and completed
+
+### MVP interpretation
+
+- MVP command uplink and Pi command execution are working.
+- GDS downlink is now decoding valid CCSDS TM frames.
+- Remaining issue is reliability/continuity, not complete link failure:
+  - APID sequence warnings still indicate dropped telemetry packets/frames under sustained downlink.
+  - For the live demo, keep telemetry tiny and avoid continuous high-rate events/logs.
+  - Longer-term fix is stronger RF rate/link settings and/or a real stream protocol with end-to-end frame sequence/NAK/replay.
+
+### Demo freeze cleanup
+
+- Added project-owned RF MVP F Prime config overrides:
+  - `ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/RfMvpConfig/ComCfg.fpp`
+  - `ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/RfMvpConfig/FpConstants.fpp`
+- Restored `ArtemisRpiTeensy_N2/lib/fprime/default/config` to upstream defaults so the F Prime submodule is clean.
+- Added runbook:
+  - `docs/RF_MVP_DEMO_RUNBOOK.md`
+- Added smoke script:
+  - `ArtemisRpiTeensy_N2/tools/demo_rf_mvp_smoke.sh`
+- Validation after cleanup:
+  - `fprime-util generate -f` passed
+  - `fprime-util build` passed
+  - `GDS_Teensy/tools/arduino-cli/build.sh` passed
+  - `ArtemisTeensy_N2_Baremetal/tools/arduino-cli/build.sh` passed
+  - live RF smoke passed with token `4320`

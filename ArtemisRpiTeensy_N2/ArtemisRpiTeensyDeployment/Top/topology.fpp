@@ -119,23 +119,24 @@ module ArtemisRpiTeensyDeployment {
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup1] -> rateGroup1.CycleIn
       rateGroup1.RateGroupMemberOut[0] -> CdhCore.tlmSend.Run
       rateGroup1.RateGroupMemberOut[1] -> FileHandling.fileDownlink.Run
-      rateGroup1.RateGroupMemberOut[2] -> systemResources.run
+      # RF MVP: keep automatic downlink volume low; command-triggered paths remain active.
+      # rateGroup1.RateGroupMemberOut[2] -> systemResources.run
       rateGroup1.RateGroupMemberOut[3] -> ComCcsds.comQueue.run
       rateGroup1.RateGroupMemberOut[4] -> ComCcsds.aggregator.timeout
       rateGroup1.RateGroupMemberOut[5] -> teensyTransportService.run
       rateGroup1.RateGroupMemberOut[6] -> missionManager.run
-      rateGroup1.RateGroupMemberOut[7] -> scienceManager.run
-      rateGroup1.RateGroupMemberOut[8] -> sohManager.run
-      rateGroup1.RateGroupMemberOut[9] -> commsManager.run
+      # rateGroup1.RateGroupMemberOut[7] -> scienceManager.run
+      # rateGroup1.RateGroupMemberOut[8] -> sohManager.run
+      # rateGroup1.RateGroupMemberOut[9] -> commsManager.run
 
       # Rate group 2
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup2] -> rateGroup2.CycleIn
       rateGroup2.RateGroupMemberOut[0] -> cmdSeq.schedIn
-      rateGroup2.RateGroupMemberOut[1] -> epsService.run
-      rateGroup2.RateGroupMemberOut[2] -> payloadService.run
-      rateGroup2.RateGroupMemberOut[3] -> adcsService.run
-      rateGroup2.RateGroupMemberOut[4] -> gpsService.run
-      rateGroup2.RateGroupMemberOut[5] -> storageService.run
+      # rateGroup2.RateGroupMemberOut[1] -> epsService.run
+      # rateGroup2.RateGroupMemberOut[2] -> payloadService.run
+      # rateGroup2.RateGroupMemberOut[3] -> adcsService.run
+      # rateGroup2.RateGroupMemberOut[4] -> gpsService.run
+      # rateGroup2.RateGroupMemberOut[5] -> storageService.run
 
       # Rate group 3
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup3] -> rateGroup3.CycleIn

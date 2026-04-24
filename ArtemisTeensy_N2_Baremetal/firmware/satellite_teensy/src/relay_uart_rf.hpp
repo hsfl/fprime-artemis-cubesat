@@ -15,6 +15,7 @@ struct RelayConfig {
   uint16_t rawUartFlushMs = 8;
   uint8_t uplinkQueueDepth = 16;
   uint8_t downlinkQueueDepth = 16;
+  uint16_t rawUartChunkBytes = link_protocol::RF_SEGMENT_MAX_DATA;
 };
 
 class RelayUartRf {
@@ -51,6 +52,10 @@ class RelayUartRf {
   bool sendRawToUart(const uint8_t* payload, uint16_t length);
 
   bool sendPayloadOverRf(const uint8_t* payload, uint16_t length);
+  bool sendRfPacketWithAck(const uint8_t* packet, uint8_t packetLen, uint8_t msgId, uint8_t segIdx);
+  bool waitForAck(uint8_t msgId, uint8_t segIdx);
+  bool isAckPacket(const uint8_t* packet, uint8_t packetLen, uint8_t msgId, uint8_t segIdx) const;
+  bool sendAck(uint8_t msgId, uint8_t segIdx);
   void processRfSegment(const uint8_t* packet, uint8_t packetLen);
   void resetReassembly(bool timeoutReset, bool dropReset);
 
@@ -85,6 +90,8 @@ class RelayUartRf {
   uint32_t m_lastFrameByteMs;
 
   uint8_t m_nextMsgId;
+  bool m_seenRxMsgId;
+  uint8_t m_lastRxMsgId;
   bool m_reassemblyActive;
   uint8_t m_expectedMsgId;
   uint8_t m_expectedSegIndex;
