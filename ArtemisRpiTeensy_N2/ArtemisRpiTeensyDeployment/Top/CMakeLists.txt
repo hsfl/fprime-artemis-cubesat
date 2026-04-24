@@ -18,4 +18,5 @@ register_fprime_module(
         "${CMAKE_CURRENT_LIST_DIR}/ArtemisRpiTeensyDeploymentTopology.cpp"
     DEPENDS
         Fw_Logger
+        RfMvpConfig
 )

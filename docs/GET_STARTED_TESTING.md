@@ -9,7 +9,8 @@ Assumes `/Users/sozodennis/Developer/fprime-artemis-cubesat/docs/RPI_SETUP.md` i
 - Teensy powers/enables the Raspberry Pi.
 - Raspberry Pi runs the F' deployment.
 - Laptop is used for operator UI (F' GDS dashboard).
-- For MVP, skip radio path and use direct RPi <-> Teensy UART wiring.
+- For the current MVP/HIL path, use the full RPi -> satellite Teensy -> RF -> ground Teensy -> laptop chain when hardware is available.
+- Direct RPi <-> Teensy UART wiring remains a local bring-up shortcut, not the nominal operator path.
 
 ## Full chain test matrix (what you asked for)
 
@@ -31,9 +32,9 @@ Assumes `/Users/sozodennis/Developer/fprime-artemis-cubesat/docs/RPI_SETUP.md` i
 
 3. **F' bytes between RPi -> Teensy -> laptop (no radio)**
    - Goal: laptop receives the same stream over USB from Teensy.
-   - Current status: **blocked in current firmware**.
-   - Why: Teensy currently uses a custom UART framing contract (`0xD4 0xC3 + len + crc`) and does not provide a transparent USB bridge path for GDS packets.
-   - Once transparent bridge mode exists, laptop-side command will be:
+   - Current status: **superseded by the two-Teensy RF bridge path**.
+   - Why: nominal MVP/HIL uses both Teensy bridges in transparent raw-byte tunnel mode; the custom UART wrapper (`0xD4 0xC3 + len + crc16`) is fallback/legacy only.
+   - GDS must use `ComCcsds` endpoint framing:
    ```bash
    fprime-gds --no-app \
      --communication-selection uart \
@@ -43,10 +44,9 @@ Assumes `/Users/sozodennis/Developer/fprime-artemis-cubesat/docs/RPI_SETUP.md` i
    ```
 
 4. **F' bytes between RPi -> Teensy -> RF23 -> laptop USB SDR**
-   - Goal: full RF chain to laptop.
-   - Current status: **blocked for MVP**.
-   - Why: SDR demod/decoder path is not implemented in this repo yet.
-   - Practical near-term alternative: use a second RF23+Teensy ground node, then USB into laptop.
+   - Goal: full RF chain to laptop through the ground Teensy bridge.
+   - Current status: **nominal MVP/HIL path uses a second RF23+Teensy ground node, then USB into laptop**.
+   - SDR demod/decoder is not the current repo path.
 
 ## Important architecture note
 
@@ -55,11 +55,13 @@ Assumes `/Users/sozodennis/Developer/fprime-artemis-cubesat/docs/RPI_SETUP.md` i
 2. USB serial (`Serial`): debug console to your laptop.
 
 The USB serial link is for logs/debug only.  
-F' GDS does not command through Teensy USB serial in this MVP.
+On the satellite Teensy, USB serial is for logs/debug only.
+On the ground Teensy, USB serial is the raw-byte GDS UART endpoint.
 
 Also important:
-- Current Teensy UART contract is custom-framed in `/Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md`.
-- So today, packet framing is **not purely end-to-end F' framing** across the chain.
+- Current Teensy UART/RF contract is documented in `/Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md`.
+- Nominal packet framing is end-to-end `ComCcsds` / `space-packet-space-data-link`; Teensy firmware only tunnels raw bytes and segments/reassembles the RF hop.
+- The custom UART wrapper is fallback/legacy only.
 
 ## Verified GDS communication flags (local check)
 
@@ -152,7 +154,7 @@ Pass if all are true:
 1. Teensy boots and prints RPi enable + LED high logs on USB serial.
 2. RPi deployment process stays running.
 3. GDS dashboard opens from laptop (via tunnel).
-4. You can send at least one command (example: `TeensyLink.LINK_STATUS`) and receive resulting data/events.
+4. You can send at least one command (example: `teensyTransportService.LINK_STATUS` or `missionManager.PING`) and receive resulting data/events.
 
 ## 8) If something fails
 

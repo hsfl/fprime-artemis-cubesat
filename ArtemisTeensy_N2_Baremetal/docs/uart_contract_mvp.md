@@ -3,10 +3,30 @@
 ## Scope
 - Single UART link only.
 - Fixed serial settings: **115200, 8N1**.
-- UART framing remains custom for RPi<->satellite-Teensy.
-- UART payload is opaque bytes (intended to carry one full F' transport packet).
+- Nominal MVP/HIL mode is transparent raw-byte tunnel mode for RPi<->satellite-Teensy.
+- UART carries raw `ComCcsds` / space-packet bytes end-to-end between `fprime-gds` and the F' deployment.
+- The Teensy bridges do not add the custom wrapper in the nominal path; they only segment/reassemble bytes for RF transport.
+- `fprime-gds` must use `--framing-selection space-packet-space-data-link`.
+- Custom UART wrapper mode is legacy/fallback only.
 
-## UART Frame Format
+## Nominal Raw-Byte Tunnel
+
+Downlink:
+1. RPi F' deployment writes raw `ComCcsds` / space-packet bytes on `/dev/serial0`.
+2. Satellite Teensy batches raw UART bytes and sends them over RF using the segment format below.
+3. Ground Teensy reassembles RF segments and writes the same raw bytes to laptop USB serial.
+4. Laptop `fprime-gds` decodes those bytes with `space-packet-space-data-link` framing.
+
+Uplink:
+1. Laptop `fprime-gds` writes raw `ComCcsds` / space-packet bytes to ground Teensy USB serial.
+2. Ground Teensy batches raw USB bytes and sends them over RF using the segment format below.
+3. Satellite Teensy reassembles RF segments and writes the same raw bytes to RPi UART.
+4. The RPi F' deployment decodes the bytes at the `ComCcsds` endpoint.
+
+## Legacy/Fallback UART Frame Format
+
+This wrapper is retained only for fallback testing or legacy debugging. It is not mixed into the nominal MVP/HIL path.
+
 1. `magic0` (1 byte): `0xD4`
 2. `magic1` (1 byte): `0xC3`
 3. `length` (2 bytes LE): payload size (`1..220`)
@@ -14,11 +34,12 @@
 5. `crc16` (2 bytes LE): CRC-16/CCITT over payload bytes only
 
 ## RF Bridge Behavior
-- Satellite Teensy strips UART wrapper and treats payload as opaque message bytes.
-- Message is transmitted over RF23BP using segmentation when needed.
+- In nominal mode, both Teensy bridges treat UART/USB bytes as opaque raw bytes and do not parse endpoint framing.
+- In fallback wrapper mode, satellite Teensy strips the legacy UART wrapper and treats payload as opaque message bytes.
+- Messages are transmitted over RF23BP using segmentation when needed.
 - Ground Teensy reassembles segments back into original message bytes.
 - Ground Teensy outputs raw message bytes over USB UART to laptop GDS.
-- For simple uplink, ground Teensy packetizes raw USB byte bursts into RF messages (8 ms idle flush or 220-byte cap).
+- For simple uplink, ground Teensy packetizes raw USB byte bursts into RF messages (12 ms idle flush or 220-byte cap).
 
 ### RF Segment Format
 Each RF packet has:
@@ -32,7 +53,7 @@ Each RF packet has:
 Project RF packet max length is `49` bytes, so RF chunk max is `44` bytes.
 
 ## Timeout Behavior
-- UART parser inter-byte timeout: **250 ms**.
+- Legacy UART wrapper parser inter-byte timeout: **250 ms**.
 - RF reassembly timeout: **500 ms**.
 
 On timeout while assembling data:

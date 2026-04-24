@@ -31,16 +31,18 @@ The current target is a shortened FlatSat FSR end-to-end demo based on the team'
 - Ground-station presentation quality matters: live telemetry, command acknowledgement, and visible science-data review are part of the success criteria.
 
 Current relay milestone:
-- one UART channel (`115200 8N1`) on RPi<->satellite Teensy with custom wrapper
+- one UART channel (`115200 8N1`) on RPi<->satellite Teensy carrying raw `ComCcsds` / space-packet bytes
+- both Teensy bridges run transparent raw-byte tunnel mode for the nominal MVP/HIL path
 - segmented RF transport between satellite and ground Teensy
-- raw reassembled F' bytes emitted on ground USB UART
+- raw reassembled F' bytes emitted on ground USB UART for `fprime-gds`
 - simple uplink burst packetization from ground USB UART to RF
+- legacy custom UART wrapper mode (`0xD4 0xC3 + len + crc16`) remains fallback-only and is not mixed into the nominal path
 
 ## Repository layout
 
 - `ArtemisRpiTeensy_N2/`
   - Active F' project (promoted in place from starter sample)
-  - Includes deployment and custom components (`TeensyLink`, `PingResponder`)
+  - Includes deployment and custom components such as `MissionManager`, `ScienceManager`, `SohManager`, `TeensyTransportService`, `CommsAdapter_TeensyRfm23`, and `PingResponder`
 - `ArtemisTeensy_N2_Baremetal/`
   - Satellite Teensy relay firmware workspace (Arduino CLI workflow)
 - `GDS_Teensy/`
@@ -99,8 +101,8 @@ cd GDS_Teensy
 
 Implemented:
 - F' deployment migrated to Linux UART transport.
-- Satellite Teensy relay with custom UART wrapper and RF segmentation/reassembly.
-- Ground Teensy relay with RF reassembly to USB raw F' bytes.
+- Satellite Teensy relay with transparent raw-byte UART tunnel mode and RF segmentation/reassembly.
+- Ground Teensy relay with transparent raw-byte USB tunnel mode and RF reassembly.
 - Ground Teensy simple uplink path (USB raw byte burst -> RF segmentation).
 - Updated UART/RF transport contract documentation.
 

@@ -7,10 +7,9 @@ on a single host. It creates two pseudo UART devices:
 - app UART: passed to ArtemisRpiTeensyDeployment (-d ...)
 - gds UART: passed to fprime-gds (--uart-device ...)
 
-The bridge logic mirrors the Teensy-side contracts:
-- UART wrapper parse/build (0xD4 0xC3 + len + payload + crc16)
-- RF segmentation/reassembly (0xA5 + msg_id + seg_idx + seg_count + chunk_len + chunk)
-- Ground uplink raw-burst flush behavior (220-byte max, 8 ms idle flush)
+Supported link modes:
+- direct: raw byte bridge app<->gds (recommended for simple local testing)
+- legacy-wrapper: Teensy-side wrapper/segment emulation
 """
 
 from __future__ import annotations
@@ -19,9 +18,11 @@ import argparse
 import errno
 import os
 import pty
+import re
 import selectors
 import signal
 import subprocess
+import shutil
 import sys
 import time
 from dataclasses import dataclass
@@ -43,8 +44,12 @@ RF_REASSEMBLY_TIMEOUT_S = 0.500
 DEFAULT_UPLINK_FLUSH_MS = 8
 DEFAULT_GUI_PORT = 5050
 DEFAULT_UART_BAUD = 115200
+DEFAULT_MAX_LOG_RUNS = 5
 DEPLOYMENT_NAME = "ArtemisRpiTeensyDeployment"
 DICT_BASENAME = f"{DEPLOYMENT_NAME}TopologyDictionary.json"
+TIMESTAMP_DIR_RE = re.compile(
+    r"^\d{4}(?:[-_])\d{2}(?:[-_])\d{2}(?:T|-)\d{2}(?:[:_])\d{2}(?:[:_])\d{2}(?:\.\d+)?$"
+)
 
 
 def crc16_ccitt(payload: bytes) -> int:
@@ -357,10 +362,12 @@ class EmulationLoop:
         app_cmd: Optional[list[str]],
         gds_cmd: Optional[list[str]],
         uplink_flush_ms: int,
+        link_mode: str,
     ) -> None:
         self.app_cmd = app_cmd
         self.gds_cmd = gds_cmd
         self.uplink_flush_s = uplink_flush_ms / 1000.0
+        self.link_mode = link_mode
 
         self.stop_requested = False
         self.exit_code = 0
@@ -399,7 +406,7 @@ class EmulationLoop:
     def _launch_child(self, cmd: list[str], name: str) -> None:
         proc = subprocess.Popen(
             cmd,
-            preexec_fn=os.setsid,
+            start_new_session=True,
         )
         self.children.append(proc)
         print(f"[emulation] launched {name}: {' '.join(cmd)}")
@@ -469,6 +476,11 @@ class EmulationLoop:
 
     def _process_app_to_gds(self, data: bytes, now: float) -> None:
         self.stats.app_uart_bytes_in += len(data)
+        if self.link_mode == "direct":
+            self.stats.gds_bytes_out += len(data)
+            self._queue_write(self.gds_master_fd, data)  # type: ignore[arg-type]
+            return
+
         app_frames = self.app_uart_parser.feed(data, now)
         for frame in app_frames:
             self.stats.app_frames_in += 1
@@ -493,6 +505,12 @@ class EmulationLoop:
 
     def _process_gds_to_app(self, data: bytes, now: float) -> None:
         self.stats.gds_uart_bytes_in += len(data)
+        if self.link_mode == "direct":
+            self.stats.gds_messages_in += 1
+            self.stats.app_bytes_out += len(data)
+            self._queue_write(self.app_master_fd, data)  # type: ignore[arg-type]
+            return
+
         messages = self.gds_burst_aggregator.feed(data, now)
         for message in messages:
             self._process_gds_message_to_app(message, now)
@@ -526,32 +544,49 @@ class EmulationLoop:
                     elif fd == self.gds_master_fd:
                         self._process_gds_to_app(data, now)
 
-                uplink_msg = self.gds_burst_aggregator.poll(now)
-                if uplink_msg is not None:
-                    self._process_gds_message_to_app(uplink_msg, now)
+                if self.link_mode == "legacy-wrapper":
+                    uplink_msg = self.gds_burst_aggregator.poll(now)
+                    if uplink_msg is not None:
+                        self._process_gds_message_to_app(uplink_msg, now)
 
-                self.app_uart_parser.poll_timeout(now)
-                self.ground_reassembler.poll_timeout(now)
-                self.sat_reassembler.poll_timeout(now)
+                    self.app_uart_parser.poll_timeout(now)
+                    self.ground_reassembler.poll_timeout(now)
+                    self.sat_reassembler.poll_timeout(now)
                 self._flush_pending()
         finally:
             self.shutdown()
         return self.exit_code
 
     def shutdown(self) -> None:
-        for proc in self.children:
-            if proc.poll() is None:
-                try:
-                    os.killpg(proc.pid, signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
-        for proc in self.children:
+        live_children = [proc for proc in self.children if proc.poll() is None]
+        for proc in live_children:
             try:
-                proc.wait(timeout=3.0)
+                os.killpg(proc.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                continue
+            except Exception:
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+        deadline = time.monotonic() + 3.0
+        for proc in live_children:
+            remaining = max(0.1, deadline - time.monotonic())
+            try:
+                proc.wait(timeout=remaining)
             except subprocess.TimeoutExpired:
                 try:
                     os.killpg(proc.pid, signal.SIGKILL)
                 except ProcessLookupError:
+                    pass
+                except Exception:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                try:
+                    proc.wait(timeout=1.0)
+                except Exception:
                     pass
 
         for fd in (self.app_master_fd, self.gds_master_fd, self.app_slave_fd, self.gds_slave_fd):
@@ -595,6 +630,28 @@ class EmulationLoop:
             f"reassembly_drops={self.sat_reassembler.reassembly_drops} "
             f"oversize_drops={self.sat_reassembler.oversize_drops}"
         )
+
+
+def _is_timestamp_log_dir(path: Path) -> bool:
+    return path.is_dir() and TIMESTAMP_DIR_RE.match(path.name) is not None
+
+
+def _prune_timestamp_dirs(log_root: Path, max_runs: int) -> list[Path]:
+    if max_runs < 0:
+        return []
+    if not log_root.exists():
+        return []
+    runs = [entry for entry in log_root.iterdir() if _is_timestamp_log_dir(entry)]
+    runs.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    to_remove = runs[max_runs:]
+    removed: list[Path] = []
+    for stale in to_remove:
+        try:
+            shutil.rmtree(stale)
+            removed.append(stale)
+        except FileNotFoundError:
+            continue
+    return removed
 
 
 def _find_latest_file(root: Path, pattern: str) -> Optional[Path]:
@@ -662,14 +719,20 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--framing-selection",
-        default="fprime",
-        help='GDS framing selection (default: "fprime")',
+        default="space-packet-space-data-link",
+        help='GDS framing selection (default: "space-packet-space-data-link")',
     )
     parser.add_argument(
         "--uplink-flush-ms",
         type=int,
         default=DEFAULT_UPLINK_FLUSH_MS,
         help=f"Ground USB burst flush timeout in ms (default: {DEFAULT_UPLINK_FLUSH_MS})",
+    )
+    parser.add_argument(
+        "--link-mode",
+        choices=("direct", "legacy-wrapper"),
+        default="direct",
+        help='Byte bridge mode: "direct" (recommended) or "legacy-wrapper" (default: direct)',
     )
     parser.add_argument(
         "--no-app",
@@ -681,12 +744,28 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Do not launch fprime-gds (emulator still creates gds UART PTY)",
     )
+    parser.add_argument(
+        "--max-log-runs",
+        type=int,
+        default=DEFAULT_MAX_LOG_RUNS,
+        help=(
+            "Keep at most this many timestamped logs in logs/ and logs/local_emulation "
+            f"(default: {DEFAULT_MAX_LOG_RUNS})"
+        ),
+    )
+    parser.add_argument(
+        "--no-log-prune",
+        action="store_true",
+        help="Disable automatic pruning of old timestamped log directories",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     project_root = args.project_root.resolve()
+    logs_root = project_root / "logs"
+    emulation_logs_root = logs_root / "local_emulation"
 
     app_binary = args.app_binary.resolve() if args.app_binary else _resolve_default_app_binary(project_root)
     dictionary = args.dictionary.resolve() if args.dictionary else _resolve_default_dictionary(project_root)
@@ -716,6 +795,7 @@ def main() -> int:
     if args.no_gds:
         gds_cmd = None
     else:
+        run_log_dir = emulation_logs_root / time.strftime("%Y_%m_%d-%H_%M_%S")
         gds_cmd = [
             "fprime-gds",
             "-n",
@@ -732,20 +812,41 @@ def main() -> int:
             args.framing_selection,
             "--gui-port",
             str(args.gui_port),
+            "--logs",
+            str(run_log_dir),
         ]
+
+    if not args.no_log_prune:
+        # Keep logs bounded both in the dedicated emulation folder and in the legacy logs root.
+        # This prevents historical runs from growing indefinitely.
+        removed = _prune_timestamp_dirs(emulation_logs_root, args.max_log_runs)
+        removed += _prune_timestamp_dirs(logs_root, args.max_log_runs)
+        if removed:
+            print(f"[emulation] pruned {len(removed)} old log directories")
 
     loop = EmulationLoop(
         app_cmd=app_cmd,
         gds_cmd=gds_cmd,
         uplink_flush_ms=args.uplink_flush_ms,
+        link_mode=args.link_mode,
     )
 
     print("[emulation] topology:")
-    print("  app (LinuxUartDriver) -> uart wrapper -> RF segment/reassemble -> gds raw bytes")
-    print("  gds raw bytes -> burst packetization -> RF segment/reassemble -> uart wrapper -> app")
+    if args.link_mode == "direct":
+        print("  app raw bytes <-> gds raw bytes (direct local bridge)")
+    else:
+        print("  app (LinuxUartDriver) -> uart wrapper -> RF segment/reassemble -> gds raw bytes")
+        print("  gds raw bytes -> burst packetization -> RF segment/reassemble -> uart wrapper -> app")
     if not args.no_gds:
         print(f"[emulation] open GDS at http://127.0.0.1:{args.gui_port}")
-    return loop.run()
+    rc = loop.run()
+
+    if not args.no_log_prune:
+        removed = _prune_timestamp_dirs(emulation_logs_root, args.max_log_runs)
+        removed += _prune_timestamp_dirs(logs_root, args.max_log_runs)
+        if removed:
+            print(f"[emulation] post-run prune removed {len(removed)} old log directories")
+    return rc
 
 
 if __name__ == "__main__":

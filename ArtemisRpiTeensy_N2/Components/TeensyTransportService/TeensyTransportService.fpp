@@ -1,6 +1,6 @@
 module Components {
-    @ Teensy link health and observability component for the UART relay path.
-    active component TeensyLink {
+    @ Teensy transport service for UART/RF link observability.
+    active component TeensyTransportService {
 
         @ Health ping input
         async input port pingIn: Svc.Ping
@@ -11,6 +11,15 @@ module Components {
         @ Rate group scheduling input
         sync input port run: Svc.Sched
 
+        @ Adapter status input
+        sync input port adapterStatusIn: Svc.Ping
+
+        @ Link status output to CommsManager (0=down, 1=acquiring, 2=locked, 3=degraded)
+        output port linkStatusOut: Svc.Ping
+
+        @ Status output to SoH manager
+        output port sohStatusOut: Svc.Ping
+
         @ Report current link counters via event
         async command LINK_STATUS
 
@@ -20,21 +29,21 @@ module Components {
         @ Incrementing heartbeat emitted by run
         telemetry LinkHeartbeat: U32
 
-        @ Counter of malformed frame observations
-        telemetry FramingDrops: U32
+        @ Counter of uplink frame observations
+        telemetry UplinkFrames: U32
 
-        @ Counter of timeout observations
-        telemetry TimeoutEvents: U32
+        @ Counter of downlink frame observations
+        telemetry DownlinkFrames: U32
 
         @ Current link status snapshot
         event LinkStatus(
             heartbeat: U32,
-            framingDrops: U32,
-            timeoutEvents: U32
-        ) severity activity high format "TeensyLink hb={} framingDrops={} timeoutEvents={}"
+            uplinkFrames: U32,
+            downlinkFrames: U32
+        ) severity activity high format "TeensyTransport hb={} uplink={} downlink={}"
 
         @ Link counters reset notification
-        event CountersReset severity activity low format "TeensyLink counters reset"
+        event CountersReset severity activity low format "TeensyTransport counters reset"
 
         @ Port for requesting the current time
         time get port timeCaller

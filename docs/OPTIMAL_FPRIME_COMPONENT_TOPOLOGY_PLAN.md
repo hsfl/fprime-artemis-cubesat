@@ -217,14 +217,14 @@ The current repo already has a good service backbone:
 - `FileHandling`
 - UART comm driver
 
-The main app-layer gap is that the current deployment only has:
+The previous app-layer gap was that the deployment only had:
 
 - `TeensyLink`
 - `PingResponder`
 
-The target direction is:
+That transition is now underway. The current deployment includes `TeensyTransportService` and additional mission/service components; keep using this direction:
 
-- keep and evolve `TeensyLink` into `TeensyTransportService`
+- keep `TeensyTransportService` as the active transport-service component
 - replace `PingResponder` with real mission-layer and subsystem-service components
 - add service and adapter structure before deeper hardware expansion
 

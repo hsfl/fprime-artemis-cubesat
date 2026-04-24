@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$ROOT_DIR/.." && pwd)"
 IMAGE_TAG="artemis-pi-zero-w-cross:local"
 HOST="${PI_ZERO_W_SSH_HOST:-pi@raspberrypi-zero-w}"
 SYSROOT_DIR="${PI_ZERO_W_SYSROOT_DIR:-$ROOT_DIR/cross/pi-zero-w/sysroot}"
@@ -10,6 +11,7 @@ DEPLOYMENT_NAME="ArtemisRpiTeensyDeployment"
 REMOTE_DIR="${PI_ZERO_W_REMOTE_DIR:-/home/pi/artemis/cross}"
 SYNC_SYSROOT="true"
 BUILD_IMAGE="true"
+LOCAL_ONLY="false"
 
 usage() {
   cat <<'EOF'
@@ -37,6 +39,7 @@ Options:
   --remote-dir <path>   Remote deploy directory on the Pi
   --skip-sync           Reuse an existing sysroot without rsync
   --skip-image-build    Reuse the existing Docker image tag
+  --local-only          Build + verify locally only (skip SSH deploy/smoke)
   -h, --help            Show this help text
 EOF
 }
@@ -63,6 +66,10 @@ while [[ $# -gt 0 ]]; do
       BUILD_IMAGE="false"
       shift
       ;;
+    --local-only)
+      LOCAL_ONLY="true"
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -82,7 +89,13 @@ echo "  ssh host: $HOST"
 echo "  sysroot: $SYSROOT_DIR"
 echo "  remote dir: $REMOTE_DIR"
 echo "  docker image: $IMAGE_TAG"
+echo "  local only: $LOCAL_ONLY"
 echo
+
+if [[ "$LOCAL_ONLY" == "true" && "$SYNC_SYSROOT" == "true" ]]; then
+  echo "Local-only mode selected; skipping sysroot sync (reusing existing sysroot)"
+  SYNC_SYSROOT="false"
+fi
 
 if [[ "$SYNC_SYSROOT" == "true" ]]; then
   "$ROOT_DIR/tools/sync_pi_zero_w_sysroot.sh" --host "$HOST" --dest "$SYSROOT_DIR"
@@ -112,14 +125,14 @@ cat > "$CONTAINER_SCRIPT" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="/workspace"
+ROOT_DIR="/repo/ArtemisRpiTeensy_N2"
 SYSROOT_DIR="$ROOT_DIR/cross/pi-zero-w/sysroot"
 VERIFY_DIR="$ROOT_DIR/cross/pi-zero-w/verify"
 TOOLCHAIN="pi-zero-w-armv6hf"
 BUILD_VENV="$ROOT_DIR/.cross-venv-linux"
 DEPLOYMENT_NAME="ArtemisRpiTeensyDeployment"
 
-python3 -m venv "$BUILD_VENV"
+python3 -m venv --clear "$BUILD_VENV"
 # shellcheck disable=SC1090
 . "$BUILD_VENV/bin/activate"
 python -m pip install --upgrade pip
@@ -158,16 +171,16 @@ EOF
 chmod +x "$CONTAINER_SCRIPT"
 
 docker run --rm \
-  -v "$ROOT_DIR:/workspace" \
+  -v "$REPO_ROOT:/repo" \
   -v "$CONTAINER_SCRIPT:/tmp/run-build.sh:ro" \
-  -w /workspace \
+  -w /repo/ArtemisRpiTeensy_N2 \
   "$IMAGE_TAG" \
   /tmp/run-build.sh
 
 rm -f "$CONTAINER_SCRIPT"
 
 BIN_PATH="$(cat "$VERIFY_DIR/binary-path.txt")"
-BIN_PATH="${BIN_PATH/#\/workspace/$ROOT_DIR}"
+BIN_PATH="${BIN_PATH/#\/repo\/ArtemisRpiTeensy_N2/$ROOT_DIR}"
 
 echo "Local binary verification"
 cat "$VERIFY_DIR/file.txt"
@@ -177,6 +190,14 @@ grep -n "Requesting program interpreter" "$VERIFY_DIR/readelf-l.txt" || true
 echo
 echo "ARM attributes"
 sed -n '1,120p' "$VERIFY_DIR/readelf-A.txt"
+
+if [[ "$LOCAL_ONLY" == "true" ]]; then
+  echo
+  echo "Local-only cross compile + verification completed successfully"
+  echo "  binary: $BIN_PATH"
+  echo "  verify dir: $VERIFY_DIR"
+  exit 0
+fi
 
 ssh "$HOST" "mkdir -p '$REMOTE_DIR'"
 scp "$BIN_PATH" "$HOST:$REMOTE_DIR/$DEPLOYMENT_NAME"

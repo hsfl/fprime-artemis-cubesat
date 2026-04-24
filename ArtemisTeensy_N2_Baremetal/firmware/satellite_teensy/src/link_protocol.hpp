@@ -14,10 +14,14 @@ static constexpr uint32_t FRAME_TIMEOUT_MS = 250;
 
 // RF segmentation parameters.
 static constexpr uint8_t RF_SEGMENT_MAGIC = 0xA5;
+static constexpr uint8_t RF_ACK_SEGMENT_INDEX = 0xFF;
 static constexpr uint8_t RF_PACKET_MAX_LEN = 49;
 static constexpr uint8_t RF_SEGMENT_HEADER_LEN = 5;
 static constexpr uint8_t RF_SEGMENT_MAX_DATA = RF_PACKET_MAX_LEN - RF_SEGMENT_HEADER_LEN;
 static constexpr uint32_t RF_REASSEMBLY_TIMEOUT_MS = 500;
+static constexpr uint8_t RF_INTER_SEGMENT_GAP_MS = 8;
+static constexpr uint8_t RF_ACK_RETRIES = 4;
+static constexpr uint16_t RF_ACK_TIMEOUT_MS = 80;
 
 static constexpr char COMMAND_PREFIX = '#';
 static constexpr size_t COMMAND_MAX_LEN = 64;

@@ -22,6 +22,13 @@ struct LinkCounters {
   uint32_t rfReassemblyDrops = 0;
   uint32_t rfOversizeDrops = 0;
   uint32_t rfTxDrops = 0;
+  uint32_t rfMsgIdGaps = 0;
+  uint32_t rfAckRx = 0;
+  uint32_t rfAckTx = 0;
+  uint32_t rfRetries = 0;
+  uint32_t rfAckTimeouts = 0;
+  uint32_t uplinkQueueDrops = 0;
+  uint32_t downlinkQueueDrops = 0;
 
   void reset() {
     uartRxBytes = 0;
@@ -42,6 +49,13 @@ struct LinkCounters {
     rfReassemblyDrops = 0;
     rfOversizeDrops = 0;
     rfTxDrops = 0;
+    rfMsgIdGaps = 0;
+    rfAckRx = 0;
+    rfAckTx = 0;
+    rfRetries = 0;
+    rfAckTimeouts = 0;
+    uplinkQueueDrops = 0;
+    downlinkQueueDrops = 0;
   }
 };
 

@@ -17,7 +17,7 @@ Semester planning window for this board:
 The codebase today is still mostly transport plumbing, not full demo software.
 
 What exists now:
-- Flight F' deployment with `TeensyLink` and `PingResponder`
+- Flight F' deployment with `MissionManager`, `ScienceManager`, `SohManager`, `TeensyTransportService`, `CommsAdapter_TeensyRfm23`, and `PingResponder`
 - Raspberry Pi UART driver wiring
 - Flight Teensy RF/UART relay firmware
 - Ground Teensy RF/USB relay firmware
@@ -72,7 +72,7 @@ Time-bound:
 ### Goal 2: Flight F' software supports one simple demo flow
 
 Specific:
-- Extend the flight software beyond `TeensyLink` and `PingResponder` to support one actual demo scenario.
+- Extend the flight software beyond transport/ping plumbing to support one actual demo scenario.
 - Implement the smallest possible demo controller or mission-state path that supports:
   idle or base mode, one command-triggered action, and one visible result.
 
@@ -245,7 +245,8 @@ SMART target:
 
 ### P0.5 Verify the downlink response path
 
-- Confirm the flight Teensy strips only the custom UART wrapper and preserves the payload.
+- Confirm the flight Teensy transparent raw-byte path preserves endpoint `ComCcsds` / space-packet bytes.
+- Keep custom UART wrapper checks scoped to explicit fallback/legacy testing only.
 - Confirm the ground Teensy reassembles RF segments correctly and emits the expected bytes to GDS.
 - Confirm GDS framing and dictionary configuration match the bytes produced by the chain.
 

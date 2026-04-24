@@ -13,6 +13,9 @@ struct RelayConfig {
   bool enableCommandMode = true;
   bool uartInputFramed = true;
   uint16_t rawUartFlushMs = 8;
+  uint8_t uplinkQueueDepth = 16;
+  uint8_t downlinkQueueDepth = 16;
+  uint16_t rawUartChunkBytes = link_protocol::RF_SEGMENT_MAX_DATA;
 };
 
 class RelayUartRf {
@@ -49,11 +52,26 @@ class RelayUartRf {
   bool sendRawToUart(const uint8_t* payload, uint16_t length);
 
   bool sendPayloadOverRf(const uint8_t* payload, uint16_t length);
+  bool sendRfPacketWithAck(const uint8_t* packet, uint8_t packetLen, uint8_t msgId, uint8_t segIdx);
+  bool waitForAck(uint8_t msgId, uint8_t segIdx);
+  bool isAckPacket(const uint8_t* packet, uint8_t packetLen, uint8_t msgId, uint8_t segIdx) const;
+  bool sendAck(uint8_t msgId, uint8_t segIdx);
   void processRfSegment(const uint8_t* packet, uint8_t packetLen);
   void resetReassembly(bool timeoutReset, bool dropReset);
 
   uint16_t crc16Ccitt(const uint8_t* data, uint16_t len) const;
   void emitLinkStatus();
+  bool enqueueUplinkMessage(const uint8_t* payload, uint16_t length);
+  bool enqueueDownlinkMessage(const uint8_t* payload, uint16_t length);
+  void serviceUplinkQueue();
+  void serviceDownlinkQueue();
+
+  static constexpr uint8_t MAX_QUEUE_DEPTH = 32;
+
+  struct QueueEntry {
+    uint16_t length;
+    uint8_t payload[link_protocol::FRAME_MAX_PAYLOAD];
+  };
 
   Stream& m_linkIo;
   Rf23Driver& m_rf;
@@ -72,6 +90,8 @@ class RelayUartRf {
   uint32_t m_lastFrameByteMs;
 
   uint8_t m_nextMsgId;
+  bool m_seenRxMsgId;
+  uint8_t m_lastRxMsgId;
   bool m_reassemblyActive;
   uint8_t m_expectedMsgId;
   uint8_t m_expectedSegIndex;
@@ -83,6 +103,16 @@ class RelayUartRf {
   uint8_t m_rawUartBuf[link_protocol::FRAME_MAX_PAYLOAD];
   uint16_t m_rawUartLen;
   uint32_t m_lastRawUartByteMs;
+
+  QueueEntry m_uplinkQueue[MAX_QUEUE_DEPTH];
+  uint8_t m_uplinkHead;
+  uint8_t m_uplinkTail;
+  uint8_t m_uplinkCount;
+
+  QueueEntry m_downlinkQueue[MAX_QUEUE_DEPTH];
+  uint8_t m_downlinkHead;
+  uint8_t m_downlinkTail;
+  uint8_t m_downlinkCount;
 };
 
 #endif

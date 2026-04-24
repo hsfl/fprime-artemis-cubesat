@@ -31,7 +31,8 @@ U32 rateGroup3Context[Svc::ActiveRateGroup::CONNECTION_COUNT_MAX] = {};
 
 enum TopologyConstants {
     COMM_PRIORITY = 34,
-    UART_READ_BUFFER_SIZE = 4096,
+    // Keep UART read buffers small enough for default ComCcsds comms buffer pools.
+    UART_READ_BUFFER_SIZE = 256,
 };
 
 bool useLinuxUartDriver(const char* device) {

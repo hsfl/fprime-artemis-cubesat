@@ -49,8 +49,21 @@ namespace PingEntries {
     namespace ArtemisRpiTeensyDeployment_rateGroup2 {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_rateGroup3 {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_cmdSeq {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_teensyLink {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_pingResponder {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_teensyTransportService {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_missionManager {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_scienceManager {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_sohManager {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_commsManager {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_epsService {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_payloadService {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_adcsService {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_gpsService {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_storageService {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_epsAdapterArtemis {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_payloadAdapterN1Legacy {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_adcsAdapterD2S2 {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_gpsAdapterArtemis {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_commsAdapterTeensyRfm23 {enum { WARN = 3, FATAL = 5 };}
 }  // namespace PingEntries
 
 // Definitions are placed within the same namespace as the FPP module that contains the topology.

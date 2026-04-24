@@ -1,0 +1,6 @@
+register_fprime_library(
+    AUTOCODER_INPUTS
+        ${CMAKE_CURRENT_LIST_DIR}/CommsAdapter_TeensyRfm23.fpp
+    SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/CommsAdapter_TeensyRfm23.cpp
+)
