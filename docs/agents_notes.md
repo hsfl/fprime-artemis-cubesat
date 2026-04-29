@@ -658,6 +658,15 @@ Build verification at handoff:
   - `ComCfg.TmFrameFixedSize = 128`
   - `FW_COM_BUFFER_MAX_SIZE = 96`
   - `FW_LOG_STRING_MAX_SIZE = 80`
+- 128-byte decision reasoning:
+  - current RF packet limit is `49` bytes
+  - RF segment header is `5` bytes
+  - useful RF payload is `44` bytes per packet
+  - `128` bytes takes `3` RF packets (`44 + 44 + 40`)
+  - default `1024` bytes takes about `24` RF packets
+  - GDS needs a whole CCSDS TM frame to pass CRC, so each extra RF segment increases the chance that the entire TM frame is lost
+  - `FW_COM_BUFFER_MAX_SIZE = 96` fits inside the 128-byte TM frame aggregation budget: `128 - 6 - 6 - 1 - 2 = 113` bytes
+  - lower than `128` may work for heartbeat-only packets, but it leaves little room for normal F Prime command/event/telemetry payloads and must be tested with the dictionary, deployed binary, and Teensy fixed-frame chunk size changed together
 - Added satellite Teensy `Serial2` RX buffer:
   - `RPI_UART_RX_BUFFER_SIZE = 4096`
 - Changed satellite raw UART batching to collect full 128-byte CCSDS TM frames before RF send:

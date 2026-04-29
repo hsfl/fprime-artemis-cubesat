@@ -94,6 +94,31 @@ These are intentionally small for the RF demo. They are project-owned overrides 
 ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/RfMvpConfig/
 ```
 
+## Why 128-Byte TM Frames
+
+The 128-byte CCSDS TM frame size is a demo transport decision, not a spacecraft-standard requirement.
+
+Current RF packet math:
+
+```text
+RF packet max length = 49 bytes
+RF segment header = 5 bytes
+Useful RF payload per packet = 44 bytes
+128-byte TM frame = 3 RF packets: 44 + 44 + 40
+1024-byte TM frame = about 24 RF packets
+```
+
+GDS validates a complete CCSDS TM frame with CRC. If one RF segment is lost inside that TM frame, the whole TM frame fails. A 1024-byte frame therefore made each GDS frame depend on about 24 RF packets arriving cleanly in order. A 128-byte frame lowers that reliability burden to 3 RF packets per GDS frame, which is why telemetry became decodable after the ACK/retry fixes.
+
+The companion `FW_COM_BUFFER_MAX_SIZE = 96` keeps F Prime command/event/telemetry buffers small enough to fit comfortably inside a 128-byte TM transfer frame after CCSDS headers, idle fill, and trailer overhead. With the current F Prime CCSDS path:
+
+```text
+AggregationSize = TmFrameFixedSize - 6 - 6 - 1 - 2
+AggregationSize = 128 - 15 = 113 bytes
+```
+
+So a 96-byte F Prime comm buffer leaves headroom inside the 113-byte aggregation payload. Going lower than 128 may work for tiny heartbeat-only telemetry, but it reduces available payload headroom fast and risks truncating normal command, event, file, or telemetry packets. Keep 128 for the RF MVP unless the dictionary, deployed binary, and Teensy fixed-frame chunk size are all changed together and retested.
+
 ## Start GDS
 
 From repo root:

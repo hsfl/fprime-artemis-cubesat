@@ -128,6 +128,69 @@ Packet count per F Prime frame:
 
 The problem is not just bandwidth. It is reliability. A 1024-byte frame needs about 24 RF packets to arrive in order. If any one of those packets drops, the whole GDS frame is bad. With no strong replay layer, large frames are fragile.
 
+## Why This Was Hard
+
+The phrase "pass raw bytes back and forth" makes this sound like a copy loop:
+
+```text
+GDS writes bytes -> satellite receives same bytes
+satellite writes bytes -> GDS receives same bytes
+```
+
+That mental model only works when the link is reliable, ordered, fast, and byte-transparent. USB serial is close enough to that model. This RF link is not.
+
+The real path has many layers:
+
+```text
+GDS byte stream
+-> F Prime CCSDS framing expectations
+-> USB serial buffering
+-> ground Teensy loop timing
+-> RFM23BP packet limit
+-> RF transmit/receive turnaround timing
+-> packet loss, retries, and duplicate packets
+-> satellite Teensy reassembly
+-> UART timing into the Pi
+-> F Prime frame parser
+```
+
+Every layer has a contract. If any layer breaks its contract, the symptom may appear somewhere else. For example, an RF segment drop appears in `fprime-gds` as a CCSDS checksum warning. That warning does not directly say "the RF ACK granularity is wrong," but that was part of the root cause.
+
+The main engineering mismatch is:
+
+- F Prime and GDS expect a stream of complete, aligned CCSDS frames.
+- The RFM23BP provides small packets with limited payload, timing constraints, and possible loss.
+
+GDS does not care that most bytes arrived. A CCSDS TM frame either arrives byte-for-byte intact and passes CRC, or it is rejected. This makes partial success hard to see. The RF counters may show traffic, the Teensy may be forwarding bytes, and the Pi may be alive, while GDS still shows no useful telemetry.
+
+Timing also matters. The radio path is effectively half-duplex for this relay design: transmit a packet, switch back to receive, wait for an ACK, retry if needed, then move to the next segment. If the sender waits for an ACK after every segment but the receiver ACKs only after the full message, both pieces of code can look locally reasonable while the protocol is globally broken.
+
+Framing is nested:
+
+```text
+F Prime command/event/telemetry packet
+inside CCSDS space packet
+inside CCSDS TM/TC transfer frame
+inside Teensy RF message
+split into RF segments
+inside RFM23BP packets
+```
+
+Students tend to debug one layer at a time, but the failure crosses layers. The downlink was not just "radio bad" or "GDS bad." It was a protocol stack issue: large CCSDS frames were being split into many RF packets, the RF ACK behavior did not match segmentation, stale partial UART chunks leaked into the stream, and GDS rejected the resulting byte stream.
+
+Low-COGS radios make this especially difficult because they do not provide TCP-like guarantees. The team has to engineer the missing transport behavior:
+
+- packet sizing
+- sequence numbers
+- ACKs and retries
+- duplicate handling
+- timeout behavior
+- reassembly
+- counters for observability
+- traffic shaping/backpressure
+
+So the hard part was not copying bytes. The hard part was making a weak packet radio behave enough like a reliable byte stream that F Prime/GDS could trust it.
+
 ## Debug Timeline
 
 ### 1. Confirmed the hardware paths
