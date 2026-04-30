@@ -363,6 +363,109 @@ If you change `TmFrameFixedSize`, change and rebuild all related pieces together
 
 Do not change only the GDS dictionary or only the Teensy constant. Frame-size mismatch looks like RF corruption even when the radio is working.
 
+## Telemetry Field Size: Where It Helps And Where It Does Not
+
+`U32` means unsigned 32-bit integer. It serializes to 4 bytes.
+
+Common F Prime scalar sizes:
+
+```text
+U8  = 1 byte
+U16 = 2 bytes
+U32 = 4 bytes
+I16 = 2 bytes signed
+I32 = 4 bytes signed
+F32 = 4 bytes float
+U64 = 8 bytes
+bool = typically 1 byte when serialized
+enum = depends on enum storage type; often larger unless defined smaller
+```
+
+Reducing telemetry field sizes can help, especially for SOH, but it does not remove the framing overhead. When TM frames are very small, headers dominate.
+
+Example loose SOH design:
+
+```text
+mode: U32
+battery_mv: U32
+temp_c: F32
+ping_count: U32
+heartbeat: U32
+```
+
+That is about:
+
+```text
+5 fields * 4 bytes = 20 bytes of values
+```
+
+A compact SOH design could be:
+
+```text
+mode: U8
+flags: U8
+battery_mv: U16
+temp_c_x10: I16
+last_cmd_status: U8
+payload_state: U8
+heartbeat_counter: U16
+```
+
+That is about:
+
+```text
+1 + 1 + 2 + 2 + 1 + 1 + 2 = 10 bytes of values
+```
+
+This is useful, but the frame still carries overhead:
+
+```text
+TM frame header
+CCSDS space packet header
+F Prime packet descriptor
+telemetry channel ID or event ID
+time/tag fields depending on packet type
+TM CRC
+idle fill
+```
+
+So changing one telemetry value from `U32` to `U8` saves 3 bytes, but it does not make the CCSDS/F Prime overhead disappear. That is why rate control and aggregation matter more than hyper-optimizing every field.
+
+For the RF MVP, prefer:
+
+```text
+one compact heartbeat/status packet every 1-2 seconds
+```
+
+Do not emit many separate high-rate telemetry channels if one compact status object will do. Many tiny channels can be worse than one compact packet because each item carries metadata and framing overhead.
+
+## 44 vs 64 vs 128 Bytes
+
+It is tempting to set `TmFrameFixedSize = 44` because `44` bytes fits in one RF packet payload.
+
+The problem is the F Prime/CCSDS payload budget becomes too small:
+
+```text
+AggregationSize = TmFrameFixedSize - 6 - 6 - 1 - 2
+AggregationSize = 44 - 15 = 29 bytes
+```
+
+Only about 29 bytes remain for useful CCSDS packet content. That may fit a carefully designed heartbeat, but it is too tight for normal F Prime events, command responses, packetized SOH, strings, file chunks, or future telemetry growth. Even the simple `missionManager.Pong` event is already around the low 30-byte range after its event ID, timestamp, token, count, and CCSDS space-packet header are included.
+
+A more practical comparison:
+
+| TM frame size | RF packets | Aggregation budget | Practical use |
+| ---: | ---: | ---: | --- |
+| 44 bytes | 1 | 29 bytes | Too tight except for custom tiny heartbeat experiments |
+| 64 bytes | 2 | 49 bytes | Aggressive; possible for compact SOH if events/logs are controlled |
+| 128 bytes | 3 | 113 bytes | Safer demo choice; enough room for small normal F Prime packets |
+
+The current team leaning is reasonable:
+
+- Use `64` only if you intentionally design a tiny SOH path and audit every downlinked packet.
+- Use `128` when you want the demo to work without hyper-optimizing every telemetry/event field.
+- Do not use `44` for the normal F Prime/GDS path unless the goal is a one-off heartbeat experiment.
+
 ## Demo Rules Of Thumb
 
 For the current RFM23BP MVP:
@@ -370,6 +473,8 @@ For the current RFM23BP MVP:
 - Keep `TmFrameFixedSize = 128`.
 - Keep `FW_COM_BUFFER_MAX_SIZE = 96`.
 - Keep telemetry tiny.
+- Prefer one compact SOH/heartbeat packet over many separate tiny channels.
+- Use `U8`, `U16`, scaled integers, and flags where natural, but do not over-optimize at the cost of clarity.
 - Avoid continuous high-rate events.
 - Avoid standard F Prime file downlink for large files.
 - Use `missionManager.PING` as the smoke-test command path.
