@@ -261,6 +261,317 @@ This should be a later milestone after the RF link has a stronger reliable trans
 
 Use Option 1.
 
+## Optimal Clean Architecture Plan
+
+The clean architecture is a two-plane system:
+
+```text
+Control plane:
+fprime-gds <-> F Prime on Pi
+Purpose: commands, state, progress, final success/failure
+Protocol: normal F Prime CCSDS/GDS
+
+Payload data plane:
+sidecar receiver <-> ground Teensy <-> RFM23BP <-> satellite Teensy <-> Pi payload source
+Purpose: move the 40 KB payload file reliably
+Protocol: custom packet protocol designed for the radio
+```
+
+Do not try to make the bulk payload file look like normal F Prime telemetry. Use F Prime to say **what** should happen. Use the custom payload protocol to move the bytes.
+
+### Recommended Physical/Data Ports
+
+Keep the existing byte-clean GDS port dedicated to GDS:
+
+```text
+Ground Teensy data port: /dev/cu.usbmodem115551201
+Use: fprime-gds CCSDS command/status stream
+```
+
+Run the payload sidecar on a separate USB interface:
+
+```text
+Ground Teensy sidecar/debug port: /dev/cu.usbmodem115551203
+Use: binary payload downlink protocol + sidecar status logs
+```
+
+Reliability rule: do not mix GDS CCSDS bytes and payload file bytes on the same USB stream during the demo. If the sidecar uses the debug port for binary payload data, debug text should either be disabled during transfer or wrapped in a clearly separate sidecar message type. A binary receiver should not have to parse human log lines interleaved with payload chunks.
+
+### Component Responsibilities
+
+| Part | Responsibility |
+| --- | --- |
+| `fprime-gds` | send `CAPTURE`, `DOWNLINK`, `ABORT`, show high-level status |
+| F Prime on Pi | own mission state, validate commands, report progress telemetry/events |
+| Pi payload source | provide the payload file bytes and metadata to satellite Teensy |
+| Satellite Teensy | cache or stream the payload, packetize for RF, resend missing chunks |
+| Ground Teensy | receive RF chunks, verify per-chunk CRC, maintain missing map, send ACK/NAK/retry requests |
+| Sidecar program | control ground payload session, reconstruct file, verify whole-file CRC, display/save result |
+
+### Preferred Demo Flow
+
+```text
+1. Operator sends F Prime CAPTURE command from GDS.
+2. Pi captures or prepares payload file.
+3. F Prime telemetry reports payload_ready, file_size, product_id.
+4. Operator starts sidecar receiver on ground PC.
+5. Operator sends F Prime DOWNLINK command from GDS.
+6. Pi sends payload metadata/file stream to satellite Teensy over UART.
+7. Satellite Teensy starts RF payload session.
+8. Ground Teensy receives chunks and forwards verified chunks to sidecar.
+9. Ground Teensy/sidecar request missing chunks until complete or retry limit.
+10. Sidecar verifies whole-file CRC/hash and writes/displays product.
+11. F Prime reports downlink_complete or downlink_failed.
+```
+
+For the current `40,368 byte` file, the satellite Teensy can reasonably cache the whole product in RAM for the MVP if memory is reserved and bounded. That makes retransmission simple because the satellite Teensy can resend any missing packet without asking the Pi again. For larger future payloads, switch to a streaming/random-access design where the Pi can resend requested chunks.
+
+### Payload Protocol Packet Types
+
+Use small binary packets over RF. Keep every packet within the RFM23BP limit.
+
+Recommended packet types:
+
+| Type | Direction | Purpose |
+| --- | --- | --- |
+| `HELLO` | satellite -> ground | announce transfer ID, protocol version |
+| `META` | satellite -> ground | file size, chunk size, chunk count, product ID, whole-file CRC/hash |
+| `DATA` | satellite -> ground | one indexed payload chunk |
+| `ACK_RANGE` | ground -> satellite | acknowledge a contiguous range or current high-water mark |
+| `NAK_BITMAP` | ground -> satellite | request retransmission of missing chunk indices |
+| `RESEND_DATA` | satellite -> ground | same format as `DATA`, sent during retry phase |
+| `COMPLETE` | ground -> satellite | sidecar/ground has complete file and CRC/hash passed |
+| `ABORT` | either | stop session and report reason |
+| `STATUS` | either | compact counters/debug without text parsing |
+
+Recommended `DATA` packet shape:
+
+```text
+magic          U8   fixed protocol marker
+version        U8
+type           U8   DATA
+transfer_id    U16
+chunk_index    U16 or U32
+payload_len    U8
+payload        up to remaining RF bytes
+chunk_crc16    U16
+```
+
+If the RF max is `49` bytes, do not spend too much header. A practical MVP can use:
+
+```text
+magic       1 byte
+type        1 byte
+transfer_id 2 bytes
+chunk_index 2 bytes
+payload_len 1 byte
+crc16       2 bytes
+```
+
+That is `9` bytes of header/trailer, leaving about `40` payload bytes per RF packet. For `40,368` bytes:
+
+```text
+40,368 / 40 = about 1,010 DATA packets
+```
+
+That is still reasonable if retry is selective and not whole-file restart.
+
+### Reliability Strategy
+
+Use selective repeat by transfer phase:
+
+1. `META` phase
+   - Satellite sends metadata repeatedly until ground ACKs the transfer ID.
+   - Ground rejects stale or wrong transfer IDs.
+
+2. First-pass data phase
+   - Satellite sends all `DATA` chunks in order.
+   - Ground verifies each packet CRC before marking the chunk received.
+   - Ground stores chunks by `chunk_index`, not by arrival order.
+
+3. Missing-map phase
+   - Ground computes missing chunks.
+   - Ground sends `NAK_BITMAP` messages listing missing chunks.
+   - Satellite resends only missing chunks.
+
+4. Retry rounds
+   - Repeat missing-map/resend until all chunks are received or max retry rounds/time expires.
+   - Recommended MVP max: `3-5` retry rounds, configurable.
+
+5. Final verification
+   - Sidecar reconstructs file.
+   - Sidecar computes whole-file CRC32 or SHA-256.
+   - Sidecar sends `COMPLETE` only if final check passes.
+   - F Prime reports final success/failure as telemetry/event.
+
+Avoid stop-and-wait per chunk unless the link is extremely unreliable. It is simple but slow. Avoid "send everything once and hope" unless the demo is purely illustrative. The best MVP balance is:
+
+```text
+burst all chunks -> request missing bitmap -> resend missing -> repeat -> final CRC
+```
+
+### Retry Bitmap Design
+
+Use bitmap retry requests like EPSCOR.
+
+For roughly `1,010` chunks, a full missing bitmap is:
+
+```text
+1,010 bits / 8 = about 127 bytes
+```
+
+That does not fit in one RF packet, so split it by window:
+
+```text
+NAK_BITMAP {
+  transfer_id
+  base_chunk_index
+  bitmap_byte_count
+  bitmap bytes
+}
+```
+
+Example:
+
+```text
+base_chunk_index = 360
+bitmap = 45 bytes = 360 chunks of coverage
+```
+
+A bit value of `1` means "please resend this chunk." This matches the EPSCOR-style approach and keeps retry requests compact.
+
+### State Machines
+
+Satellite Teensy transfer states:
+
+```text
+IDLE
+WAIT_FILE_FROM_PI
+SEND_META
+SEND_DATA_BURST
+WAIT_RETRY_REQUEST
+RESEND_MISSING
+WAIT_COMPLETE
+DONE
+ERROR
+```
+
+Ground Teensy/sidecar transfer states:
+
+```text
+IDLE
+WAIT_META
+RECEIVE_DATA
+SEND_MISSING_MAP
+RECEIVE_RETRY_DATA
+VERIFY_FILE
+COMPLETE
+ERROR
+```
+
+F Prime mission state should stay high-level:
+
+```text
+IDLE
+CAPTURING
+PAYLOAD_READY
+DOWNLINKING
+DOWNLINK_COMPLETE
+DOWNLINK_FAILED
+```
+
+Do not make F Prime track every RF chunk for the MVP. That would turn a reliable payload protocol problem into a noisy telemetry problem.
+
+### Sidecar Program Behavior
+
+The sidecar should be the source of truth for ground reconstruction.
+
+Recommended sidecar features:
+
+- open the ground Teensy sidecar/debug port
+- parse only binary payload protocol messages
+- maintain a chunk receipt table
+- write chunks into a preallocated file buffer or sparse file
+- display progress:
+  - bytes received
+  - chunks received
+  - missing chunks
+  - retry round
+  - packet CRC failures
+  - whole-file CRC/hash status
+- save raw transfer logs for post-demo debugging
+- export final payload file/image
+
+For reliability, the sidecar should be able to restart a transfer cleanly:
+
+- discard stale transfer IDs
+- detect duplicate chunks
+- tolerate chunks arriving out of order
+- request missing chunks after timeouts
+- fail with a clear reason if retry limit is exceeded
+
+### Pi-To-Satellite Teensy Interface
+
+Keep this simple for the MVP.
+
+Recommended Pi-to-satellite Teensy messages:
+
+```text
+PAYLOAD_BEGIN {
+  transfer_id
+  file_size
+  chunk_size
+  file_crc32 or sha256
+  product_id
+}
+
+PAYLOAD_BYTES {
+  transfer_id
+  offset
+  length
+  bytes
+}
+
+PAYLOAD_END {
+  transfer_id
+}
+```
+
+For a `40 KB` file, the satellite Teensy can cache the whole file and then control the RF session. This avoids having RF retry timing depend on Pi filesystem or UART timing.
+
+If memory is tight later, change this to:
+
+```text
+satellite Teensy requests missing chunk from Pi -> Pi reads file chunk -> Teensy resends over RF
+```
+
+That is more scalable but more complicated.
+
+### Failure Handling
+
+Every failure should map to a small F Prime status/event and a sidecar log entry.
+
+| Failure | Detection | Action |
+| --- | --- | --- |
+| metadata not ACKed | satellite timeout | resend META, then fail |
+| chunk CRC fail | ground packet check | do not mark chunk received; request retry |
+| missing chunks remain | sidecar missing map | send NAK bitmap |
+| retry limit exceeded | sidecar/satellite counter | abort transfer, F Prime reports failed |
+| whole-file CRC/hash fail | sidecar final verification | request full retry or fail |
+| wrong transfer ID | ground or satellite parser | drop packet |
+| duplicate chunk | sidecar receipt table | ignore or overwrite same bytes after CRC check |
+| sidecar disconnected | ground USB write failure | abort payload data plane, keep GDS alive |
+
+### What Not To Do
+
+- Do not put raw payload bytes into `fprime-gds` CCSDS telemetry.
+- Do not mix binary payload data and human debug text on the same sidecar stream.
+- Do not restart the whole 40 KB transfer for one missing RF packet.
+- Do not depend on arrival order.
+- Do not treat "packet received by radio" as "file byte accepted"; verify CRC first.
+- Do not make F Prime emit telemetry for every chunk unless needed for debugging.
+- Do not use stock F Prime file downlink for the demo unless the RF link has already proven sustained low-loss delivery.
+
 ### Command/Control Plane
 
 F Prime/GDS should issue commands:
@@ -410,4 +721,3 @@ Use F Prime to command the downlink and report progress.
 Use a custom payload protocol to move the file.
 Use a helper/viewer to reconstruct and display the file.
 ```
-
