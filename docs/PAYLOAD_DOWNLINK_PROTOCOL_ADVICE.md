@@ -316,7 +316,7 @@ Reliability rule: do not mix GDS CCSDS bytes and payload file bytes on the same 
 3. F Prime telemetry reports payload_ready, file_size, product_id.
 4. Operator starts sidecar receiver on ground PC.
 5. Operator sends F Prime DOWNLINK command from GDS.
-6. Pi sends payload metadata/file stream to satellite Teensy over UART.
+6. Pi sends payload metadata/file stream to satellite Teensy over SPI if that link is already wired/proven; otherwise use a second UART.
 7. Satellite Teensy starts RF payload session.
 8. Ground Teensy receives chunks and forwards verified chunks to sidecar.
 9. Ground Teensy/sidecar request missing chunks until complete or retry limit.
@@ -514,6 +514,32 @@ For reliability, the sidecar should be able to restart a transfer cleanly:
 
 Keep this simple for the MVP.
 
+If SPI is already wired and proven between the Pi and satellite Teensy, use SPI for Pi-to-Teensy payload staging. Keep the existing UART path for F Prime/GDS control unless there is a separate reason to refactor it.
+
+Recommended split:
+
+```text
+F Prime/GDS control:
+GDS -> RF -> satellite Teensy -> Pi UART/F Prime
+
+Payload ingress:
+Pi -> SPI -> satellite Teensy RAM buffer
+
+Payload downlink:
+satellite Teensy -> RFM23BP chunks -> ground Teensy -> sidecar
+```
+
+SPI is attractive here because it is fast, keeps payload bytes off the CCSDS/GDS UART stream, and can move the `40 KB` file into Teensy RAM quickly. The important rule is to decouple wired ingress from RF egress:
+
+```text
+Pi sends full payload over SPI
+Teensy stores it
+Teensy verifies whole-file CRC/hash
+Teensy starts RF downlink using the RF retry protocol
+```
+
+Do not tightly stream SPI directly into RF. The SPI side is fast and Pi-clocked; the RF side is slow, lossy, and retry-driven. Buffering first makes failures easier to isolate.
+
 Recommended Pi-to-satellite Teensy messages:
 
 ```text
@@ -536,6 +562,33 @@ PAYLOAD_END {
   transfer_id
 }
 ```
+
+If using SPI, wrap those same messages in explicit SPI transactions:
+
+```text
+SPI frame {
+  magic
+  version
+  type       BEGIN | DATA | END | STATUS | ABORT
+  transfer_id
+  sequence
+  length
+  payload
+  crc16
+}
+```
+
+SPI reliability rules:
+
+- Pi is usually SPI master; Teensy responds when clocked.
+- Use CRC on every SPI frame.
+- Use sequence numbers on every data frame.
+- Teensy tracks expected sequence and total bytes received.
+- Pi retries a frame if Teensy reports CRC or sequence error.
+- Consider a Teensy `READY/BUSY` GPIO so the Pi does not clock data while the Teensy is still processing.
+- Verify the whole file before starting RF downlink.
+
+If SPI is not already working, a second UART is still the lowest-complexity payload ingress path. Avoid I2C for this payload file path.
 
 For a `40 KB` file, the satellite Teensy can cache the whole file and then control the RF session. This avoids having RF retry timing depend on Pi filesystem or UART timing.
 
