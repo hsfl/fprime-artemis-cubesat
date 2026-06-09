@@ -16,6 +16,16 @@ IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for an
 |component-sdds:{root:./ArtemisRpiTeensy_N2/lib/fprime,locations:Svc/**/docs/*.md plus Fw/**/docs/*.md plus Drv/**/docs/*.md plus Os/**/docs/*.md plus Utils/**/docs/*.md,search:`rg --files ArtemisRpiTeensy_N2/lib/fprime | rg '/docs/.*\\.md$'`}
 </!>
 
+## Agent Skills
+
+Project skills live in `.claude/skills/` and are auto-loaded by Claude Code. Codex-style agents (which read AGENTS.md but don't auto-load skills) should consult these files directly:
+
+| Skill | File | Use when... |
+|-------|------|-------------|
+| `fprime-swe` | [`.claude/skills/fprime-swe/SKILL.md`](.claude/skills/fprime-swe/SKILL.md) | Developing F' components, ports, topologies, running builds, or using fprime-util |
+| `fprime-docs-search` | [`.claude/skills/fprime-docs-search/SKILL.md`](.claude/skills/fprime-docs-search/SKILL.md) | Looking up F' framework docs — check repo-local docs at `ArtemisRpiTeensy_N2/lib/fprime/docs` first |
+| `fprime-cross-compilation` | [`.claude/skills/fprime-cross-compilation/SKILL.md`](.claude/skills/fprime-cross-compilation/SKILL.md) | Cross-compiling for ARM targets; Pi Zero W ARMv6 landmine documented here |
+
 ## F' Agent Usage Guide
 
 Use this project with the `fprime-swe` skill and follow these steps exactly.
