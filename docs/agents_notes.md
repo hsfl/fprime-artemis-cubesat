@@ -420,6 +420,17 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - When choosing scope, favor the shortest implementation that makes the end-to-end demo story credible in front of judges.
 - Simulated payload data is acceptable if it unblocks the demo and is documented clearly.
 
+## Design Plan Pointer (2026-06-09)
+
+- New plan doc for the remaining payload-downlink work and the long-term radio-swap architecture:
+  - `docs/RADIO_AGNOSTIC_COMMS_AND_PAYLOAD_DOWNLINK_PLAN.md`
+- Read it before touching payload downlink, the Teensy link protocol, or comms topology.
+- Core decisions captured there:
+  - payload bulk data moves on a second stateless virtual channel over the existing RF bridge (per-frame channel tags, no link mode switching)
+  - GDS keeps a byte-pure CCSDS stream on channel 0 (GUI cannot break)
+  - all radio MTU knowledge is isolated at a single seam (`LinkCfg` + `link_protocol.hpp`) so the RFM23BP can later be swapped for a 256-byte UART radio or SatNOGS board without touching mission logic
+  - custom payload protocol is tactical; graduation criteria to stock `Svc.FileDownlink` are defined in the plan
+
 ## Session Handoff (2026-04-23)
 
 ### Pi Zero W cross-build and versioning
