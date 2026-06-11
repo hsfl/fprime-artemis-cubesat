@@ -118,14 +118,42 @@ protocol. That stays true: when `ScienceManager` commands a downlink, the Pi pus
 image file to the Teensy over UART (existing `DE AD BE EF` framing) and the Teensy runs the
 proven packetizer.
 
-**UART contention risk and mitigation:** the CCSDS tunnel and the payload bulk transfer
-must not interleave on one UART. Teensy 4.1 has 8 hardware UARTs and the demo already used
-`Serial2` (pins 7/8) for the image path while N2 relay uses its own UART. **Use two
-UARTs:** UART-A = CCSDS tunnel (always on), UART-B = payload bulk (`DE AD BE EF` framing,
-only active during transfer). This keeps the GDS link alive during downlink so progress
-telemetry streams while the bulk transfer runs. If wiring forces a single UART, fall back
-to a half-duplex mode switch commanded by F´ (downlink telemetry pauses during transfer) —
-acceptable but strictly worse for the demo story.
+**UART contention — verified against the Artemis User's Manual (April 2026): there is
+exactly ONE Pi↔Teensy UART, and a second one cannot be added.** The constraint is on both
+ends:
+
+- *Pi side:* the Pi Zero W 40-pin header exposes a single UART pin pair (GPIO14/15,
+  physical pins 8/10 — the "UART6" nets in the manual's RPi header table). The demo's
+  `thermal_camera_controller.py` line 48 uses exactly this: `/dev/serial0`. The Pi's one
+  USB OTG port is occupied by the thermal camera, so a USB-serial adapter is not an option
+  either.
+- *Teensy side:* on the Artemis OBC every UART-capable pin pair is already consumed:
+  Serial1 (pins 0/1) = PDU UART, Serial2 (pins 7/8) = Pi link (used by both the EPSCoR
+  demo and the N2 relay firmware), Serial7 (pins 28/29) = GPS, Serial8 (pins 34/35) =
+  external breakout connector (routed off-board, not to the Pi). Serial3/Serial5 pins
+  (14/15/20/21) are the TMP36 analog inputs AIN0/1/3/4; Serial4 pins (16/17) carry the
+  Pi I2C; Serial6 pins (24/25) carry the Teensy I2C bus (`Wire2`, INA219s).
+
+**Therefore: share the single UART with a commanded half-duplex mode switch.** This is
+fine because the UART is not the bottleneck — the radio is. Moving the 38,400-byte image
+Pi→Teensy at 115200 baud takes ~3.5 s (demo-measured); the RF downlink of ~854 packets
+takes minutes. Sequence: `START_PAYLOAD_DOWNLINK` → relay firmware switches the UART to
+bulk mode → Pi sends the `DE AD BE EF`-framed image (~3.5 s, CCSDS tunnel paused) → relay
+returns to tunnel mode → Teensy transmits payload packets over RF while the UART carries
+live progress telemetry again. The telemetry blackout is only the ~3.5 s handoff, and
+raising the baud (Teensy 4.1 and the Pi PL011 both handle 921600; the demo code notes
+this) shrinks it under 1 s. A channel-tagged mux on the relay's existing framing is the
+later polish if even that gap matters.
+
+Two wired alternatives exist on the OBC but are not recommended for MVP: the Pi↔Teensy
+SPI0 link (manual pins 10–13; Teensy-as-SPI-slave is poorly supported on the 4.1) and the
+Pi↔Teensy I2C (slow, Teensy-as-slave). Note them as future options only.
+
+**Hardware-revision caveat:** the manual's newest OBC pin table assigns pins 7/8 to
+"Modular Radio" RESET/DIO0, which would conflict with Serial2; the demo and N2 firmware
+match the "OBC version 4.24" RFM23BP pinout (CS=38, NIRQ=40, RX_ON=30, TX_ON=31, SPI1 on
+26/27/39). If the team ever moves to the modular-radio OBC revision, the Pi UART routing
+must be re-verified before anything in this plan changes hands.
 
 Radio-time contention still exists (one RFM23BP): `CommsManager`/`MissionManager` enter a
 `ScienceTx` mode that throttles telemetry to a slow heartbeat while payload packets own
@@ -142,6 +170,7 @@ the air, mirroring the radio-agnostic comms plan.
 | `p1`/`p0`/`ps` | Pi power | stays Teensy-local (hardware function below F´) |
 | `s*` | GPS/IMU queries | replaced by continuous F´ telemetry channels via sensor sideband |
 | `g` | ping | `Svc.Health` / existing `PingResponder` |
+| `d` | dump RF23 RX FIFO (debug) | stays a Teensy-local debug hook in the relay firmware |
 | `~` | reset satellite Teensy | Teensy-local; optionally a `TeensyTransportService` command later |
 | `capture`/`request`/`export` CLI | operator flow | `fprime-gds` commanding + helper auto-reconstruct/export |
 
@@ -155,6 +184,13 @@ New telemetry (replaces ad-hoc `STATUS:*` strings and serial prints):
 
 The Pi-side `STATUS:*` strings (`CAM_READY`, `CAPTURE_DONE`, …) become F´ **events** of
 the adapter — same semantics, now timestamped and dictionary-defined.
+
+**An entire ad-hoc channel disappears:** today every satellite print statement travels as
+`0xAA` "serial message" RF packets (with a continuation-flag bit, `SAT> ` prefixes, and
+chunking), and the PC CLI runs a raw-buffer scanner to demux that text from binary `WRM!`
+stream frames and CSV blocks on one serial stream — a recurring source of fragility. In
+the refactor all of it is replaced by typed F´ events and channels; the only remaining
+non-CCSDS traffic is the payload bulk packets, which are cleanly tagged by packet type.
 
 ## 5. Phased migration (every phase ends demo-able)
 
@@ -194,15 +230,23 @@ new work happens in the F´ workspace and firmware folders.
 ### Phase 3 — Payload bulk downlink (2–3 weeks, highest risk)
 - Port the packetizer/retry-resend out of `satellite_teensy.ino` into a clean module in
   `ArtemisTeensy_N2_Baremetal/firmware` (`payload_downlink.{h,cpp}`): header packet, 45-byte
-  data chunks + CRC16, end packet, `0xBB` retry bitmap handling — byte-identical on air.
-- Add UART-B receive path (`DE AD BE EF` framing) on the Teensy; add Pi-side sender in
-  `PayloadService`/`TeensyTransportService` (open `/dev/ttyAMA*`, frame, send, watch acks).
+  data chunks + CRC16 (CCITT-FALSE, poly 0x1021, init 0xFFFF), end packet, `0xBB` retry
+  bitmap handling — byte-identical on air. Preserve the protocol quirks exactly: the
+  retry-completion end packet reports the *resent* count (not the total), and `imageLength`
+  is a `uint16` (payloads >65,535 bytes need a protocol rev — flag, don't silently extend).
+- Add the half-duplex UART mode switch to the relay firmware (tunnel mode ↔ `DE AD BE EF`
+  bulk-receive mode, entered on command, exited on end-marker or timeout — reuse the demo's
+  15 s header / 30 s payload / 1 s end timeouts); add the Pi-side sender in
+  `PayloadService`/`TeensyTransportService` (pause tunnel, frame, send, resume).
 - Extend `GDS_Teensy` to classify payload packets and forward them tagged over USB
   alongside the raw CCSDS stream (reuse the demo's `WRM!`-style binary tagging idea).
 - Write `payload_downlink_helper.py` on the PC: missing-packet bitmap, retry requests,
   reconstruction, CRC verify, CSV export, viewer — ported from the demo ground CLI +
   ground-Teensy reassembly logic (logic already exists; it moves from C++ on a Teensy to
-  Python on the PC where it is testable).
+  Python on the PC where it is testable). Keep the demo's verified retry behavior:
+  2,500 ms grace after the end packet, 5,000 ms re-request timeout, max 2 retry rounds,
+  skip auto-retry when ≤10 packets are missing (manual-inspection threshold), and up to 3
+  bitmap requests per round each covering 360 packets starting at the first missing index.
 - Add downlink progress telemetry through the control plane; `MissionManager` enters
   `ScienceTx` mode and throttles telemetry during transfer.
 - Exit criteria: full demo sequence via GDS — schedule collection, watch mode transitions
@@ -218,31 +262,46 @@ new work happens in the F´ workspace and firmware folders.
 - Exit criteria: live temperatures, currents, GPS, IMU in GDS channels during BaseMode.
 
 ### Phase 5 — Stretch + cleanup
-- Livestream mode (80×60 8-bit) re-evaluated: likely stays a special Teensy mode triggered
-  by an F´ command, or is dropped — it is demo candy, not mission-critical.
+- Livestream mode re-evaluated: it is a third protocol stack of its own (Pi downsamples
+  to 80×60 8-bit, `CA FE BA BE` UART frames on request/response `FRAME\n` flow control,
+  ~107 best-effort RF packets per frame with no CRC, ground Teensy outputs a 4,808-byte
+  `WRM!` binary frame at ≥102 packets received, matplotlib viewer in a separate process).
+  Likely stays a special relay mode triggered by an F´ command, or is dropped — it is demo
+  candy, not mission-critical, and it conflicts with the tunnel for both UART and air time.
 - Retire duplicated code: the EPSCoR satellite/ground .ino monoliths are now fully
   superseded; `espcor_teensy_demo/` is marked reference-only (it already is in README).
 - Write the "new mission HOWTO": *to fly a new payload on the Artemis bus, implement
   `PayloadAdapter_<YourPayload>` against `PayloadService`'s ports and you are done.* This
   document is the deliverable that proves the reuse story for future teams.
-- Fold `pdu_comm/` into `EpsAdapter_Artemis` when EPS work starts.
+- Fold `pdu_comm/` into `EpsAdapter_Artemis` when EPS work starts. The protocol is already
+  defined and hardware-verified (`pdu_protocol.h` v1.0, PDU board v2.2 / MCU v2.2.1):
+  Teensy `Serial1` at 9600 baud, packed structs sent as ASCII (each byte + 0x30 offset),
+  switch control for 3V3/5V/12V/VBATT/burn-wire/torque-coil rails — including an `RPI`
+  switch, which is the eventual proper home for Pi power control instead of the Teensy
+  GPIO pin 36 used today.
 
 ## 6. Risks and open questions
 
 | Risk | Mitigation |
 | --- | --- |
 | Single shared RFM23BP: telemetry vs. payload packets fight for air time | Explicit `ScienceTx` mode throttles control plane during bulk transfer (Phase 3); already anticipated in comms plan |
-| Single-UART wiring on current flatsat harness | Strongly prefer adding UART-B (Teensy 4.1 has 8 UARTs; demo already used Serial2 pins 7/8). Half-duplex mode switch is the fallback |
+| Single Pi↔Teensy UART shared by CCSDS tunnel and payload bulk transfer (verified: no second UART exists on either side — see §3.3) | Commanded half-duplex mode switch; blackout is only the ~3.5 s UART handoff; raise baud toward 921600 to shrink it; channel-tagged mux as later polish |
 | Pi Zero W performance with F´ + camera capture | Already validated F´ on Pi Zero W (ARMv6 cross-build, `docs/CROSS_COMPILE_HANDOFF_PI_ZERO_W.md`); capture is burst CPU, schedule capture outside telemetry-heavy moments; 2a child-process isolates camera memory |
 | Placeholder `Svc.Ping` ports across mission/service components mean "wiring exists, semantics don't" | Phase 2 defines the real FPP types once, on the payload path first — the highest-value path — before generalizing |
-| Retry protocol moves from ground Teensy (C++) to PC helper (Python) — subtle behavior drift | Golden transcripts from Phase 0; keep retry constants identical (grace period, threshold, max 2 rounds); unit-test bitmap handling against recorded packet logs |
+| Retry protocol moves from ground Teensy (C++) to PC helper (Python) — subtle behavior drift | Golden transcripts from Phase 0; keep retry constants identical (2.5 s grace, 5 s timeout, 2 rounds, ≤10-missing threshold, 3×360-packet bitmaps); replicate the resent-count end-packet quirk; unit-test bitmap handling against recorded packet logs |
+| UART mode-switch deadlock (relay stuck in bulk mode if Pi dies mid-transfer) | Reuse the demo's proven timeouts (15 s header / 30 s payload / 1 s end) as the bulk-mode watchdog; always fall back to tunnel mode |
 | Team bandwidth / brittle hardware time | Phases 1 and 4 are low-risk and parallelizable; Phase 3 is the only genuinely new integration and gets the buffer |
 
 Open questions to settle before Phase 3:
-1. Confirm physical availability of a second Pi↔Teensy UART on the C3M flatsat harness.
+1. Pick the UART handoff baud rate (115200 known-good vs. 460800/921600 — measure error
+   rate on the actual harness; demo code asserts 921600 is fine on Teensy 4.1).
 2. Decide where reconstructed images/CSVs live on the PC (GDS plugin vs. standalone helper
    window) for the judge-facing display.
-3. Decide whether sensor sideband rides the relay link (reserved msg type) or UART-B.
+3. Sensor sideband transport: reserved message type on the relay link is the only clean
+   option (no spare UART) — confirm the relay segmentation header has room for a channel
+   ID, or interleave sensor reports between bulk transfers in tunnel mode.
+4. Confirm which OBC revision future kits ship with (modular-radio pin table vs. v4.24) —
+   pins 7/8 are Serial2 on v4.24 but radio control lines on the newer table (§3.3 caveat).
 
 ## 7. Definition of done
 
