@@ -51,6 +51,21 @@ Rule for the whole refactor: **treat the proven protocols (UART framing `DE AD B
 logic*, not *what goes over the wire*, until everything is under F´ and we choose to
 evolve a protocol deliberately.
 
+## 2.5 Decision log (locked — implement as written)
+
+These decisions are made. Future coding agents should implement them, not re-litigate them.
+
+| # | Decision |
+| --- | --- |
+| D1 | One Pi↔Teensy UART, shared via commanded half-duplex mode switch (tunnel ↔ bulk). No second UART exists (§3.3). Start at 115200 baud; raising baud is a later tuning step, not a blocker. |
+| D2 | The Teensy keeps the EPSCoR payload packetizer; the Pi pushes the image file over the UART bulk mode. Bulk payload bytes never ride the CCSDS/GDS stream. |
+| D3 | All on-wire formats are frozen contracts: UART `DE AD BE EF` framing, 49-byte RF packets, CRC16-CCITT-FALSE, `0xBB` retry bitmap, retry constants (§5 Phase 3). Change nothing on the wire until everything runs under F´. |
+| D4 | Camera integration starts as a managed Python child process (Phase 2a); native C++ (2b) only after 2a is demo-stable. |
+| D5 | Assume current OBC wiring (version 4.24) is correct — the demo and N2 firmware both run on it. Serial2 (pins 7/8) is the Pi link. Do not design for the modular-radio pin table (§3.3 caveat) unless new hardware actually arrives. |
+| D6 | Sensor sideband rides the relay link as a reserved message type (no spare UART). |
+| D7 | PDU: skeleton component only. The code in `pdu_comm/` is **out of date** — the PDU is being actively refactored in a separate repo. Build `EpsService`/`EpsAdapter_Artemis` as typed skeletons with the port shapes from `pdu_protocol.h`, and integrate the real protocol implementation when the refactored PDU code lands. Do not port `pdu_comm.ino` as-is. |
+| D8 | Mission/service/adapter layering and component names follow `docs/OPTIMAL_FPRIME_COMPONENT_TOPOLOGY_PLAN.md`; the only new component is `PayloadAdapter_C3MThermal`. |
+
 ## 3. Target architecture
 
 ### 3.1 Where each piece of today's demo lands
@@ -67,7 +82,7 @@ evolve a protocol deliberately.
 | `ground_station_teensy.ino` RF reassembly → USB | `GDS_Teensy` relay firmware (already exists) + payload-packet pass-through |
 | `ground_station_teensy.ino` retry tracking, CSV export | **Ground Python helper** (PC-side, where it belongs) |
 | `ground_station_serial_cli_teensy.py` operator CLI | `fprime-gds` (commands, telemetry, events) + companion payload viewer/reconstructor script |
-| `pdu_comm/` test utility | Folded into `EpsAdapter_Artemis` / `EpsService` later (out of MVP scope) |
+| `pdu_comm/` test utility | **Out of date** — PDU is being refactored in a separate repo (D7). `EpsService`/`EpsAdapter_Artemis` stay skeletons until that lands |
 
 ### 3.2 Layered component view (reusing N2 components)
 
@@ -149,11 +164,22 @@ Two wired alternatives exist on the OBC but are not recommended for MVP: the Pi�
 SPI0 link (manual pins 10–13; Teensy-as-SPI-slave is poorly supported on the 4.1) and the
 Pi↔Teensy I2C (slow, Teensy-as-slave). Note them as future options only.
 
-**Hardware-revision caveat:** the manual's newest OBC pin table assigns pins 7/8 to
-"Modular Radio" RESET/DIO0, which would conflict with Serial2; the demo and N2 firmware
-match the "OBC version 4.24" RFM23BP pinout (CS=38, NIRQ=40, RX_ON=30, TX_ON=31, SPI1 on
-26/27/39). If the team ever moves to the modular-radio OBC revision, the Pi UART routing
-must be re-verified before anything in this plan changes hands.
+**Hardware-revision caveat (informational only — per D5, assume current v4.24 wiring is
+fine):** the manual contains two different OBC pinouts. Exact references in
+`docs/Artemis User's Manual - April 2026.txt` (ctrl+f these strings):
+
+- `"OBC version 4.24 pinouts"` — the RFM23BP wiring table that matches the demo and N2
+  firmware exactly (CS=38, NIRQ=40, RX_ON=30, TX_ON=31, SPI1 on 26/27/39). This is the
+  hardware we have.
+- `"Teensy 4.1 Pin Configuration"` — caption of the manual's main OBC pin table, which
+  describes a newer modular-radio revision: ctrl+f `"Modular Radio Reset GPIO"` shows
+  pin 7 reassigned to radio reset (and pin 8 to `"Modular Radio DIO0"`), which would
+  conflict with Serial2.
+- `"UART6 RX"` — the RPi 40-pin header table, showing the Pi's single UART (physical
+  pins 8/10, GPIO14/15) as the only UART net to the Pi.
+
+If a future kit ships with the modular-radio revision, re-verify the Pi UART routing
+before reusing this plan's firmware. Until then, ignore this.
 
 Radio-time contention still exists (one RFM23BP): `CommsManager`/`MissionManager` enter a
 `ScienceTx` mode that throttles telemetry to a slow heartbeat while payload packets own
@@ -255,8 +281,7 @@ new work happens in the F´ workspace and firmware folders.
 
 ### Phase 4 — Sensors and SOH (1–2 weeks, parallelizable with Phase 3)
 - Port TMP36/INA219/GPS/IMU polling from the demo .ino into clean firmware modules; emit a
-  compact binary sensor-status sideband (either as a reserved message type on the relay
-  link or on UART-B between transfers).
+  compact binary sensor-status sideband as a reserved message type on the relay link (D6).
 - Map into `EpsService`/`GpsService` telemetry; `SoHManager` aggregates the judge-facing
   health page.
 - Exit criteria: live temperatures, currents, GPS, IMU in GDS channels during BaseMode.
@@ -273,12 +298,12 @@ new work happens in the F´ workspace and firmware folders.
 - Write the "new mission HOWTO": *to fly a new payload on the Artemis bus, implement
   `PayloadAdapter_<YourPayload>` against `PayloadService`'s ports and you are done.* This
   document is the deliverable that proves the reuse story for future teams.
-- Fold `pdu_comm/` into `EpsAdapter_Artemis` when EPS work starts. The protocol is already
-  defined and hardware-verified (`pdu_protocol.h` v1.0, PDU board v2.2 / MCU v2.2.1):
-  Teensy `Serial1` at 9600 baud, packed structs sent as ASCII (each byte + 0x30 offset),
-  switch control for 3V3/5V/12V/VBATT/burn-wire/torque-coil rails — including an `RPI`
-  switch, which is the eventual proper home for Pi power control instead of the Teensy
-  GPIO pin 36 used today.
+- PDU (per D7): the code in `pdu_comm/` is **out of date** — the PDU is being refactored
+  in a separate repo. Keep `EpsService`/`EpsAdapter_Artemis` as typed skeletons. Use
+  `pdu_protocol.h` only as a shape reference for the port types (switch IDs incl. the
+  `RPI` power switch — the eventual proper home for Pi power control instead of Teensy
+  GPIO 36; Teensy `Serial1`; ASCII-offset encoding), and swap in the refactored protocol
+  implementation when it lands.
 
 ## 6. Risks and open questions
 
@@ -293,15 +318,14 @@ new work happens in the F´ workspace and firmware folders.
 | Team bandwidth / brittle hardware time | Phases 1 and 4 are low-risk and parallelizable; Phase 3 is the only genuinely new integration and gets the buffer |
 
 Open questions to settle before Phase 3:
-1. Pick the UART handoff baud rate (115200 known-good vs. 460800/921600 — measure error
-   rate on the actual harness; demo code asserts 921600 is fine on Teensy 4.1).
+1. Baud is decided (D1: start at 115200). Optional tuning: measure 460800/921600 error
+   rate on the actual harness if the ~3.5 s handoff blackout bothers anyone (demo code
+   asserts 921600 is fine on Teensy 4.1).
 2. Decide where reconstructed images/CSVs live on the PC (GDS plugin vs. standalone helper
    window) for the judge-facing display.
-3. Sensor sideband transport: reserved message type on the relay link is the only clean
-   option (no spare UART) — confirm the relay segmentation header has room for a channel
-   ID, or interleave sensor reports between bulk transfers in tunnel mode.
-4. Confirm which OBC revision future kits ship with (modular-radio pin table vs. v4.24) —
-   pins 7/8 are Serial2 on v4.24 but radio control lines on the newer table (§3.3 caveat).
+3. Sensor sideband (D6 decides the transport): confirm the relay segmentation header has
+   room for a channel/message-type ID, or define a new reserved type alongside the
+   existing segment format.
 
 ## 7. Definition of done
 
