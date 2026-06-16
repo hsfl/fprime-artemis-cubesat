@@ -47,6 +47,8 @@ module ArtemisRpiTeensyDeployment {
     instance adcsAdapterD2S2
     instance gpsAdapterArtemis
     instance commsAdapterTeensyRfm23
+    instance uartChannelMux
+    instance payloadDownlinkManager
 
   # ----------------------------------------------------------------------
   # Pattern graph specifiers
@@ -96,12 +98,17 @@ module ArtemisRpiTeensyDeployment {
       comDriver.allocate      -> ComCcsds.commsBufferManager.bufferGetCallee
       comDriver.deallocate    -> ComCcsds.commsBufferManager.bufferSendIn
       
-      # ComDriver <-> ComStub (Uplink)
-      comDriver.$recv                     -> ComCcsds.comStub.drvReceiveIn
-      ComCcsds.comStub.drvReceiveReturnOut -> comDriver.recvReturnIn
+      # ComDriver <-> UART channel mux <-> ComStub/Payload manager
+      comDriver.$recv                     -> uartChannelMux.drvReceiveIn
+      uartChannelMux.drvReceiveReturnOut  -> comDriver.recvReturnIn
+      uartChannelMux.ccsdsRecvOut         -> ComCcsds.comStub.drvReceiveIn
+      ComCcsds.comStub.drvReceiveReturnOut -> uartChannelMux.ccsdsRecvReturnIn
+      uartChannelMux.payloadRecvOut       -> payloadDownlinkManager.packetIn
       
-      # ComStub <-> ComDriver (Downlink)
-      ComCcsds.comStub.drvSendOut      -> comDriver.$send
+      # ComStub/Payload manager <-> UART channel mux <-> ComDriver
+      ComCcsds.comStub.drvSendOut       -> uartChannelMux.ccsdsSendIn
+      payloadDownlinkManager.packetOut  -> uartChannelMux.payloadSendIn
+      uartChannelMux.drvSendOut         -> comDriver.$send
       comDriver.ready         -> ComCcsds.comStub.drvConnected
     }
 
@@ -125,9 +132,10 @@ module ArtemisRpiTeensyDeployment {
       rateGroup1.RateGroupMemberOut[4] -> ComCcsds.aggregator.timeout
       rateGroup1.RateGroupMemberOut[5] -> teensyTransportService.run
       rateGroup1.RateGroupMemberOut[6] -> missionManager.run
-      # rateGroup1.RateGroupMemberOut[7] -> scienceManager.run
-      # rateGroup1.RateGroupMemberOut[8] -> sohManager.run
-      # rateGroup1.RateGroupMemberOut[9] -> commsManager.run
+      rateGroup1.RateGroupMemberOut[7] -> payloadDownlinkManager.run
+      # rateGroup1.RateGroupMemberOut[8] -> scienceManager.run
+      # rateGroup1.RateGroupMemberOut[9] -> sohManager.run
+      # rateGroup1.RateGroupMemberOut[10] -> commsManager.run
 
       # Rate group 2
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup2] -> rateGroup2.CycleIn
@@ -161,6 +169,7 @@ module ArtemisRpiTeensyDeployment {
       scienceManager.scienceProductOut -> storageService.requestIn
       storageService.downlinkReadyOut -> commsManager.scienceReadyIn
       commsManager.downlinkRequestOut -> storageService.downlinkRequestIn
+      commsManager.payloadDownlinkRequestOut -> payloadDownlinkManager.downlinkRequestIn
     }
 
     connections ServiceAdapterBindings {

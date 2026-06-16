@@ -30,6 +30,7 @@ GDS receives valid CCSDS TM frames
 | --- | --- | --- |
 | Ground Teensy | `/dev/cu.usbmodem115551201` | byte-clean GDS data stream |
 | Ground Teensy | `/dev/cu.usbmodem115551203` | debug counter stream |
+| Ground Teensy | `/dev/cu.usbmodem...` | payload blob stream after `usb=serial3` re-enumeration |
 | Ground Teensy | `usb:1100000` | Arduino CLI upload port |
 | Satellite Teensy | `/dev/cu.usbmodem115502201` | debug counter stream |
 | Satellite Teensy | `usb:100000` | Arduino CLI upload port |
@@ -201,12 +202,12 @@ Ground Teensy:
 cd GDS_Teensy
 export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
 arduino-cli compile --clean \
-  --fqbn teensy:avr:teensy41:usb=serial2 \
+  --fqbn teensy:avr:teensy41:usb=serial3 \
   --libraries "$PWD/../ArtemisTeensy_N2_Baremetal/firmware/libs" \
   --build-path "$PWD/build/arduino-cli-gds-teensy-debug" \
   "$PWD/firmware/gds_teensy"
 arduino-cli upload -v \
-  --fqbn teensy:avr:teensy41:usb=serial2 \
+  --fqbn teensy:avr:teensy41:usb=serial3 \
   -p usb:1100000 \
   --input-dir "$PWD/build/arduino-cli-gds-teensy-debug" \
   "$PWD/firmware/gds_teensy"

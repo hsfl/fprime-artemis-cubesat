@@ -55,8 +55,9 @@ cd ArtemisRpiTeensy_N2
 Nominal MVP/HIL framing:
 - `fprime-gds` uses `--framing-selection space-packet-space-data-link`.
 - The F' deployment and GDS are the `ComCcsds` endpoints.
-- Both Teensy bridges run transparent raw-byte tunnel mode and only segment/reassemble bytes for the RF hop.
-- The custom UART wrapper (`0xD4 0xC3 + len + crc16`) is legacy/fallback only.
+- The Pi-side UART uses the channelized wrapper (`0xD4 0xC3 + channel + len + crc16`) through `UartChannelMux`.
+- Channel `0` is byte-clean GDS/CCSDS traffic; channel `1` is fixed 44-byte generic payload-blob packets.
+- The Teensy bridges route by channel tag and segment/reassemble bytes for the RF hop.
 
 Open dashboard:
 - `http://127.0.0.1:5050`

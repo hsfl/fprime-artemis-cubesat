@@ -23,14 +23,32 @@ static constexpr uint32_t DEBUG_STATUS_PERIOD_MS = 1000;
 #define ARTEMIS_HAS_DEBUG_USB 0
 #endif
 
+#if defined(USB_TRIPLE_SERIAL)
+#define ARTEMIS_HAS_PAYLOAD_USB 1
+#else
+#define ARTEMIS_HAS_PAYLOAD_USB 0
+#endif
+
 LinkCounters g_linkCounters;
 Rf23Driver g_rfDriver(RADIO_CS, RADIO_INT, RADIO_RX_ON_PIN, RADIO_TX_ON_PIN);
-// Demo bridge mode:
-// - read raw CCSDS bytes from laptop GDS on USB Serial
-// - aggregate and segment over RF
-// - reassemble RF return traffic and write raw back to GDS
-RelayConfig g_relayConfig{true, false, false, false, RAW_UART_FLUSH_MS, UPLINK_QUEUE_DEPTH, DOWNLINK_QUEUE_DEPTH};
+// Channelized bridge mode:
+// - Serial remains raw CCSDS for fprime-gds on channel 0
+// - SerialUSB2 is a raw payload-blob packet stream on channel 1 when triple serial is enabled
+RelayConfig g_relayConfig{
+    true,
+    false,
+    false,
+    false,
+    RAW_UART_FLUSH_MS,
+    UPLINK_QUEUE_DEPTH,
+    DOWNLINK_QUEUE_DEPTH,
+    link_protocol::RF_SEGMENT_MAX_DATA,
+    link_protocol::CHANNEL_CCSDS};
+#if ARTEMIS_HAS_PAYLOAD_USB
+RelayUartRf g_relay(Serial, g_rfDriver, g_linkCounters, g_relayConfig, &SerialUSB2);
+#else
 RelayUartRf g_relay(Serial, g_rfDriver, g_linkCounters, g_relayConfig);
+#endif
 
 void debugPrintCounters(const char* prefix) {
 #if ARTEMIS_HAS_DEBUG_USB
@@ -80,6 +98,9 @@ void setup() {
 #if ARTEMIS_HAS_DEBUG_USB
   SerialUSB1.begin(DEBUG_UART_BAUD);
 #endif
+#if ARTEMIS_HAS_PAYLOAD_USB
+  SerialUSB2.begin(USB_UART_BAUD);
+#endif
 
   // Keep USB clean: no banner prints on this stream.
   const bool radioOk = g_rfDriver.begin();
@@ -89,7 +110,7 @@ void setup() {
   delay(200);
   SerialUSB1.println("[GDS_Teensy] debug port ready; data port is USB Serial");
   if (radioOk) {
-    SerialUSB1.println("[GDS_Teensy] RF23 bridge ready (raw USB byte tunnel + RF segmentation)");
+    SerialUSB1.println("[GDS_Teensy] RF23 bridge ready (raw GDS channel + payload channel + RF segmentation)");
   } else {
     SerialUSB1.println("[GDS_Teensy] RF23 init failed; relay running without RF");
   }

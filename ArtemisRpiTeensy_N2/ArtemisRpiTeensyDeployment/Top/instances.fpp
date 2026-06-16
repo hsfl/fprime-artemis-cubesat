@@ -96,6 +96,11 @@ module ArtemisRpiTeensyDeployment {
     stack size Default.STACK_SIZE \
     priority 30
 
+  instance payloadDownlinkManager: Components.PayloadDownlinkManager base id 0x1000F000 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 29
+
   # ----------------------------------------------------------------------
   # Queued component instances
   # ----------------------------------------------------------------------
@@ -124,5 +129,7 @@ module ArtemisRpiTeensyDeployment {
   instance gpsAdapterArtemis: Components.GpsAdapter_Artemis base id 0x10023000
 
   instance commsAdapterTeensyRfm23: Components.CommsAdapter_TeensyRfm23 base id 0x10024000
+
+  instance uartChannelMux: Components.UartChannelMux base id 0x10025000
 
 }
