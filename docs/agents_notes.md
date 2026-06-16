@@ -378,6 +378,23 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   - add service-facing adapter/driver path separately (for example `LinuxI2cDriver`) when implementing real Teensy/PDU ingestion
 - If no extra sideband wiring is available, defer to post-MVP single-UART multiplexing only after the CCSDS chain is stable.
 
+## Future Subsystem Submodule Plan (2026-06-15)
+
+- Long-term integration direction: the top-level F' repo should pin whole subsystem implementation repos as submodules, not depend on a tiny protocol-constants-only repo as the main source of truth.
+- Intended shape:
+  - `ArtemisRpiTeensy_N2/` remains the active F' deployment and mission-facing component workspace.
+  - `external/pdu-firmware/` can be a submodule pointing at the ATSAME51 PDU firmware repo, including firmware implementation, ICD, protocol header, Teensy/bench tooling, and notes.
+  - `external/<other-subsystem>/` can be added later for other subsystem firmware/tools when the F' side needs implementation context.
+- Rationale:
+  - F' component and adapter work often needs actual subsystem behavior, not just enum values or packet constants.
+  - Keeping firmware, ICD, bench scripts, and history together reduces drift between implementation, test tooling, and the F' adapter.
+  - The F' repo can pin a known-good subsystem revision by submodule commit for demos and flight-like integration.
+  - Student developers should not have to chase a constants-only repo plus a separate implementation repo to understand what is real today.
+- Ownership rule:
+  - The PDU firmware repo owns `pdu_protocol_v2.h`, `PDU_PROTOCOL_ICD.md`, the PDU implementation, and bench/test tooling.
+  - This F' repo owns mission-facing EPS/PDU components, adapters, topology wiring, and the pinned subsystem revisions.
+  - Do not treat the legacy `artemis-cubesat-protocols` protocol-only submodule as the ground truth for the PDU v2 runtime contract.
+
 ## Primary TODO
 
 1. Record first successful non-crashing runtime on `/dev/serial0` using the real UART path.
