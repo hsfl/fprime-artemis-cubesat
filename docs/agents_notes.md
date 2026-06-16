@@ -384,6 +384,8 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - Intended shape:
   - `ArtemisRpiTeensy_N2/` remains the active F' deployment and mission-facing component workspace.
   - `external/pdu-firmware/` can be a submodule pointing at the ATSAME51 PDU firmware repo, including firmware implementation, ICD, protocol header, Teensy/bench tooling, and notes.
+  - `external/satnogs-radio/` can be added once the SatNOGS dev-board repo is real and should include radio firmware/protocol, MTU/data-budget constraints, setup scripts, and bench/test tools.
+  - `external/payload/` can be added once the real payload-board repo exists. Until then, keep the RPi-hosted emulated payload adapter local to this repo.
   - `external/<other-subsystem>/` can be added later for other subsystem firmware/tools when the F' side needs implementation context.
 - Rationale:
   - F' component and adapter work often needs actual subsystem behavior, not just enum values or packet constants.
@@ -394,6 +396,11 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   - The PDU firmware repo owns `pdu_protocol_v2.h`, `PDU_PROTOCOL_ICD.md`, the PDU implementation, and bench/test tooling.
   - This F' repo owns mission-facing EPS/PDU components, adapters, topology wiring, and the pinned subsystem revisions.
   - Do not treat the legacy `artemis-cubesat-protocols` protocol-only submodule as the ground truth for the PDU v2 runtime contract.
+- Submodule decision rule:
+  - Add a submodule only if the external repo owns firmware source, ICD/protocol docs, hardware test scripts, or release history that F Prime must pin to a known-good revision.
+  - Do not add a submodule for only constants, copied headers, one markdown doc, or speculative future code.
+  - Current priority is PDU first, SatNOGS second, payload only when real, and ADCS/GPS/IMU/thermal only if they become standalone firmware/tooling repos.
+  - For the base case, default to RFM23BP and RPi-emulated payload, keep data products slim, and increase data budget only after SatNOGS hardware is available and validated.
 
 ## Primary TODO
 

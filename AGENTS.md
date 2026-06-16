@@ -218,6 +218,8 @@ cd GDS_Teensy
 
 ### Lessons Learned
 - Keep `ArtemisRpiTeensy_N2/lib/fprime` as a root-managed Git submodule; avoid nested standalone repos inside the workspace.
+- For external subsystems, submodule whole implementation repos under `external/` only when they own real firmware, ICDs, bench tools, or hardware protocol code. Do not make constants-only repos the primary source of truth.
+- Current submodule priority: `external/pdu-firmware/` first, `external/satnogs-radio/` second once the SatNOGS repo/dev board is real, `external/payload/` only once the payload board repo exists. Do not add ADCS/GPS/IMU/thermal submodules until they have standalone firmware/tooling repos.
 - If using `fprime-util new --deployment` for validation, register it in `project.cmake` during the prompt so build targets exist.
 - In this repo, prefer `fprime-util generate -f` to avoid stale build-cache failures.
 - For deployment smoke validation, direct CMake target build is reliable:
