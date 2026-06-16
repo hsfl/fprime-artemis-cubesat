@@ -17,9 +17,13 @@ class CommsManager final : public CommsManagerComponentBase {
     void scienceReadyIn_handler(FwIndexType portNum, U32 key) override;
     void adapterStatusIn_handler(FwIndexType portNum, U32 key) override;
     void REQUEST_SCIENCE_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+    void REQUEST_LINK_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+    void SELECT_RADIO_BACKEND_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 backend) override;
 
     U32 m_linkState;
     U32 m_pendingScienceBytes;
+    U32 m_radioBackend;
+    U32 m_linkPollCount;
 };
 
 }  // namespace Components

@@ -32,17 +32,32 @@ module Components {
         @ Request science downlink
         async command REQUEST_SCIENCE_DOWNLINK
 
+        @ Request latest link status from the selected radio adapter
+        async command REQUEST_LINK_STATUS
+
+        @ Select logical radio backend. 0=RFM23BP, 1=SatNOGS.
+        async command SELECT_RADIO_BACKEND(backend: U32)
+
         @ Current link state
         telemetry LinkState: U32
 
         @ Pending science bytes
         telemetry PendingScienceBytes: U32
 
+        @ Selected logical radio backend
+        telemetry ActiveRadioBackend: U32
+
+        @ Number of explicit link polls
+        telemetry LinkPollCount: U32
+
         @ Downlink request event
         event DownlinkRequested(bytes: U32) severity activity high format "Downlink requested for {} bytes"
 
         @ Link state event
         event LinkStateUpdated(linkState: U32) severity activity low format "Comms link state updated {}"
+
+        @ Radio backend selection event
+        event RadioBackendSelected(backend: U32) severity activity high format "Radio backend selected {}"
 
         @ Port for requesting the current time
         time get port timeCaller
