@@ -27,6 +27,14 @@ Project skills are shared through `.agents/skills/` for Codex-style agents and `
 | `fprime-cross-compilation` | [`.agents/skills/fprime-cross-compilation/SKILL.md`](.agents/skills/fprime-cross-compilation/SKILL.md) | Cross-compiling for ARM targets; Pi Zero W ARMv6 landmine documented here |
 | `student-git-handoff` | [`.agents/skills/student-git-handoff/SKILL.md`](.agents/skills/student-git-handoff/SKILL.md) | Helping non-technical students use GitHub feature branches, commits, pushes, and pull requests with Software Dev Lead-approved base branches |
 
+## Student Platform Policy
+
+- All new software choices, tools, scripts, dependencies, and workflows must support student use on macOS first, then Windows.
+- F Prime development on Windows means WSL unless an official native-Windows path is documented for the specific tool. Do not present native PowerShell/CMD F Prime builds as the default student path.
+- Prefer cross-platform tools with clear macOS and Windows installation paths. Avoid Linux-only assumptions unless the workflow is explicitly target-hardware-only or includes a documented macOS/Windows path through Docker, WSL, or a VM.
+- When adding student-facing commands, include macOS examples first and Windows notes second when the commands differ.
+- For non-technical testing users, prefer browser/Python-standard-library tools that run natively on Windows. Require WSL only for F Prime build/developer workflows, not for simple ground-side viewers, payload review, or demo-data inspection.
+
 ## F' Agent Usage Guide
 
 Use this project with the `fprime-swe` skill and follow these steps exactly.
