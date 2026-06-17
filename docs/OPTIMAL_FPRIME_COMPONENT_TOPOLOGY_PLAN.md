@@ -60,6 +60,7 @@ These components expose stable spacecraft-facing interfaces, not raw hardware de
 - `AdcsService`
 - `GpsService`
 - `StorageService`
+- `ThermalService`
 - `TeensyTransportService`
 
 These services should expose commands, events, telemetry, and ports in subsystem terms such as:
@@ -69,6 +70,7 @@ These services should expose commands, events, telemetry, and ports in subsystem
 - get ADCS state
 - get GPS fix
 - request science product storage/downlink
+- get thermal state
 - report link counters and link health
 
 ### 4. Hardware adapter / HAL layer
@@ -79,6 +81,7 @@ These are the replaceable hardware-specific implementations.
 - `PayloadAdapter_N1Legacy`
 - `AdcsAdapter_D2S2`
 - `GpsAdapter_Artemis`
+- `ThermalAdapter_Artemis`
 - `CommsAdapter_TeensyRfm23`
 
 Later replacements may include:
@@ -87,6 +90,7 @@ Later replacements may include:
 - `PayloadAdapter_N2`
 - `EpsAdapter_N2`
 - `AdcsAdapter_Flight`
+- `ThermalAdapter_Flight`
 
 ## Recommended Custom Components
 
@@ -105,6 +109,7 @@ Later replacements may include:
 - `AdcsService`
 - `GpsService`
 - `StorageService`
+- `ThermalService`
 
 ### Adapter / HAL layer
 
@@ -112,6 +117,7 @@ Later replacements may include:
 - `PayloadAdapter_N1Legacy`
 - `AdcsAdapter_D2S2`
 - `GpsAdapter_Artemis`
+- `ThermalAdapter_Artemis`
 - `CommsAdapter_TeensyRfm23`
 
 ## Topology Recommendation
@@ -177,7 +183,7 @@ Ground <-> RF/Teensy/UART <-> LinuxUartDriver <-> ComCcsds <-> CdhCore
 - owns UART bridge observability and transport counters
 - sits above the concrete UART/radio hardware details
 
-### `EpsService`, `PayloadService`, `AdcsService`, `GpsService`
+### `EpsService`, `PayloadService`, `AdcsService`, `GpsService`, `ThermalService`
 
 - expose stable subsystem behavior to the rest of the flight software
 - hide the current Artemis/demo hardware choices from mission logic
@@ -220,12 +226,12 @@ The current repo already has a good service backbone:
 The previous app-layer gap was that the deployment only had:
 
 - `TeensyLink`
-- `PingResponder`
+- a minimal ping responder
 
-That transition is now underway. The current deployment includes `TeensyTransportService` and additional mission/service components; keep using this direction:
+That transition is now complete for the RF MVP path. The current deployment uses `TeensyTransportService` and mission/service components; keep using this direction:
 
 - keep `TeensyTransportService` as the active transport-service component
-- replace `PingResponder` with real mission-layer and subsystem-service components
+- keep `MissionManager.PING` as the smoke-test command path
 - add service and adapter structure before deeper hardware expansion
 
 ## Recommended Near-Term Build Order
@@ -236,8 +242,9 @@ That transition is now underway. The current deployment includes `TeensyTranspor
 4. `EpsService`
 5. `AdcsService`
 6. `GpsService`
-7. `ScienceManager`
-8. `SoHManager`
+7. `ThermalService`
+8. `ScienceManager`
+9. `SoHManager`
 
 ## Summary
 

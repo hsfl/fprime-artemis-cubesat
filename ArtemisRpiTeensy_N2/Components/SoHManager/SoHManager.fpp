@@ -12,7 +12,7 @@ module Components {
         sync input port run: Svc.Sched
 
         @ Status inputs from subsystem and transport services
-        sync input port statusIn: [7] Svc.Ping
+        sync input port statusIn: [8] Svc.Ping
 
         @ Emit a health snapshot event
         async command EMIT_SOH_SNAPSHOT
@@ -35,6 +35,9 @@ module Components {
         @ Last storage health key
         telemetry StorageHealth: U32
 
+        @ Last thermal health key
+        telemetry ThermalHealth: U32
+
         @ Last comms health key
         telemetry CommsHealth: U32
 
@@ -49,9 +52,10 @@ module Components {
             adcs: U32,
             gps: U32,
             storage: U32,
+            thermal: U32,
             comms: U32,
             transport: U32
-        ) severity activity high format "SOH overall={} eps={} payload={} adcs={} gps={} storage={} comms={} transport={}"
+        ) severity activity high format "SOH overall={} eps={} payload={} adcs={} gps={} storage={} thermal={} comms={} transport={}"
 
         @ Port for requesting the current time
         time get port timeCaller

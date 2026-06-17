@@ -42,7 +42,7 @@ Current relay milestone:
 
 - `ArtemisRpiTeensy_N2/`
   - Active F' project (promoted in place from starter sample)
-  - Includes deployment and custom components such as `MissionManager`, `ScienceManager`, `SohManager`, `TeensyTransportService`, `CommsAdapter_TeensyRfm23`, and `PingResponder`
+  - Includes deployment and custom components such as `MissionManager`, `ScienceManager`, `SoHManager`, `ThermalService`, `TeensyTransportService`, and `CommsAdapter_TeensyRfm23`
 - `ArtemisTeensy_N2_Baremetal/`
   - Satellite Teensy relay firmware workspace (Arduino CLI workflow)
 - `GDS_Teensy/`
@@ -108,7 +108,7 @@ Implemented:
 
 Not implemented yet:
 - Generic payload component connected to F'.
-- Full proxy components for PDU/GPS/IMU telemetry + commands.
+- Full EPS/PDU, thermal, GPS, and IMU telemetry + command adapter behavior.
 - Full uplink robustness (deterministic packet-boundary extraction and retry/ack strategy).
 - Full demo-state orchestration for `Base Mode` -> scheduled collection -> science downlink.
 - Ground-side science-data analysis/presentation workflow finalized for the judges' demo.

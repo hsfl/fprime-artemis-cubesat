@@ -17,9 +17,10 @@ class SoHManager final : public SoHManagerComponentBase {
         SLOT_ADCS = 2,
         SLOT_GPS = 3,
         SLOT_STORAGE = 4,
-        SLOT_COMMS = 5,
-        SLOT_TRANSPORT = 6,
-        SLOT_COUNT = 7,
+        SLOT_THERMAL = 5,
+        SLOT_COMMS = 6,
+        SLOT_TRANSPORT = 7,
+        SLOT_COUNT = 8,
     };
 
     void pingIn_handler(FwIndexType portNum, U32 key) override;

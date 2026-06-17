@@ -43,9 +43,10 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - Deployment uses Linux UART transport (`Drv.LinuxUartDriver`) on `/dev/serial0`.
 - Main runtime binary accepts `-d <uart_device>`.
 - MVP custom components in deployment:
-  - `Components/PingResponder`
-  - `Components/CommsAdapter_TeensyRfm23`
   - `Components/TeensyTransportService`
+  - `Components/MissionManager`
+  - `Components/ThermalService`
+  - `Components/CommsAdapter_TeensyRfm23`
 - Build status:
   - `fprime-util generate -f` passes
   - `fprime-util build` passes

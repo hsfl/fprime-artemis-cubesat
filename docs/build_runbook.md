@@ -68,7 +68,7 @@ Local Mac-only closed-loop emulation (no hardware) is documented in:
 1. Verify process starts without initialization assertion failures.
 2. Verify Teensy serial log prints relay-ready line.
 3. In GDS, issue `teensyTransportService.LINK_STATUS` and verify event/telemetry updates.
-4. In GDS, issue health ping checks and verify `PingResponder`, `MissionManager`, and `TeensyTransportService` participate.
+4. In GDS, issue `missionManager.PING` and verify the pong event/telemetry path.
 
 ## 7) Fault Handling Checks
 1. Disconnect UART cable while app is running and verify app process remains alive.

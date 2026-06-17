@@ -42,11 +42,13 @@ module ArtemisRpiTeensyDeployment {
     instance adcsService
     instance gpsService
     instance storageService
+    instance thermalService
     instance epsAdapterArtemis
     instance payloadAdapterN1Legacy
     instance adcsAdapterD2S2
     instance gpsAdapterArtemis
     instance commsAdapterTeensyRfm23
+    instance thermalAdapterArtemis
 
   # ----------------------------------------------------------------------
   # Pattern graph specifiers
@@ -137,6 +139,7 @@ module ArtemisRpiTeensyDeployment {
       # rateGroup2.RateGroupMemberOut[3] -> adcsService.run
       # rateGroup2.RateGroupMemberOut[4] -> gpsService.run
       # rateGroup2.RateGroupMemberOut[5] -> storageService.run
+      # rateGroup2.RateGroupMemberOut[6] -> thermalService.run
 
       # Rate group 3
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup3] -> rateGroup3.CycleIn
@@ -176,6 +179,9 @@ module ArtemisRpiTeensyDeployment {
       gpsService.adapterRequestOut -> gpsAdapterArtemis.requestIn
       gpsAdapterArtemis.statusOut -> gpsService.adapterStatusIn
 
+      thermalService.adapterRequestOut -> thermalAdapterArtemis.requestIn
+      thermalAdapterArtemis.statusOut -> thermalService.adapterStatusIn
+
       commsManager.adapterRequestOut -> commsAdapterTeensyRfm23.requestIn
       commsAdapterTeensyRfm23.statusOut[0] -> commsManager.adapterStatusIn
       commsAdapterTeensyRfm23.statusOut[1] -> teensyTransportService.adapterStatusIn
@@ -191,8 +197,9 @@ module ArtemisRpiTeensyDeployment {
       adcsService.sohStatusOut -> sohManager.statusIn[2]
       gpsService.sohStatusOut -> sohManager.statusIn[3]
       storageService.sohStatusOut -> sohManager.statusIn[4]
-      commsManager.sohStatusOut -> sohManager.statusIn[5]
-      teensyTransportService.sohStatusOut -> sohManager.statusIn[6]
+      thermalService.sohStatusOut -> sohManager.statusIn[5]
+      commsManager.sohStatusOut -> sohManager.statusIn[6]
+      teensyTransportService.sohStatusOut -> sohManager.statusIn[7]
     }
 
     connections ArtemisRpiTeensyDeployment {
