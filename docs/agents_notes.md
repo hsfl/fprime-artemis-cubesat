@@ -387,6 +387,8 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   - `external/pdu-firmware/` can be a submodule pointing at the ATSAME51 PDU firmware repo, including firmware implementation, ICD, protocol header, Teensy/bench tooling, and notes.
   - `external/satnogs-radio/` can be added once the SatNOGS dev-board repo is real and should include radio firmware/protocol, MTU/data-budget constraints, setup scripts, and bench/test tools.
   - `external/payload/` can be added once the real payload-board repo exists. Until then, keep the RPi-hosted emulated payload adapter local to this repo.
+  - `external/epscorc3m/` is the most up-to-date full Artemis CubeSat baremetal demo reference currently pinned in this repo. It documents many practical footguns, but it is not the target F Prime architecture.
+  - `external/artemis-cubesat-examples/` is reference-only legacy code from the original general-purpose low-cost Artemis 1U CubeSat bus. Use it as subsystem sample code, not as mission software to copy.
   - `external/<other-subsystem>/` can be added later for other subsystem firmware/tools when the F' side needs implementation context.
 - Rationale:
   - F' component and adapter work often needs actual subsystem behavior, not just enum values or packet constants.
@@ -402,6 +404,9 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   - Do not add a submodule for only constants, copied headers, one markdown doc, or speculative future code.
   - Current priority is PDU first, SatNOGS second, payload only when real, and ADCS/GPS/IMU/thermal only if they become standalone firmware/tooling repos.
   - For the base case, default to RFM23BP and RPi-emulated payload, keep data products slim, and increase data budget only after SatNOGS hardware is available and validated.
+- Reference-code warning:
+  - Legacy Artemis examples often assume Teensy as the main flight computer, while this repo uses Raspberry Pi as the host for the F Prime deployment and Teensy only for bridge/control duties.
+  - Treat handwritten baremetal examples as useful interface references but review carefully for bugs, memory-safety issues, and mission mismatch before adapting anything.
 
 ## Primary TODO
 
