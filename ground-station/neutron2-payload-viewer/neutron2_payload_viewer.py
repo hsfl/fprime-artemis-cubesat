@@ -92,6 +92,37 @@ HTML = """<!doctype html>
       font-size: 16px;
       letter-spacing: 0;
     }
+    .docs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .docs h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: #20313b;
+    }
+    .docs p {
+      margin: 0 0 8px;
+      color: #40505b;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    dl {
+      margin: 0;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      column-gap: 10px;
+      row-gap: 7px;
+      font-size: 13px;
+    }
+    dt { font-weight: 700; color: #20313b; }
+    dd { margin: 0; color: #40505b; line-height: 1.35; }
+    .status-note {
+      flex-basis: 100%;
+      color: #5d6b76;
+      font-size: 12px;
+    }
     svg {
       width: 100%;
       height: 340px;
@@ -117,6 +148,7 @@ HTML = """<!doctype html>
     @media (max-width: 760px) {
       main { padding: 16px; }
       .grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .docs { grid-template-columns: 1fr; }
       header h1 { font-size: 21px; }
     }
   </style>
@@ -131,6 +163,7 @@ HTML = """<!doctype html>
       <select id="dataset"></select>
       <button id="refresh">Refresh</button>
       <span id="status" class="status"></span>
+      <span id="watcher" class="status-note">Watching for the newest downlinked payload CSV.</span>
     </div>
     <section class="grid" id="metrics"></section>
     <section class="panel">
@@ -144,6 +177,34 @@ HTML = """<!doctype html>
         <tbody id="rows"></tbody>
       </table>
     </section>
+    <section class="panel">
+      <h2>Data Notes</h2>
+      <div class="docs">
+        <div>
+          <h3>CSV Fields</h3>
+          <dl>
+            <dt>t_s</dt><dd>Mission-elapsed seconds at the start of the integration window.</dd>
+            <dt>counts</dt><dd>Neutron events counted during that one-second window.</dd>
+            <dt>flag</dt><dd>BG means background. SAA means simulated South Atlantic Anomaly pass.</dd>
+          </dl>
+        </div>
+        <div>
+          <h3>Summary Metrics</h3>
+          <dl>
+            <dt>Rows</dt><dd>Number of one-second samples in this capture.</dd>
+            <dt>Total</dt><dd>All neutron counts summed across the capture.</dd>
+            <dt>Mean</dt><dd>Average counts per one-second sample.</dd>
+            <dt>SAA/BG Mean</dt><dd>Average count rate split by anomaly and background windows.</dd>
+          </dl>
+        </div>
+        <div>
+          <h3>How To Read It</h3>
+          <p>Red chart bands mark SAA rows, where elevated counts are expected. Blue line movement outside red bands is background variation.</p>
+          <p>This demo data is synthetic and order-of-magnitude realistic, not a calibrated detector product. The viewer automatically opens a newer CSV when downlink or capture produces one.</p>
+          <p>Capture files are run artifacts in the OS temp folder. Do not rely on automatic cleanup; archive or delete old files as needed, or run StorageService.REMOVE_OLD_DATASETS(confirm=1).</p>
+        </div>
+      </div>
+    </section>
   </main>
   <script>
     const datasetSelect = document.getElementById("dataset");
@@ -152,6 +213,9 @@ HTML = """<!doctype html>
     const metricsEl = document.getElementById("metrics");
     const chartEl = document.getElementById("chart");
     const rowsEl = document.getElementById("rows");
+    const watcherEl = document.getElementById("watcher");
+    let activeSource = "";
+    let newestPath = "";
 
     function metric(label, value) {
       return `<div class="metric"><div class="label">${label}</div><div class="value">${value}</div></div>`;
@@ -194,20 +258,32 @@ HTML = """<!doctype html>
     async function loadDatasets() {
       const res = await fetch("/api/datasets");
       const data = await res.json();
+      const selectedPath = datasetSelect.selectedOptions[0]?.dataset.path || "";
+      const latestPath = data.datasets[0]?.path || "";
+      const openedNewLatest = latestPath && latestPath !== newestPath;
       datasetSelect.innerHTML = "";
       data.datasets.forEach((item, index) => {
         const option = document.createElement("option");
         option.value = item.id;
+        option.dataset.path = item.path;
         option.textContent = item.label;
-        if (index === 0) option.selected = true;
         datasetSelect.appendChild(option);
       });
+      newestPath = latestPath;
+      const targetPath = openedNewLatest ? latestPath : selectedPath;
+      const target = Array.from(datasetSelect.options).find(option => option.dataset.path === targetPath);
+      if (target) {
+        target.selected = true;
+      } else if (datasetSelect.options.length) {
+        datasetSelect.options[0].selected = true;
+      }
       statusEl.textContent = data.cleanup_hint || (data.datasets.length ? "" : "No CSV products found.");
+      return openedNewLatest;
     }
 
-    async function loadDataset() {
+    async function loadDataset({silent = false} = {}) {
       if (!datasetSelect.value) return;
-      statusEl.textContent = "Loading...";
+      if (!silent) statusEl.textContent = "Loading...";
       const res = await fetch(`/api/dataset?id=${encodeURIComponent(datasetSelect.value)}`);
       const data = await res.json();
       if (data.error) {
@@ -234,15 +310,27 @@ HTML = """<!doctype html>
           <td>${r.counts}</td>
         </tr>
       `).join("");
+      activeSource = data.source;
       statusEl.textContent = data.source;
     }
 
+    async function refreshFromDisk({manual = false} = {}) {
+      const openedNewLatest = await loadDatasets();
+      const selectedPath = datasetSelect.selectedOptions[0]?.dataset.path || "";
+      if (manual || openedNewLatest || selectedPath !== activeSource) {
+        await loadDataset({silent: !manual});
+      }
+      watcherEl.textContent = openedNewLatest
+        ? "Opened newest downlinked payload CSV."
+        : "Watching for the newest downlinked payload CSV.";
+    }
+
     refreshButton.addEventListener("click", async () => {
-      await loadDatasets();
-      await loadDataset();
+      await refreshFromDisk({manual: true});
     });
-    datasetSelect.addEventListener("change", loadDataset);
-    loadDatasets().then(loadDataset);
+    datasetSelect.addEventListener("change", () => loadDataset());
+    refreshFromDisk({manual: true});
+    setInterval(() => refreshFromDisk(), 3000);
   </script>
 </body>
 </html>
@@ -357,7 +445,12 @@ class Handler(BaseHTTPRequestHandler):
         return {
             "cleanup_hint": cleanup_hint(paths, self.server.args.capture_dir),
             "datasets": [
-                {"id": str(index), "label": f"{path.name} ({path.parent})"}
+                {
+                    "id": str(index),
+                    "label": f"{path.name} ({path.parent})",
+                    "path": str(path),
+                    "mtime": path.stat().st_mtime,
+                }
                 for index, path in enumerate(paths)
             ]
         }
