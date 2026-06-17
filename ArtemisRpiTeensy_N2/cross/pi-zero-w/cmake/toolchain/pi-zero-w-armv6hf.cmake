@@ -15,7 +15,7 @@ set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 include("${CMAKE_CURRENT_LIST_DIR}/../../../../lib/fprime/cmake/toolchain/helpers/arm-linux-base.cmake")
 
 set(PI_ZERO_W_CPU_FLAGS "-marm -mcpu=arm1176jzf-s -mfpu=vfp -mfloat-abi=hard")
-set(PI_ZERO_W_RUNTIME_FLAGS "")
+set(PI_ZERO_W_LINK_FLAGS "")
 
 if(DEFINED CMAKE_SYSROOT)
   file(GLOB PI_ZERO_W_GCC_RUNTIME_CANDIDATES LIST_DIRECTORIES true "${CMAKE_SYSROOT}/usr/lib/gcc/arm-linux-gnueabihf/*")
@@ -28,16 +28,27 @@ if(DEFINED CMAKE_SYSROOT)
 
   message(STATUS "Pi Zero W GCC runtime dir: ${PI_ZERO_W_GCC_RUNTIME_DIR}")
 
-  string(JOIN " " PI_ZERO_W_RUNTIME_FLAGS
-      "-B${PI_ZERO_W_GCC_RUNTIME_DIR}"
+  # Stage only .o/.a files from the sysroot gcc dir into a clean directory
+  # so -B finds the ARMv6 crt startup objects without discovering ARM-native
+  # build-tool executables (cc1, collect2) that trigger qemu on the host.
+  set(PI_ZERO_W_STAGED_GCC_DIR "${CMAKE_BINARY_DIR}/_pi-zero-w-gcc-runtime")
+  file(MAKE_DIRECTORY "${PI_ZERO_W_STAGED_GCC_DIR}")
+  file(GLOB PI_ZERO_W_GCC_OBJ_FILES "${PI_ZERO_W_GCC_RUNTIME_DIR}/*.o" "${PI_ZERO_W_GCC_RUNTIME_DIR}/*.a")
+  foreach(_f IN LISTS PI_ZERO_W_GCC_OBJ_FILES)
+    get_filename_component(_fname "${_f}" NAME)
+    file(CREATE_LINK "${_f}" "${PI_ZERO_W_STAGED_GCC_DIR}/${_fname}" COPY_ON_ERROR SYMBOLIC)
+  endforeach()
+
+  string(JOIN " " PI_ZERO_W_LINK_FLAGS
+      "-B${PI_ZERO_W_STAGED_GCC_DIR}"
       "-B${CMAKE_SYSROOT}/usr/lib/arm-linux-gnueabihf"
       "-B${CMAKE_SYSROOT}/lib/arm-linux-gnueabihf"
       "-Wl,-rpath-link,${CMAKE_SYSROOT}/usr/lib/arm-linux-gnueabihf"
       "-Wl,-rpath-link,${CMAKE_SYSROOT}/lib/arm-linux-gnueabihf")
 endif()
 
-string(APPEND CMAKE_C_FLAGS_INIT " ${PI_ZERO_W_CPU_FLAGS} ${PI_ZERO_W_RUNTIME_FLAGS}")
-string(APPEND CMAKE_CXX_FLAGS_INIT " ${PI_ZERO_W_CPU_FLAGS} ${PI_ZERO_W_RUNTIME_FLAGS}")
+string(APPEND CMAKE_C_FLAGS_INIT " ${PI_ZERO_W_CPU_FLAGS}")
+string(APPEND CMAKE_CXX_FLAGS_INIT " ${PI_ZERO_W_CPU_FLAGS}")
 string(APPEND CMAKE_ASM_FLAGS_INIT " ${PI_ZERO_W_CPU_FLAGS}")
-string(APPEND CMAKE_EXE_LINKER_FLAGS_INIT " ${PI_ZERO_W_CPU_FLAGS} ${PI_ZERO_W_RUNTIME_FLAGS}")
-string(APPEND CMAKE_SHARED_LINKER_FLAGS_INIT " ${PI_ZERO_W_CPU_FLAGS} ${PI_ZERO_W_RUNTIME_FLAGS}")
+string(APPEND CMAKE_EXE_LINKER_FLAGS_INIT " ${PI_ZERO_W_CPU_FLAGS} ${PI_ZERO_W_LINK_FLAGS}")
+string(APPEND CMAKE_SHARED_LINKER_FLAGS_INIT " ${PI_ZERO_W_CPU_FLAGS} ${PI_ZERO_W_LINK_FLAGS}")
