@@ -18,13 +18,14 @@ IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for an
 
 ## Agent Skills
 
-Project skills live in `.claude/skills/` and are auto-loaded by Claude Code. Codex-style agents (which read AGENTS.md but don't auto-load skills) should consult these files directly:
+Project skills are shared through `.agents/skills/` for Codex-style agents and `.claude/skills/` for Claude Code. Keep these skill folders symlinked so both agent surfaces use the same skill files. Codex-style agents should consult `.agents/skills/` directly; Claude Code can auto-load from `.claude/skills/`.
 
 | Skill | File | Use when... |
 |-------|------|-------------|
-| `fprime-swe` | [`.claude/skills/fprime-swe/SKILL.md`](.claude/skills/fprime-swe/SKILL.md) | Developing F' components, ports, topologies, running builds, or using fprime-util |
-| `fprime-docs-search` | [`.claude/skills/fprime-docs-search/SKILL.md`](.claude/skills/fprime-docs-search/SKILL.md) | Looking up F' framework docs — check repo-local docs at `ArtemisRpiTeensy_N2/lib/fprime/docs` first |
-| `fprime-cross-compilation` | [`.claude/skills/fprime-cross-compilation/SKILL.md`](.claude/skills/fprime-cross-compilation/SKILL.md) | Cross-compiling for ARM targets; Pi Zero W ARMv6 landmine documented here |
+| `fprime-swe` | [`.agents/skills/fprime-swe/SKILL.md`](.agents/skills/fprime-swe/SKILL.md) | Developing F' components, ports, topologies, running builds, or using fprime-util |
+| `fprime-docs-search` | [`.agents/skills/fprime-docs-search/SKILL.md`](.agents/skills/fprime-docs-search/SKILL.md) | Looking up F' framework docs — check repo-local docs at `ArtemisRpiTeensy_N2/lib/fprime/docs` first |
+| `fprime-cross-compilation` | [`.agents/skills/fprime-cross-compilation/SKILL.md`](.agents/skills/fprime-cross-compilation/SKILL.md) | Cross-compiling for ARM targets; Pi Zero W ARMv6 landmine documented here |
+| `student-git-handoff` | [`.agents/skills/student-git-handoff/SKILL.md`](.agents/skills/student-git-handoff/SKILL.md) | Helping non-technical students use GitHub feature branches, commits, pushes, and pull requests with Software Dev Lead-approved base branches |
 
 ## F' Agent Usage Guide
 

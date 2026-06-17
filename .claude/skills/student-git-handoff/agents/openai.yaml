@@ -1,0 +1,4 @@
+interface:
+  display_name: "Student Git Handoff"
+  short_description: "Safe GitHub branch, commit, push, and PR handoff"
+  default_prompt: "Use $student-git-handoff to help a student prepare a GitHub feature branch, commit, push, and pull request for review."
