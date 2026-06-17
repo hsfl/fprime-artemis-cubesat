@@ -5,3 +5,7 @@
 	path = external/artemis-pdu
 	url = https://github.com/hsfl/artemis-cubesat-pdu-firmware.git
 	branch = codex/pdu-protocol-refactor
+[submodule "external/epscorc3m"]
+	path = external/epscorc3m
+	url = https://github.com/hsfl/epscor-c3m-payload.git
+	branch = master
