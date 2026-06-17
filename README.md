@@ -115,6 +115,6 @@ Not implemented yet:
 
 ## Notes
 
-- Use `docs/FPRIME_ARTEMIS_CUBESAT.md` for the original implementation plan.
+- Use `docs/archive/` for historical implementation plans, sizing memos, and RF debug notes.
 - Use `docs/build_runbook.md` for operational command sequence.
 - Use `docs/GDS_TEENSY_RUNBOOK.md` for ground Teensy + UART GDS workflow and troubleshooting.
