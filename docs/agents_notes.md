@@ -45,6 +45,8 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - MVP custom components in deployment:
   - `Components/TeensyTransportService`
   - `Components/MissionManager`
+  - `Components/PayloadService`
+  - `Components/PayloadAdapter_NeutronSim`
   - `Components/ThermalService`
   - `Components/CommsAdapter_TeensyRfm23`
 - Build status:
@@ -413,7 +415,7 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 1. Record first successful non-crashing runtime on `/dev/serial0` using the real UART path.
 2. Run full HIL end-to-end tests with real `fprime-gds` UART traffic over RF (both directions).
 3. Implement the minimum demo-state flow for `Base Mode` -> scheduled data collection -> science-data downlink.
-4. Decide and document the payload-data source for the demo: real payload path vs simulated temporary data.
+4. Extend the neutron simulator product path from product-size telemetry into the selected downlink/review path.
 5. Keep `fprime-gds` as the live MVP demo ground interface and treat `Yamcs` as the post-MVP target presentation/analysis stack.
 6. Add minimal segment ACK/retry for RF relay reliability after transparent raw-byte path is stable.
    - MVP target: command uplink delivery confidence and reduced telemetry burst loss during demo.
@@ -428,6 +430,8 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 
 - F' project root:
   - `ArtemisRpiTeensy_N2`
+- RPi-hosted neutron payload simulator:
+  - `external/payload-neutron-simulation`
 - Satellite Teensy project:
   - `ArtemisTeensy_N2_Baremetal`
 - Ground Teensy project:

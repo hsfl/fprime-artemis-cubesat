@@ -35,6 +35,9 @@ module Components {
         @ Start a payload collection by collection ID
         async command START_PAYLOAD_COLLECTION(collectionId: U32)
 
+        @ Capture neutron samples for the requested duration in seconds
+        async command SCIENCE_CAPTURE(durationSeconds: U32)
+
         @ Enable or disable simulated payload mode. 0=real, nonzero=simulated.
         async command SET_PAYLOAD_SIM_MODE(enable: U32)
 
@@ -43,6 +46,9 @@ module Components {
 
         @ Last collection ID requested
         telemetry LastCollectionId: U32
+
+        @ Last requested capture duration in seconds
+        telemetry LastCaptureDurationSeconds: U32
 
         @ Configured sample count
         telemetry SampleCount: U32
@@ -67,6 +73,9 @@ module Components {
 
         @ Payload simulation mode event
         event PayloadSimModeChanged(enable: U32) severity activity high format "Payload sim mode={}"
+
+        @ Payload science capture event
+        event PayloadScienceCaptureRequested(durationSeconds: U32) severity activity high format "Payload science capture requested duration={}s"
 
         @ Port for requesting the current time
         time get port timeCaller

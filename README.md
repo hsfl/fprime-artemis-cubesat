@@ -105,9 +105,9 @@ Implemented:
 - Ground Teensy relay with transparent raw-byte USB tunnel mode and RF reassembly.
 - Ground Teensy simple uplink path (USB raw byte burst -> RF segmentation).
 - Updated UART/RF transport contract documentation.
+- RPi-hosted neutron payload simulator wired through `PayloadService` and `PayloadAdapter_NeutronSim`.
 
 Not implemented yet:
-- Generic payload component connected to F'.
 - Full EPS/PDU, thermal, GPS, and IMU telemetry + command adapter behavior.
 - Full uplink robustness (deterministic packet-boundary extraction and retry/ack strategy).
 - Full demo-state orchestration for `Base Mode` -> scheduled collection -> science downlink.

@@ -1,0 +1,108 @@
+# Neutron 2 Payload Viewer
+
+BLUF: this is the ground-side GUI for reconstructed Neutron 2 neutron-count payload CSV files.
+
+It is intentionally separate from `fprime-gds`:
+
+- `fprime-gds` shows commands, events, telemetry, and transfer progress.
+- The payload receiver/downlink helper reconstructs the opaque payload blob into a CSV file.
+- This viewer opens that CSV and gives operators a quick science-data review screen.
+
+## Run
+
+From the repo root:
+
+```bash
+python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py
+```
+
+On Windows PowerShell:
+
+```powershell
+py -3 ground-station\neutron2-payload-viewer\neutron2_payload_viewer.py
+```
+
+Default behavior:
+
+- scans the OS temp capture directory:
+  - macOS/Linux: `/tmp/neutron_payload_captures`
+  - Windows: `%TEMP%\neutron_payload_captures`
+- opens `http://127.0.0.1:8062`
+- shows newest CSV first
+- warns when old downlink CSVs are accumulating
+
+Open one file directly:
+
+```bash
+python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
+  --file /path/to/reconstructed/neutron_capture.csv
+```
+
+Windows:
+
+```powershell
+py -3 ground-station\neutron2-payload-viewer\neutron2_payload_viewer.py `
+  --file C:\path\to\reconstructed\neutron_capture.csv
+```
+
+Run without opening a browser automatically:
+
+```bash
+python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py --no-open
+```
+
+Windows:
+
+```powershell
+py -3 ground-station\neutron2-payload-viewer\neutron2_payload_viewer.py --no-open
+```
+
+## What Operators See
+
+- rows captured
+- total neutron counts
+- mean and max count rate
+- SAA row count and background row count
+- SAA mean versus background mean
+- counts-vs-time plot with SAA intervals highlighted
+- first rows table for sanity checking the file
+
+## File Format
+
+The viewer expects a CSV with:
+
+```csv
+t_s,counts,flag
+0,8,SAA
+1,8,SAA
+```
+
+This matches `external/payload-neutron-simulation/neutron_data.csv` and the capture files emitted by the RPi-hosted simulator.
+
+## Compatibility
+
+- macOS: Python 3.10+ with Safari/Chrome/Firefox.
+- Windows: Python 3.10+ with Edge/Chrome/Firefox.
+- Dependencies: Python standard library only. No `pip install` step.
+- Network use: local loopback only, default `127.0.0.1:8062`.
+
+## File Cleanup
+
+Downlink/reconstructed CSVs should be treated as run artifacts. The payload
+simulator allocates incrementing filenames and will not overwrite an existing
+CSV. If a base filename already exists, the next file becomes:
+
+```text
+neutron_capture_YYYYMMDDTHHMMSSZ_00000_00600_001.csv
+neutron_capture_YYYYMMDDTHHMMSSZ_00000_00600_002.csv
+```
+
+When the folder gets crowded, the viewer shows a cleanup notice. For simulator
+products on the RPi, operators can use:
+
+```text
+StorageService.REMOVE_OLD_DATASETS(confirm=1)
+```
+
+For ground laptop files, archive or delete old CSVs from the capture directory
+after the demo/test run.

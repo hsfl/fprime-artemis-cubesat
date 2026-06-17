@@ -26,8 +26,17 @@ module Components {
         @ Trigger immediate collection
         async command START_COLLECTION
 
+        @ Set the capture duration used by scheduled collections
+        async command CONFIGURE_CAPTURE_DURATION(durationSeconds: U32)
+
+        @ Trigger immediate collection for the requested duration
+        async command SCIENCE_CAPTURE(durationSeconds: U32)
+
         @ Pending delay before collection
         telemetry PendingDelaySeconds: U32
+
+        @ Capture duration in seconds used for scheduled collection
+        telemetry CaptureDurationSeconds: U32
 
         @ Number of completed collections
         telemetry CollectionCount: U32
@@ -37,6 +46,9 @@ module Components {
 
         @ Product handoff event
         event ScienceProductReady(productSize: U32) severity activity high format "Science product ready size={}"
+
+        @ Capture duration configuration event
+        event CaptureDurationConfigured(durationSeconds: U32) severity activity high format "Science capture duration configured {}s"
 
         @ Port for requesting the current time
         time get port timeCaller

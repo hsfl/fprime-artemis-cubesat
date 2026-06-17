@@ -16,8 +16,11 @@ class ScienceManager final : public ScienceManagerComponentBase {
     void requestIn_handler(FwIndexType portNum, U32 key) override;
     void payloadStatusIn_handler(FwIndexType portNum, U32 key) override;
     void START_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+    void CONFIGURE_CAPTURE_DURATION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
+    void SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
 
     U32 m_pendingDelaySeconds;
+    U32 m_captureDurationSeconds;
     U32 m_collectionCount;
 };
 

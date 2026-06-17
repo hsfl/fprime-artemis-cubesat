@@ -44,7 +44,7 @@ module ArtemisRpiTeensyDeployment {
     instance storageService
     instance thermalService
     instance epsAdapterArtemis
-    instance payloadAdapterN1Legacy
+    instance payloadAdapterNeutronSim
     instance adcsAdapterD2S2
     instance gpsAdapterArtemis
     instance commsAdapterTeensyRfm23
@@ -170,8 +170,8 @@ module ArtemisRpiTeensyDeployment {
       epsService.adapterRequestOut -> epsAdapterArtemis.requestIn
       epsAdapterArtemis.statusOut -> epsService.adapterStatusIn
 
-      payloadService.adapterRequestOut -> payloadAdapterN1Legacy.requestIn
-      payloadAdapterN1Legacy.statusOut -> payloadService.adapterStatusIn
+      payloadService.adapterRequestOut -> payloadAdapterNeutronSim.requestIn
+      payloadAdapterNeutronSim.statusOut -> payloadService.adapterStatusIn
 
       adcsService.adapterRequestOut -> adcsAdapterD2S2.requestIn
       adcsAdapterD2S2.statusOut -> adcsService.adapterStatusIn

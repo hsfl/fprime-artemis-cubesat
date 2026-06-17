@@ -18,10 +18,12 @@ class PayloadService final : public PayloadServiceComponentBase {
     void REQUEST_PAYLOAD_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void CONFIGURE_PAYLOAD_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 sampleCount, U32 periodMs) override;
     void START_PAYLOAD_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 collectionId) override;
+    void SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
     void SET_PAYLOAD_SIM_MODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 enable) override;
 
     U32 m_lastPayloadValue;
     U32 m_lastCollectionId;
+    U32 m_lastCaptureDurationSeconds;
     U32 m_sampleCount;
     U32 m_samplePeriodMs;
     U32 m_simModeEnabled;

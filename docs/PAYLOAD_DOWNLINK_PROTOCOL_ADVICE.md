@@ -184,7 +184,7 @@ Custom helper owns:
 - retry requests
 - file reconstruction
 - CRC verification
-- image/file display
+- Neutron 2 CSV display using `ground-station/neutron2-payload-viewer/`
 
 Pros:
 
@@ -410,4 +410,3 @@ Use F Prime to command the downlink and report progress.
 Use a custom payload protocol to move the file.
 Use a helper/viewer to reconstruct and display the file.
 ```
-

@@ -6,6 +6,7 @@ PayloadService::PayloadService(const char* const compName)
     : PayloadServiceComponentBase(compName),
       m_lastPayloadValue(0),
       m_lastCollectionId(0),
+      m_lastCaptureDurationSeconds(600),
       m_sampleCount(1),
       m_samplePeriodMs(1000),
       m_simModeEnabled(1),
@@ -27,6 +28,7 @@ void PayloadService::run_handler(FwIndexType portNum, U32 context) {
     }
     this->tlmWrite_LastPayloadValue(this->m_lastPayloadValue);
     this->tlmWrite_LastCollectionId(this->m_lastCollectionId);
+    this->tlmWrite_LastCaptureDurationSeconds(this->m_lastCaptureDurationSeconds);
     this->tlmWrite_SampleCount(this->m_sampleCount);
     this->tlmWrite_SamplePeriodMs(this->m_samplePeriodMs);
     this->tlmWrite_SimModeEnabled(this->m_simModeEnabled);
@@ -36,6 +38,7 @@ void PayloadService::run_handler(FwIndexType portNum, U32 context) {
 void PayloadService::requestIn_handler(FwIndexType portNum, U32 key) {
     static_cast<void>(portNum);
     this->m_lastCollectionId = key;
+    this->m_lastCaptureDurationSeconds = key;
     this->log_ACTIVITY_HI_PayloadCollectionForwarded(key);
     if (this->isConnected_adapterRequestOut_OutputPort(0)) {
         this->adapterRequestOut_out(0, key);
@@ -55,9 +58,9 @@ void PayloadService::adapterStatusIn_handler(FwIndexType portNum, U32 key) {
 }
 
 void PayloadService::REQUEST_PAYLOAD_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    if (this->isConnected_adapterRequestOut_OutputPort(0)) {
-        this->adapterRequestOut_out(0, this->m_serviceHeartbeat + 1);
-    }
+    this->tlmWrite_LastPayloadValue(this->m_lastPayloadValue);
+    this->tlmWrite_LastCollectionId(this->m_lastCollectionId);
+    this->tlmWrite_LastCaptureDurationSeconds(this->m_lastCaptureDurationSeconds);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
@@ -78,6 +81,15 @@ void PayloadService::START_PAYLOAD_COLLECTION_cmdHandler(FwOpcodeType opCode, U3
     this->log_ACTIVITY_HI_PayloadCollectionForwarded(collectionId);
     if (this->isConnected_adapterRequestOut_OutputPort(0)) {
         this->adapterRequestOut_out(0, collectionId);
+    }
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void PayloadService::SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) {
+    this->m_lastCaptureDurationSeconds = durationSeconds;
+    this->log_ACTIVITY_HI_PayloadScienceCaptureRequested(durationSeconds);
+    if (this->isConnected_adapterRequestOut_OutputPort(0)) {
+        this->adapterRequestOut_out(0, durationSeconds);
     }
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }

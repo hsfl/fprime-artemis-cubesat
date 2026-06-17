@@ -122,7 +122,7 @@ module ArtemisRpiTeensyDeployment {
 
   instance epsAdapterArtemis: Components.EpsAdapter_Artemis base id 0x10020000
 
-  instance payloadAdapterN1Legacy: Components.PayloadAdapter_N1Legacy base id 0x10021000
+  instance payloadAdapterNeutronSim: Components.PayloadAdapter_NeutronSim base id 0x10021000
 
   instance adcsAdapterD2S2: Components.AdcsAdapter_D2S2 base id 0x10022000
 
