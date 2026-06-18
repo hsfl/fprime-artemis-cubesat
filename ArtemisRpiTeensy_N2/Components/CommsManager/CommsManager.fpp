@@ -23,6 +23,9 @@ module Components {
         @ Downlink request output to storage
         output port downlinkRequestOut: Components.ScienceDownlinkRequest
 
+        @ Generic payload downlink request output
+        output port payloadDownlinkRequestOut: Svc.Ping
+
         @ Adapter request output
         output port adapterRequestOut: Svc.Ping
 

@@ -43,6 +43,7 @@ module ArtemisRpiTeensyDeployment {
     instance gpsService
     instance storageService
     instance thermalService
+    instance payloadDownlinkManager
     instance epsAdapterArtemis
     instance payloadAdapterNeutronSim
     instance adcsAdapterD2S2
@@ -109,6 +110,10 @@ module ArtemisRpiTeensyDeployment {
       ComCcsds.comStub.drvSendOut -> uartChannelMux.ccsdsSendIn
       uartChannelMux.drvSendOut   -> comDriver.$send
       comDriver.ready         -> ComCcsds.comStub.drvConnected
+
+      # Channel 1 carries generic payload blob packets outside CCSDS.
+      uartChannelMux.payloadRecvOut -> payloadDownlinkManager.packetIn
+      payloadDownlinkManager.packetOut -> uartChannelMux.payloadSendIn
     }
 
     connections FileHandling_DataProducts {
@@ -131,11 +136,12 @@ module ArtemisRpiTeensyDeployment {
       rateGroup1.RateGroupMemberOut[4] -> ComCcsds.aggregator.timeout
       rateGroup1.RateGroupMemberOut[5] -> teensyTransportService.run
       rateGroup1.RateGroupMemberOut[6] -> missionManager.run
+      rateGroup1.RateGroupMemberOut[7] -> payloadDownlinkManager.run
       # HIL/default profile: keep demo-only managers off the periodic path unless
       # building with NEUTRON2_TOPOLOGY_PROFILE=local-demo.
-      # rateGroup1.RateGroupMemberOut[7] -> scienceManager.run
-      # rateGroup1.RateGroupMemberOut[8] -> sohManager.run
-      # rateGroup1.RateGroupMemberOut[9] -> commsManager.run
+      # rateGroup1.RateGroupMemberOut[8] -> scienceManager.run
+      # rateGroup1.RateGroupMemberOut[9] -> sohManager.run
+      # rateGroup1.RateGroupMemberOut[10] -> commsManager.run
 
       # Rate group 2
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup2] -> rateGroup2.CycleIn
@@ -170,6 +176,7 @@ module ArtemisRpiTeensyDeployment {
       scienceManager.scienceProductOut -> storageService.requestIn
       storageService.downlinkReadyOut -> commsManager.scienceReadyIn
       commsManager.downlinkRequestOut -> storageService.downlinkRequestIn
+      commsManager.payloadDownlinkRequestOut -> payloadDownlinkManager.downlinkRequestIn
       scienceManager.missionModeOut -> missionManager.modeUpdateIn[0]
       commsManager.missionModeOut -> missionManager.modeUpdateIn[1]
     }

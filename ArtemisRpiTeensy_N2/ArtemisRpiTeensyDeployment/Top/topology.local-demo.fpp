@@ -43,6 +43,7 @@ module ArtemisRpiTeensyDeployment {
     instance gpsService
     instance storageService
     instance thermalService
+    instance payloadDownlinkManager
     instance epsAdapterArtemis
     instance payloadAdapterNeutronSim
     instance adcsAdapterD2S2
@@ -108,6 +109,10 @@ module ArtemisRpiTeensyDeployment {
       ComCcsds.comStub.drvSendOut -> uartChannelMux.ccsdsSendIn
       uartChannelMux.drvSendOut   -> comDriver.$send
       comDriver.ready         -> ComCcsds.comStub.drvConnected
+
+      # Channel 1 carries generic payload blob packets outside CCSDS.
+      uartChannelMux.payloadRecvOut -> payloadDownlinkManager.packetIn
+      payloadDownlinkManager.packetOut -> uartChannelMux.payloadSendIn
     }
 
     connections FileHandling_DataProducts {
@@ -133,8 +138,9 @@ module ArtemisRpiTeensyDeployment {
       # Local emulation branch: run the minimum laptop demo-state path.
       rateGroup1.RateGroupMemberOut[7] -> scienceManager.run
       rateGroup1.RateGroupMemberOut[8] -> sohManager.run
+      rateGroup1.RateGroupMemberOut[9] -> payloadDownlinkManager.run
       # Keep commsManager.run disabled here: it polls the adapter and can flood local GDS events.
-      # rateGroup1.RateGroupMemberOut[9] -> commsManager.run
+      # rateGroup1.RateGroupMemberOut[10] -> commsManager.run
 
       # Rate group 2
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup2] -> rateGroup2.CycleIn
@@ -170,6 +176,7 @@ module ArtemisRpiTeensyDeployment {
       scienceManager.scienceProductOut -> storageService.requestIn
       storageService.downlinkReadyOut -> commsManager.scienceReadyIn
       commsManager.downlinkRequestOut -> storageService.downlinkRequestIn
+      commsManager.payloadDownlinkRequestOut -> payloadDownlinkManager.downlinkRequestIn
       scienceManager.missionModeOut -> missionManager.modeUpdateIn[0]
       commsManager.missionModeOut -> missionManager.modeUpdateIn[1]
     }

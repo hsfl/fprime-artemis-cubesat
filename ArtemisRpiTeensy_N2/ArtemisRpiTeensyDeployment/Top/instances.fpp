@@ -101,6 +101,11 @@ module ArtemisRpiTeensyDeployment {
     stack size Default.STACK_SIZE \
     priority 29
 
+  instance payloadDownlinkManager: Components.PayloadDownlinkManager base id 0x10030000 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 28
+
   # ----------------------------------------------------------------------
   # Queued component instances
   # ----------------------------------------------------------------------

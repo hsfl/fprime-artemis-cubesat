@@ -60,6 +60,7 @@ namespace PingEntries {
     namespace ArtemisRpiTeensyDeployment_gpsService {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_storageService {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_thermalService {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_payloadDownlinkManager {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_epsAdapterArtemis {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_payloadAdapterNeutronSim {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_adcsAdapterD2S2 {enum { WARN = 3, FATAL = 5 };}
