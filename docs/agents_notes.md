@@ -44,7 +44,9 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - `UartChannelMux` wraps/unwraps the single Pi <-> satellite Teensy UART into tagged channels.
 - Main runtime binary accepts `-d <uart_device>`.
 - MVP custom components in deployment:
+  - `Components/LinkCfg`
   - `Components/UartChannelMux`
+  - `Components/PayloadDownlinkManager`
   - `Components/TeensyTransportService`
   - `Components/MissionManager`
   - `Components/PayloadService`
