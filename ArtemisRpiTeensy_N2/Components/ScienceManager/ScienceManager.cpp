@@ -25,6 +25,9 @@ void ScienceManager::run_handler(FwIndexType portNum, U32 context) {
             if (this->isConnected_payloadRequestOut_OutputPort(0)) {
                 this->payloadRequestOut_out(0, this->m_captureDurationSeconds);
             }
+            if (this->isConnected_missionModeOut_OutputPort(0)) {
+                this->missionModeOut_out(0, Components::MissionMode::COLLECTING, this->m_captureDurationSeconds);
+            }
         }
     }
 
@@ -33,18 +36,21 @@ void ScienceManager::run_handler(FwIndexType portNum, U32 context) {
     this->tlmWrite_CollectionCount(this->m_collectionCount);
 }
 
-void ScienceManager::requestIn_handler(FwIndexType portNum, U32 key) {
+void ScienceManager::requestIn_handler(FwIndexType portNum, U32 delaySeconds) {
     static_cast<void>(portNum);
-    this->m_pendingDelaySeconds = key;
-    this->log_ACTIVITY_HI_CollectionTriggered(key);
+    this->m_pendingDelaySeconds = delaySeconds;
+    this->log_ACTIVITY_HI_CollectionTriggered(delaySeconds);
 }
 
-void ScienceManager::payloadStatusIn_handler(FwIndexType portNum, U32 key) {
+void ScienceManager::payloadStatusIn_handler(FwIndexType portNum, U32 productBytes) {
     static_cast<void>(portNum);
     this->m_collectionCount += 1;
-    this->log_ACTIVITY_HI_ScienceProductReady(key);
+    this->log_ACTIVITY_HI_ScienceProductReady(productBytes);
     if (this->isConnected_scienceProductOut_OutputPort(0)) {
-        this->scienceProductOut_out(0, key);
+        this->scienceProductOut_out(0, productBytes);
+    }
+    if (this->isConnected_missionModeOut_OutputPort(0)) {
+        this->missionModeOut_out(0, Components::MissionMode::SCIENCE_READY, productBytes);
     }
 }
 
@@ -52,6 +58,9 @@ void ScienceManager::START_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq
     this->m_pendingDelaySeconds = 0;
     if (this->isConnected_payloadRequestOut_OutputPort(0)) {
         this->payloadRequestOut_out(0, this->m_captureDurationSeconds);
+    }
+    if (this->isConnected_missionModeOut_OutputPort(0)) {
+        this->missionModeOut_out(0, Components::MissionMode::COLLECTING, this->m_captureDurationSeconds);
     }
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
@@ -68,6 +77,9 @@ void ScienceManager::SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
     this->log_ACTIVITY_HI_CaptureDurationConfigured(durationSeconds);
     if (this->isConnected_payloadRequestOut_OutputPort(0)) {
         this->payloadRequestOut_out(0, durationSeconds);
+    }
+    if (this->isConnected_missionModeOut_OutputPort(0)) {
+        this->missionModeOut_out(0, Components::MissionMode::COLLECTING, durationSeconds);
     }
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }

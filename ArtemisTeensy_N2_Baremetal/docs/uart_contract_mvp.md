@@ -1,49 +1,80 @@
 # UART Contract (RPi <-> Satellite Teensy)
 
 ## Scope
-- Single UART link only.
+- Single Raspberry Pi <-> satellite Teensy UART link.
 - Fixed serial settings: **115200, 8N1**.
-- Nominal MVP/HIL mode is transparent raw-byte tunnel mode for RPi<->satellite-Teensy.
-- UART carries raw `ComCcsds` / space-packet bytes end-to-end between `fprime-gds` and the F' deployment.
-- The Teensy bridges do not add the custom wrapper in the nominal path; they only segment/reassemble bytes for RF transport.
-- `fprime-gds` must use `--framing-selection space-packet-space-data-link`.
-- Custom UART wrapper mode is legacy/fallback only.
+- The Pi UART is shared by tagged virtual channels. It is not a raw byte tunnel anymore.
+- `fprime-gds` still uses `--framing-selection space-packet-space-data-link`; channel framing is below the F Prime/GDS endpoint layer.
+- The satellite Teensy owns the local PDU UART and terminates PDU requests on channel 2.
 
-## Nominal Raw-Byte Tunnel
+## Pi <-> Satellite UART Frame
 
-Downlink:
-1. RPi F' deployment writes raw `ComCcsds` / space-packet bytes on `/dev/serial0`.
-2. Satellite Teensy batches raw UART bytes and sends them over RF using the segment format below.
-3. Ground Teensy reassembles RF segments and writes the same raw bytes to laptop USB serial.
-4. Laptop `fprime-gds` decodes those bytes with `space-packet-space-data-link` framing.
-
-Uplink:
-1. Laptop `fprime-gds` writes raw `ComCcsds` / space-packet bytes to ground Teensy USB serial.
-2. Ground Teensy batches raw USB bytes and sends them over RF using the segment format below.
-3. Satellite Teensy reassembles RF segments and writes the same raw bytes to RPi UART.
-4. The RPi F' deployment decodes the bytes at the `ComCcsds` endpoint.
-
-## Legacy/Fallback UART Frame Format
-
-This wrapper is retained only for fallback testing or legacy debugging. It is not mixed into the nominal MVP/HIL path.
+Every Pi <-> satellite Teensy frame uses:
 
 1. `magic0` (1 byte): `0xD4`
 2. `magic1` (1 byte): `0xC3`
-3. `length` (2 bytes LE): payload size (`1..220`)
-4. `payload` (`length` bytes)
-5. `crc16` (2 bytes LE): CRC-16/CCITT over payload bytes only
+3. `channel` (1 byte)
+4. `length` (2 bytes LE): payload size (`1..220`)
+5. `payload` (`length` bytes)
+6. `crc16` (2 bytes LE): CRC-16/CCITT over payload bytes only
 
-## RF Bridge Behavior
-- In nominal mode, both Teensy bridges treat UART/USB bytes as opaque raw bytes and do not parse endpoint framing.
-- In fallback wrapper mode, satellite Teensy strips the legacy UART wrapper and treats payload as opaque message bytes.
-- Messages are transmitted over RF23BP using segmentation when needed.
-- Ground Teensy reassembles segments back into original message bytes.
-- Ground Teensy outputs raw message bytes over USB UART to laptop GDS.
-- For simple uplink, ground Teensy packetizes raw USB byte bursts into RF messages (12 ms idle flush or 220-byte cap).
+## Channel Map
 
-### RF Segment Format
-Each RF packet has:
-1. `seg_magic` (1 byte): `0xA5`
+| Channel | Name | RF forwarded? | Purpose |
+|---:|---|---|---|
+| `0` | CCSDS | Yes, RF magic `0xA5` | Normal F Prime/GDS command and telemetry stream |
+| `1` | Payload | Yes, RF magic `0xA6` | Payload/science bulk packets, surfaced on ground Teensy payload USB when enabled |
+| `2` | Teensy local | No | Pi-side subsystem RPC to the satellite Teensy, currently PDU/EPS |
+
+Channel 2 must never be transmitted over RF. It is consumed by the satellite Teensy and answered back over the same Pi UART channel.
+
+## CCSDS Path (Channel 0)
+
+Downlink:
+1. F Prime `ComCcsds` writes CCSDS bytes to `UartChannelMux`.
+2. `UartChannelMux` wraps the bytes as channel 0 on `/dev/serial0`.
+3. Satellite Teensy unwraps channel 0 and sends it over RF using segment magic `0xA5`.
+4. Ground Teensy reassembles RF segments and writes raw CCSDS bytes to laptop USB serial.
+5. Laptop `fprime-gds` decodes those bytes with `space-packet-space-data-link`.
+
+Uplink:
+1. Laptop `fprime-gds` writes raw CCSDS bytes to ground Teensy USB serial.
+2. Ground Teensy sends them over RF using segment magic `0xA5`.
+3. Satellite Teensy reassembles RF segments and wraps them as channel 0 to the Pi.
+4. `UartChannelMux` unwraps channel 0 and forwards bytes to `ComCcsds`.
+
+## PDU/EPS Path (Channel 2)
+
+The Pi does not open a second PDU serial device. F Prime sends PDU work to the satellite Teensy over channel 2:
+
+1. `EpsService` issues a typed EPS/PDU request.
+2. `EpsAdapter_Artemis` builds a PDU v2 frame using `external/artemis-pdu/src/pdu_protocol_v2.h`.
+3. `UartChannelMux` wraps the local request as channel 2.
+4. Satellite `PduProxy` consumes channel 2, writes the inner PDU frame to `Serial1` at `9600` baud, and waits for the PDU response.
+5. `PduProxy` returns a channel 2 response to the Pi.
+6. `EpsAdapter_Artemis` validates the PDU v2 response and emits EPS status/telemetry.
+
+Channel 2 request payload:
+
+1. `target` (1 byte): `1` = PDU
+2. `request_id` (1 byte): adapter sequence/request ID
+3. `pdu_frame_len` (1 byte)
+4. `reserved` (1 byte): `0`
+5. `pdu_frame` (`pdu_frame_len` bytes)
+
+Channel 2 response payload:
+
+1. `target` (1 byte): `1` = PDU
+2. `request_id` (1 byte): matches request
+3. `local_status` (1 byte): `0=OK`, `1=BAD_REQUEST`, `2=BUSY`, `3=TIMEOUT`, `4=TARGET_ERROR`
+4. `pdu_frame_len` (1 byte)
+5. `pdu_frame` (`pdu_frame_len` bytes, only meaningful when `local_status=OK`)
+
+## RF Segment Format
+
+Only channels 0 and 1 are RF forwarded. Each RF packet has:
+
+1. `seg_magic` (1 byte): `0xA5` for channel 0, `0xA6` for channel 1
 2. `msg_id` (1 byte): rolling message ID
 3. `seg_idx` (1 byte): segment index
 4. `seg_count` (1 byte): total segments in message
@@ -53,20 +84,14 @@ Each RF packet has:
 Project RF packet max length is `49` bytes, so RF chunk max is `44` bytes.
 
 ## Timeout Behavior
-- Legacy UART wrapper parser inter-byte timeout: **250 ms**.
+- UART frame parser inter-byte timeout: **250 ms**.
 - RF reassembly timeout: **500 ms**.
+- PDU response timeout in the satellite proxy: **350 ms**.
 
 On timeout while assembling data:
 - Drop partial data
 - Increment relevant timeout/drop counters
 - Reset parser/reassembler state
-
-## Control Commands (ASCII, line-based)
-Commands are prefixed with `#` and newline terminated.
-
-- `#PING\n` -> `#PONG\n`
-- `#LINK_STATUS\n` -> one line with current counters
-- `#RESET_COUNTERS\n` -> `#OK RESET_COUNTERS\n`
 
 ## Counter Semantics
 - `uartRxBytes`, `uartTxBytes`: bytes read/written on local UART/USB side.
@@ -74,7 +99,7 @@ Commands are prefixed with `#` and newline terminated.
 - `rfRxMessages`, `rfTxMessages`: complete opaque messages reassembled/sent.
 - `rfRxSegments`, `rfTxSegments`: segment-level counters.
 - `crcDrops`: UART frame CRC mismatch drops.
-- `framingDrops`: malformed UART/RF framing drops.
+- `framingDrops`: malformed UART/RF framing or illegal channel drops.
 - `timeoutEvents`: UART frame parser timeouts.
 - `rfReassemblyTimeouts`: RF reassembly timeout resets.
 - `rfReassemblyDrops`: dropped partial RF messages due to mismatch/order issues.

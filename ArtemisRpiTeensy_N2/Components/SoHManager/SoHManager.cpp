@@ -4,7 +4,12 @@ namespace Components {
 
 SoHManager::SoHManager(const char* const compName)
     : SoHManagerComponentBase(compName),
-      m_status{} {}
+      m_status{},
+      m_detail{} {
+    for (U32 slot = 0; slot < SLOT_COUNT; ++slot) {
+        this->m_status[slot] = Components::HealthState::UNKNOWN;
+    }
+}
 
 SoHManager::~SoHManager() {}
 
@@ -17,9 +22,7 @@ void SoHManager::run_handler(FwIndexType portNum, U32 context) {
     static_cast<void>(portNum);
     static_cast<void>(context);
 
-    const U32 overall = this->m_status[SLOT_EPS] + this->m_status[SLOT_PAYLOAD] + this->m_status[SLOT_ADCS] +
-                        this->m_status[SLOT_GPS] + this->m_status[SLOT_STORAGE] + this->m_status[SLOT_COMMS] +
-                        this->m_status[SLOT_THERMAL] + this->m_status[SLOT_TRANSPORT];
+    const Components::HealthState overall = this->overallHealth();
 
     this->tlmWrite_OverallHealth(overall);
     this->tlmWrite_EpsHealth(this->m_status[SLOT_EPS]);
@@ -32,16 +35,15 @@ void SoHManager::run_handler(FwIndexType portNum, U32 context) {
     this->tlmWrite_TransportHealth(this->m_status[SLOT_TRANSPORT]);
 }
 
-void SoHManager::statusIn_handler(FwIndexType portNum, U32 key) {
+void SoHManager::statusIn_handler(FwIndexType portNum, const Components::HealthState& health, U32 detail) {
     if (portNum < SLOT_COUNT) {
-        this->m_status[portNum] = key;
+        this->m_status[portNum] = health;
+        this->m_detail[portNum] = detail;
     }
 }
 
 void SoHManager::EMIT_SOH_SNAPSHOT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    const U32 overall = this->m_status[SLOT_EPS] + this->m_status[SLOT_PAYLOAD] + this->m_status[SLOT_ADCS] +
-                        this->m_status[SLOT_GPS] + this->m_status[SLOT_STORAGE] + this->m_status[SLOT_COMMS] +
-                        this->m_status[SLOT_THERMAL] + this->m_status[SLOT_TRANSPORT];
+    const Components::HealthState overall = this->overallHealth();
     this->log_ACTIVITY_HI_Snapshot(
         overall,
         this->m_status[SLOT_EPS],
@@ -53,6 +55,30 @@ void SoHManager::EMIT_SOH_SNAPSHOT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
         this->m_status[SLOT_COMMS],
         this->m_status[SLOT_TRANSPORT]);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+Components::HealthState SoHManager::overallHealth() const {
+    bool sawWarn = false;
+    bool sawUnknown = false;
+    for (U32 slot = 0; slot < SLOT_COUNT; ++slot) {
+        const Components::HealthState health = this->m_status[slot];
+        if (health == Components::HealthState::FAIL) {
+            return Components::HealthState::FAIL;
+        }
+        if (health == Components::HealthState::WARN) {
+            sawWarn = true;
+        }
+        if (health == Components::HealthState::UNKNOWN) {
+            sawUnknown = true;
+        }
+    }
+    if (sawWarn) {
+        return Components::HealthState::WARN;
+    }
+    if (sawUnknown) {
+        return Components::HealthState::UNKNOWN;
+    }
+    return Components::HealthState::OK;
 }
 
 }  // namespace Components

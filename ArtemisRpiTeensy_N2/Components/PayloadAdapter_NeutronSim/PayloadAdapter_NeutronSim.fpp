@@ -9,10 +9,10 @@ module Components {
         output port pingOut: Svc.Ping
 
         @ Capture-duration request input, in seconds
-        sync input port requestIn: Svc.Ping
+        sync input port requestIn: Components.PayloadCaptureRequest
 
         @ Captured product size/status output
-        output port statusOut: Svc.Ping
+        output port statusOut: Components.ScienceProduct
 
         @ Last requested capture duration in seconds
         telemetry LastDurationSeconds: U32

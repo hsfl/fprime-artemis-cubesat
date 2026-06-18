@@ -13,8 +13,8 @@ class PayloadService final : public PayloadServiceComponentBase {
   private:
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void run_handler(FwIndexType portNum, U32 context) override;
-    void requestIn_handler(FwIndexType portNum, U32 key) override;
-    void adapterStatusIn_handler(FwIndexType portNum, U32 key) override;
+    void requestIn_handler(FwIndexType portNum, U32 durationSeconds) override;
+    void adapterStatusIn_handler(FwIndexType portNum, U32 productBytes) override;
     void REQUEST_PAYLOAD_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void CONFIGURE_PAYLOAD_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 sampleCount, U32 periodMs) override;
     void START_PAYLOAD_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 collectionId) override;

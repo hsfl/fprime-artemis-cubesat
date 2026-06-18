@@ -12,16 +12,19 @@ module Components {
         sync input port run: Svc.Sched
 
         @ Collection request input from MissionManager
-        sync input port requestIn: Svc.Ping
+        sync input port requestIn: Components.CollectionRequest
 
         @ Payload status input from PayloadService
-        sync input port payloadStatusIn: Svc.Ping
+        sync input port payloadStatusIn: Components.ScienceProduct
 
         @ Forwarded collection request to PayloadService
-        output port payloadRequestOut: Svc.Ping
+        output port payloadRequestOut: Components.PayloadCaptureRequest
 
         @ Science product handoff to StorageService
-        output port scienceProductOut: Svc.Ping
+        output port scienceProductOut: Components.ScienceProduct
+
+        @ Mission mode update output
+        output port missionModeOut: Components.MissionModeUpdate
 
         @ Trigger immediate collection
         async command START_COLLECTION

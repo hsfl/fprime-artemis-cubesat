@@ -15,19 +15,22 @@ module Components {
         sync input port linkStatusIn: Svc.Ping
 
         @ Science ready input from storage
-        sync input port scienceReadyIn: Svc.Ping
+        sync input port scienceReadyIn: Components.ScienceDownlinkReady
 
         @ Adapter status input
         sync input port adapterStatusIn: Svc.Ping
 
         @ Downlink request output to storage
-        output port downlinkRequestOut: Svc.Ping
+        output port downlinkRequestOut: Components.ScienceDownlinkRequest
 
         @ Adapter request output
         output port adapterRequestOut: Svc.Ping
 
         @ Status output to SoH manager
-        output port sohStatusOut: Svc.Ping
+        output port sohStatusOut: Components.HealthStatus
+
+        @ Mission mode update output
+        output port missionModeOut: Components.MissionModeUpdate
 
         @ Request science downlink
         async command REQUEST_SCIENCE_DOWNLINK

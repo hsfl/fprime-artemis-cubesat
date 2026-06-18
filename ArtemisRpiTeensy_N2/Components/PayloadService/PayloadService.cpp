@@ -24,7 +24,9 @@ void PayloadService::run_handler(FwIndexType portNum, U32 context) {
     static_cast<void>(context);
     this->m_serviceHeartbeat += 1;
     if (this->isConnected_sohStatusOut_OutputPort(0)) {
-        this->sohStatusOut_out(0, this->m_lastPayloadValue);
+        const Components::HealthState health =
+            (this->m_lastPayloadValue == 0U) ? Components::HealthState::UNKNOWN : Components::HealthState::OK;
+        this->sohStatusOut_out(0, health, this->m_lastPayloadValue);
     }
     this->tlmWrite_LastPayloadValue(this->m_lastPayloadValue);
     this->tlmWrite_LastCollectionId(this->m_lastCollectionId);
@@ -35,25 +37,27 @@ void PayloadService::run_handler(FwIndexType portNum, U32 context) {
     this->tlmWrite_ServiceHeartbeat(this->m_serviceHeartbeat);
 }
 
-void PayloadService::requestIn_handler(FwIndexType portNum, U32 key) {
+void PayloadService::requestIn_handler(FwIndexType portNum, U32 durationSeconds) {
     static_cast<void>(portNum);
-    this->m_lastCollectionId = key;
-    this->m_lastCaptureDurationSeconds = key;
-    this->log_ACTIVITY_HI_PayloadCollectionForwarded(key);
+    this->m_lastCollectionId += 1U;
+    this->m_lastCaptureDurationSeconds = durationSeconds;
+    this->log_ACTIVITY_HI_PayloadCollectionForwarded(durationSeconds);
     if (this->isConnected_adapterRequestOut_OutputPort(0)) {
-        this->adapterRequestOut_out(0, key);
+        this->adapterRequestOut_out(0, durationSeconds);
     }
 }
 
-void PayloadService::adapterStatusIn_handler(FwIndexType portNum, U32 key) {
+void PayloadService::adapterStatusIn_handler(FwIndexType portNum, U32 productBytes) {
     static_cast<void>(portNum);
-    this->m_lastPayloadValue = key;
-    this->log_ACTIVITY_LO_PayloadStatusUpdated(key);
+    this->m_lastPayloadValue = productBytes;
+    this->log_ACTIVITY_LO_PayloadStatusUpdated(productBytes);
     if (this->isConnected_statusOut_OutputPort(0)) {
-        this->statusOut_out(0, key);
+        this->statusOut_out(0, productBytes);
     }
     if (this->isConnected_sohStatusOut_OutputPort(0)) {
-        this->sohStatusOut_out(0, key);
+        const Components::HealthState health =
+            (productBytes == 0U) ? Components::HealthState::FAIL : Components::HealthState::OK;
+        this->sohStatusOut_out(0, health, productBytes);
     }
 }
 

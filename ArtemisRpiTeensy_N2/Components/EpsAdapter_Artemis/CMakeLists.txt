@@ -3,4 +3,7 @@ register_fprime_library(
         ${CMAKE_CURRENT_LIST_DIR}/EpsAdapter_Artemis.fpp
     SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/EpsAdapter_Artemis.cpp
+    DEPENDS
+        Components_Types
+        Components_LinkCfg
 )

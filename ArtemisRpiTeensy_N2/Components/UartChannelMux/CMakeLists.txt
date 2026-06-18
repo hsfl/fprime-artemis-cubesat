@@ -1,0 +1,10 @@
+register_fprime_library(
+    AUTOCODER_INPUTS
+        ${CMAKE_CURRENT_LIST_DIR}/UartChannelMux.fpp
+    SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/UartChannelMux.cpp
+    HEADERS
+        ${CMAKE_CURRENT_LIST_DIR}/UartChannelMux.hpp
+    DEPENDS
+        Components_LinkCfg
+)

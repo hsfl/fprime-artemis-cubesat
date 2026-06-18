@@ -26,7 +26,15 @@ void CommsManager::run_handler(FwIndexType portNum, U32 context) {
         this->adapterRequestOut_out(0, normalizedLink + 1U);
     }
     if (this->isConnected_sohStatusOut_OutputPort(0)) {
-        this->sohStatusOut_out(0, this->m_linkState);
+        Components::HealthState health = Components::HealthState::UNKNOWN;
+        if (this->m_linkState == 2U) {
+            health = Components::HealthState::OK;
+        } else if ((this->m_linkState == 1U) || (this->m_linkState == 3U)) {
+            health = Components::HealthState::WARN;
+        } else if (this->m_linkState == 0U) {
+            health = Components::HealthState::FAIL;
+        }
+        this->sohStatusOut_out(0, health, this->m_linkState);
     }
 
     this->tlmWrite_LinkState(this->m_linkState);
@@ -41,9 +49,9 @@ void CommsManager::linkStatusIn_handler(FwIndexType portNum, U32 key) {
     this->log_ACTIVITY_LO_LinkStateUpdated(this->m_linkState);
 }
 
-void CommsManager::scienceReadyIn_handler(FwIndexType portNum, U32 key) {
+void CommsManager::scienceReadyIn_handler(FwIndexType portNum, U32 productBytes) {
     static_cast<void>(portNum);
-    this->m_pendingScienceBytes = key;
+    this->m_pendingScienceBytes = productBytes;
 }
 
 void CommsManager::adapterStatusIn_handler(FwIndexType portNum, U32 key) {
@@ -57,6 +65,10 @@ void CommsManager::REQUEST_SCIENCE_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 
     if (this->isConnected_downlinkRequestOut_OutputPort(0)) {
         this->downlinkRequestOut_out(0, this->m_pendingScienceBytes);
         this->log_ACTIVITY_HI_DownlinkFinished(this->m_pendingScienceBytes);
+        if (this->isConnected_missionModeOut_OutputPort(0)) {
+            this->missionModeOut_out(0, Components::MissionMode::DOWNLINKING, this->m_pendingScienceBytes);
+            this->missionModeOut_out(0, Components::MissionMode::BASE, this->m_pendingScienceBytes);
+        }
     }
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }

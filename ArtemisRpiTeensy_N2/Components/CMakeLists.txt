@@ -1,6 +1,10 @@
 # Include project-wide components here
 
 # add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/MyComponent")
+add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/Types/")
+add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/LinkCfg/")
+add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/UartChannelMux/")
+add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/PayloadDownlinkManager/")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/MissionManager/")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/ScienceManager/")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/SoHManager/")

@@ -49,6 +49,7 @@ module ArtemisRpiTeensyDeployment {
     instance gpsAdapterArtemis
     instance commsAdapterTeensyRfm23
     instance thermalAdapterArtemis
+    instance uartChannelMux
 
   # ----------------------------------------------------------------------
   # Pattern graph specifiers
@@ -97,12 +98,15 @@ module ArtemisRpiTeensyDeployment {
       comDriver.allocate      -> ComCcsds.commsBufferManager.bufferGetCallee
       comDriver.deallocate    -> ComCcsds.commsBufferManager.bufferSendIn
 
-      # ComDriver <-> ComStub (Uplink)
-      comDriver.$recv                     -> ComCcsds.comStub.drvReceiveIn
-      ComCcsds.comStub.drvReceiveReturnOut -> comDriver.recvReturnIn
+      # ComDriver <-> UART channel mux <-> ComStub (Uplink)
+      comDriver.$recv                      -> uartChannelMux.drvReceiveIn
+      uartChannelMux.drvReceiveReturnOut   -> comDriver.recvReturnIn
+      uartChannelMux.ccsdsRecvOut          -> ComCcsds.comStub.drvReceiveIn
+      ComCcsds.comStub.drvReceiveReturnOut -> uartChannelMux.ccsdsRecvReturnIn
 
-      # ComStub <-> ComDriver (Downlink)
-      ComCcsds.comStub.drvSendOut      -> comDriver.$send
+      # ComStub <-> UART channel mux <-> ComDriver (Downlink)
+      ComCcsds.comStub.drvSendOut -> uartChannelMux.ccsdsSendIn
+      uartChannelMux.drvSendOut   -> comDriver.$send
       comDriver.ready         -> ComCcsds.comStub.drvConnected
     }
 
@@ -166,11 +170,15 @@ module ArtemisRpiTeensyDeployment {
       scienceManager.scienceProductOut -> storageService.requestIn
       storageService.downlinkReadyOut -> commsManager.scienceReadyIn
       commsManager.downlinkRequestOut -> storageService.downlinkRequestIn
+      scienceManager.missionModeOut -> missionManager.modeUpdateIn[0]
+      commsManager.missionModeOut -> missionManager.modeUpdateIn[1]
     }
 
     connections ServiceAdapterBindings {
       epsService.adapterRequestOut -> epsAdapterArtemis.requestIn
       epsAdapterArtemis.statusOut -> epsService.adapterStatusIn
+      epsAdapterArtemis.teensyRequestOut -> uartChannelMux.localSendIn
+      uartChannelMux.localRecvOut -> epsAdapterArtemis.teensyResponseIn
 
       payloadService.adapterRequestOut -> payloadAdapterNeutronSim.requestIn
       payloadAdapterNeutronSim.statusOut -> payloadService.adapterStatusIn

@@ -18,7 +18,7 @@ module Components {
         output port adapterRequestOut: Svc.Ping
 
         @ Status output to SoH manager
-        output port sohStatusOut: Svc.Ping
+        output port sohStatusOut: Components.HealthStatus
 
         @ Request latest thermal status from adapter
         async command REQUEST_THERMAL_STATUS

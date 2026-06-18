@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #include "src/link_counters.hpp"
+#include "src/pdu_proxy.hpp"
 #include "src/relay_uart_rf.hpp"
 #include "src/rf23_driver.hpp"
 
@@ -13,6 +14,7 @@ static constexpr uint8_t RPI_ENABLE_PIN = 36;
 static constexpr uint8_t TEENSY_LED_PIN = 13;
 
 static constexpr uint32_t UART_BAUD = 115200;
+static constexpr uint32_t PDU_UART_BAUD = 9600;
 static constexpr uint32_t DEBUG_UART_BAUD = 115200;
 static constexpr uint16_t RAW_UART_FLUSH_MS = 12;
 static constexpr uint8_t UPLINK_QUEUE_DEPTH = 32;
@@ -23,13 +25,23 @@ static constexpr uint16_t CCSDS_TM_FRAME_BYTES = 128;
 
 LinkCounters g_linkCounters;
 Rf23Driver g_rfDriver(RADIO_CS, RADIO_INT, RADIO_RX_ON_PIN, RADIO_TX_ON_PIN);
+PduProxy g_pduProxy(Serial1);
 static uint8_t g_rpiUartRxBuffer[RPI_UART_RX_BUFFER_SIZE];
-// Transparent bridge mode for HIL:
-// - raw UART bytes from Pi are RF-relayed as payload
-// - RF-reassembled bytes are emitted raw to Pi UART
+// Channelized bridge mode:
+// - channel 0: CCSDS/GDS bytes forwarded over RF
+// - channel 1: payload blob packets forwarded over RF
+// - channel 2: Teensy-local subsystem RPC, terminated on this Teensy
 RelayConfig g_relayConfig{
-    true, false, false, false, RAW_UART_FLUSH_MS, UPLINK_QUEUE_DEPTH, DOWNLINK_QUEUE_DEPTH, CCSDS_TM_FRAME_BYTES};
-RelayUartRf g_relay(Serial2, g_rfDriver, g_linkCounters, g_relayConfig);
+    true,
+    true,
+    false,
+    true,
+    RAW_UART_FLUSH_MS,
+    UPLINK_QUEUE_DEPTH,
+    DOWNLINK_QUEUE_DEPTH,
+    CCSDS_TM_FRAME_BYTES,
+    link_protocol::CHANNEL_CCSDS};
+RelayUartRf g_relay(Serial2, g_rfDriver, g_linkCounters, g_relayConfig, nullptr, &g_pduProxy);
 
 void debugPrintCounters(const char* prefix) {
   Serial.print(prefix);
@@ -82,11 +94,12 @@ void setup() {
 
   Serial2.addMemoryForRead(g_rpiUartRxBuffer, sizeof(g_rpiUartRxBuffer));
   Serial2.begin(UART_BAUD);
+  g_pduProxy.begin(PDU_UART_BAUD);
   const bool radioOk = g_rfDriver.begin();
   g_relay.begin();
 
   if (radioOk) {
-    Serial.println("[ArtemisTeensy] Relay bridge ready (raw UART byte tunnel + RF segmentation)");
+    Serial.println("[ArtemisTeensy] Relay bridge ready (channelized UART + RF segmentation + local PDU proxy)");
   } else {
     Serial.println("[ArtemisTeensy] RF23 init failed; relay running without RF");
   }

@@ -25,10 +25,13 @@ class SoHManager final : public SoHManagerComponentBase {
 
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void run_handler(FwIndexType portNum, U32 context) override;
-    void statusIn_handler(FwIndexType portNum, U32 key) override;
+    void statusIn_handler(FwIndexType portNum, const Components::HealthState& health, U32 detail) override;
     void EMIT_SOH_SNAPSHOT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
 
-    U32 m_status[SLOT_COUNT];
+    Components::HealthState overallHealth() const;
+
+    Components::HealthState m_status[SLOT_COUNT];
+    U32 m_detail[SLOT_COUNT];
 };
 
 }  // namespace Components

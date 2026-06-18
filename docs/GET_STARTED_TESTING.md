@@ -33,7 +33,7 @@ Assumes `/Users/sozodennis/Developer/fprime-artemis-cubesat/docs/RPI_SETUP.md` i
 3. **F' bytes between RPi -> Teensy -> laptop (no radio)**
    - Goal: laptop receives the same stream over USB from Teensy.
    - Current status: **superseded by the two-Teensy RF bridge path**.
-   - Why: nominal MVP/HIL uses both Teensy bridges in transparent raw-byte tunnel mode; the custom UART wrapper (`0xD4 0xC3 + len + crc16`) is fallback/legacy only.
+   - Why: nominal MVP/HIL uses both Teensy bridges with tagged virtual channels; channel 0 preserves the GDS CCSDS stream while channel 2 stays local to the satellite Teensy for PDU/EPS.
    - GDS must use `ComCcsds` endpoint framing:
    ```bash
    fprime-gds --no-app \
@@ -60,8 +60,8 @@ On the ground Teensy, USB serial is the raw-byte GDS UART endpoint.
 
 Also important:
 - Current Teensy UART/RF contract is documented in `/Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md`.
-- Nominal packet framing is end-to-end `ComCcsds` / `space-packet-space-data-link`; Teensy firmware only tunnels raw bytes and segments/reassembles the RF hop.
-- The custom UART wrapper is fallback/legacy only.
+- Nominal endpoint framing is still end-to-end `ComCcsds` / `space-packet-space-data-link`.
+- The Pi <-> satellite Teensy UART adds a channel tag below that endpoint layer: channel 0 for CCSDS over RF, channel 1 for payload over RF, channel 2 for satellite-local PDU/EPS RPC.
 
 ## Verified GDS communication flags (local check)
 

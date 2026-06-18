@@ -18,7 +18,7 @@ module Components {
         output port linkStatusOut: Svc.Ping
 
         @ Status output to SoH manager
-        output port sohStatusOut: Svc.Ping
+        output port sohStatusOut: Components.HealthStatus
 
         @ Report current link counters via event
         async command LINK_STATUS

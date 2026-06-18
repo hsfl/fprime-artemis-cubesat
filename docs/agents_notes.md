@@ -4,9 +4,9 @@
 
 This repo is the Neutron 2 team F' integration workspace:
 - F' flight software runs on Raspberry Pi.
-- Satellite Teensy provides transparent raw-byte UART tunnel mode plus RF23BP segmentation/reassembly.
-- Ground Teensy reassembles RF messages to USB raw bytes and supports simple USB-burst uplink back to RF.
-- Legacy UART wrapper mode remains fallback-only.
+- Satellite Teensy provides a channelized Pi UART bridge plus RF23BP segmentation/reassembly.
+- Channel 0 is the normal F Prime/GDS CCSDS stream, channel 1 is payload/science packets, and channel 2 is satellite-Teensy-local subsystem RPC.
+- Ground Teensy reassembles RF channel 0 to the laptop GDS USB serial stream and RF channel 1 to payload USB when triple-serial mode is enabled.
 
 ## Demo Target Snapshot (2026-04-07)
 
@@ -41,13 +41,17 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 
 ### 1) F' side (`ArtemisRpiTeensy_N2`)
 - Deployment uses Linux UART transport (`Drv.LinuxUartDriver`) on `/dev/serial0`.
+- `UartChannelMux` wraps/unwraps the single Pi <-> satellite Teensy UART into tagged channels.
 - Main runtime binary accepts `-d <uart_device>`.
 - MVP custom components in deployment:
+  - `Components/UartChannelMux`
   - `Components/TeensyTransportService`
   - `Components/MissionManager`
   - `Components/PayloadService`
   - `Components/PayloadAdapter_NeutronSim`
   - `Components/ThermalService`
+  - `Components/EpsService`
+  - `Components/EpsAdapter_Artemis`
   - `Components/CommsAdapter_TeensyRfm23`
 - Build status:
   - `fprime-util generate -f` passes
@@ -77,10 +81,11 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   - `firmware/satellite_teensy/src/link_protocol.hpp`
   - `firmware/satellite_teensy/src/link_counters.hpp`
 - Transport behavior:
-  - Default HIL path is transparent raw-byte bridge:
-    - RPi UART raw bytes -> RF segment transport -> ground USB raw bytes
-    - ground USB raw bytes -> RF segment transport -> RPi UART raw bytes
-  - UART wrapper mode (`0xD4 0xC3 + len + crc16`) remains optional fallback only
+  - Default HIL path is channelized:
+    - channel 0 CCSDS bytes -> RF segment transport -> ground USB raw bytes
+    - channel 1 payload packets -> RF segment transport -> ground payload USB when enabled
+    - channel 2 Teensy-local RPC -> satellite `PduProxy` -> PDU UART, no RF forwarding
+  - Pi <-> satellite UART frames use `0xD4 0xC3 + channel + len + crc16`
   - UART payload max now `220` bytes
   - Queue-backed relay path enabled for burst tolerance:
     - `RAW_UART_FLUSH_MS = 12`
@@ -97,9 +102,10 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   - `firmware/gds_teensy/src/relay_uart_rf.*`
   - `firmware/gds_teensy/src/rf23_driver.*`
 - Behavior:
-  - Receives RF segments and reassembles full message bytes
-  - Streams reassembled bytes directly to USB serial (`Serial`) for laptop GDS UART input
-  - Packetizes raw USB byte bursts (`12 ms` idle flush or `220`-byte full buffer) for uplink
+  - Receives RF segments and reassembles full message bytes for RF channels 0 and 1
+  - Streams reassembled channel 0 bytes directly to USB serial (`Serial`) for laptop GDS UART input
+  - Streams reassembled channel 1 bytes to `SerialUSB2` when triple-serial USB is enabled
+  - Packetizes raw USB byte bursts (`12 ms` idle flush or 44-byte channel 0 burst) for uplink
   - Queue-backed relay path enabled for burst tolerance:
     - `UPLINK_QUEUE_DEPTH = 32`
     - `DOWNLINK_QUEUE_DEPTH = 32`
@@ -111,25 +117,21 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 
 - End-to-end payload is still opaque F' bytes.
 - Endpoints (GDS and F' app) use `ComCcsds` framing (`space-packet-space-data-link`).
-- Teensy bridge default for HIL is transport-only and should not add an extra UART frame format in the main path.
-- RF transport is now segmented and reassembled before UART egress.
+- The Pi <-> satellite Teensy hop is channelized below the F Prime/GDS endpoint layer; `fprime-gds` still sees a byte-pure CCSDS stream.
+- RF transport carries only channel 0 and channel 1. Channel 2 is consumed locally by the satellite Teensy.
 - Contract documentation:
   - `ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md`
   - `GDS_Teensy/docs/transport_contract.md`
 
-## HIL Framing Alignment (2026-04-15)
+## HIL Framing Alignment (2026-04-15, superseded by channel mux on 2026-06-18)
 
-- Root issue:
-  - ground Teensy was in raw mode while satellite Teensy was still defaulting to framed UART mode.
-- Fix applied:
-  - `ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/satellite_teensy.ino`
-  - relay config now matches ground bridge for raw-byte tunnel mode:
-    - `RelayConfig{true, false, false, false, RAW_UART_FLUSH_MS, UPLINK_QUEUE_DEPTH, DOWNLINK_QUEUE_DEPTH}`
-- Intended runtime contract:
-  - laptop `fprime-gds` UART plugin sends raw bytes
-  - ground Teensy relays raw bytes over RF segments
-  - satellite Teensy reassembles and forwards raw bytes to RPi UART
-  - RPi F' deployment handles the CCSDS/space-packet framing at endpoint level
+- Historical note: the raw-tunnel alignment fixed the earlier mismatch between ground and satellite bridge modes.
+- Current runtime contract is channelized on the Pi <-> satellite UART:
+  - laptop `fprime-gds` still sends/receives raw CCSDS bytes on the ground Teensy USB data port
+  - ground Teensy maps those bytes to RF channel 0
+  - satellite Teensy maps RF channel 0 to a tagged Pi UART frame
+  - RPi `UartChannelMux` unwraps channel 0 back into `ComCcsds`
+  - PDU/EPS requests use channel 2 and never traverse RF
 
 ## Local Emulation Findings (2026-04-08)
 
@@ -177,9 +179,9 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 ### Framing Guidance (Decision Rule)
 
 - `space-packet-space-data-link` is stock F' `ComCcsds` framing, not custom framing.
-- The custom Teensy UART wrapper (`0xD4 0xC3 + len + crc16`) is a separate link-layer mechanism.
-- For demo and local/GDS validation, use `ComCcsds` framing as the primary/default path.
-- Keep custom UART wrapper support only as an optional hardware fallback mode when physical-link behavior requires it.
+- The Teensy UART channel wrapper (`0xD4 0xC3 + channel + len + crc16`) is a separate link-layer mechanism below `ComCcsds`.
+- For local GDS validation, use `ComCcsds` framing as the primary/default endpoint path.
+- For hardware HIL, `UartChannelMux` applies the channel wrapper on the Pi <-> satellite Teensy UART while GDS still sees normal `ComCcsds`.
 
 ## Laptop GDS <-> Ground Teensy USB Debug Chain (2026-04-20)
 
@@ -367,19 +369,20 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 
 ## RPi-Teensy Service Path Decision (2026-04-15)
 
-- Keep the existing `RPi <-> Teensy` UART path dedicated to raw `ComCcsds` packets only.
-- Do not inject custom Teensy service RPC/control bytes into that same UART CCSDS stream for MVP.
-- For Teensy-owned PDU telemetry/control (for example analog temperatures, INA219 current/power, switch commands), use a sideband bus between Raspberry Pi and Teensy.
-- Recommended sideband for MVP: `I2C` (`RPi` master, `Teensy` slave with a small register/command map).
-- Acceptable alternates if wiring or latency requires it:
-  - `SPI` sideband
-  - `GPIO` handshake/interrupt line in addition to `I2C`/`SPI`
-- Manual caveat remains in force:
-  - pin naming/labeling in the Artemis manual has conflicts; verify against board wiring/continuity before final pin assignment.
-- F' integration implication:
-  - keep `LinuxUartDriver` for the CCSDS link
-  - add service-facing adapter/driver path separately (for example `LinuxI2cDriver`) when implementing real Teensy/PDU ingestion
-- If no extra sideband wiring is available, defer to post-MVP single-UART multiplexing only after the CCSDS chain is stable.
+- Superseded implementation decision (2026-06-18): use tagged channels on the one available `RPi <-> satellite Teensy` UART.
+- Reason:
+  - The Raspberry Pi has one active UART to the satellite Teensy in the current FlatSat layout.
+  - The satellite Teensy is the microcontroller that can talk to PDU, radio, GPS, and other local subsystems.
+  - A second Pi-side PDU UART should not be assumed.
+- Current contract:
+  - channel 0: CCSDS/GDS stream over RF
+  - channel 1: payload/science packet stream over RF
+  - channel 2: Teensy-local subsystem RPC, currently PDU/EPS
+- Design rule:
+  - Keep channel 2 bounded request/response traffic only.
+  - Do not send channel 2 over RF.
+  - Do not let mission components know about UART/RF framing; keep it behind adapters and `UartChannelMux`.
+  - If future hardware adds a real sideband bus, it can replace channel 2 behind the EPS/PDU adapter without changing `EpsService`.
 
 ## Future Subsystem Submodule Plan (2026-06-15)
 
@@ -414,13 +417,13 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 
 1. Record first successful non-crashing runtime on `/dev/serial0` using the real UART path.
 2. Run full HIL end-to-end tests with real `fprime-gds` UART traffic over RF (both directions).
-3. Implement the minimum demo-state flow for `Base Mode` -> scheduled data collection -> science-data downlink.
-4. Extend the neutron simulator product path from product-size telemetry into the selected downlink/review path.
-5. Keep `fprime-gds` as the live MVP demo ground interface and treat `Yamcs` as the post-MVP target presentation/analysis stack.
-6. Add minimal segment ACK/retry for RF relay reliability after transparent raw-byte path is stable.
+3. HIL-test channel 2 against a real PDU through satellite Teensy `Serial1`.
+4. Implement the minimum demo-state flow for `Base Mode` -> scheduled data collection -> science-data downlink.
+5. Extend the neutron simulator product path from product-size telemetry into the selected downlink/review path.
+6. Keep `fprime-gds` as the live MVP demo ground interface and treat `Yamcs` as the post-MVP target presentation/analysis stack.
+7. Add minimal segment ACK/retry for RF relay reliability after the channelized CCSDS path is stable.
    - MVP target: command uplink delivery confidence and reduced telemetry burst loss during demo.
-7. Add deterministic packet boundary extraction for uplink beyond simple burst mode if required by the selected demo flow.
-8. Build post-MVP mission/service multiplexing only after chain stability.
+8. Add deterministic packet boundary extraction for uplink beyond simple burst mode if required by the selected demo flow.
 9. Complete real file downlink path for the science demo flow:
    - current `REQUEST_SCIENCE_DOWNLINK` path is handshake-only (events/channels)
    - wire an actual `Svc::FileDownlink` transfer for science products
@@ -462,6 +465,7 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - Core decisions captured there:
   - payload bulk data moves on a second stateless virtual channel over the existing RF bridge (per-frame channel tags, no link mode switching)
   - GDS keeps a byte-pure CCSDS stream on channel 0 (GUI cannot break)
+  - PDU/EPS uses channel 2 as a satellite-Teensy-local RPC path and is not forwarded over RF
   - all radio MTU knowledge is isolated at a single seam (`LinkCfg` + `link_protocol.hpp`) so the RFM23BP can later be swapped for a 256-byte UART radio or SatNOGS board without touching mission logic
   - custom payload protocol is tactical; graduation criteria to stock `Svc.FileDownlink` are defined in the plan
 
@@ -797,3 +801,23 @@ Build verification at handoff:
   - `GDS_Teensy/tools/arduino-cli/build.sh` passed
   - `ArtemisTeensy_N2_Baremetal/tools/arduino-cli/build.sh` passed
   - live RF smoke passed with token `4320`
+
+## EPS/PDU adapter notes
+
+- F Prime now exposes the mission-facing EPS/PDU path through `EpsService` and `EpsAdapter_Artemis`.
+- The adapter uses the PDU v2 framed UART protocol from `external/artemis-pdu/src/pdu_protocol_v2.h`.
+- The adapter no longer opens a separate Pi serial device for the PDU.
+- EPS/PDU requests are wrapped as channel 2 local RPC packets over the existing Pi <-> satellite Teensy UART.
+- Satellite `PduProxy` writes the inner PDU v2 frame to `Serial1` at 9600 baud and returns the PDU response over channel 2.
+- Channel 2 local status values are `0=OK`, `1=BAD_REQUEST`, `2=BUSY`, `3=TIMEOUT`, `4=TARGET_ERROR`.
+- `TransportFailureCount` tracks bad local envelopes, timeouts, target errors, malformed PDU frames, and busy/not-connected send attempts.
+- Operator-safe commands currently exposed:
+  - `REQUEST_EPS_STATUS`
+  - `PING_PDU`
+  - `REQUEST_PDU_PROTOCOL`
+  - `REQUEST_PDU_OUTPUT`
+  - `SET_PDU_OUTPUT` with `confirm=1`
+  - `POWER_CYCLE_PDU_OUTPUT` with `confirm=1`
+  - `REQUEST_CHARGER_STATUS`
+  - `SET_CHARGER_STATE` with `confirm=1`
+- Burn-wire and torque-coil commands are intentionally not exposed through `EpsService` yet; add those only with a dedicated HIL/runbook procedure.

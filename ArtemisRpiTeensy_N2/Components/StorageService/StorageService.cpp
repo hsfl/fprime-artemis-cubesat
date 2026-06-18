@@ -54,14 +54,16 @@ void StorageService::run_handler(FwIndexType portNum, U32 context) {
     this->tlmWrite_RemovedDatasetFiles(this->m_removedDatasetFiles);
     this->tlmWrite_RemoveDatasetFailures(this->m_removeDatasetFailures);
     if (this->isConnected_sohStatusOut_OutputPort(0)) {
-        this->sohStatusOut_out(0, this->m_storedProducts);
+        const Components::HealthState health =
+            (this->m_removeDatasetFailures == 0U) ? Components::HealthState::OK : Components::HealthState::WARN;
+        this->sohStatusOut_out(0, health, this->m_storedProducts);
     }
 }
 
-void StorageService::requestIn_handler(FwIndexType portNum, U32 key) {
+void StorageService::requestIn_handler(FwIndexType portNum, U32 productBytes) {
     static_cast<void>(portNum);
     this->m_storedProducts += 1;
-    this->m_lastProductSize = key;
+    this->m_lastProductSize = productBytes;
     this->rememberProduct(this->m_storedProducts, this->m_lastProductSize);
     this->log_ACTIVITY_HI_ScienceStored(this->m_storedProducts, this->m_lastProductSize);
     if (this->isConnected_downlinkReadyOut_OutputPort(0)) {
@@ -69,9 +71,9 @@ void StorageService::requestIn_handler(FwIndexType portNum, U32 key) {
     }
 }
 
-void StorageService::downlinkRequestIn_handler(FwIndexType portNum, U32 key) {
+void StorageService::downlinkRequestIn_handler(FwIndexType portNum, U32 productBytes) {
     static_cast<void>(portNum);
-    static_cast<void>(key);
+    static_cast<void>(productBytes);
     this->log_ACTIVITY_LO_DownlinkPrepared(this->m_lastProductSize);
     if (this->isConnected_downlinkReadyOut_OutputPort(0)) {
         this->downlinkReadyOut_out(0, this->m_lastProductSize);

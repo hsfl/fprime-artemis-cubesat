@@ -13,8 +13,8 @@ class StorageService final : public StorageServiceComponentBase {
   private:
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void run_handler(FwIndexType portNum, U32 context) override;
-    void requestIn_handler(FwIndexType portNum, U32 key) override;
-    void downlinkRequestIn_handler(FwIndexType portNum, U32 key) override;
+    void requestIn_handler(FwIndexType portNum, U32 productBytes) override;
+    void downlinkRequestIn_handler(FwIndexType portNum, U32 productBytes) override;
     void REPORT_STORAGE_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void REPORT_LATEST_DATASET_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void REPORT_STORAGE_HISTORY_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;

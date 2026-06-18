@@ -12,16 +12,16 @@ module Components {
         sync input port run: Svc.Sched
 
         @ Science product input from ScienceManager
-        sync input port requestIn: Svc.Ping
+        sync input port requestIn: Components.ScienceProduct
 
         @ Downlink request input from CommsManager
-        sync input port downlinkRequestIn: Svc.Ping
+        sync input port downlinkRequestIn: Components.ScienceDownlinkRequest
 
         @ Science availability output to CommsManager
-        output port downlinkReadyOut: Svc.Ping
+        output port downlinkReadyOut: Components.ScienceDownlinkReady
 
         @ Status output to SoH manager
-        output port sohStatusOut: Svc.Ping
+        output port sohStatusOut: Components.HealthStatus
 
         @ Report storage status
         async command REPORT_STORAGE_STATUS

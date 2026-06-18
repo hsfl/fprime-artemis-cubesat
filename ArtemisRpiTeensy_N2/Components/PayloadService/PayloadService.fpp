@@ -12,19 +12,19 @@ module Components {
         sync input port run: Svc.Sched
 
         @ Collection request input from ScienceManager
-        sync input port requestIn: Svc.Ping
+        sync input port requestIn: Components.PayloadCaptureRequest
 
         @ Adapter status input
-        sync input port adapterStatusIn: Svc.Ping
+        sync input port adapterStatusIn: Components.ScienceProduct
 
         @ Adapter request output
-        output port adapterRequestOut: Svc.Ping
+        output port adapterRequestOut: Components.PayloadCaptureRequest
 
         @ Payload status output to ScienceManager
-        output port statusOut: Svc.Ping
+        output port statusOut: Components.ScienceProduct
 
         @ Status output to SoH manager
-        output port sohStatusOut: Svc.Ping
+        output port sohStatusOut: Components.HealthStatus
 
         @ Request latest payload status from adapter
         async command REQUEST_PAYLOAD_STATUS

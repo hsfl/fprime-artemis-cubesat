@@ -132,4 +132,6 @@ module ArtemisRpiTeensyDeployment {
 
   instance thermalAdapterArtemis: Components.ThermalAdapter_Artemis base id 0x10025000
 
+  instance uartChannelMux: Components.UartChannelMux base id 0x10026000
+
 }

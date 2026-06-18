@@ -12,7 +12,10 @@ module Components {
         sync input port run: Svc.Sched
 
         @ Collection scheduling output to ScienceManager
-        output port collectionRequestOut: Svc.Ping
+        output port collectionRequestOut: Components.CollectionRequest
+
+        @ Mission mode update input from story services
+        sync input port modeUpdateIn: [2] Components.MissionModeUpdate
 
         @ Enter base mode
         async command ENTER_BASE_MODE
@@ -24,7 +27,7 @@ module Components {
         async command SCHEDULE_COLLECTION(delaySeconds: U32)
 
         @ Current mission mode
-        telemetry CurrentMode: U32
+        telemetry CurrentMode: Components.MissionMode
 
         @ Last requested schedule delay
         telemetry LastScheduledDelaySeconds: U32
@@ -36,7 +39,7 @@ module Components {
         telemetry ModeHeartbeat: U32
 
         @ Mission mode transition
-        event ModeChanged(mode: U32) severity activity high format "Mission mode changed to {}"
+        event ModeChanged(mode: Components.MissionMode) severity activity high format "Mission mode changed to {}"
 
         @ Ping response event
         event Pong(token: U32, count: U32) severity activity low format "MissionManager pong token={} count={}"
