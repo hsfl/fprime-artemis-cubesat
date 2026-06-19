@@ -12,7 +12,6 @@ VIEWER_PORT="${VIEWER_PORT:-8062}"
 DELAY_SECONDS="${DELAY_SECONDS:-10}"
 CAPTURE_SECONDS="${CAPTURE_SECONDS:-10}"
 HOLD_AFTER_SEQUENCE="true"
-START_VIEWER="true"
 DICT_PATH="${DICT_PATH:-}"
 TOPOLOGY_PROFILE="${NEUTRON2_TOPOLOGY_PROFILE:-local-demo}"
 BUILD_CACHE="${BUILD_CACHE:-$ROOT_DIR/build-neutron2-local-demo}"
@@ -35,14 +34,15 @@ Options:
   --dictionary <path>        topology dictionary path (default: latest Darwin dict)
   --build-cache <path>       local-demo build cache (default: ArtemisRpiTeensy_N2/build-neutron2-local-demo)
   --skip-build               use existing binary/dictionary without regenerating the local-demo profile
-  --no-viewer                do not start the payload viewer
   --exit-after-sequence      stop emulator/viewer after automated checks pass
   -h, --help                 show this help text
 
 Pass criteria:
   - GDS command path accepts the demo commands
   - scheduled collection produces a new neutron_capture_*.csv
+  - F Prime payload downlink completes
   - payload viewer summary parses the generated CSV
+  - payload viewer is opened/refocused after verified downlink
 EOF
 }
 
@@ -83,10 +83,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-build)
       SKIP_BUILD="true"
-      shift
-      ;;
-    --no-viewer)
-      START_VIEWER="false"
       shift
       ;;
     --exit-after-sequence)
@@ -191,6 +187,33 @@ raise SystemExit(1)
 PY
 }
 
+wait_for_log_pattern() {
+  local pattern="$1"
+  local label="$2"
+  local deadline
+  deadline=$((SECONDS + 20))
+  while (( SECONDS < deadline )); do
+    if grep -q "$pattern" "$LOG_DIR/emulation.log"; then
+      return 0
+    fi
+    if grep -Eq "CaptureFailed|PayloadDownlinkFailed|DownlinkFailed" "$LOG_DIR/emulation.log"; then
+      return 1
+    fi
+    sleep 0.5
+  done
+  printf '[neutron2-local-demo] timed out waiting for %s\n' "$label" >&2
+  return 1
+}
+
+open_url() {
+  local url="$1"
+  if command -v open >/dev/null 2>&1; then
+    open "$url" >/dev/null 2>&1 || true
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$url" >/dev/null 2>&1 || true
+  fi
+}
+
 latest_capture_after() {
   local epoch="$1"
   python3 - "$CAPTURE_DIR" "$epoch" <<'PY'
@@ -207,6 +230,26 @@ if not matches:
     raise SystemExit(1)
 matches.sort(key=lambda path: path.stat().st_mtime, reverse=True)
 print(matches[0])
+PY
+}
+
+verify_latest_payload() {
+  local capture_file="$1"
+  python3 - "$capture_file" "$CAPTURE_DIR/latest_payload.bin" <<'PY'
+from pathlib import Path
+import sys
+
+capture = Path(sys.argv[1]).resolve()
+latest = Path(sys.argv[2])
+if not latest.exists():
+    print(f"latest payload link does not exist: {latest}", file=sys.stderr)
+    raise SystemExit(1)
+if latest.resolve() != capture:
+    print(f"latest payload points to {latest.resolve()}, expected {capture}", file=sys.stderr)
+    raise SystemExit(1)
+if latest.stat().st_size <= 0:
+    print(f"latest payload is empty: {latest}", file=sys.stderr)
+    raise SystemExit(1)
 PY
 }
 
@@ -240,46 +283,45 @@ log "logs: $LOG_DIR"
 (
   cd "$ROOT_DIR"
   export NEUTRON_PAYLOAD_SIM_ROOT="$REPO_ROOT/external/payload-neutron-simulation"
-  exec ./tools/run_local_emulation.sh --gui-port "$GUI_PORT"
+  exec ./tools/run_local_emulation.sh --gui-port "$GUI_PORT" --link-mode channelized
 ) >"$LOG_DIR/emulation.log" 2>&1 &
 EMU_PID="$!"
 log "started local emulator pid=$EMU_PID; GDS: http://127.0.0.1:$GUI_PORT"
 
-if [[ "$START_VIEWER" == "true" ]]; then
-  (
-    cd "$REPO_ROOT"
-    exec python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
-      --capture-dir "$CAPTURE_DIR" \
-      --port "$VIEWER_PORT" \
-      --no-open
-  ) >"$LOG_DIR/payload_viewer.log" 2>&1 &
-  VIEWER_PID="$!"
-  log "started payload viewer pid=$VIEWER_PID; viewer: http://127.0.0.1:$VIEWER_PORT"
-fi
+(
+  cd "$REPO_ROOT"
+  exec python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
+    --capture-dir "$CAPTURE_DIR" \
+    --port "$VIEWER_PORT" \
+    --no-open
+) >"$LOG_DIR/payload_viewer.log" 2>&1 &
+VIEWER_PID="$!"
+log "started payload viewer pid=$VIEWER_PID; viewer: http://127.0.0.1:$VIEWER_PORT"
 
 wait_for_port "$GUI_PORT" "fprime-gds"
-if [[ "$START_VIEWER" == "true" ]]; then
-  wait_for_port "$VIEWER_PORT" "payload viewer"
-fi
+wait_for_port "$VIEWER_PORT" "payload viewer"
 
 START_EPOCH="$(python3 -c 'import time; print(time.time())')"
 
 log "sending demo command sequence"
-send_command "missionManager.ENTER_BASE_MODE"
-send_command "sohManager.EMIT_SOH_SNAPSHOT"
-send_command "scienceManager.CONFIGURE_CAPTURE_DURATION" "$CAPTURE_SECONDS"
-send_command "missionManager.SCHEDULE_COLLECTION" "$DELAY_SECONDS"
+send_command "missionManager.ENTER_BASE_MODE" || fail "Command failed: missionManager.ENTER_BASE_MODE"
+send_command "sohManager.EMIT_SOH_SNAPSHOT" || fail "Command failed: sohManager.EMIT_SOH_SNAPSHOT"
+send_command "scienceManager.CONFIGURE_CAPTURE_DURATION" "$CAPTURE_SECONDS" || fail "Command failed: scienceManager.CONFIGURE_CAPTURE_DURATION"
+send_command "missionManager.SCHEDULE_COLLECTION" "$DELAY_SECONDS" || fail "Command failed: missionManager.SCHEDULE_COLLECTION"
 
 WAIT_SECONDS=$((DELAY_SECONDS + 4))
 log "waiting ${WAIT_SECONDS}s for scheduled capture"
 sleep "$WAIT_SECONDS"
 
-send_command "storageService.REPORT_LATEST_DATASET"
-send_command "storageService.REPORT_STORAGE_HISTORY"
-send_command "commsManager.REQUEST_SCIENCE_DOWNLINK"
+send_command "storageService.REPORT_LATEST_DATASET" || fail "Command failed: storageService.REPORT_LATEST_DATASET"
+send_command "storageService.REPORT_STORAGE_HISTORY" || fail "Command failed: storageService.REPORT_STORAGE_HISTORY"
+send_command "commsManager.REQUEST_SCIENCE_DOWNLINK" || fail "Command failed: commsManager.REQUEST_SCIENCE_DOWNLINK"
+wait_for_log_pattern "PayloadDownlinkComplete" "payload downlink completion" || fail "Payload downlink did not complete"
+wait_for_log_pattern "DownlinkFinished" "comms downlink completion" || fail "Comms downlink did not complete"
 
 CAPTURE_FILE="$(latest_capture_after "$START_EPOCH")" || fail "No new neutron_capture_*.csv found in $CAPTURE_DIR"
 log "new capture: $CAPTURE_FILE"
+verify_latest_payload "$CAPTURE_FILE" || fail "F Prime did not publish the latest capture for downlink"
 
 SUMMARY="$(
   python3 "$REPO_ROOT/ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py" \
@@ -287,13 +329,13 @@ SUMMARY="$(
 )"
 printf '%s\n' "$SUMMARY" > "$LOG_DIR/latest_capture_summary.json"
 log "viewer summary written: $LOG_DIR/latest_capture_summary.json"
+open_url "http://127.0.0.1:$VIEWER_PORT"
+log "opened/refocused payload viewer after verified downlink: http://127.0.0.1:$VIEWER_PORT"
 log "PASS: local Neutron 2 MVP demo sequence produced and parsed a science CSV"
 
 if [[ "$HOLD_AFTER_SEQUENCE" == "true" ]]; then
   log "GDS: http://127.0.0.1:$GUI_PORT"
-  if [[ "$START_VIEWER" == "true" ]]; then
-    log "payload viewer: http://127.0.0.1:$VIEWER_PORT"
-  fi
+  log "payload viewer: http://127.0.0.1:$VIEWER_PORT"
   log "press Ctrl-C to stop local emulation"
   while true; do
     sleep 3600

@@ -37,22 +37,6 @@ def crc16_ccitt(data: bytes) -> int:
     return crc
 
 
-def expected_blob_byte(product_id: int, offset: int) -> int:
-    return (product_id + (offset * 31) + (offset >> 8)) & 0xFF
-
-
-def expected_blob_crc(product_id: int, byte_count: int) -> int:
-    crc = 0xFFFF
-    for offset in range(byte_count):
-        crc ^= expected_blob_byte(product_id, offset) << 8
-        for _ in range(8):
-            if crc & 0x8000:
-                crc = ((crc << 1) ^ 0x1021) & 0xFFFF
-            else:
-                crc = (crc << 1) & 0xFFFF
-    return crc
-
-
 class PayloadReceiver:
     def __init__(self, port: str, baud: int, output: pathlib.Path, timeout_s: float) -> None:
         self.port = port
@@ -67,6 +51,7 @@ class PayloadReceiver:
         self.packet_data_bytes = DATA_BYTES
         self.packets: dict[int, bytes] = {}
         self.end_seen = False
+        self.rx_buffer = bytearray()
 
     def run(self) -> int:
         deadline = time.monotonic() + self.timeout_s
@@ -114,17 +99,62 @@ class PayloadReceiver:
         return self.total_packets > 0 and len(self.packets) == self.total_packets
 
     def read_packet(self, ser: serial.Serial) -> bytes:
-        packet = bytearray(ser.read(MAX_PACKET))
-        if not packet:
-            return b""
+        packet = self.try_extract_packet()
+        if packet:
+            return packet
+
         partial_deadline = time.monotonic() + 0.5
-        while len(packet) < MAX_PACKET and time.monotonic() < partial_deadline:
-            chunk = ser.read(MAX_PACKET - len(packet))
+        while time.monotonic() < partial_deadline:
+            chunk = ser.read(MAX_PACKET)
             if chunk:
-                packet += chunk
-        if len(packet) != MAX_PACKET:
-            return b""
-        return bytes(packet)
+                self.rx_buffer += chunk
+                packet = self.try_extract_packet()
+                if packet:
+                    return packet
+            elif not self.rx_buffer:
+                return b""
+        return b""
+
+    def try_extract_packet(self) -> bytes:
+        while True:
+            magic_index = self.rx_buffer.find(MAGIC)
+            if magic_index < 0:
+                self.rx_buffer.clear()
+                return b""
+            if magic_index > 0:
+                del self.rx_buffer[:magic_index]
+            if len(self.rx_buffer) < 4:
+                return b""
+
+            packet_type = self.rx_buffer[2]
+            if packet_type == TYPE_HEADER:
+                needed = 17
+            elif packet_type == TYPE_END:
+                needed = 8
+            elif packet_type == TYPE_DATA:
+                if len(self.rx_buffer) < 7:
+                    return b""
+                valid_len = self.rx_buffer[6]
+                if valid_len > self.packet_data_bytes:
+                    del self.rx_buffer[0]
+                    continue
+                needed = 7 + valid_len + 2
+            elif packet_type == TYPE_RETRY_REQUEST:
+                if len(self.rx_buffer) < 7:
+                    return b""
+                needed = 7 + self.rx_buffer[6]
+            else:
+                del self.rx_buffer[0]
+                continue
+
+            if needed > MAX_PACKET:
+                del self.rx_buffer[0]
+                continue
+            if len(self.rx_buffer) < needed:
+                return b""
+            packet = bytes(self.rx_buffer[:needed])
+            del self.rx_buffer[:needed]
+            return packet
 
     def handle_packet(self, packet: bytes, ser: serial.Serial) -> None:
         if len(packet) < 4 or packet[0:2] != MAGIC:
@@ -157,12 +187,10 @@ class PayloadReceiver:
         self.file_crc = struct.unpack_from("<H", packet, 15)[0]
         self.packets.clear()
         self.end_seen = False
-        expected_crc = expected_blob_crc(self.product_id, self.total_bytes)
         print(
             "header: "
             f"product={self.product_id} transfer={self.transfer_id} bytes={self.total_bytes} "
-            f"packets={self.total_packets} crc=0x{self.file_crc:04x} "
-            f"pattern_crc=0x{expected_crc:04x}"
+            f"packets={self.total_packets} crc=0x{self.file_crc:04x}"
         )
 
     def handle_data(self, packet: bytes) -> None:
@@ -201,7 +229,6 @@ class PayloadReceiver:
         request += struct.pack("<H", start)
         request += bytes([len(bitmap)])
         request += bitmap
-        request += bytes(MAX_PACKET - len(request))
         ser.write(bytes(request))
         print(f"retry: start={start} count={len(span)} bitmap_bytes={len(bitmap)}")
 
