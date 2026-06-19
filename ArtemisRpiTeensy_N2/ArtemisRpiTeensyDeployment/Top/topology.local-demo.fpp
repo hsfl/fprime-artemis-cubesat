@@ -145,8 +145,8 @@ module ArtemisRpiTeensyDeployment {
       # Rate group 2
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup2] -> rateGroup2.CycleIn
       rateGroup2.RateGroupMemberOut[0] -> cmdSeq.schedIn
+      rateGroup2.RateGroupMemberOut[1] -> epsAdapterArtemis.run
       # RF/HIL subsystem polling stays off for laptop-only demo stability.
-      # rateGroup2.RateGroupMemberOut[1] -> epsService.run
       rateGroup2.RateGroupMemberOut[2] -> payloadService.run
       # rateGroup2.RateGroupMemberOut[3] -> adcsService.run
       # rateGroup2.RateGroupMemberOut[4] -> gpsService.run
@@ -177,6 +177,7 @@ module ArtemisRpiTeensyDeployment {
       storageService.downlinkReadyOut -> commsManager.scienceReadyIn
       commsManager.downlinkRequestOut -> storageService.downlinkRequestIn
       commsManager.payloadDownlinkRequestOut -> payloadDownlinkManager.downlinkRequestIn
+      payloadDownlinkManager.statusOut -> commsManager.payloadDownlinkStatusIn
       scienceManager.missionModeOut -> missionManager.modeUpdateIn[0]
       commsManager.missionModeOut -> missionManager.modeUpdateIn[1]
     }

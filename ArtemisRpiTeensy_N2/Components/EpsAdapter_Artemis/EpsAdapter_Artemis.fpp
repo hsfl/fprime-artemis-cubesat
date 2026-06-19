@@ -8,6 +8,9 @@ module Components {
         @ Health ping output
         output port pingOut: Svc.Ping
 
+        @ Rate group scheduling input for pending request timeout recovery
+        sync input port run: Svc.Sched
+
         @ Adapter request input
         sync input port requestIn: Components.EpsCommand
 
@@ -44,6 +47,9 @@ module Components {
         @ Teensy-local RPC failure count
         telemetry TransportFailureCount: U32
 
+        @ Age of the pending Teensy-local PDU request in scheduler ticks
+        telemetry PendingRequestTicks: U32
+
         @ PDU request queued to the Teensy-local channel
         event PduRequestQueued(epsRequest: Components.EpsRequest, requestId: U32) severity activity low format "Artemis PDU request={} queued local request={}"
 
@@ -52,6 +58,9 @@ module Components {
 
         @ PDU request failure event
         event PduRequestFailed(epsRequest: Components.EpsRequest, status: U32) severity warning low format "Artemis PDU request={} failed status={}"
+
+        @ PDU request timeout event
+        event PduRequestTimedOut(epsRequest: Components.EpsRequest, requestId: U32) severity warning low format "Artemis PDU request={} timed out local request={}"
 
         @ Port for requesting the current time
         time get port timeCaller

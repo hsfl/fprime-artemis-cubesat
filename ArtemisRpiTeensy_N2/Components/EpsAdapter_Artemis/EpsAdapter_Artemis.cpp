@@ -9,6 +9,7 @@ EpsAdapter_Artemis::EpsAdapter_Artemis(const char* const compName)
       m_sequence(0),
       m_pendingRequestId(0),
       m_pendingOpcode(0),
+      m_pendingRequestTicks(0),
       m_requestPending(false),
       m_lastRequest(Components::EpsRequest::GET_SUMMARY_STATUS),
       m_protocolVersion(0),
@@ -28,6 +29,18 @@ EpsAdapter_Artemis::~EpsAdapter_Artemis() {}
 void EpsAdapter_Artemis::pingIn_handler(FwIndexType portNum, U32 key) {
     static_cast<void>(portNum);
     this->pingOut_out(0, key);
+}
+
+void EpsAdapter_Artemis::run_handler(FwIndexType portNum, U32 context) {
+    static_cast<void>(portNum);
+    static_cast<void>(context);
+    if (this->m_requestPending) {
+        this->m_pendingRequestTicks += 1U;
+        if (this->m_pendingRequestTicks >= PDU_REQUEST_TIMEOUT_TICKS) {
+            this->timeoutPendingRequest();
+        }
+    }
+    this->writeTelemetry();
 }
 
 void EpsAdapter_Artemis::requestIn_handler(
@@ -114,6 +127,7 @@ bool EpsAdapter_Artemis::sendPduRequest(U8 opcode, const U8* payload, U8 payload
 
     this->m_pendingRequestId = seq;
     this->m_pendingOpcode = opcode;
+    this->m_pendingRequestTicks = 0;
     this->m_requestPending = true;
     Fw::Buffer localRequest(this->m_localPacket, packetLen);
     this->teensyRequestOut_out(0, localRequest);
@@ -139,6 +153,7 @@ void EpsAdapter_Artemis::teensyResponseIn_handler(FwIndexType portNum, Fw::Buffe
         if ((target == LinkCfg::TEENSY_TARGET_PDU) && this->m_requestPending &&
             (requestId == this->m_pendingRequestId)) {
             this->m_requestPending = false;
+            this->m_pendingRequestTicks = 0;
             this->emitStatus(Components::HealthState::UNKNOWN, LINK_ERROR, 0xFCU, this->m_pendingOpcode);
             this->writeTelemetry();
         }
@@ -147,6 +162,7 @@ void EpsAdapter_Artemis::teensyResponseIn_handler(FwIndexType portNum, Fw::Buffe
 
     if (localStatus != LinkCfg::TEENSY_STATUS_OK) {
         this->m_requestPending = false;
+        this->m_pendingRequestTicks = 0;
         this->m_transportFailureCount += 1U;
         this->m_lastPduStatus = localStatus;
         this->m_lastOpcode = this->m_pendingOpcode;
@@ -164,6 +180,7 @@ void EpsAdapter_Artemis::teensyResponseIn_handler(FwIndexType portNum, Fw::Buffe
         this->m_pendingOpcode,
         response);
     this->m_requestPending = false;
+    this->m_pendingRequestTicks = 0;
     if (!parsed) {
         this->m_transportFailureCount += 1U;
         this->emitStatus(Components::HealthState::UNKNOWN, LINK_ERROR, 0xFBU, this->m_pendingOpcode);
@@ -274,6 +291,24 @@ void EpsAdapter_Artemis::writeTelemetry() {
     this->tlmWrite_PduFaultBitmap(this->m_faultBitmap);
     this->tlmWrite_PduUptimeSeconds(this->m_uptimeSeconds);
     this->tlmWrite_TransportFailureCount(this->m_transportFailureCount);
+    this->tlmWrite_PendingRequestTicks(this->m_pendingRequestTicks);
+}
+
+void EpsAdapter_Artemis::timeoutPendingRequest() {
+    const U8 timedOutRequestId = this->m_pendingRequestId;
+    const U8 timedOutOpcode = this->m_pendingOpcode;
+    this->m_requestPending = false;
+    this->m_pendingRequestTicks = 0;
+    this->m_transportFailureCount += 1U;
+    this->m_lastPduStatus = LinkCfg::TEENSY_STATUS_TIMEOUT;
+    this->m_lastOpcode = timedOutOpcode;
+    this->emitStatus(
+        Components::HealthState::UNKNOWN,
+        LINK_ERROR,
+        LinkCfg::TEENSY_STATUS_TIMEOUT,
+        timedOutOpcode);
+    this->log_WARNING_LO_PduRequestTimedOut(this->m_lastRequest, timedOutRequestId);
+    this->log_WARNING_LO_PduRequestFailed(this->m_lastRequest, LinkCfg::TEENSY_STATUS_TIMEOUT);
 }
 
 U16 EpsAdapter_Artemis::crc16Ccitt(const U8* data, U32 length) {

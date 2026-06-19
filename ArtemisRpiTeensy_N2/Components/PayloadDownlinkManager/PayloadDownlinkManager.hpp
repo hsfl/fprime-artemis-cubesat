@@ -4,6 +4,8 @@
 #include "Components/LinkCfg/LinkCfg.hpp"
 #include "Components/PayloadDownlinkManager/PayloadDownlinkManagerComponentAc.hpp"
 
+#include <string>
+
 namespace Components {
 
 class PayloadDownlinkManager final : public PayloadDownlinkManagerComponentBase {
@@ -35,19 +37,22 @@ class PayloadDownlinkManager final : public PayloadDownlinkManagerComponentBase 
     void ABORT_PAYLOAD_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void GET_PAYLOAD_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
 
-    void resetTransfer(U32 productId, U32 byteCount);
+    bool resetTransfer(U32 productId, U32 byteCount);
+    bool prepareSource(U32 byteCount);
     void emitTelemetry();
-    void sendHeaderPacket();
-    void sendDataPacket(U32 packetIndex);
-    void sendEndPacket();
-    void sendPacket(const U8* data, FwSizeType size);
+    void emitStatus();
+    bool sendHeaderPacket();
+    bool sendDataPacket(U32 packetIndex);
+    bool sendEndPacket();
+    bool sendPacket(const U8* data, FwSizeType size);
     void handleRetryRequest(const U8* data, FwSizeType size);
-    U8 blobByteAt(U32 offset) const;
-    U16 blobCrc(U32 byteCount) const;
+    bool readSourceBytes(U32 offset, U8* output, U32 length) const;
+    bool computeSourceCrc(U32 byteCount, U16& crcOut) const;
     U16 crc16Ccitt(const U8* data, FwSizeType size) const;
     void putU16(U8* data, FwSizeType offset, U16 value) const;
     void putU32(U8* data, FwSizeType offset, U32 value) const;
     U16 getU16(const U8* data, FwSizeType offset) const;
+    void failTransfer(U32 reason, U32 detail);
 
     State m_state;
     U8 m_transferId;
@@ -62,6 +67,9 @@ class PayloadDownlinkManager final : public PayloadDownlinkManagerComponentBase 
     U16 m_blobCrc;
     bool m_sentHeader;
     bool m_sentEnd;
+    bool m_sourceReady;
+    U32 m_sourceBytes;
+    std::string m_sourcePath;
     U8 m_packet[LinkCfg::PAYLOAD_PACKET_MAX_BYTES];
 };
 

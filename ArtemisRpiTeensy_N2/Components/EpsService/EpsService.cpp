@@ -87,7 +87,7 @@ void EpsService::REQUEST_PDU_PROTOCOL_cmdHandler(FwOpcodeType opCode, U32 cmdSeq
 void EpsService::REQUEST_PDU_OUTPUT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 outputId) {
     if (outputId > MAX_U8_VALUE) {
         this->log_WARNING_LO_EpsCommandRejected(1, outputId);
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
         return;
     }
     this->sendRequest(Components::EpsRequest::GET_OUTPUT_STATE, static_cast<U8>(outputId), 0, 0);
@@ -97,12 +97,12 @@ void EpsService::REQUEST_PDU_OUTPUT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, 
 void EpsService::SET_PDU_OUTPUT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 outputId, U32 state, U32 confirm) {
     if (confirm != CONFIRM_VALUE) {
         this->log_WARNING_LO_EpsCommandRejected(2, confirm);
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
         return;
     }
     if (!this->isSafeOutputId(outputId) || (state > 1U)) {
         this->log_WARNING_LO_EpsCommandRejected(3, outputId);
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
         return;
     }
     this->sendRequest(Components::EpsRequest::SET_OUTPUT_STATE, static_cast<U8>(outputId), static_cast<U8>(state), 0);
@@ -118,12 +118,12 @@ void EpsService::POWER_CYCLE_PDU_OUTPUT_cmdHandler(
 ) {
     if (confirm != CONFIRM_VALUE) {
         this->log_WARNING_LO_EpsCommandRejected(2, confirm);
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
         return;
     }
     if (!this->isSafeOutputId(outputId) || (offMs > MAX_POWER_CYCLE_MS)) {
         this->log_WARNING_LO_EpsCommandRejected(4, outputId);
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
         return;
     }
     this->sendRequest(
@@ -142,7 +142,7 @@ void EpsService::REQUEST_CHARGER_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdS
 void EpsService::SET_CHARGER_STATE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 enable, U32 confirm) {
     if (confirm != CONFIRM_VALUE) {
         this->log_WARNING_LO_EpsCommandRejected(2, confirm);
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
         return;
     }
     this->sendRequest(Components::EpsRequest::SET_CHARGER_STATE, 0, (enable == 0U) ? 0U : 1U, 0);

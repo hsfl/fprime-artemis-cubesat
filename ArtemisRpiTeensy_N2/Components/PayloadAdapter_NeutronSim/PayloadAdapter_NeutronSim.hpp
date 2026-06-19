@@ -19,6 +19,7 @@ class PayloadAdapter_NeutronSim final : public PayloadAdapter_NeutronSimComponen
         U32 saaRows;
         U32 productBytes;
         U32 exitStatus;
+        std::string outputPath;
     };
 
     void pingIn_handler(FwIndexType portNum, U32 key) override;
@@ -28,6 +29,7 @@ class PayloadAdapter_NeutronSim final : public PayloadAdapter_NeutronSimComponen
     static std::string getSimRoot();
     static std::string shellQuote(const std::string& value);
     static void parseSummaryLine(const std::string& line, CaptureSummary& summary);
+    static bool publishLatestCapture(const std::string& outputPath);
     static U32 parseU32(const std::string& value);
 
     U32 m_lastDurationSeconds;

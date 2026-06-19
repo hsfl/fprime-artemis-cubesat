@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
+#include <sys/wait.h>
 #include <unistd.h>
 
 namespace Components {
@@ -13,6 +14,7 @@ constexpr const char* DEFAULT_SIM_ROOT = "../external/payload-neutron-simulation
 constexpr const char* REPO_ROOT_SIM_ROOT = "external/payload-neutron-simulation";
 constexpr const char* DEFAULT_CURSOR = "/tmp/neutron_payload_sim_cursor.json";
 constexpr const char* DEFAULT_OUTPUT_DIR = "/tmp/neutron_payload_captures";
+constexpr const char* DEFAULT_LATEST_PAYLOAD = "/tmp/neutron_payload_captures/latest_payload.bin";
 constexpr U32 DEFAULT_CAPTURE_SECONDS = 600;
 
 }  // namespace
@@ -39,7 +41,11 @@ void PayloadAdapter_NeutronSim::requestIn_handler(FwIndexType portNum, U32 durat
         durationSeconds = DEFAULT_CAPTURE_SECONDS;
     }
 
-    const CaptureSummary summary = this->runCapture(durationSeconds);
+    CaptureSummary summary = this->runCapture(durationSeconds);
+    if ((summary.exitStatus == 0U) && !summary.outputPath.empty() && !publishLatestCapture(summary.outputPath)) {
+        summary.exitStatus = 126U;
+    }
+
     this->m_lastDurationSeconds = durationSeconds;
     this->m_lastRowsCaptured = summary.rows;
     this->m_lastTotalCounts = summary.totalCounts;
@@ -91,7 +97,13 @@ PayloadAdapter_NeutronSim::CaptureSummary PayloadAdapter_NeutronSim::runCapture(
     }
 
     const int status = ::pclose(pipe);
-    summary.exitStatus = (status == 0) ? 0U : static_cast<U32>(status);
+    if (status == 0) {
+        summary.exitStatus = 0U;
+    } else if (WIFEXITED(status)) {
+        summary.exitStatus = static_cast<U32>(WEXITSTATUS(status));
+    } else {
+        summary.exitStatus = static_cast<U32>(status);
+    }
     return summary;
 }
 
@@ -130,7 +142,11 @@ void PayloadAdapter_NeutronSim::parseSummaryLine(const std::string& line, Captur
         return;
     }
     const std::string key = line.substr(0, separator);
-    const std::string value = line.substr(separator + 1);
+    std::string value = line.substr(separator + 1);
+    while (!value.empty() &&
+           ((value.back() == '\n') || (value.back() == '\r') || (value.back() == ' ') || (value.back() == '\t'))) {
+        value.pop_back();
+    }
 
     if (key == "rows") {
         summary.rows = parseU32(value);
@@ -140,7 +156,17 @@ void PayloadAdapter_NeutronSim::parseSummaryLine(const std::string& line, Captur
         summary.saaRows = parseU32(value);
     } else if (key == "output_bytes") {
         summary.productBytes = parseU32(value);
+    } else if (key == "output_path") {
+        summary.outputPath = value;
     }
+}
+
+bool PayloadAdapter_NeutronSim::publishLatestCapture(const std::string& outputPath) {
+    if (::access(outputPath.c_str(), R_OK) != 0) {
+        return false;
+    }
+    (void)::unlink(DEFAULT_LATEST_PAYLOAD);
+    return (::symlink(outputPath.c_str(), DEFAULT_LATEST_PAYLOAD) == 0);
 }
 
 U32 PayloadAdapter_NeutronSim::parseU32(const std::string& value) {

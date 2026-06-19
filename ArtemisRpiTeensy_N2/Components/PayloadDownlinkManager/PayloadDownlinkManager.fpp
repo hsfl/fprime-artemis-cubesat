@@ -20,6 +20,9 @@ module Components {
         @ Payload protocol packets to the UART channel mux.
         output port packetOut: Fw.BufferSend
 
+        @ Payload transfer status to mission communications manager.
+        output port statusOut: Components.PayloadDownlinkStatus
+
         @ Start downlinking a generic deterministic blob.
         async command START_PAYLOAD_DOWNLINK(productId: U32, byteCount: U32)
 
@@ -63,6 +66,10 @@ module Components {
         @ Payload downlink completed.
         event PayloadDownlinkComplete(transferId: U32, packetsSent: U32) \
             severity activity high format "Payload downlink complete transfer={} packetsSent={}"
+
+        @ Payload downlink failed.
+        event PayloadDownlinkFailed(reason: U32, detail: U32) \
+            severity warning low format "Payload downlink failed reason={} detail={}"
 
         @ Payload retry request received.
         event PayloadRetryRequested(startIndex: U32, missingCount: U32) \

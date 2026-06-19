@@ -48,10 +48,12 @@ class EpsAdapter_Artemis final : public EpsAdapter_ArtemisComponentBase {
     static constexpr U8 LINK_BUSY = 4;
     static constexpr U8 LOCAL_HEADER_LEN = 4;
     static constexpr U32 LOCAL_MAX_PACKET_LEN = LOCAL_HEADER_LEN + PDU_V2_MAX_FRAME_LEN;
+    static constexpr U32 PDU_REQUEST_TIMEOUT_TICKS = 2;
 
     U8 m_sequence;
     U8 m_pendingRequestId;
     U8 m_pendingOpcode;
+    U32 m_pendingRequestTicks;
     bool m_requestPending;
     Components::EpsRequest m_lastRequest;
     U8 m_protocolVersion;
@@ -64,6 +66,9 @@ class EpsAdapter_Artemis final : public EpsAdapter_ArtemisComponentBase {
     U8 m_lastOpcode;
     U32 m_transportFailureCount;
     U8 m_localPacket[LOCAL_MAX_PACKET_LEN];
+
+    void run_handler(FwIndexType portNum, U32 context) override;
+    void timeoutPendingRequest();
 };
 
 }  // namespace Components

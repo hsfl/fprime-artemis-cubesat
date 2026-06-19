@@ -50,6 +50,17 @@ module Components {
   @ Mission mode update from services that complete visible story transitions.
   port MissionModeUpdate(mode: MissionMode, detail: U32)
 
+  @ Payload downlink transfer status from the channel-1 blob manager.
+  port PayloadDownlinkStatus(
+    stateValue: U32,
+    transferId: U32,
+    productId: U32,
+    totalBytes: U32,
+    packetsSent: U32,
+    totalPackets: U32,
+    lastError: U32
+  )
+
   @ EPS/PDU command from mission-facing EPS service to hardware adapter.
   port EpsCommand(epsRequest: EpsRequest, outputId: U8, commandedState: U8, durationMs: U16)
 

@@ -1,13 +1,89 @@
 #include "Components/PayloadDownlinkManager/PayloadDownlinkManager.hpp"
 
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <dirent.h>
+#include <sys/stat.h>
 
 namespace Components {
 
 namespace {
-constexpr U32 DEFAULT_BLOB_BYTES = 40368;
 constexpr U32 MAX_BLOB_BYTES = 1024U * 1024U;
 constexpr U32 PACKETS_PER_RUN = 4;
+constexpr const char* PAYLOAD_SOURCE_ENV = "NEUTRON_PAYLOAD_DOWNLINK_FILE";
+constexpr const char* DEFAULT_PAYLOAD_SOURCE = "/tmp/neutron_payload_captures/latest_payload.bin";
+constexpr const char* CAPTURE_DIR = "/tmp/neutron_payload_captures";
+constexpr const char* CAPTURE_PREFIX = "neutron_capture_";
+constexpr const char* CAPTURE_SUFFIX = ".csv";
+
+bool hasPrefix(const char* value, const char* prefix) {
+    return std::strncmp(value, prefix, std::strlen(prefix)) == 0;
+}
+
+bool hasSuffix(const char* value, const char* suffix) {
+    const std::size_t valueLength = std::strlen(value);
+    const std::size_t suffixLength = std::strlen(suffix);
+    if (valueLength < suffixLength) {
+        return false;
+    }
+    return std::strcmp(value + valueLength - suffixLength, suffix) == 0;
+}
+
+bool fileSizeBytes(const std::string& path, U32& bytes) {
+    struct stat info {};
+    if (::stat(path.c_str(), &info) != 0 || !S_ISREG(info.st_mode) || info.st_size < 0) {
+        return false;
+    }
+    if (static_cast<unsigned long long>(info.st_size) > static_cast<unsigned long long>(MAX_BLOB_BYTES)) {
+        return false;
+    }
+    bytes = static_cast<U32>(info.st_size);
+    return true;
+}
+
+std::string latestCapturePath() {
+    DIR* directory = ::opendir(CAPTURE_DIR);
+    if (directory == nullptr) {
+        return std::string();
+    }
+
+    std::string latest;
+    while (dirent* entry = ::readdir(directory)) {
+        const char* name = entry->d_name;
+        if (!hasPrefix(name, CAPTURE_PREFIX) || !hasSuffix(name, CAPTURE_SUFFIX)) {
+            continue;
+        }
+        const std::string candidate = std::string(CAPTURE_DIR) + "/" + name;
+        if (candidate > latest) {
+            latest = candidate;
+        }
+    }
+    (void)::closedir(directory);
+    return latest;
+}
+
+std::string resolvePayloadSource(U32& sourceBytes) {
+    const char* envPath = std::getenv(PAYLOAD_SOURCE_ENV);
+    if ((envPath != nullptr) && (envPath[0] != '\0')) {
+        const std::string path(envPath);
+        if (fileSizeBytes(path, sourceBytes)) {
+            return path;
+        }
+        return std::string();
+    }
+
+    const std::string defaultPath(DEFAULT_PAYLOAD_SOURCE);
+    if (fileSizeBytes(defaultPath, sourceBytes)) {
+        return defaultPath;
+    }
+
+    const std::string latest = latestCapturePath();
+    if (!latest.empty() && fileSizeBytes(latest, sourceBytes)) {
+        return latest;
+    }
+    return std::string();
+}
 }
 
 PayloadDownlinkManager::PayloadDownlinkManager(const char* const compName)
@@ -24,7 +100,10 @@ PayloadDownlinkManager::PayloadDownlinkManager(const char* const compName)
       m_lastError(0),
       m_blobCrc(0),
       m_sentHeader(false),
-      m_sentEnd(false) {
+      m_sentEnd(false),
+      m_sourceReady(false),
+      m_sourceBytes(0),
+      m_sourcePath() {
     std::memset(this->m_packet, 0, sizeof(this->m_packet));
 }
 
@@ -41,22 +120,35 @@ void PayloadDownlinkManager::run_handler(FwIndexType portNum, U32 context) {
 
     if (this->m_state == STATE_DOWNLINKING) {
         if (!this->m_sentHeader) {
-            this->sendHeaderPacket();
+            if (!this->sendHeaderPacket()) {
+                this->failTransfer(3U, this->m_lastError);
+                this->emitTelemetry();
+                return;
+            }
             this->m_sentHeader = true;
         }
 
         U32 sentThisRun = 0;
         while (sentThisRun < PACKETS_PER_RUN && this->m_nextPacketIndex < this->m_totalPackets) {
-            this->sendDataPacket(this->m_nextPacketIndex);
+            if (!this->sendDataPacket(this->m_nextPacketIndex)) {
+                this->failTransfer(6U, this->m_lastError);
+                break;
+            }
             this->m_nextPacketIndex++;
             sentThisRun++;
         }
 
-        if (this->m_nextPacketIndex >= this->m_totalPackets && !this->m_sentEnd) {
-            this->sendEndPacket();
+        if ((this->m_state == STATE_DOWNLINKING) && this->m_nextPacketIndex >= this->m_totalPackets &&
+            !this->m_sentEnd) {
+            if (!this->sendEndPacket()) {
+                this->failTransfer(3U, this->m_lastError);
+                this->emitTelemetry();
+                return;
+            }
             this->m_sentEnd = true;
             this->m_state = STATE_DONE;
             this->log_ACTIVITY_HI_PayloadDownlinkComplete(this->m_transferId, this->m_packetsSent);
+            this->emitStatus();
         }
     }
 
@@ -74,15 +166,21 @@ void PayloadDownlinkManager::packetIn_handler(FwIndexType portNum, Fw::Buffer& f
 
 void PayloadDownlinkManager::downlinkRequestIn_handler(FwIndexType portNum, U32 key) {
     static_cast<void>(portNum);
-    const U32 byteCount = (key == 0U) ? DEFAULT_BLOB_BYTES : key;
-    const U32 productId = static_cast<U32>(this->m_transferId) + 1U;
-    if (byteCount > MAX_BLOB_BYTES) {
-        this->m_lastError = 2;
-        this->m_state = STATE_ERROR;
+    if (key == 0U) {
+        this->failTransfer(8U, 0U);
         return;
     }
-    this->resetTransfer(productId, byteCount);
+    const U32 byteCount = key;
+    const U32 productId = static_cast<U32>(this->m_transferId) + 1U;
+    if (byteCount > MAX_BLOB_BYTES) {
+        this->failTransfer(2U, byteCount);
+        return;
+    }
+    if (!this->resetTransfer(productId, byteCount)) {
+        return;
+    }
     this->log_ACTIVITY_HI_PayloadDownlinkStarted(this->m_productId, this->m_totalBytes, this->m_totalPackets);
+    this->emitStatus();
 }
 
 void PayloadDownlinkManager::START_PAYLOAD_DOWNLINK_cmdHandler(FwOpcodeType opCode,
@@ -91,22 +189,28 @@ void PayloadDownlinkManager::START_PAYLOAD_DOWNLINK_cmdHandler(FwOpcodeType opCo
                                                                U32 byteCount) {
     U32 normalizedBytes = byteCount;
     if (normalizedBytes == 0) {
-        normalizedBytes = DEFAULT_BLOB_BYTES;
+        this->failTransfer(8U, 0U);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+        return;
     }
     if (normalizedBytes > MAX_BLOB_BYTES) {
-        this->m_lastError = 2;
-        this->m_state = STATE_ERROR;
+        this->failTransfer(2U, normalizedBytes);
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
         return;
     }
 
-    this->resetTransfer(productId, normalizedBytes);
+    if (!this->resetTransfer(productId, normalizedBytes)) {
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
+        return;
+    }
     this->log_ACTIVITY_HI_PayloadDownlinkStarted(this->m_productId, this->m_totalBytes, this->m_totalPackets);
+    this->emitStatus();
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
 void PayloadDownlinkManager::ABORT_PAYLOAD_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     this->m_state = STATE_ABORTED;
+    this->emitStatus();
     this->emitTelemetry();
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
@@ -117,7 +221,18 @@ void PayloadDownlinkManager::GET_PAYLOAD_STATUS_cmdHandler(FwOpcodeType opCode, 
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
-void PayloadDownlinkManager::resetTransfer(U32 productId, U32 byteCount) {
+bool PayloadDownlinkManager::resetTransfer(U32 productId, U32 byteCount) {
+    if (!this->prepareSource(byteCount)) {
+        const U32 reason = (this->m_lastError != 0U) ? this->m_lastError : 7U;
+        this->failTransfer(reason, byteCount);
+        return false;
+    }
+    U16 sourceCrc = 0;
+    if (!this->computeSourceCrc(byteCount, sourceCrc)) {
+        this->failTransfer(7U, byteCount);
+        return false;
+    }
+
     this->m_state = STATE_DOWNLINKING;
     this->m_transferId++;
     if (this->m_transferId == 0) {
@@ -132,9 +247,34 @@ void PayloadDownlinkManager::resetTransfer(U32 productId, U32 byteCount) {
     this->m_retryRound = 0;
     this->m_packetsMissing = 0;
     this->m_lastError = 0;
-    this->m_blobCrc = this->blobCrc(byteCount);
+    this->m_blobCrc = sourceCrc;
     this->m_sentHeader = false;
     this->m_sentEnd = false;
+    return true;
+}
+
+bool PayloadDownlinkManager::prepareSource(U32 byteCount) {
+    U32 sourceBytes = 0;
+    const std::string sourcePath = resolvePayloadSource(sourceBytes);
+    if (sourcePath.empty()) {
+        this->m_sourceReady = false;
+        this->m_sourceBytes = 0;
+        this->m_sourcePath.clear();
+        this->m_lastError = 7U;
+        return false;
+    }
+    if (sourceBytes != byteCount) {
+        this->m_sourceReady = false;
+        this->m_sourceBytes = sourceBytes;
+        this->m_sourcePath = sourcePath;
+        this->m_lastError = 9U;
+        return false;
+    }
+
+    this->m_sourceReady = true;
+    this->m_sourceBytes = sourceBytes;
+    this->m_sourcePath = sourcePath;
+    return true;
 }
 
 void PayloadDownlinkManager::emitTelemetry() {
@@ -149,7 +289,21 @@ void PayloadDownlinkManager::emitTelemetry() {
     this->tlmWrite_LastError(this->m_lastError);
 }
 
-void PayloadDownlinkManager::sendHeaderPacket() {
+void PayloadDownlinkManager::emitStatus() {
+    if (this->isConnected_statusOut_OutputPort(0)) {
+        this->statusOut_out(
+            0,
+            this->m_state,
+            this->m_transferId,
+            this->m_productId,
+            this->m_totalBytes,
+            this->m_packetsSent,
+            this->m_totalPackets,
+            this->m_lastError);
+    }
+}
+
+bool PayloadDownlinkManager::sendHeaderPacket() {
     std::memset(this->m_packet, 0, sizeof(this->m_packet));
     this->m_packet[0] = LinkCfg::PAYLOAD_MAGIC_0;
     this->m_packet[1] = LinkCfg::PAYLOAD_MAGIC_1;
@@ -160,10 +314,10 @@ void PayloadDownlinkManager::sendHeaderPacket() {
     this->putU16(this->m_packet, 12, static_cast<U16>(this->m_totalPackets));
     this->m_packet[14] = static_cast<U8>(LinkCfg::PAYLOAD_PACKET_DATA_BYTES);
     this->putU16(this->m_packet, 15, this->m_blobCrc);
-    this->sendPacket(this->m_packet, 17);
+    return this->sendPacket(this->m_packet, 17);
 }
 
-void PayloadDownlinkManager::sendDataPacket(U32 packetIndex) {
+bool PayloadDownlinkManager::sendDataPacket(U32 packetIndex) {
     const U32 offset = packetIndex * LinkCfg::PAYLOAD_PACKET_DATA_BYTES;
     U32 remaining = (offset < this->m_totalBytes) ? (this->m_totalBytes - offset) : 0;
     if (remaining > LinkCfg::PAYLOAD_PACKET_DATA_BYTES) {
@@ -177,17 +331,21 @@ void PayloadDownlinkManager::sendDataPacket(U32 packetIndex) {
     this->m_packet[3] = this->m_transferId;
     this->putU16(this->m_packet, 4, static_cast<U16>(packetIndex));
     this->m_packet[6] = static_cast<U8>(remaining);
-    for (U32 i = 0; i < remaining; i++) {
-        this->m_packet[7 + i] = this->blobByteAt(offset + i);
+    if (!this->readSourceBytes(offset, &this->m_packet[7], remaining)) {
+        this->m_lastError = 7U;
+        return false;
     }
     const FwSizeType crcOffset = 7 + remaining;
     const U16 crc = this->crc16Ccitt(this->m_packet, crcOffset);
     this->putU16(this->m_packet, crcOffset, crc);
-    this->sendPacket(this->m_packet, crcOffset + 2);
+    if (!this->sendPacket(this->m_packet, crcOffset + 2)) {
+        return false;
+    }
     this->m_packetsSent++;
+    return true;
 }
 
-void PayloadDownlinkManager::sendEndPacket() {
+bool PayloadDownlinkManager::sendEndPacket() {
     std::memset(this->m_packet, 0, sizeof(this->m_packet));
     this->m_packet[0] = LinkCfg::PAYLOAD_MAGIC_0;
     this->m_packet[1] = LinkCfg::PAYLOAD_MAGIC_1;
@@ -195,20 +353,21 @@ void PayloadDownlinkManager::sendEndPacket() {
     this->m_packet[3] = this->m_transferId;
     this->putU16(this->m_packet, 4, static_cast<U16>(this->m_totalPackets));
     this->putU16(this->m_packet, 6, this->m_blobCrc);
-    this->sendPacket(this->m_packet, 8);
+    return this->sendPacket(this->m_packet, 8);
 }
 
-void PayloadDownlinkManager::sendPacket(const U8* data, FwSizeType size) {
+bool PayloadDownlinkManager::sendPacket(const U8* data, FwSizeType size) {
     if (!this->isConnected_packetOut_OutputPort(0)) {
         this->m_lastError = 3;
-        return;
+        return false;
     }
     if (data == nullptr || size == 0 || size > LinkCfg::PAYLOAD_PACKET_MAX_BYTES) {
         this->m_lastError = 6;
-        return;
+        return false;
     }
-    Fw::Buffer packet(const_cast<U8*>(data), LinkCfg::PAYLOAD_PACKET_MAX_BYTES);
+    Fw::Buffer packet(const_cast<U8*>(data), size);
     this->packetOut_out(0, packet);
+    return true;
 }
 
 void PayloadDownlinkManager::handleRetryRequest(const U8* data, FwSizeType size) {
@@ -235,23 +394,56 @@ void PayloadDownlinkManager::handleRetryRequest(const U8* data, FwSizeType size)
             }
             const U32 packetIndex = static_cast<U32>(startIndex) + static_cast<U32>(byteIndex) * 8U + bit;
             if (packetIndex < this->m_totalPackets) {
-                this->sendDataPacket(packetIndex);
-                missing++;
+                if (this->sendDataPacket(packetIndex)) {
+                    missing++;
+                } else {
+                    this->failTransfer(6U, this->m_lastError);
+                    break;
+                }
             }
+        }
+        if (this->m_state == STATE_ERROR) {
+            break;
         }
     }
     this->m_packetsMissing = missing;
     this->log_ACTIVITY_LO_PayloadRetryRequested(startIndex, missing);
+    this->emitStatus();
 }
 
-U8 PayloadDownlinkManager::blobByteAt(U32 offset) const {
-    return static_cast<U8>((this->m_productId + (offset * 31U) + (offset >> 8U)) & 0xFFU);
+bool PayloadDownlinkManager::readSourceBytes(U32 offset, U8* output, U32 length) const {
+    if (!this->m_sourceReady || output == nullptr || offset > this->m_sourceBytes ||
+        length > (this->m_sourceBytes - offset)) {
+        return false;
+    }
+    if (length == 0U) {
+        return true;
+    }
+
+    std::FILE* file = std::fopen(this->m_sourcePath.c_str(), "rb");
+    if (file == nullptr) {
+        return false;
+    }
+    const bool seekOk = (std::fseek(file, static_cast<long>(offset), SEEK_SET) == 0);
+    const std::size_t bytesRead = seekOk ? std::fread(output, 1, static_cast<std::size_t>(length), file) : 0U;
+    (void)std::fclose(file);
+    return seekOk && (bytesRead == static_cast<std::size_t>(length));
 }
 
-U16 PayloadDownlinkManager::blobCrc(U32 byteCount) const {
+bool PayloadDownlinkManager::computeSourceCrc(U32 byteCount, U16& crcOut) const {
     U16 crc = 0xFFFFU;
+    std::FILE* file = this->m_sourceReady ? std::fopen(this->m_sourcePath.c_str(), "rb") : nullptr;
+    if (file == nullptr) {
+        return false;
+    }
+
     for (U32 i = 0; i < byteCount; i++) {
-        crc ^= static_cast<U16>(this->blobByteAt(i)) << 8U;
+        const int value = std::fgetc(file);
+        if (value == EOF) {
+            (void)std::fclose(file);
+            return false;
+        }
+        crc ^= static_cast<U16>(static_cast<U8>(value)) << 8U;
         for (U8 bit = 0; bit < 8; bit++) {
             if ((crc & 0x8000U) != 0) {
                 crc = static_cast<U16>((crc << 1U) ^ 0x1021U);
@@ -260,7 +452,9 @@ U16 PayloadDownlinkManager::blobCrc(U32 byteCount) const {
             }
         }
     }
-    return crc;
+    (void)std::fclose(file);
+    crcOut = crc;
+    return true;
 }
 
 U16 PayloadDownlinkManager::crc16Ccitt(const U8* data, FwSizeType size) const {
@@ -292,6 +486,14 @@ void PayloadDownlinkManager::putU32(U8* data, FwSizeType offset, U32 value) cons
 
 U16 PayloadDownlinkManager::getU16(const U8* data, FwSizeType offset) const {
     return static_cast<U16>(data[offset]) | (static_cast<U16>(data[offset + 1]) << 8U);
+}
+
+void PayloadDownlinkManager::failTransfer(U32 reason, U32 detail) {
+    this->m_lastError = reason;
+    this->m_state = STATE_ERROR;
+    this->log_WARNING_LO_PayloadDownlinkFailed(reason, detail);
+    this->emitStatus();
+    this->emitTelemetry();
 }
 
 }  // namespace Components

@@ -20,6 +20,9 @@ module Components {
         @ Adapter status input
         sync input port adapterStatusIn: Svc.Ping
 
+        @ Payload downlink transfer status input
+        sync input port payloadDownlinkStatusIn: Components.PayloadDownlinkStatus
+
         @ Downlink request output to storage
         output port downlinkRequestOut: Components.ScienceDownlinkRequest
 
@@ -61,6 +64,9 @@ module Components {
 
         @ Downlink completion event for the current synchronous/demo downlink path
         event DownlinkFinished(bytes: U32) severity activity high format "Downlink finished for {} bytes"
+
+        @ Downlink failure or rejected request event
+        event DownlinkFailed(stateValue: U32, lastError: U32) severity warning low format "Downlink failed state={} error={}"
 
         @ Link state event
         event LinkStateUpdated(linkState: U32) severity activity low format "Comms link state updated {}"
