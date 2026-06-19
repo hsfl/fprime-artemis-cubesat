@@ -7,11 +7,13 @@ This runbook shows:
 
 - F Prime app running locally
 - `fprime-gds` command/event/telemetry view
+- channelized Pi UART mux behavior at the host-side boundary
 - Base Mode and live SOH telemetry
 - operator-scheduled payload collection
 - simulated neutron payload CSV generation
 - science downlink progress events
 - payload viewer opening the latest CSV automatically
+- payload viewer refocus/open after verified science downlink completion
 
 ## What This Does And Does Not Prove
 
@@ -24,6 +26,7 @@ Validated:
 - scheduled collection command path
 - simulated Neutron 2 payload capture path
 - storage/downlink handoff events
+- channel 1 payload downlink manager completion events
 - ground-side CSV review in the payload viewer
 
 Not validated:
@@ -32,7 +35,8 @@ Not validated:
 - Teensy bridge firmware behavior
 - RF link behavior
 - real payload board behavior
-- real file/blob transfer over the selected radio path
+- physical channel 1 payload reconstruction over the RFM23BP path
+- real PDU hardware response behavior over satellite Teensy `Serial1`
 
 ## Preflight
 
@@ -69,6 +73,10 @@ cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 export NEUTRON_PAYLOAD_SIM_ROOT=/Users/sozodennis/Developer/fprime-artemis-cubesat/external/payload-neutron-simulation
 ./tools/run_local_emulation.sh --gui-port 5050
 ```
+
+`run_local_emulation.sh` defaults to `--link-mode channelized`, which unwraps
+channel 0 for `fprime-gds`, observes channel 1 payload traffic locally, and keeps
+channel 2 satellite-local RPC off the ground stream.
 
 Terminal 2: start the Neutron 2 payload viewer.
 
@@ -298,14 +306,20 @@ Expected events, in order:
 ```text
 CommsManager.DownlinkRequested
 StorageService.DownlinkPrepared
+PayloadDownlinkManager.PayloadDownlinkStarted
+PayloadDownlinkManager.PayloadDownlinkComplete
 CommsManager.DownlinkFinished
 ```
 
 Lead-facing line:
 
 ```text
-This shows the current F Prime downlink handoff and completion event path. HIL will replace this with the real payload transfer over the selected communications path.
+This shows the current F Prime downlink handoff and completion-driven channel 1 payload transfer path. HIL will validate the same payload path over the Teensy/RFM23BP hardware link.
 ```
+
+The automated `run_neutron2_local_demo.sh` check waits for these completion
+events and verifies that F Prime published the generated capture as
+`/tmp/neutron_payload_captures/latest_payload.bin`.
 
 ### 8. Review Payload CSV
 
@@ -337,7 +351,9 @@ The ground-side viewer opens the latest downlinked or captured payload product a
 
 ## One-Command Rehearsal
 
-Use this before the lead demo to verify the whole laptop path quickly:
+Use this before the lead demo to verify the whole laptop path quickly. The
+script always launches both GDS and the payload viewer; after verified payload
+downlink completion it opens/refocuses the viewer for visual inspection.
 
 ```bash
 cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2

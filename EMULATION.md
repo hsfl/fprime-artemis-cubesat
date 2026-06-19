@@ -2,12 +2,17 @@
 
 This is the fastest local end-user test loop for this repo:
 
-- run flight app + local link emulator + `fprime-gds` on one laptop
+- run flight app + channelized local link emulator + `fprime-gds` on one laptop
 - watch live-changing telemetry
 - send one simple ping command and get a pong event/command response
 - run the Neutron 2 simulated payload path and review the captured CSV in the local payload viewer
 
-All transport stays local over pseudo-terminals (`pty`).
+All transport stays local over pseudo-terminals (`pty`). The emulator defaults
+to the current Pi UART channel mux contract:
+
+- channel 0: GDS/CCSDS bytes
+- channel 1: payload/science bytes observed by the emulator, not forwarded to GDS
+- channel 2: satellite-local RPC observed by the emulator, not forwarded to GDS
 
 This deployment uses `ComCcsds`, so the working GDS framing is:
 
@@ -15,15 +20,17 @@ This deployment uses `ComCcsds`, so the working GDS framing is:
 
 ## What this validates
 
-- F' app <-> local byte bridge <-> `fprime-gds` data path
+- F' app <-> channelized local bridge <-> `fprime-gds` data path
 - Live telemetry downlink
 - Command uplink and command response/event path
+- The Pi-side UART wrapper boundary used by HIL
 
 ## What this does not validate
 
 - physical radios/UART electrical behavior
 - real RF conditions
 - real hardware timing and power sequencing
+- PDU response behavior over the real satellite Teensy UART
 
 ## Prerequisites
 
@@ -86,7 +93,8 @@ For a lead-facing manual walkthrough, use:
 
 Use this for the laptop-only demo story before HIL testing. It starts local
 emulation, starts the Neutron 2 payload viewer, sends the demo command sequence,
-and verifies that a new simulated payload CSV was generated and parsed.
+verifies that a new simulated payload CSV was generated and parsed, then
+opens/refocuses the payload viewer after payload downlink completion.
 
 ```bash
 cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
@@ -119,12 +127,18 @@ The pass condition is intentionally laptop-local:
 
 - GDS accepts the command sequence.
 - `PayloadAdapter_NeutronSim` writes a new CSV under `/tmp/neutron_payload_captures`.
+- F Prime publishes that CSV as `/tmp/neutron_payload_captures/latest_payload.bin`.
+- `PayloadDownlinkManager.PayloadDownlinkComplete` and `CommsManager.DownlinkFinished`
+  appear in the run log.
 - `ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py --summary` parses that CSV.
+- The payload viewer is opened/refocused for visual inspection after the verified
+  downlink.
 
 In this branch, GDS is the command/event/telemetry surface and the Neutron 2
-viewer is the science-data review surface. `REQUEST_SCIENCE_DOWNLINK` is still
-the current F Prime handoff/progress event path; bulk RF/file transfer remains a
-later HIL/downlink implementation concern.
+viewer is the science-data review surface. `REQUEST_SCIENCE_DOWNLINK` starts the
+channel 1 payload downlink manager and produces completion events locally. HIL
+still needs to validate the physical RFM23BP channel 1 receive path with
+`tools/payload_receiver.py`.
 
 ## End-user manual test (minimal)
 
@@ -190,25 +204,28 @@ Optional follow-on command:
 
 - Send `REQUEST_SCIENCE_DOWNLINK` on `commsManager`
 - Expect `ArtemisRpiTeensyDeployment.commsManager.DownlinkRequested`,
-  `ArtemisRpiTeensyDeployment.storageService.DownlinkPrepared`, and
+  `ArtemisRpiTeensyDeployment.storageService.DownlinkPrepared`,
+  `ArtemisRpiTeensyDeployment.payloadDownlinkManager.PayloadDownlinkStarted`,
+  `ArtemisRpiTeensyDeployment.payloadDownlinkManager.PayloadDownlinkComplete`, and
   `ArtemisRpiTeensyDeployment.commsManager.DownlinkFinished`
-- Current F Prime behavior is handshake/progress-only (events/channels), not a real file transfer in GDS `#Downlink`.
-- Review the generated science CSV in the Neutron 2 payload viewer at `http://127.0.0.1:8062`.
+- `DownlinkFinished` is emitted after the payload downlink manager completes, not immediately on request.
+- This is a real channel 1 payload transfer path, but it is not a stock GDS `#Downlink` file transfer.
+- In local laptop emulation, review the generated science CSV in the Neutron 2 payload viewer at `http://127.0.0.1:8062`. In HIL, run `tools/payload_receiver.py` on the ground channel 1 serial endpoint and review the reconstructed file.
 
 If chart lines do not move, verify the chart is not paused (toggle play/pause in the chart widget).
 
-## Next Step: Real Downlink Path
+## Next Step: HIL Payload Downlink
 
-Current `REQUEST_SCIENCE_DOWNLINK` validates command/event flow only. For HIL,
-the payload CSV must be moved over the selected downlink path and then opened by
-the Neutron 2 payload viewer.
+Current `REQUEST_SCIENCE_DOWNLINK` starts the file-backed channel 1 payload
+transfer. For HIL, validate the same path through the satellite Teensy,
+RFM23BP pair, ground Teensy, and payload receiver tool.
 
 Done criteria:
 
 1. Triggering science downlink causes an actual payload transfer.
 2. GDS shows command/event/telemetry progress without corrupting the CCSDS stream.
 3. Reconstructed CSV exists on the laptop and matches expected test content.
-4. The Neutron 2 payload viewer opens the reconstructed CSV.
+4. The Neutron 2 payload viewer opens/refocuses on the reconstructed CSV.
 
 ## Useful options
 

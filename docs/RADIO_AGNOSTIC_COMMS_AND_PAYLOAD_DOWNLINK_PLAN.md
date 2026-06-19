@@ -1,17 +1,17 @@
 # Radio-Agnostic Comms and Payload Downlink Plan
 
 Date: 2026-06-09
-Status: design plan (not yet implemented)
+Status: design plan with core channelized mux + channel 1 payload path now implemented; HIL validation still pending
 Audience: future agents and students working on the Neutron 2 / Artemis F Prime stack
 
 ## BLUF
 
-Payload downlink "outside the GDS GUI" is really a **multiplexing problem**, not a protocol problem. The EPSCOR demo already proved the RFM23BP can move a ~40 KB product with indexed packets + CRC + retry bitmap. The hard part is that payload bytes and the GDS CCSDS stream must share **one radio and one Pi UART**:
+Payload downlink "outside the GDS GUI" is really a **multiplexing problem**, not a protocol problem. The EPSCOR demo already proved the RFM23BP can move a ~40 KB product with indexed packets + CRC + retry bitmap. The hard part is that payload bytes, the GDS CCSDS stream, and satellite-local subsystem RPC must share **one Pi UART**:
 
 - `/dev/serial0` is owned exclusively by the F Prime process (`Drv.LinuxUartDriver`).
 - The ground Teensy GDS data port is owned exclusively by `fprime-gds`.
 
-Recommended solution: **two stateless virtual channels over the existing RF bridge**, tagged per-frame at every hop. Channel 0 stays byte-identical CCSDS (the GDS GUI cannot break). Channel 1 carries EPSCOR-style payload packets, surfaced on a third ground-Teensy USB serial port to a small Python receiver.
+Recommended solution: **tagged virtual channels over the existing bridge**, with RF forwarding only for the channels that need it. Channel 0 stays byte-identical CCSDS (the GDS GUI cannot break). Channel 1 carries EPSCOR-style payload packets over RF, surfaced on a third ground-Teensy USB serial port to a small Python receiver. Channel 2 carries satellite-Teensy-local subsystem RPC such as EPS/PDU and is not forwarded over RF.
 
 Equally important: every piece of this design is placed at a **swappable seam**, because the strategic goal of this repo is not the RFM23BP. The mission demo is the bounded objective ("left/right bounds"); the lasting deliverable is an F Prime architecture where future students can swap the radio (256-byte UART radio, SatNOGS board) or the payload without re-architecting.
 
@@ -26,13 +26,14 @@ Two goals coexist in this repo and they must not be confused:
 
 Practical test for any change: *"If we swapped the RFM23BP for a 256-byte-MTU UART radio tomorrow, how many files would this change touch?"* If the answer includes mission logic, the design is wrong.
 
-## Current State (as of 2026-06-09)
+## Current State (updated 2026-06-18)
 
 - F Prime deployment (`ArtemisRpiTeensy_N2`) runs on Pi Zero W, cross-compiled, systemd-managed.
 - End-to-end RF command path proven: `fprime-gds` -> ground Teensy -> RFM23BP -> satellite Teensy -> Pi `/dev/serial0` -> `missionManager.PING` pong.
 - GDS decodes valid 128-byte CCSDS TM frames after per-segment RF ACK was added; residual APID sequence warnings = occasional dropped packets under sustained downlink.
 - Demo path is frozen per `docs/RF_MVP_DEMO_RUNBOOK.md`.
-- `REQUEST_SCIENCE_DOWNLINK` is handshake-only; no real product bytes move yet (agents_notes Primary TODO #9).
+- `REQUEST_SCIENCE_DOWNLINK` now starts the file-backed channel 1 `PayloadDownlinkManager` path and reports completion through `CommsManager` after the payload manager completes.
+- The channel 1 path transfers real staged payload bytes but is not a stock GDS `#Downlink` file transfer.
 - `docs/PAYLOAD_DOWNLINK_PROTOCOL_ADVICE.md` already concluded: do not push the ~40,368-byte product through stock `Svc.FileDownlink` over this link. This plan is the concrete architecture for its "Option 1".
 
 ## The Core Problem: One Medium, Two Traffic Classes
@@ -51,7 +52,7 @@ fprime-gds (Mac)          payload receiver (Mac)
         F Prime deployment (Pi)             <- file lives here
 ```
 
-Any payload downlink that bypasses the GDS still has to traverse the same UART and the same radio as the GDS CCSDS stream. So the design question is: how do two byte streams share the link without corrupting each other?
+Any payload downlink that bypasses the GDS still has to traverse the same UART and the same radio as the GDS CCSDS stream. EPS/PDU control has to traverse the same Pi UART but terminates at the satellite Teensy. So the design question is: how do these traffic classes share the link without corrupting each other?
 
 ## Alternatives Considered and Rejected
 
@@ -74,23 +75,25 @@ Second segment magic byte in the Teensy link protocol
 - `0xA5` = channel 0, CCSDS tunnel (existing)
 - `0xA6` = channel 1, payload protocol (new)
 
-Same 5-byte segment header, same 44 useful data bytes. Receivers route by magic.
+Same 5-byte segment header, same 44 useful data bytes. Receivers route by magic. Channel 2 is intentionally absent from RF; it is local to the satellite Teensy.
 
 Reliability split per channel:
 
 - **Channel 0 keeps per-segment ACK/retry.** That is what made GDS decode cleanly; do not touch it.
 - **Channel 1 uses no per-segment ACK.** Blast all packets, then recover at the file layer via retry bitmap (the proven EPSCOR approach). Avoids ~80 ms x ~918 packets of stop-and-wait, and puts reliability where it belongs for bulk data.
+- **Channel 2 is not forwarded over RF.** It is bounded request/response traffic between the Pi and satellite Teensy only, currently used for EPS/PDU RPC.
 
 ### Layer 2 — Pi <-> Teensy UART (the one contract change)
 
 Today the satellite Teensy treats Pi UART bytes as an opaque stream chunked into 128-byte TM frames; it cannot tell payload bytes from CCSDS bytes. Fix: extend the existing (already-implemented, currently fallback-only) `0xD4 0xC3 + len + crc16` wrapper with **one channel byte**, and wrap *both* streams on this hop:
 
-- channel 0 frame = exactly one 128-byte CCSDS TM frame
+- channel 0 frame = CCSDS/GDS bytes for the stock F Prime communications path
 - channel 1 frame = exactly one payload-protocol packet
+- channel 2 frame = one local satellite-Teensy subsystem RPC packet, currently EPS/PDU
 
 Side benefit: explicit framing replaces the fragile "count to 128 bytes and hope" chunker and the stale-partial-drop hack, eliminating the 7-byte-fragment bug class from the 2026-04-24 debug sessions.
 
-Uplink is symmetric: GDS command bytes arrive as channel 0; ground-helper retry bitmaps arrive as channel 1.
+Uplink is symmetric for RF channels: GDS command bytes arrive as channel 0; ground-helper retry bitmaps arrive as channel 1. Channel 2 requests originate on the Pi and terminate at the satellite Teensy.
 
 Update `ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md` and `GDS_Teensy/docs/transport_contract.md` in the same PR as the firmware change (per AGENTS.md pitfall list).
 
@@ -102,21 +105,23 @@ Two new components, inserted at the stock Communication Adapter seam visible in
 **`UartChannelMux`** (passive): wraps/unwraps the channel framing.
 
 ```text
-ComCcsds.comStub.drvSendOut        -> uartMux.ccsdsIn        (wrap ch0)
-payloadDownlinkManager.packetOut   -> uartMux.payloadIn      (wrap ch1)
+ComCcsds.comStub.drvSendOut        -> uartMux.ccsdsSendIn    (wrap ch0)
+payloadDownlinkManager.packetOut   -> uartMux.payloadSendIn  (wrap ch1)
+epsAdapterArtemis.teensyRequestOut -> uartMux.localSendIn    (wrap ch2)
 uartMux.drvSendOut                 -> comDriver.$send
 
 comDriver.$recv                    -> uartMux.drvRecvIn      (unwrap, route by channel)
 uartMux.ccsdsRecvOut               -> ComCcsds.comStub.drvReceiveIn
 uartMux.payloadRecvOut             -> payloadDownlinkManager.packetIn
+uartMux.localRecvOut               -> epsAdapterArtemis.teensyResponseIn
 ```
 
 **`PayloadDownlinkManager`** (active): owns the EPSCOR-style file protocol.
 
-- Commands: `START_PAYLOAD_DOWNLINK(productId)`, `ABORT_PAYLOAD_DOWNLINK`, `GET_PAYLOAD_STATUS`
+- Commands: `START_PAYLOAD_DOWNLINK(productId, byteCount)`, `ABORT_PAYLOAD_DOWNLINK`, `GET_PAYLOAD_STATUS`
 - Packet types: header (magic, transfer ID, file length, total packets, file CRC16); data (transfer ID, 2-byte index, payload bytes, CRC16); end; retry-request (missing-packet bitmap); retry data
 - Telemetry (small, status only — never file bytes): `PayloadState`, `TotalPackets`, `PacketsSent`, `RetryRound`, `PacketsMissing`, `LastError`
-- Reads the product file from the path staged by `StorageService`. Replace the current `Svc.Ping` placeholder handoff between `StorageService` and the downlink path with a real product-path/size port. This is the concrete implementation of agents_notes Primary TODO #9.
+- Reads arbitrary staged bytes from `NEUTRON_PAYLOAD_DOWNLINK_FILE`, `/tmp/neutron_payload_captures/latest_payload.bin`, or the latest simulator CSV in `/tmp/neutron_payload_captures`.
 - Pacing: emits N data packets per rate-group tick (configurable) so Teensy relay queues (depth 32) never overflow. Tune on the bench.
 
 Judges watch progress in the GDS GUI (the status telemetry) while the actual bytes flow on channel 1. The GUI is part of the show and cannot break, because it never sees a payload byte.

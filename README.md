@@ -21,7 +21,7 @@ The current target is a shortened FlatSat FSR end-to-end demo based on the team'
 4. While still in base mode, send a command that schedules a short data-collection action, for example `10` seconds from now.
 5. Trigger the data-collection script/command using simulated or temporary payload data if real payload integration is not ready.
 6. After collection completes, transition to a science-data transmit path and downlink the collected payload/science data.
-7. On the ground PC, use `fprime-gds` as the MVP demo ground tool to review the downlinked science data. Longer term, the end-goal ground presentation stack is `Yamcs` or another mission-control style analysis/display tool.
+7. On the ground PC, use `fprime-gds` for command/event/telemetry visibility and the Neutron 2 payload viewer for visual review of the downlinked science data. Longer term, the end-goal ground presentation stack is `Yamcs` or another mission-control style analysis/display tool.
 
 ### Demo scope assumptions
 
@@ -31,18 +31,18 @@ The current target is a shortened FlatSat FSR end-to-end demo based on the team'
 - Ground-station presentation quality matters: live telemetry, command acknowledgement, and visible science-data review are part of the success criteria.
 
 Current relay milestone:
-- one UART channel (`115200 8N1`) on RPi<->satellite Teensy carrying raw `ComCcsds` / space-packet bytes
-- both Teensy bridges run transparent raw-byte tunnel mode for the nominal MVP/HIL path
-- segmented RF transport between satellite and ground Teensy
-- raw reassembled F' bytes emitted on ground USB UART for `fprime-gds`
-- simple uplink burst packetization from ground USB UART to RF
-- legacy custom UART wrapper mode (`0xD4 0xC3 + len + crc16`) remains fallback-only and is not mixed into the nominal path
+- one physical UART (`115200 8N1`) on RPi<->satellite Teensy with tagged virtual channels
+- channel 0 carries normal F Prime/GDS CCSDS bytes over RF
+- channel 1 carries payload/science packets over RF, sized for the current RFM23BP packet budget
+- channel 2 carries satellite-Teensy-local subsystem RPC such as EPS/PDU; it is consumed by the satellite Teensy and is not forwarded over RF
+- the Pi-side UART wrapper is `0xD4 0xC3 + channel + len + payload + crc16`
+- ground USB exposes channel 0 to `fprime-gds`; payload channel 1 is received separately by the payload receiver tool when the ground Teensy triple-serial path is enabled
 
 ## Repository layout
 
 - `ArtemisRpiTeensy_N2/`
   - Active F' project (promoted in place from starter sample)
-  - Includes deployment and custom components such as `MissionManager`, `ScienceManager`, `SoHManager`, `ThermalService`, `TeensyTransportService`, and `CommsAdapter_TeensyRfm23`
+  - Includes deployment and custom components such as `MissionManager`, `ScienceManager`, `SoHManager`, `ThermalService`, `UartChannelMux`, `PayloadDownlinkManager`, `EpsService`, and `EpsAdapter_Artemis`
 - `ArtemisTeensy_N2_Baremetal/`
   - Satellite Teensy relay firmware workspace (Arduino CLI workflow)
 - `GDS_Teensy/`
@@ -101,16 +101,19 @@ cd GDS_Teensy
 
 Implemented:
 - F' deployment migrated to Linux UART transport.
-- Satellite Teensy relay with transparent raw-byte UART tunnel mode and RF segmentation/reassembly.
-- Ground Teensy relay with transparent raw-byte USB tunnel mode and RF reassembly.
-- Ground Teensy simple uplink path (USB raw byte burst -> RF segmentation).
+- Satellite and ground Teensy relay firmware with channelized UART framing plus RF segmentation/reassembly.
+- Channel 0 CCSDS/GDS path, channel 1 payload/science path, and channel 2 satellite-local EPS/PDU RPC path.
+- Ground Teensy simple uplink path (USB raw byte burst -> RF segmentation for channels that cross RF).
 - Updated UART/RF transport contract documentation.
-- RPi-hosted neutron payload simulator wired through `PayloadService` and `PayloadAdapter_NeutronSim`.
+- RPi-hosted neutron payload simulator wired through `PayloadService` and `PayloadAdapter_NeutronSim`, including a latest-capture handoff for downlink.
+- File-backed `PayloadDownlinkManager` and payload receiver tooling for arbitrary payload bytes over channel 1.
+- Artemis EPS/PDU command adapter over channel 2 using the PDU v2 protocol from `external/artemis-pdu`, with timeout/recovery handling.
 
 Not implemented yet:
-- Full EPS/PDU, thermal, GPS, and IMU telemetry + command adapter behavior.
+- HIL validation of channel 2 against the real PDU and HIL validation of channel 0/1 over the RFM23BP pair.
+- Broader EPS/PDU telemetry beyond the current command/status path, plus thermal, GPS, and IMU telemetry + command adapter behavior.
 - Full uplink robustness (deterministic packet-boundary extraction and retry/ack strategy).
-- Full demo-state orchestration for `Base Mode` -> scheduled collection -> science downlink.
+- Full demo-state orchestration polish for `Base Mode` -> scheduled collection -> science downlink.
 - Ground-side science-data analysis/presentation workflow finalized for the judges' demo.
 
 ## Notes

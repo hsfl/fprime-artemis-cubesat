@@ -20,7 +20,7 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 4. Operator sends a command to schedule data collection after a short delay, for example `10` seconds.
 5. Flight software executes a data-collection action using payload data; simulated or temporary payload data is acceptable for the demo if the real payload path is not ready.
 6. After collection, the system transitions into a science downlink path and sends payload/science data to the ground side.
-7. Ground software on the laptop reviews, displays, or analyzes the downlinked science data. `fprime-gds` is the MVP demo tool and default ground interface for this phase. `Yamcs` is the longer-term end-goal ground presentation and analysis stack.
+7. Ground software on the laptop reviews, displays, or analyzes the downlinked science data. `fprime-gds` is the MVP command/event/telemetry interface for this phase, and the Neutron 2 payload viewer is the current science-data review surface. `Yamcs` is the longer-term end-goal ground presentation and analysis stack.
 
 ### What matters most for the demo
 
@@ -415,21 +415,37 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   - Legacy Artemis examples often assume Teensy as the main flight computer, while this repo uses Raspberry Pi as the host for the F Prime deployment and Teensy only for bridge/control duties.
   - Treat handwritten baremetal examples as useful interface references but review carefully for bugs, memory-safety issues, and mission mismatch before adapting anything.
 
+## Current Local Demo Status
+
+- 2026-06-18: `./tools/run_neutron2_local_demo.sh --gui-port 5070 --viewer-port 8070 --delay 3 --capture-seconds 3 --exit-after-sequence --skip-build`
+  passed with the channelized local emulator.
+- Verified runtime events included:
+  - `PayloadAdapter_NeutronSim.CaptureComplete`
+  - `StorageService.ScienceStored`
+  - `PayloadDownlinkManager.PayloadDownlinkComplete`
+  - `CommsManager.DownlinkFinished`
+- The local emulator observed channel 1 payload bytes and kept them off the GDS channel 0 stream.
+- `run_neutron2_local_demo.sh` always starts GDS and the Neutron 2 payload viewer, then opens/refocuses the viewer after verified downlink completion.
+- Remaining proof is HIL: real RPi UART behavior, satellite/ground Teensy firmware, RFM23BP channel 0/1 path, and real PDU response behavior over satellite Teensy `Serial1`.
+
 ## Primary TODO
 
 1. Record first successful non-crashing runtime on `/dev/serial0` using the real UART path.
 2. Run full HIL end-to-end tests with real `fprime-gds` UART traffic over RF (both directions).
 3. HIL-test channel 2 against a real PDU through satellite Teensy `Serial1`.
-4. Implement the minimum demo-state flow for `Base Mode` -> scheduled data collection -> science-data downlink.
-5. Extend the neutron simulator product path from product-size telemetry into the selected downlink/review path.
+4. Rehearse the minimum demo-state flow on HIL: `Base Mode` -> scheduled data collection -> science-data downlink.
+5. Rehearse the neutron simulator product path through the selected HIL downlink/review path:
+   - `PayloadAdapter_NeutronSim` stages the latest capture for downlink.
+   - `REQUEST_SCIENCE_DOWNLINK` starts the channel 1 `PayloadDownlinkManager` transfer.
+   - Use `tools/payload_receiver.py` on the ground channel 1 serial endpoint for HIL payload reconstruction.
 6. Keep `fprime-gds` as the live MVP demo ground interface and treat `Yamcs` as the post-MVP target presentation/analysis stack.
 7. Add minimal segment ACK/retry for RF relay reliability after the channelized CCSDS path is stable.
    - MVP target: command uplink delivery confidence and reduced telemetry burst loss during demo.
 8. Add deterministic packet boundary extraction for uplink beyond simple burst mode if required by the selected demo flow.
-9. Complete real file downlink path for the science demo flow:
-   - current `REQUEST_SCIENCE_DOWNLINK` path is handshake-only (events/channels)
-   - wire an actual `Svc::FileDownlink` transfer for science products
-   - pass criteria: file transfer visible in GDS `#Downlink`, file can be downloaded locally, content/size matches expectation
+9. Decide whether the MVP stays on the custom channel 1 payload receiver or graduates to stock F Prime file downlink:
+   - current channel 1 path transfers real staged payload bytes but does not appear as a stock GDS `#Downlink` file transfer
+   - future migration target is `Svc::FileDownlink` once the link MTU/loss behavior can carry the stock file-transfer path cleanly
+   - pass criteria for the current MVP path: reconstructed file exists on the laptop, content/size/CRC match the source capture, and channel 0 GDS traffic stays healthy during transfer
 
 ## Important Paths
 
@@ -822,4 +838,6 @@ Build verification at handoff:
   - `POWER_CYCLE_PDU_OUTPUT` with `confirm=1`
   - `REQUEST_CHARGER_STATUS`
   - `SET_CHARGER_STATE` with `confirm=1`
+- Missing confirmation or unsafe/out-of-range PDU command arguments return
+  `VALIDATION_ERROR` in GDS command history and emit `EpsCommandRejected`.
 - Burn-wire and torque-coil commands are intentionally not exposed through `EpsService` yet; add those only with a dedicated HIL/runbook procedure.
