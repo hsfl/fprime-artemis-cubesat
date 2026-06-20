@@ -23,6 +23,8 @@ TYPE_END = 3
 TYPE_RETRY_REQUEST = 4
 MAX_PACKET = 44
 DATA_BYTES = 35
+RETRY_INTERVAL_S = 5.0
+RETRY_AFTER_SILENCE_S = 8.0
 
 
 def crc16_ccitt(data: bytes) -> int:
@@ -52,6 +54,8 @@ class PayloadReceiver:
         self.packets: dict[int, bytes] = {}
         self.end_seen = False
         self.rx_buffer = bytearray()
+        self.next_retry_request_s = 0.0
+        self.last_packet_s = 0.0
 
     def run(self) -> int:
         deadline = time.monotonic() + self.timeout_s
@@ -59,20 +63,23 @@ class PayloadReceiver:
             while time.monotonic() < deadline:
                 packet = self.read_packet(ser)
                 if not packet:
-                    if self.end_seen and self.complete:
+                    self.request_retries_if_due(ser)
+                    if self.complete:
                         break
                     continue
                 self.handle_packet(packet, ser)
-                if self.end_seen and self.complete:
+                self.request_retries_if_due(ser)
+                if self.complete:
                     break
 
             if not self.complete:
-                self.request_retries(ser)
+                self.request_retries_if_due(ser, force=True)
                 retry_deadline = time.monotonic() + min(20.0, self.timeout_s)
                 while time.monotonic() < retry_deadline and not self.complete:
                     packet = self.read_packet(ser)
                     if packet:
                         self.handle_packet(packet, ser)
+                    self.request_retries_if_due(ser)
 
         if not self.complete:
             missing = self.missing_packets()
@@ -174,7 +181,19 @@ class PayloadReceiver:
         elif packet_type == TYPE_END:
             self.end_seen = True
             if not self.complete:
-                self.request_retries(ser)
+                self.request_retries_if_due(ser, force=True)
+
+    def request_retries_if_due(self, ser: serial.Serial, force: bool = False) -> None:
+        now = time.monotonic()
+        header_seen = self.transfer_id is not None and self.total_packets > 0
+        if not self.end_seen and (
+            not header_seen or self.last_packet_s == 0.0 or now - self.last_packet_s < RETRY_AFTER_SILENCE_S
+        ):
+            return
+        if not force and now < self.next_retry_request_s:
+            return
+        if self.request_retries(ser):
+            self.next_retry_request_s = now + RETRY_INTERVAL_S
 
     def handle_header(self, packet: bytes) -> None:
         if len(packet) < 17:
@@ -187,6 +206,7 @@ class PayloadReceiver:
         self.file_crc = struct.unpack_from("<H", packet, 15)[0]
         self.packets.clear()
         self.end_seen = False
+        self.last_packet_s = time.monotonic()
         print(
             "header: "
             f"product={self.product_id} transfer={self.transfer_id} bytes={self.total_bytes} "
@@ -206,15 +226,16 @@ class PayloadReceiver:
             return
         if index < self.total_packets:
             self.packets[index] = packet[7:crc_offset]
+            self.last_packet_s = time.monotonic()
             if len(self.packets) % 50 == 0 or len(self.packets) == self.total_packets:
                 print(f"progress: {len(self.packets)}/{self.total_packets}")
 
-    def request_retries(self, ser: serial.Serial) -> None:
+    def request_retries(self, ser: serial.Serial) -> bool:
         if self.transfer_id is None or self.total_packets == 0:
-            return
+            return False
         missing = self.missing_packets()
         if not missing:
-            return
+            return False
         start = missing[0]
         span = [idx for idx in missing if idx < start + 8 * 36]
         bitmap = bytearray(36)
@@ -231,6 +252,7 @@ class PayloadReceiver:
         request += bitmap
         ser.write(bytes(request))
         print(f"retry: start={start} count={len(span)} bitmap_bytes={len(bitmap)}")
+        return True
 
     def missing_packets(self) -> list[int]:
         return [idx for idx in range(self.total_packets) if idx not in self.packets]

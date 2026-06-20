@@ -54,6 +54,8 @@ class PayloadDownlinkManager final : public PayloadDownlinkManagerComponentBase 
     U16 getU16(const U8* data, FwSizeType offset) const;
     void failTransfer(U32 reason, U32 detail);
 
+    static constexpr U32 MAX_RETRY_PACKETS = 8U * 36U;
+
     State m_state;
     U8 m_transferId;
     U32 m_productId;
@@ -70,6 +72,9 @@ class PayloadDownlinkManager final : public PayloadDownlinkManagerComponentBase 
     bool m_sourceReady;
     U32 m_sourceBytes;
     std::string m_sourcePath;
+    U32 m_retryPackets[MAX_RETRY_PACKETS];
+    U32 m_retryCount;
+    U32 m_retryCursor;
     U8 m_packet[LinkCfg::PAYLOAD_PACKET_MAX_BYTES];
 };
 

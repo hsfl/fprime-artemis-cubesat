@@ -10,7 +10,8 @@ namespace Components {
 
 namespace {
 constexpr U32 MAX_BLOB_BYTES = 1024U * 1024U;
-constexpr U32 PACKETS_PER_RUN = 4;
+constexpr U32 PACKETS_PER_RUN = 1;
+constexpr U32 RETRY_PACKETS_PER_RUN = 1;
 constexpr const char* PAYLOAD_SOURCE_ENV = "NEUTRON_PAYLOAD_DOWNLINK_FILE";
 constexpr const char* DEFAULT_PAYLOAD_SOURCE = "/tmp/neutron_payload_captures/latest_payload.bin";
 constexpr const char* CAPTURE_DIR = "/tmp/neutron_payload_captures";
@@ -103,7 +104,10 @@ PayloadDownlinkManager::PayloadDownlinkManager(const char* const compName)
       m_sentEnd(false),
       m_sourceReady(false),
       m_sourceBytes(0),
-      m_sourcePath() {
+      m_sourcePath(),
+      m_retryPackets{},
+      m_retryCount(0),
+      m_retryCursor(0) {
     std::memset(this->m_packet, 0, sizeof(this->m_packet));
 }
 
@@ -117,6 +121,21 @@ void PayloadDownlinkManager::pingIn_handler(FwIndexType portNum, U32 key) {
 void PayloadDownlinkManager::run_handler(FwIndexType portNum, U32 context) {
     static_cast<void>(portNum);
     static_cast<void>(context);
+
+    U32 retrySentThisRun = 0;
+    while (retrySentThisRun < RETRY_PACKETS_PER_RUN && this->m_retryCursor < this->m_retryCount) {
+        if (!this->sendDataPacket(this->m_retryPackets[this->m_retryCursor])) {
+            this->failTransfer(6U, this->m_lastError);
+            this->emitTelemetry();
+            return;
+        }
+        this->m_retryCursor++;
+        retrySentThisRun++;
+    }
+    if (this->m_retryCursor >= this->m_retryCount) {
+        this->m_retryCount = 0;
+        this->m_retryCursor = 0;
+    }
 
     if (this->m_state == STATE_DOWNLINKING) {
         if (!this->m_sentHeader) {
@@ -250,6 +269,8 @@ bool PayloadDownlinkManager::resetTransfer(U32 productId, U32 byteCount) {
     this->m_blobCrc = sourceCrc;
     this->m_sentHeader = false;
     this->m_sentEnd = false;
+    this->m_retryCount = 0;
+    this->m_retryCursor = 0;
     return true;
 }
 
@@ -386,6 +407,8 @@ void PayloadDownlinkManager::handleRetryRequest(const U8* data, FwSizeType size)
 
     U32 missing = 0;
     this->m_retryRound++;
+    this->m_retryCount = 0;
+    this->m_retryCursor = 0;
     for (U8 byteIndex = 0; byteIndex < bitmapBytes; byteIndex++) {
         const U8 bits = data[7 + byteIndex];
         for (U8 bit = 0; bit < 8; bit++) {
@@ -394,9 +417,12 @@ void PayloadDownlinkManager::handleRetryRequest(const U8* data, FwSizeType size)
             }
             const U32 packetIndex = static_cast<U32>(startIndex) + static_cast<U32>(byteIndex) * 8U + bit;
             if (packetIndex < this->m_totalPackets) {
-                if (this->sendDataPacket(packetIndex)) {
+                if (this->m_retryCount < MAX_RETRY_PACKETS) {
+                    this->m_retryPackets[this->m_retryCount] = packetIndex;
+                    this->m_retryCount++;
                     missing++;
                 } else {
+                    this->m_lastError = 10U;
                     this->failTransfer(6U, this->m_lastError);
                     break;
                 }

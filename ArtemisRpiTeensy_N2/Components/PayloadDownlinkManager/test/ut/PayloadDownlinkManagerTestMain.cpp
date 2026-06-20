@@ -5,6 +5,11 @@ TEST(Nominal, FileBackedVariableLengthPackets) {
     tester.testFileBackedVariableLengthPackets();
 }
 
+TEST(Nominal, QueuesRetryPacketsForScheduledResend) {
+    Components::PayloadDownlinkManagerTester tester;
+    tester.testQueuesRetryPacketsForScheduledResend();
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

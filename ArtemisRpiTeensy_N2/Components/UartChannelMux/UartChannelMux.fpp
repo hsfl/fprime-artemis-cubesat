@@ -6,10 +6,10 @@ module Components {
         guarded input port ccsdsSendIn: Drv.ByteStreamSend
 
         @ Payload packets from PayloadDownlinkManager, wrapped as channel 1.
-        sync input port payloadSendIn: Fw.BufferSend
+        guarded input port payloadSendIn: Fw.BufferSend
 
         @ Local Teensy subsystem RPC packets, wrapped as channel 2.
-        sync input port localSendIn: Fw.BufferSend
+        guarded input port localSendIn: Fw.BufferSend
 
         @ Wrapped bytes received from the UART driver.
         sync input port drvReceiveIn: Drv.ByteStreamData

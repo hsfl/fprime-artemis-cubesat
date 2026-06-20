@@ -137,9 +137,9 @@ module ArtemisRpiTeensyDeployment {
       rateGroup1.RateGroupMemberOut[5] -> teensyTransportService.run
       rateGroup1.RateGroupMemberOut[6] -> missionManager.run
       rateGroup1.RateGroupMemberOut[7] -> payloadDownlinkManager.run
-      # HIL/default profile: keep demo-only managers off the periodic path unless
-      # building with NEUTRON2_TOPOLOGY_PROFILE=local-demo.
-      # rateGroup1.RateGroupMemberOut[8] -> scienceManager.run
+      # HIL/default profile: tick the scheduled science path; keep higher-volume
+      # demo status loops off unless building with NEUTRON2_TOPOLOGY_PROFILE=local-demo.
+      rateGroup1.RateGroupMemberOut[8] -> scienceManager.run
       # rateGroup1.RateGroupMemberOut[9] -> sohManager.run
       # rateGroup1.RateGroupMemberOut[10] -> commsManager.run
 
