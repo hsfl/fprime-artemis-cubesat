@@ -45,6 +45,7 @@ class PayloadDownlinkManager final : public PayloadDownlinkManagerComponentBase 
     bool sendDataPacket(U32 packetIndex);
     bool sendEndPacket();
     bool sendPacket(const U8* data, FwSizeType size);
+    void emitProgressIfDue();
     void handleRetryRequest(const U8* data, FwSizeType size);
     bool readSourceBytes(U32 offset, U8* output, U32 length) const;
     bool computeSourceCrc(U32 byteCount, U16& crcOut) const;
@@ -66,6 +67,7 @@ class PayloadDownlinkManager final : public PayloadDownlinkManagerComponentBase 
     U32 m_retryRound;
     U32 m_packetsMissing;
     U32 m_lastError;
+    U32 m_nextProgressPercent;
     U16 m_blobCrc;
     bool m_sentHeader;
     bool m_sentEnd;

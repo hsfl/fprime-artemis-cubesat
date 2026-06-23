@@ -5,6 +5,11 @@ TEST(Nominal, FileBackedVariableLengthPackets) {
     tester.testFileBackedVariableLengthPackets();
 }
 
+TEST(Nominal, ProgressEventsEveryTenPercent) {
+    Components::PayloadDownlinkManagerTester tester;
+    tester.testProgressEventsEveryTenPercent();
+}
+
 TEST(Nominal, QueuesRetryPacketsForScheduledResend) {
     Components::PayloadDownlinkManagerTester tester;
     tester.testQueuesRetryPacketsForScheduledResend();

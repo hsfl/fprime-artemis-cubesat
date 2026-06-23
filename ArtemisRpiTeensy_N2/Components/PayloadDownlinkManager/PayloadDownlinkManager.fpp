@@ -67,6 +67,10 @@ module Components {
         event PayloadDownlinkComplete(transferId: U32, packetsSent: U32) \
             severity activity high format "Payload downlink complete transfer={} packetsSent={}"
 
+        @ Payload downlink progress, throttled to nominal 10 percent increments.
+        event PayloadDownlinkProgress(transferId: U32, percentComplete: U32, packetsSent: U32, totalPackets: U32) \
+            severity activity low format "Payload downlink progress transfer={} percent={} packets={}/{}"
+
         @ Payload downlink failed.
         event PayloadDownlinkFailed(reason: U32, detail: U32) \
             severity warning low format "Payload downlink failed reason={} detail={}"

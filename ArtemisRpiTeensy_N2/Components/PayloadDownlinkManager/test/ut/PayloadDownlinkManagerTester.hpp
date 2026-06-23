@@ -18,6 +18,7 @@ class PayloadDownlinkManagerTester final : public PayloadDownlinkManagerGTestBas
     ~PayloadDownlinkManagerTester();
 
     void testFileBackedVariableLengthPackets();
+    void testProgressEventsEveryTenPercent();
     void testQueuesRetryPacketsForScheduledResend();
 
   private:

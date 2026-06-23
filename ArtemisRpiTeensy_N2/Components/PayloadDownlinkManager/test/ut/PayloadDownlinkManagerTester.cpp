@@ -86,6 +86,59 @@ void PayloadDownlinkManagerTester::testFileBackedVariableLengthPackets() {
     }
 }
 
+void PayloadDownlinkManagerTester::testProgressEventsEveryTenPercent() {
+    U8 payload[LinkCfg::PAYLOAD_PACKET_DATA_BYTES * 10U] = {};
+    for (FwSizeType i = 0; i < sizeof(payload); ++i) {
+        payload[i] = static_cast<U8>(i & 0xFFU);
+    }
+    this->writePayloadFile(payload, sizeof(payload));
+    this->clearHistory();
+    this->m_packets.clear();
+
+    this->sendCmd_START_PAYLOAD_DOWNLINK(0, 0, 12, sizeof(payload));
+    this->component.doDispatch();
+    ASSERT_CMD_RESPONSE_SIZE(1);
+    ASSERT_EVENTS_PayloadDownlinkStarted_SIZE(1);
+    ASSERT_EVENTS_PayloadDownlinkProgress_SIZE(0);
+
+    for (U32 expectedPercent = 10; expectedPercent < 100; expectedPercent += 10) {
+        this->invoke_to_run(0, 0);
+        ASSERT_EVENTS_PayloadDownlinkProgress_SIZE(expectedPercent / 10U);
+        ASSERT_EVENTS_PayloadDownlinkProgress(
+            expectedPercent / 10U - 1U,
+            1,
+            expectedPercent,
+            expectedPercent / 10U,
+            10);
+    }
+
+    this->invoke_to_run(0, 0);
+    ASSERT_EVENTS_PayloadDownlinkProgress_SIZE(9);
+    ASSERT_EVENTS_PayloadDownlinkComplete_SIZE(1);
+
+    U8 smallPayload[(LinkCfg::PAYLOAD_PACKET_DATA_BYTES * 2U) + 1U] = {};
+    for (FwSizeType i = 0; i < sizeof(smallPayload); ++i) {
+        smallPayload[i] = static_cast<U8>((i + 1U) & 0xFFU);
+    }
+    this->writePayloadFile(smallPayload, sizeof(smallPayload));
+    this->clearHistory();
+    this->m_packets.clear();
+
+    this->sendCmd_START_PAYLOAD_DOWNLINK(0, 0, 13, sizeof(smallPayload));
+    this->component.doDispatch();
+    ASSERT_CMD_RESPONSE_SIZE(1);
+    ASSERT_EVENTS_PayloadDownlinkStarted_SIZE(1);
+    ASSERT_EVENTS_PayloadDownlinkProgress_SIZE(0);
+
+    while (this->m_packets.size() < 5U) {
+        this->invoke_to_run(0, 0);
+    }
+    ASSERT_EVENTS_PayloadDownlinkProgress_SIZE(9);
+    ASSERT_EVENTS_PayloadDownlinkProgress(0, 2, 10, 1, 3);
+    ASSERT_EVENTS_PayloadDownlinkProgress(8, 2, 90, 2, 3);
+    ASSERT_EVENTS_PayloadDownlinkComplete_SIZE(1);
+}
+
 void PayloadDownlinkManagerTester::testQueuesRetryPacketsForScheduledResend() {
     const U8 payload[] = {
         0x00, 0x4E, 0x32, 0xFF, 0x01, 0x02, 0x03, 0x04,

@@ -99,6 +99,7 @@ PayloadDownlinkManager::PayloadDownlinkManager(const char* const compName)
       m_retryRound(0),
       m_packetsMissing(0),
       m_lastError(0),
+      m_nextProgressPercent(10),
       m_blobCrc(0),
       m_sentHeader(false),
       m_sentEnd(false),
@@ -154,6 +155,7 @@ void PayloadDownlinkManager::run_handler(FwIndexType portNum, U32 context) {
                 break;
             }
             this->m_nextPacketIndex++;
+            this->emitProgressIfDue();
             sentThisRun++;
         }
 
@@ -266,6 +268,7 @@ bool PayloadDownlinkManager::resetTransfer(U32 productId, U32 byteCount) {
     this->m_retryRound = 0;
     this->m_packetsMissing = 0;
     this->m_lastError = 0;
+    this->m_nextProgressPercent = 10U;
     this->m_blobCrc = sourceCrc;
     this->m_sentHeader = false;
     this->m_sentEnd = false;
@@ -389,6 +392,22 @@ bool PayloadDownlinkManager::sendPacket(const U8* data, FwSizeType size) {
     Fw::Buffer packet(const_cast<U8*>(data), size);
     this->packetOut_out(0, packet);
     return true;
+}
+
+void PayloadDownlinkManager::emitProgressIfDue() {
+    if (this->m_totalPackets == 0U || this->m_nextProgressPercent >= 100U) {
+        return;
+    }
+    U32 bytesSent = this->m_nextPacketIndex * LinkCfg::PAYLOAD_PACKET_DATA_BYTES;
+    if (bytesSent > this->m_totalBytes) {
+        bytesSent = this->m_totalBytes;
+    }
+    const U32 percentComplete = (bytesSent * 100U) / this->m_totalBytes;
+    while (this->m_nextProgressPercent < 100U && percentComplete >= this->m_nextProgressPercent) {
+        this->log_ACTIVITY_LO_PayloadDownlinkProgress(
+            this->m_transferId, this->m_nextProgressPercent, this->m_nextPacketIndex, this->m_totalPackets);
+        this->m_nextProgressPercent += 10U;
+    }
 }
 
 void PayloadDownlinkManager::handleRetryRequest(const U8* data, FwSizeType size) {
