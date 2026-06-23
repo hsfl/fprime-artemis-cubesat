@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
 import json
 import math
 import statistics
@@ -19,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 DEFAULT_CAPTURE_DIR = Path(tempfile.gettempdir()) / "neutron_payload_captures"
 MAX_INLINE_ROWS = 5000
 CLEANUP_NOTICE_THRESHOLD = 10
+PAYLOAD_GLOBS = ("*.csv", "*.bin")
 
 
 HTML = """<!doctype html>
@@ -156,14 +158,14 @@ HTML = """<!doctype html>
 <body>
   <header>
     <h1>Neutron 2 Payload Viewer</h1>
-    <p>Ground-side CSV analysis for reconstructed neutron-count science products.</p>
+    <p>Ground-side CSV analysis for reconstructed neutron-count science products, including CSV bytes downlinked as .bin payloads.</p>
   </header>
   <main>
     <div class="toolbar">
       <select id="dataset"></select>
       <button id="refresh">Refresh</button>
       <span id="status" class="status"></span>
-      <span id="watcher" class="status-note">Watching for the newest downlinked payload CSV.</span>
+      <span id="watcher" class="status-note">Watching for the newest downlinked payload product.</span>
     </div>
     <section class="grid" id="metrics"></section>
     <section class="panel">
@@ -200,7 +202,7 @@ HTML = """<!doctype html>
         <div>
           <h3>How To Read It</h3>
           <p>Red chart bands mark SAA rows, where elevated counts are expected. Blue line movement outside red bands is background variation.</p>
-          <p>This demo data is synthetic and order-of-magnitude realistic, not a calibrated detector product. The viewer automatically opens a newer CSV when downlink or capture produces one.</p>
+          <p>This demo data is synthetic and order-of-magnitude realistic, not a calibrated detector product. The viewer automatically opens a newer CSV or CSV-in-BIN payload when downlink or capture produces one.</p>
           <p>Capture files are run artifacts in the OS temp folder. Do not rely on automatic cleanup; archive or delete old files as needed, or run StorageService.REMOVE_OLD_DATASETS(confirm=1).</p>
         </div>
       </div>
@@ -277,7 +279,7 @@ HTML = """<!doctype html>
       } else if (datasetSelect.options.length) {
         datasetSelect.options[0].selected = true;
       }
-      statusEl.textContent = data.cleanup_hint || (data.datasets.length ? "" : "No CSV products found.");
+      statusEl.textContent = data.cleanup_hint || (data.datasets.length ? "" : "No payload products found.");
       return openedNewLatest;
     }
 
@@ -321,8 +323,8 @@ HTML = """<!doctype html>
         await loadDataset({silent: !manual});
       }
       watcherEl.textContent = openedNewLatest
-        ? "Opened newest downlinked payload CSV."
-        : "Watching for the newest downlinked payload CSV.";
+        ? "Opened newest downlinked payload product."
+        : "Watching for the newest downlinked payload product.";
     }
 
     refreshButton.addEventListener("click", async () => {
@@ -337,13 +339,21 @@ HTML = """<!doctype html>
 """
 
 
+def read_payload_text(path: Path) -> str:
+    data = path.read_bytes()
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"{path.name} is not a UTF-8 CSV payload") from exc
+
+
 def read_rows(path: Path) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
-    with path.open(newline="") as stream:
+    with io.StringIO(read_payload_text(path), newline="") as stream:
         reader = csv.DictReader(stream)
         required = {"t_s", "counts", "flag"}
         if reader.fieldnames is None or not required.issubset(set(reader.fieldnames)):
-            raise ValueError("CSV must include t_s, counts, and flag columns")
+            raise ValueError("payload CSV must include t_s, counts, and flag columns")
         for row in reader:
             rows.append({
                 "t_s": int(float(row["t_s"])),
@@ -380,7 +390,9 @@ def list_datasets(capture_dir: Path, explicit_file: Path | None) -> list[Path]:
     if explicit_file is not None:
         files.append(explicit_file.resolve())
     if capture_dir.exists():
-        files.extend(sorted(capture_dir.glob("*.csv"), key=lambda path: path.stat().st_mtime, reverse=True))
+        for pattern in PAYLOAD_GLOBS:
+            files.extend(capture_dir.glob(pattern))
+        files.sort(key=lambda path: path.stat().st_mtime, reverse=True)
     deduped: list[Path] = []
     seen: set[Path] = set()
     for path in files:
@@ -396,7 +408,7 @@ def cleanup_hint(paths: list[Path], capture_dir: Path) -> str:
     if len(paths) < CLEANUP_NOTICE_THRESHOLD:
         return ""
     return (
-        f"{len(paths)} CSV products found. Cleanup old downlink files when done: "
+        f"{len(paths)} payload products found. Cleanup old downlink files when done: "
         f"StorageService.REMOVE_OLD_DATASETS(confirm=1), or archive/delete files in {capture_dir}."
     )
 
@@ -483,12 +495,12 @@ class Handler(BaseHTTPRequestHandler):
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--capture-dir", type=Path, default=DEFAULT_CAPTURE_DIR)
-    parser.add_argument("--file", type=Path, help="Open one reconstructed payload CSV explicitly")
+    parser.add_argument("--file", type=Path, help="Open one reconstructed payload CSV or CSV-in-BIN explicitly")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8062)
     parser.add_argument("--no-open", action="store_true", help="Do not open a browser automatically")
     parser.add_argument("--quiet", action="store_true")
-    parser.add_argument("--summary", type=Path, help="Print JSON summary for a CSV and exit")
+    parser.add_argument("--summary", type=Path, help="Print JSON summary for a CSV or CSV-in-BIN payload and exit")
     return parser
 
 

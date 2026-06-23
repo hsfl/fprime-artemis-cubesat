@@ -1,12 +1,15 @@
 # Neutron 2 Payload Viewer
 
-BLUF: this is the ground-side GUI for reconstructed Neutron 2 neutron-count payload CSV files.
+BLUF: this is the ground-side GUI for reconstructed Neutron 2 neutron-count
+payload CSV files, including CSV bytes that arrive in a `.bin` downlink product.
 
 It is intentionally separate from `fprime-gds`:
 
 - `fprime-gds` shows commands, events, telemetry, and transfer progress.
-- The payload receiver/downlink helper reconstructs the opaque payload blob into a CSV file.
-- This viewer opens that CSV and gives operators a quick science-data review screen.
+- The payload receiver/downlink helper reconstructs the opaque payload blob into
+  a file.
+- This viewer opens neutron-count CSV content from either `.csv` files or `.bin`
+  payload files and gives operators a quick science-data review screen.
 
 ## Run
 
@@ -28,8 +31,9 @@ Default behavior:
   - macOS/Linux: `/tmp/neutron_payload_captures`
   - Windows: `%TEMP%\neutron_payload_captures`
 - opens `http://127.0.0.1:8062`
-- shows newest CSV first
-- watches for new CSV products and automatically opens the newest file
+- shows newest supported payload first
+- watches for new `.csv` and `.bin` products and automatically opens the newest
+  file when it contains neutron-count CSV content
 - always reminds operators that capture files are run artifacts to archive/delete
   as needed
 - warns more strongly when old downlink CSVs are accumulating
@@ -39,6 +43,13 @@ Open one file directly:
 ```bash
 python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
   --file /path/to/reconstructed/neutron_capture.csv
+```
+
+Downlinked `.bin` that contains CSV bytes works the same way:
+
+```bash
+python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
+  --file /tmp/neutron_payload_captures/latest_payload.bin
 ```
 
 Windows:
@@ -74,7 +85,7 @@ py -3 ground-station\neutron2-payload-viewer\neutron2_payload_viewer.py --no-ope
 
 ## File Format
 
-The viewer expects a CSV with:
+The viewer expects CSV content with:
 
 ```csv
 t_s,counts,flag
@@ -83,6 +94,11 @@ t_s,counts,flag
 ```
 
 This matches `external/payload-neutron-simulation/neutron_data.csv` and the capture files emitted by the RPi-hosted simulator.
+
+The downlink transport is filetype-agnostic: it moves bytes and includes a
+`product_id`, but it does not currently include a filename, extension, MIME type,
+or schema tag. The viewer therefore treats `.bin` as a possible CSV container and
+sniffs the decoded content for the Neutron 2 CSV columns.
 
 ## Compatibility
 
@@ -93,7 +109,7 @@ This matches `external/payload-neutron-simulation/neutron_data.csv` and the capt
 
 ## File Cleanup
 
-Downlink/reconstructed CSVs should be treated as run artifacts. The payload
+Downlink/reconstructed payloads should be treated as run artifacts. The payload
 simulator allocates incrementing filenames and will not overwrite an existing
 CSV. If a base filename already exists, the next file becomes:
 
@@ -111,5 +127,5 @@ cleanup notice. For simulator products on the RPi, operators can use:
 StorageService.REMOVE_OLD_DATASETS(confirm=1)
 ```
 
-For ground laptop files, archive or delete old CSVs from the capture directory
+For ground laptop files, archive or delete old payloads from the capture directory
 after the demo/test run.

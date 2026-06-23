@@ -20,6 +20,7 @@ static constexpr uint16_t RAW_UART_FLUSH_MS = 12;
 static constexpr uint8_t UPLINK_QUEUE_DEPTH = 32;
 static constexpr uint8_t DOWNLINK_QUEUE_DEPTH = 32;
 static constexpr uint32_t DEBUG_STATUS_PERIOD_MS = 1000;
+static constexpr uint32_t RADIO_TRAFFIC_LED_BLINK_MS = 60;
 static constexpr size_t RPI_UART_RX_BUFFER_SIZE = 4096;
 static constexpr uint16_t CCSDS_TM_FRAME_BYTES = 128;
 
@@ -42,6 +43,47 @@ RelayConfig g_relayConfig{
     CCSDS_TM_FRAME_BYTES,
     link_protocol::CHANNEL_CCSDS};
 RelayUartRf g_relay(Serial2, g_rfDriver, g_linkCounters, g_relayConfig, nullptr, &g_pduProxy);
+static uint32_t g_radioTrafficLedUntilMs = 0;
+
+struct RadioTrafficSnapshot {
+  uint32_t rxPackets = 0;
+  uint32_t txPackets = 0;
+  uint32_t ackRx = 0;
+  uint32_t ackTx = 0;
+  uint32_t retries = 0;
+  uint32_t ackTimeouts = 0;
+  uint32_t txDrops = 0;
+};
+
+RadioTrafficSnapshot radioTrafficSnapshot() {
+  return {
+      g_linkCounters.rfRxPackets,
+      g_linkCounters.rfTxPackets,
+      g_linkCounters.rfAckRx,
+      g_linkCounters.rfAckTx,
+      g_linkCounters.rfRetries,
+      g_linkCounters.rfAckTimeouts,
+      g_linkCounters.rfTxDrops,
+  };
+}
+
+bool radioTrafficChanged(const RadioTrafficSnapshot& a, const RadioTrafficSnapshot& b) {
+  return a.rxPackets != b.rxPackets || a.txPackets != b.txPackets || a.ackRx != b.ackRx ||
+         a.ackTx != b.ackTx || a.retries != b.retries || a.ackTimeouts != b.ackTimeouts ||
+         a.txDrops != b.txDrops;
+}
+
+void updateRadioTrafficLed(uint32_t now) {
+  static RadioTrafficSnapshot lastTraffic = radioTrafficSnapshot();
+  const RadioTrafficSnapshot currentTraffic = radioTrafficSnapshot();
+  if (radioTrafficChanged(currentTraffic, lastTraffic)) {
+    lastTraffic = currentTraffic;
+    g_radioTrafficLedUntilMs = now + RADIO_TRAFFIC_LED_BLINK_MS;
+    digitalWrite(TEENSY_LED_PIN, LOW);
+  } else if (static_cast<int32_t>(now - g_radioTrafficLedUntilMs) >= 0) {
+    digitalWrite(TEENSY_LED_PIN, HIGH);
+  }
+}
 
 void debugPrintCounters(const char* prefix) {
   Serial.print(prefix);
@@ -112,6 +154,8 @@ void loop() {
   g_relay.poll();
 
   const uint32_t now = millis();
+  updateRadioTrafficLed(now);
+
   if ((now - lastDebugStatusMs) >= DEBUG_STATUS_PERIOD_MS) {
     debugPrintCounters("[ArtemisTeensy] counters");
     lastDebugStatusMs = now;
