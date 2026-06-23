@@ -44,6 +44,7 @@ module ArtemisRpiTeensyDeployment {
     instance storageService
     instance epsAdapterArtemis
     instance payloadAdapterN1Legacy
+    instance payloadAdapterLepton
     instance adcsAdapterD2S2
     instance gpsAdapterArtemis
     instance commsAdapterTeensyRfm23
@@ -193,6 +194,12 @@ module ArtemisRpiTeensyDeployment {
       storageService.sohStatusOut -> sohManager.statusIn[4]
       commsManager.sohStatusOut -> sohManager.statusIn[5]
       teensyTransportService.sohStatusOut -> sohManager.statusIn[6]
+    }
+
+    connections DataProductProducers {
+      # Lepton payload adapter produces thermal-image data products (synchronous get/send path)
+      payloadAdapterLepton.productGetOut  -> DataProducts.dpMgr.productGetIn
+      payloadAdapterLepton.productSendOut -> DataProducts.dpMgr.productSendIn
     }
 
     connections ArtemisRpiTeensyDeployment {

@@ -96,6 +96,11 @@ module ArtemisRpiTeensyDeployment {
     stack size Default.STACK_SIZE \
     priority 30
 
+  instance payloadAdapterLepton: Components.PayloadAdapter_Lepton base id 0x1000F000 \
+    queue size Default.QUEUE_SIZE \
+    stack size 256 * 1024 \
+    priority 29
+
   # ----------------------------------------------------------------------
   # Queued component instances
   # ----------------------------------------------------------------------
