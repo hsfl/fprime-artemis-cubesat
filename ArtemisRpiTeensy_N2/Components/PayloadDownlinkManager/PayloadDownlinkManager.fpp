@@ -15,7 +15,7 @@ module Components {
         sync input port packetIn: Fw.BufferSend
 
         @ Mission downlink request carrying the staged generic blob byte count.
-        sync input port downlinkRequestIn: Svc.Ping
+        async input port downlinkRequestIn: Svc.Ping
 
         @ Payload protocol packets to the UART channel mux.
         output port packetOut: Fw.BufferSend
