@@ -128,7 +128,7 @@ The ground side for this demo should be understood as a separate but essential p
 - `Yamcs`
   - longer-term end-goal ground presentation / analysis environment
 - operator-facing display
-  - the live demo must make telemetry, command acknowledgement, and science-data review visible
+  - the live demo must make telemetry, command acknowledgement, payload-transfer progress, and science-data review visible
 
 ## Demo Operating Story
 
@@ -140,7 +140,75 @@ This is the architecture-level story the software must support.
 4. Operator sends a command that schedules data collection after a short delay, such as `10` seconds.
 5. The spacecraft performs a payload/data-collection action using a real or simulated payload source.
 6. The system transitions into a science-data downlink path.
-7. Ground software reviews and presents the result.
+7. Ground software reconstructs, reviews, and presents the result.
+
+## Current HIL Data Path
+
+The current hardware-in-the-loop demo uses one RF chain, but it separates
+different data classes by logical channel.
+
+```text
+Channel 0: fprime-gds command/events/telemetry
+Mac fprime-gds
+-> ground Teensy Serial data port
+-> ground RFM23BP
+-> satellite RFM23BP
+-> satellite Teensy
+-> Raspberry Pi /dev/serial0
+-> UartChannelMux
+-> F Prime ComCcsds
+
+Channel 1: payload/science product bytes
+F Prime PayloadDownlinkManager
+-> UartChannelMux
+-> satellite Teensy
+-> RFM23BP RF link
+-> ground Teensy payload serial port
+-> tools/payload_receiver.py
+-> reconstructed .bin or .csv file
+-> ground-station/neutron2-payload-viewer
+
+Channel 2: satellite-local subsystem RPC
+F Prime adapter
+-> UartChannelMux
+-> satellite Teensy
+-> local board bus such as PDU/EPS
+```
+
+Important student-facing rule:
+
+- `fprime-gds` is the command, event, telemetry, and progress screen.
+- `tools/payload_receiver.py` is the file reconstruction tool for channel 1.
+- `ground-station/neutron2-payload-viewer` is the science review tool after a
+  payload file exists.
+- The viewer can parse `.bin` payload products when the bytes inside are the
+  Neutron 2 CSV format.
+
+## Payload Downlink Progress
+
+For the MVP path, F Prime does not use stock GDS file downlink for the science
+product. Instead, the mission command path starts a custom channel 1 payload
+transfer designed for the RFM23BP link.
+
+Runtime ownership is:
+
+- `PayloadAdapter_NeutronSim` or a future real payload adapter produces payload
+  bytes.
+- `StorageService` tracks the latest science product.
+- `CommsManager.REQUEST_SCIENCE_DOWNLINK` requests downlink of the latest stored
+  product.
+- `PayloadDownlinkManager` packetizes the product, sends channel 1 packets, and
+  emits progress events.
+- `tools/payload_receiver.py` reconstructs bytes, requests retries for missing
+  packets, verifies CRC, and writes the output file.
+- The payload viewer opens the reconstructed file and parses neutron-count CSV
+  content.
+
+`PayloadDownlinkManager.PayloadDownlinkProgress` emits nominal `10%` increments
+from `10` through `90`. `PayloadDownlinkComplete` and
+`CommsManager.DownlinkFinished` are the completion signals. For tiny payloads,
+several progress events may appear at the same timestamp or packet count because
+one payload packet can represent more than ten percent of the file.
 
 ## Development Assumptions
 

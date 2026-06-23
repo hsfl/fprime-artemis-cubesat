@@ -415,7 +415,7 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   - Legacy Artemis examples often assume Teensy as the main flight computer, while this repo uses Raspberry Pi as the host for the F Prime deployment and Teensy only for bridge/control duties.
   - Treat handwritten baremetal examples as useful interface references but review carefully for bugs, memory-safety issues, and mission mismatch before adapting anything.
 
-## Current Local Demo Status
+## Current Demo / HIL Status
 
 - 2026-06-18: `./tools/run_neutron2_local_demo.sh --gui-port 5070 --viewer-port 8070 --delay 3 --capture-seconds 3 --exit-after-sequence --skip-build`
   passed with the channelized local emulator.
@@ -426,23 +426,57 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   - `CommsManager.DownlinkFinished`
 - The local emulator observed channel 1 payload bytes and kept them off the GDS channel 0 stream.
 - `run_neutron2_local_demo.sh` always starts GDS and the Neutron 2 payload viewer, then opens/refocuses the viewer after verified downlink completion.
-- Remaining proof is HIL: real RPi UART behavior, satellite/ground Teensy firmware, RFM23BP channel 0/1 path, and real PDU response behavior over satellite Teensy `Serial1`.
+- 2026-06-23 HIL proved the shortened demo story over the real RPi UART,
+  satellite/ground Teensy firmware, and RFM23BP channel 0/1 path:
+  - three full capture/downlink/viewer passes completed with local-vs-Pi hash
+    match and viewer summaries
+  - a later progress-log redeploy smoke completed with a 72 byte payload hash
+    match and viewer summary
+  - Pi journal showed `PayloadDownlinkProgress` at nominal 10% increments plus
+    `PayloadDownlinkComplete` and `DownlinkFinished`
+- Current HIL USB / upload map from the progress-smoke run:
+  - satellite Teensy debug: `/dev/cu.usbmodem115502201`
+  - satellite Teensy upload ID: `usb:2100000`
+  - ground Teensy GDS / channel 0 data: `/dev/cu.usbmodem115553301`
+  - ground Teensy debug: `/dev/cu.usbmodem115553303`
+  - ground Teensy payload / channel 1: `/dev/cu.usbmodem115553305`
+  - ground Teensy upload ID: `usb:100000`
+- Current deployed Pi progress-smoke artifacts:
+  - binary hash: `fd8e260f042407545620936405e3b35f7026b404d1d8c26cd103afd7d478d670`
+  - dictionary hash: `9a744f4343623d136236d9e10427c7c5fedd2457c773fd951c21bab131215f92`
+  - payload hash: `094338d54bf52f0defee9dfa101d03bba7712ad20a877d51e2ff3202f468114f`
+  - payload bytes: `72`
+  - viewer rows: `6`
+- Earlier three-pass gate evidence:
+  - pass 1: `83` bytes, SHA-256 `eabd0e9f1ddbff5224617affffc72d187b53bffe5bf83426714f5f5359157165`, viewer rows `6`
+  - pass 2: `83` bytes, SHA-256 `b4cd40d47c8b7cef9fc407ab7013fdc8831e2d31651e322921592e7f97fe792c`, viewer rows `6`
+  - pass 3: `83` bytes, SHA-256 `00a1f94fa03521938757e4e6f85fde76b81ca82fe04099f74fa0c177ca7ccfa7`, viewer rows `6`
+- HIL pass criteria now live in `docs/RF_MVP_DEMO_RUNBOOK.md`:
+  - GDS receives live F Prime events/telemetry
+  - payload receiver writes the reconstructed file
+  - local payload hash matches Pi `/tmp/neutron_payload_captures/latest_payload.bin`
+  - payload viewer parses the result
+  - Pi journal shows `PayloadDownlinkProgress` and `DownlinkFinished`
+- Remaining hardware proof: real PDU response behavior over satellite Teensy
+  `Serial1` and RF/GDS cleanup to reduce APID sequence-count warnings.
+- Known caveat: GDS APID sequence-count warnings mean channel 0 is lossy, not
+  dead. The channel 1 payload receiver retry/CRC path recovered the tested
+  science products.
 
 ## Primary TODO
 
-1. Record first successful non-crashing runtime on `/dev/serial0` using the real UART path.
-2. Run full HIL end-to-end tests with real `fprime-gds` UART traffic over RF (both directions).
-3. HIL-test channel 2 against a real PDU through satellite Teensy `Serial1`.
-4. Rehearse the minimum demo-state flow on HIL: `Base Mode` -> scheduled data collection -> science-data downlink.
-5. Rehearse the neutron simulator product path through the selected HIL downlink/review path:
+1. Keep the HIL demo repeatable: `Base Mode` -> scheduled data collection -> science-data downlink -> viewer summary.
+2. HIL-test channel 2 against a real PDU through satellite Teensy `Serial1`.
+3. Reduce RF/GDS APID sequence-count warnings without regressing the payload retry path.
+4. Keep rehearsing the neutron simulator product path through the selected HIL downlink/review path:
    - `PayloadAdapter_NeutronSim` stages the latest capture for downlink.
    - `REQUEST_SCIENCE_DOWNLINK` starts the channel 1 `PayloadDownlinkManager` transfer.
    - Use `tools/payload_receiver.py` on the ground channel 1 serial endpoint for HIL payload reconstruction.
-6. Keep `fprime-gds` as the live MVP demo ground interface and treat `Yamcs` as the post-MVP target presentation/analysis stack.
-7. Add minimal segment ACK/retry for RF relay reliability after the channelized CCSDS path is stable.
+5. Keep `fprime-gds` as the live MVP demo ground interface and treat `Yamcs` as the post-MVP target presentation/analysis stack.
+6. Add minimal segment ACK/retry for RF relay reliability after the channelized CCSDS path is stable.
    - MVP target: command uplink delivery confidence and reduced telemetry burst loss during demo.
-8. Add deterministic packet boundary extraction for uplink beyond simple burst mode if required by the selected demo flow.
-9. Decide whether the MVP stays on the custom channel 1 payload receiver or graduates to stock F Prime file downlink:
+7. Add deterministic packet boundary extraction for uplink beyond simple burst mode if required by the selected demo flow.
+8. Decide whether the MVP stays on the custom channel 1 payload receiver or graduates to stock F Prime file downlink:
    - current channel 1 path transfers real staged payload bytes but does not appear as a stock GDS `#Downlink` file transfer
    - future migration target is `Svc::FileDownlink` once the link MTU/loss behavior can carry the stock file-transfer path cleanly
    - pass criteria for the current MVP path: reconstructed file exists on the laptop, content/size/CRC match the source capture, and channel 0 GDS traffic stays healthy during transfer
@@ -599,18 +633,24 @@ Build verification at handoff:
   - treat RF/UART chain as current failure point, not F' process bring-up.
   - debug should focus on physical link path and Teensy-side relay/radio chain stability.
 
-## Session Handoff (2026-04-24, RF/GDS HIL debug)
+## Historical Session Handoff (2026-04-24, RF/GDS HIL debug)
+
+Current 2026-06-23 upload IDs supersede the older IDs in this historical
+section:
+
+- ground Teensy upload ID: `usb:100000`
+- satellite Teensy upload ID: `usb:2100000`
 
 ### USB/SSH mapping confirmed
 
 - Satellite Teensy:
   - `/dev/cu.usbmodem115502201`
-  - physical Teensy upload port: `usb:100000`
+  - historical physical Teensy upload port: `usb:100000`
   - current sketch role: satellite bridge, Pi data on `Serial2`, USB `Serial` debug counters
 - Ground station Teensy:
   - `/dev/cu.usbmodem115551201` = GDS data stream (`Serial`)
   - `/dev/cu.usbmodem115551203` = debug stream (`SerialUSB1`)
-  - physical Teensy upload port: `usb:1100000`
+  - historical physical Teensy upload port: `usb:1100000`
 - Raspberry Pi:
   - SSH alias: `artemis-pi`
   - host/IP: `192.168.0.152`
@@ -623,8 +663,8 @@ Build verification at handoff:
 
 - Do not upload by `/dev/cu.usbmodem*` when both Teensys are connected; Arduino CLI may auto-search and choose the wrong Teensy.
 - Use the physical Teensy ports from `arduino-cli board list`:
-  - ground: `-p usb:1100000`
-  - satellite: `-p usb:100000`
+  - ground: `-p usb:100000`
+  - satellite: `-p usb:2100000`
 - Use explicit build directories to avoid stale artifacts:
   - ground debug: `GDS_Teensy/build/arduino-cli-gds-teensy-debug`
   - satellite debug: `ArtemisTeensy_N2_Baremetal/build/arduino-cli-satellite-debug`
@@ -779,8 +819,8 @@ Build verification at handoff:
   - when fixed-frame raw chunking is enabled (`rawUartChunkBytes > RF_SEGMENT_MAX_DATA`), stale partial chunks are dropped and counted as `framingDrops`
   - ground default small-chunk uplink behavior is unchanged
 - Rebuilt and reflashed both Teensys sequentially:
-  - ground: `usb:1100000`
-  - satellite: `usb:100000`
+  - historical ground ID at that time: `usb:1100000`
+  - historical satellite ID at that time: `usb:100000`
 - Raw ground capture after cleanup:
   - captured exactly one 128-byte frame
   - CRC scan found `valid128_count=1` at offset `0`
