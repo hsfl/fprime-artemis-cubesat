@@ -104,12 +104,32 @@ This allows the deployment to come up far enough for a no-UART smoke test withou
 
 ## Normal Flow
 
-From the F' project root:
+macOS:
 
 ```bash
-cd ArtemisRpiTeensy_N2
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+export PI_ZERO_W_SSH_HOST=pi@artemis-pi.local
+export PI_ZERO_W_REMOTE_DIR=/home/pi/artemis/cross
 ./tools/docker_cross_compile_pi_zero_w.sh
 ```
+
+Windows WSL2:
+
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+export PI_ZERO_W_SSH_HOST=pi@artemis-pi.local
+export PI_ZERO_W_REMOTE_DIR=/home/pi/artemis/cross
+./tools/docker_cross_compile_pi_zero_w.sh
+```
+
+The default flow is now the fast iterative path:
+
+- reuse the Docker image if it already exists
+- reuse the synced Pi Zero W sysroot if it is complete
+- reuse `.cross-venv-linux` if the F Prime tools still run
+- reuse the F Prime build cache unless `--clean` is used
+- build and verify the ARMv6 binary every time
+- deploy to the Pi and run the `/dev/null` smoke test unless `--local-only` is used
 
 This script is meant to be reused on another workstation. Do not assume the
 SSH host alias or remote directory from the original setup will exist.
@@ -118,7 +138,7 @@ Students or future agents should change the target using either environment
 variables:
 
 ```bash
-export PI_ZERO_W_SSH_HOST=pi@192.168.1.44
+export PI_ZERO_W_SSH_HOST=pi@artemis-pi.local
 export PI_ZERO_W_REMOTE_DIR=/home/pi/artemis/cross
 export PI_ZERO_W_SYSROOT_DIR="$PWD/cross/pi-zero-w/sysroot"
 ```
@@ -126,7 +146,7 @@ export PI_ZERO_W_SYSROOT_DIR="$PWD/cross/pi-zero-w/sysroot"
 or explicit flags:
 
 ```bash
-./tools/docker_cross_compile_pi_zero_w.sh --host pi@192.168.1.44 --remote-dir /home/pi/artemis/cross
+./tools/docker_cross_compile_pi_zero_w.sh --host pi@artemis-pi.local --remote-dir /home/pi/artemis/cross
 ```
 
 The Pi-side requirements are:
@@ -137,21 +157,30 @@ The Pi-side requirements are:
 
 What the script does:
 
-1. syncs the sysroot from the Pi
+1. syncs the sysroot from the Pi only when needed, or when `--clean` is used
 2. ensures the loader symlink exists in the sysroot
-3. builds inside Docker
+3. builds inside Docker, reusing the F Prime build cache unless `--clean` is used
 4. verifies the binary with `file` and `readelf`
-5. copies the binary to the Pi
-6. runs the remote smoke test with `/dev/null`
+5. copies the binary to the Pi unless `--local-only` is used
+6. runs the remote smoke test with `/dev/null` unless `--local-only` is used
 
 Useful flags:
 
 ```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+./tools/docker_cross_compile_pi_zero_w.sh --local-only
+./tools/docker_cross_compile_pi_zero_w.sh --clean
 ./tools/docker_cross_compile_pi_zero_w.sh --skip-sync
 ./tools/docker_cross_compile_pi_zero_w.sh --skip-image-build
-./tools/docker_cross_compile_pi_zero_w.sh --host <ssh-host>
-./tools/docker_cross_compile_pi_zero_w.sh --remote-dir <remote-path>
+./tools/docker_cross_compile_pi_zero_w.sh --host pi@artemis-pi.local
+./tools/docker_cross_compile_pi_zero_w.sh --remote-dir /home/pi/artemis/cross
 ```
+
+Use `--clean` for a deliberate full refresh. It refreshes the sysroot,
+rebuilds the Docker image, recreates the cross Python venv, and force-regenerates
+the F Prime build cache. For normal FPP/C++ iteration, avoid `--clean`; the slow
+part is usually Python dependency download/install, and forced regeneration also
+throws away incremental compile state.
 
 ## Verification Artifacts
 

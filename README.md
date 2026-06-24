@@ -54,48 +54,86 @@ Current relay milestone:
 - `docs/agents_notes.md`
   - Current implementation status and next-agent guidance
 - `EMULATION.md`
-  - Local Mac-only closed-loop emulation workflow (no hardware)
+  - Local laptop closed-loop emulation workflow (no hardware)
+- `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md`
+  - Windows laptop setup for student developers and testing/viewer users
 
-## Build and run
+## Build and Run
 
-### 1) Build F' (RPi side)
+### macOS Laptop
+
+Use this when the repo is cloned at `~/Developer/fprime-artemis-cubesat`.
+
 ```bash
-cd <repo-root>
+cd ~/Developer/fprime-artemis-cubesat
 . ArtemisRpiTeensy_N2/fprime-venv/bin/activate
 cd ArtemisRpiTeensy_N2
 fprime-util generate -f
 fprime-util build
 ```
 
-Run deployment:
+Build satellite Teensy bridge:
 ```bash
+cd ~/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+./tools/arduino-cli/build.sh
+```
+
+Build ground Teensy bridge:
+```bash
+cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
+./tools/arduino-cli/build.sh
+```
+
+Run local laptop emulation:
+```bash
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+./tools/run_local_emulation.sh
+```
+
+### Windows Laptop (WSL2)
+
+Use this when the repo is cloned inside Ubuntu/WSL at `~/fprime-artemis-cubesat`.
+
+```bash
+cd ~/fprime-artemis-cubesat
+. ArtemisRpiTeensy_N2/fprime-venv/bin/activate
 cd ArtemisRpiTeensy_N2
-./build-artifacts/Darwin/ArtemisRpiTeensyDeployment/bin/ArtemisRpiTeensyDeployment -d /dev/serial0
+fprime-util generate -f
+fprime-util build
 ```
 
-### 2) Build satellite Teensy bridge
+Build satellite Teensy bridge:
 ```bash
-cd ArtemisTeensy_N2_Baremetal
+cd ~/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
 ./tools/arduino-cli/build.sh
 ```
 
-Upload (example port):
+Build ground Teensy bridge:
 ```bash
-cd ArtemisTeensy_N2_Baremetal
-./tools/arduino-cli/upload.sh /dev/ttyACM0
-```
-
-### 3) Build ground Teensy bridge
-```bash
-cd GDS_Teensy
+cd ~/fprime-artemis-cubesat/GDS_Teensy
 ./tools/arduino-cli/build.sh
 ```
 
-Upload (example port):
+Run local laptop emulation:
 ```bash
-cd GDS_Teensy
-./tools/arduino-cli/upload.sh /dev/ttyACM1
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+./tools/run_local_emulation.sh
 ```
+
+### Raspberry Pi Target
+
+Use this on the Pi after cloning the repo at `~/fprime-artemis-cubesat`.
+
+```bash
+cd ~/fprime-artemis-cubesat
+. ArtemisRpiTeensy_N2/fprime-venv/bin/activate
+cd ArtemisRpiTeensy_N2
+fprime-util generate -f
+fprime-util build
+./build-artifacts/Linux/bin/ArtemisRpiTeensyDeployment -d /dev/serial0
+```
+
+Windows note: use WSL2 for F' build/development work. Native Windows is fine for the browser/Python payload viewer path.
 
 ## Status
 

@@ -53,16 +53,35 @@ That is why this flow checks the final binary with `readelf` before using it.
 
 ## One-Command Flow
 
-From the F' project directory:
+### macOS
+
+Use this when the repo is cloned at `~/Developer/fprime-artemis-cubesat`.
 
 ```bash
-cd ArtemisRpiTeensy_N2
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+export PI_ZERO_W_SSH_HOST=pi@artemis-pi.local
+export PI_ZERO_W_REMOTE_DIR=/home/pi/artemis/cross
 ./tools/docker_cross_compile_pi_zero_w.sh
 ```
 
+### Windows Laptop (WSL2)
+
+Use this when the repo is cloned inside Ubuntu/WSL at `~/fprime-artemis-cubesat`.
+
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+export PI_ZERO_W_SSH_HOST=pi@artemis-pi.local
+export PI_ZERO_W_REMOTE_DIR=/home/pi/artemis/cross
+./tools/docker_cross_compile_pi_zero_w.sh
+```
+
+That script uses the normal fast path. It reuses the Docker image, Pi sysroot,
+cross Python environment, and F Prime build cache when they already exist, but
+it still builds and verifies the ARMv6 binary.
+
 That script will:
 
-1. copy the needed sysroot files from the Pi
+1. copy the needed sysroot files from the Pi if they are missing
 2. build the deployment in Docker
 3. verify the binary is ARMv6-compatible
 4. copy the binary to the Pi
@@ -71,6 +90,23 @@ That script will:
 ```bash
 ./ArtemisRpiTeensyDeployment -d /dev/null
 ```
+
+For a local artifact check without copying to the Pi:
+
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+./tools/docker_cross_compile_pi_zero_w.sh --local-only
+```
+
+For a deliberate full refresh:
+
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+./tools/docker_cross_compile_pi_zero_w.sh --clean
+```
+
+Use `--clean` when the Docker image, Pi sysroot, Python dependencies, or F Prime
+build cache may be stale. Do not use it for every small code change.
 
 ## What Success Looks Like
 

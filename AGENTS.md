@@ -126,29 +126,39 @@ fprime-util build
 ## Run `fprime-gds` over UART (RPi/Operator Side)
 
 Preferred launcher (repo-maintained defaults):
+macOS:
 ```bash
-cd ArtemisRpiTeensy_N2
-./tools/run_gds_uart.sh
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
+./tools/run_gds_uart.sh --port "$PORT"
+```
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
+./tools/run_gds_uart.sh --port "$PORT"
 ```
 
 Script defaults:
-- UART device: `/dev/cu.usbmodem115551201`
+- UART device: auto-detected when exactly one supported serial device is present;
+  otherwise pass `--port <device>`
 - UART baud: `115200`
 - GUI port: `5050`
-- dictionary: `build-artifacts/Darwin/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json`
+- dictionary: auto-detected under `build-artifacts` when not supplied
 
 Useful overrides:
 ```bash
-./tools/run_gds_uart.sh --port /dev/cu.usbmodemXXXX --baud 115200
+./tools/run_gds_uart.sh --port "$PORT" --baud 115200
 ./tools/run_gds_uart.sh --gui-port 5050
-./tools/run_gds_uart.sh --dictionary /abs/path/to/TopologyDictionary.json
+./tools/run_gds_uart.sh --dictionary build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json
 ./tools/run_gds_uart.sh --dry-run
 ```
 
 Notes:
 - On macOS, port `5000` may already be occupied by Control Center/AirPlay Receiver. Use non-5000 GUI ports (default script port is `5050`).
 - If using raw CLI instead of script, pass UART args explicitly:
-  - `fprime-gds -n --communication-selection uart --uart-device <device> --uart-baud 115200 --framing-selection space-packet-space-data-link`
+  - `fprime-gds -n --communication-selection uart --uart-device "$PORT" --uart-baud 115200 --framing-selection space-packet-space-data-link`
 
 ## Common Pitfalls
 - Running generators without a build cache.
@@ -165,17 +175,32 @@ Use this section when working in the Teensy bridge workspace:
 
 ### Build (Arduino CLI)
 Run from the baremetal project root:
+macOS:
 ```bash
-cd ArtemisTeensy_N2_Baremetal
+cd ~/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+./tools/arduino-cli/build.sh
+```
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
 ./tools/arduino-cli/build.sh
 ```
 
 ### Upload (Arduino CLI)
+macOS:
 ```bash
-cd ArtemisTeensy_N2_Baremetal
-./tools/arduino-cli/upload.sh /dev/ttyACM0
+cd ~/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
+./tools/arduino-cli/upload.sh "$PORT"
 ```
-- Replace `/dev/ttyACM0` with the actual connected Teensy port.
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
+./tools/arduino-cli/upload.sh "$PORT"
+```
 
 ### Teensy Source of Truth
 - Main sketch:
@@ -198,18 +223,33 @@ Use this section when working in the ground bridge workspace:
 
 ### Build (Arduino CLI)
 Run from `GDS_Teensy`:
+macOS:
 ```bash
-cd GDS_Teensy
+cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
+./tools/arduino-cli/build.sh
+```
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/GDS_Teensy
 ./tools/arduino-cli/build.sh
 ```
 
 ### Upload (Arduino CLI)
 Run from `GDS_Teensy`:
+macOS:
 ```bash
-cd GDS_Teensy
-./tools/arduino-cli/upload.sh /dev/cu.usbmodemXXXX
+cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
+PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
+./tools/arduino-cli/upload.sh "$PORT"
 ```
-- Use the actual detected USB modem/ACM port.
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/GDS_Teensy
+PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
+./tools/arduino-cli/upload.sh "$PORT"
+```
 - `upload.sh` expects artifacts from `build.sh` in `build/arduino-cli`.
 
 ### Ground Teensy Source of Truth
@@ -286,9 +326,9 @@ cd GDS_Teensy
 
 ### Runtime Smoke Flow (RPi)
 - Binary:
-  - `ArtemisRpiTeensy_N2/build-artifacts/Darwin/ArtemisRpiTeensyDeployment/bin/ArtemisRpiTeensyDeployment`
+  - `ArtemisRpiTeensy_N2/build-artifacts/Linux/bin/ArtemisRpiTeensyDeployment`
 - Run:
-  - `./ArtemisRpiTeensyDeployment -d /dev/serial0`
+  - `cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2 && ./build-artifacts/Linux/bin/ArtemisRpiTeensyDeployment -d /dev/serial0`
 - Minimum pass criteria:
   - startup banner appears
   - no immediate init assertion

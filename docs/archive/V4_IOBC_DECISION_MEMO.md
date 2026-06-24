@@ -73,7 +73,7 @@ That is too little margin to approve, but it is close enough that `v4` is not au
 
 Reference:
 
-- [PI_ZERO_W_MINIMAL_FPRIME_SIZE_COMPARISON.md](/Users/sozodennis/Developer/fprime-artemis-cubesat/docs/archive/PI_ZERO_W_MINIMAL_FPRIME_SIZE_COMPARISON.md)
+- [PI_ZERO_W_MINIMAL_FPRIME_SIZE_COMPARISON.md](PI_ZERO_W_MINIMAL_FPRIME_SIZE_COMPARISON.md)
 
 ### 2. Architecture mismatch is real
 

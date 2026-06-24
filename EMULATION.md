@@ -1,4 +1,4 @@
-# Local Closed-Loop Emulation (MacBook)
+# Local Closed-Loop Emulation (Laptop)
 
 This is the fastest local end-user test loop for this repo:
 
@@ -34,8 +34,24 @@ This deployment uses `ComCcsds`, so the working GDS framing is:
 
 ## Prerequisites
 
+### macOS
+
+Use this when the repo is cloned at `~/Developer/fprime-artemis-cubesat`.
+
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat
+cd ~/Developer/fprime-artemis-cubesat
+. ArtemisRpiTeensy_N2/fprime-venv/bin/activate
+cd ArtemisRpiTeensy_N2
+fprime-util generate -f
+fprime-util build
+```
+
+### Windows Laptop (WSL2)
+
+Use this when the repo is cloned inside Ubuntu/WSL at `~/fprime-artemis-cubesat`.
+
+```bash
+cd ~/fprime-artemis-cubesat
 . ArtemisRpiTeensy_N2/fprime-venv/bin/activate
 cd ArtemisRpiTeensy_N2
 fprime-util generate -f
@@ -55,16 +71,32 @@ Switching profiles requires regenerate + rebuild.
 
 Default/HIL build:
 
+macOS:
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+fprime-util generate -f -DNEUTRON2_TOPOLOGY_PROFILE=hil
+fprime-util build
+```
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 fprime-util generate -f -DNEUTRON2_TOPOLOGY_PROFILE=hil
 fprime-util build
 ```
 
 Local-demo build:
 
+macOS:
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+fprime-util generate -f -DNEUTRON2_TOPOLOGY_PROFILE=local-demo
+fprime-util build
+```
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 fprime-util generate -f -DNEUTRON2_TOPOLOGY_PROFILE=local-demo
 fprime-util build
 ```
@@ -74,8 +106,15 @@ unless `--skip-build` is supplied.
 
 ## One-command launch
 
+macOS:
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+./tools/run_local_emulation.sh
+```
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 ./tools/run_local_emulation.sh
 ```
 
@@ -97,7 +136,13 @@ verifies that a new simulated payload CSV was generated and parsed, then
 opens/refocuses the payload viewer after payload downlink completion.
 
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+./tools/run_neutron2_local_demo.sh
+```
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 ./tools/run_neutron2_local_demo.sh
 ```
 
@@ -268,17 +313,36 @@ When using `--no-app` and/or `--no-gds`, the emulator prints:
 
 Run app manually:
 
+macOS:
 ```bash
-./build-artifacts/Darwin/ArtemisRpiTeensyDeployment/bin/ArtemisRpiTeensyDeployment -d <app_uart_device>
+./build-artifacts/Darwin/ArtemisRpiTeensyDeployment/bin/ArtemisRpiTeensyDeployment -d "$APP_UART_DEVICE"
+```
+
+Linux/WSL2:
+```bash
+./build-artifacts/Linux/ArtemisRpiTeensyDeployment/bin/ArtemisRpiTeensyDeployment -d "$APP_UART_DEVICE"
 ```
 
 Run GDS manually:
 
+macOS:
 ```bash
 fprime-gds -n \
   --dictionary build-artifacts/Darwin/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json \
   --communication-selection uart \
-  --uart-device <gds_uart_device> \
+  --uart-device "$GDS_UART_DEVICE" \
+  --uart-baud 115200 \
+  --uart-skip-port-check \
+  --framing-selection space-packet-space-data-link \
+  --gui-port 5050
+```
+
+Linux/WSL2:
+```bash
+fprime-gds -n \
+  --dictionary build-artifacts/Linux/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json \
+  --communication-selection uart \
+  --uart-device "$GDS_UART_DEVICE" \
   --uart-baud 115200 \
   --uart-skip-port-check \
   --framing-selection space-packet-space-data-link \
@@ -287,7 +351,7 @@ fprime-gds -n \
 
 ## Emulation files
 
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2/tools/run_local_emulation.sh`
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2/tools/local_emulation_loop.py`
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2/tools/run_neutron2_local_demo.sh`
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat/ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py`
+- `ArtemisRpiTeensy_N2/tools/run_local_emulation.sh`
+- `ArtemisRpiTeensy_N2/tools/local_emulation_loop.py`
+- `ArtemisRpiTeensy_N2/tools/run_neutron2_local_demo.sh`
+- `ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py`

@@ -8,7 +8,7 @@ Purpose: freeze the known-good RF MVP demo path and provide a repeatable HIL smo
 The command/telemetry path to freeze is:
 
 ```text
-fprime-gds on Mac
+fprime-gds on the operator laptop
 -> ground Teensy USB data port / channel 0
 -> RFM23BP RF hop
 -> satellite Teensy
@@ -40,8 +40,9 @@ Pi journal shows PayloadDownlinkProgress and DownlinkFinished
 
 ## Known-Good Hardware Map
 
-Observed on 2026-06-23. Recheck with `arduino-cli board list` and
-`ls /dev/cu.usbmodem*` each session.
+Observed on 2026-06-23 on one macOS bench laptop. Treat these as examples only.
+Recheck with `arduino-cli board list` and the platform serial-device listing
+each session.
 
 | Device | Port / address | Purpose |
 | --- | --- | --- |
@@ -144,14 +145,34 @@ ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/RfMvpConfig/
 
 ## Start GDS
 
-From repo root:
+### macOS Bench Laptop
 
 ```sh
-cd ArtemisRpiTeensy_N2
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 . fprime-venv/bin/activate
+GDS_DATA_PORT=/dev/cu.usbmodem115553301
 fprime-gds -n \
   --communication-selection uart \
-  --uart-device /dev/cu.usbmodem115553301 \
+  --uart-device "$GDS_DATA_PORT" \
+  --uart-baud 115200 \
+  --framing-selection space-packet-space-data-link \
+  --dictionary build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json \
+  --gui-port 5051 \
+  --log-to-stdout \
+  --log-level-gds INFO
+```
+
+### Windows Laptop (WSL2)
+
+Attach the ground Teensy USB data device to WSL first, then run:
+
+```sh
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+. fprime-venv/bin/activate
+GDS_DATA_PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
+fprime-gds -n \
+  --communication-selection uart \
+  --uart-device "$GDS_DATA_PORT" \
   --uart-baud 115200 \
   --framing-selection space-packet-space-data-link \
   --dictionary build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json \
@@ -178,10 +199,24 @@ Use this when validating the current demo story, not just the command link.
 
 ### 1. Preflight
 
+macOS:
 ```sh
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat
+cd ~/Developer/fprime-artemis-cubesat
+GDS_DATA_PORT=/dev/cu.usbmodem115553301
+GDS_DEBUG_PORT=/dev/cu.usbmodem115553303
+GDS_PAYLOAD_PORT=/dev/cu.usbmodem115553305
+SAT_DEBUG_PORT=/dev/cu.usbmodem115502201
 ps -axo pid,command | rg 'fprime-gds|fprime-server|payload_receiver|teensy-monitor|Arduino IDE' || true
-lsof /dev/cu.usbmodem115553301 /dev/cu.usbmodem115553303 /dev/cu.usbmodem115553305 /dev/cu.usbmodem115502201 2>/dev/null || true
+lsof "$GDS_DATA_PORT" "$GDS_DEBUG_PORT" "$GDS_PAYLOAD_PORT" "$SAT_DEBUG_PORT" 2>/dev/null || true
+ssh artemis-pi 'systemctl is-active artemis-fprime.service; pgrep -af ArtemisRpiTeensyDeployment'
+```
+
+Windows WSL2:
+```sh
+cd ~/fprime-artemis-cubesat
+GDS_DATA_PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
+ps -axo pid,command | rg 'fprime-gds|fprime-server|payload_receiver|teensy-monitor|Arduino IDE' || true
+lsof "$GDS_DATA_PORT" 2>/dev/null || true
 ssh artemis-pi 'systemctl is-active artemis-fprime.service; pgrep -af ArtemisRpiTeensyDeployment'
 ```
 
@@ -195,12 +230,27 @@ Expected:
 
 Start this before requesting the downlink:
 
+macOS:
 ```sh
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 . fprime-venv/bin/activate
+GDS_PAYLOAD_PORT=/dev/cu.usbmodem115553305
 mkdir -p /tmp/neutron_hil/progress_smoke
 python -u tools/payload_receiver.py \
-  --port /dev/cu.usbmodem115553305 \
+  --port "$GDS_PAYLOAD_PORT" \
+  --baud 115200 \
+  --output /tmp/neutron_hil/progress_smoke/payload.bin \
+  --timeout 180
+```
+
+Windows WSL2:
+```sh
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+. fprime-venv/bin/activate
+GDS_PAYLOAD_PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
+mkdir -p /tmp/neutron_hil/progress_smoke
+python -u tools/payload_receiver.py \
+  --port "$GDS_PAYLOAD_PORT" \
   --baud 115200 \
   --output /tmp/neutron_hil/progress_smoke/payload.bin \
   --timeout 180
@@ -219,8 +269,24 @@ complete: product=<id> transfer=<id> bytes=<n> packets=<n> crc=0x.... output=<pa
 
 In another terminal:
 
+macOS:
 ```sh
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+. fprime-venv/bin/activate
+DICT=build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json
+
+fprime-cli command-send ArtemisRpiTeensyDeployment.sohManager.EMIT_SOH_SNAPSHOT --dictionary "$DICT"
+fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.ENTER_BASE_MODE --dictionary "$DICT"
+fprime-cli command-send ArtemisRpiTeensyDeployment.scienceManager.CONFIGURE_CAPTURE_DURATION --arguments 6 --dictionary "$DICT"
+fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.SCHEDULE_COLLECTION --arguments 4 --dictionary "$DICT"
+sleep 12
+fprime-cli command-send ArtemisRpiTeensyDeployment.storageService.REPORT_LATEST_DATASET --dictionary "$DICT"
+fprime-cli command-send ArtemisRpiTeensyDeployment.commsManager.REQUEST_SCIENCE_DOWNLINK --dictionary "$DICT"
+```
+
+Windows WSL2:
+```sh
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 . fprime-venv/bin/activate
 DICT=build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json
 
@@ -237,9 +303,19 @@ Use fully-qualified command names with this dictionary.
 
 ### 4. Verify file and viewer
 
+macOS:
 ```sh
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat
+cd ~/Developer/fprime-artemis-cubesat
 printf 'local  '; shasum -a 256 /tmp/neutron_hil/progress_smoke/payload.bin
+printf 'remote '; ssh artemis-pi 'sha256sum /tmp/neutron_payload_captures/latest_payload.bin'
+python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
+  --summary /tmp/neutron_hil/progress_smoke/payload.bin
+```
+
+Windows WSL2:
+```sh
+cd ~/fprime-artemis-cubesat
+printf 'local  '; sha256sum /tmp/neutron_hil/progress_smoke/payload.bin
 printf 'remote '; ssh artemis-pi 'sha256sum /tmp/neutron_payload_captures/latest_payload.bin'
 python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
   --summary /tmp/neutron_hil/progress_smoke/payload.bin

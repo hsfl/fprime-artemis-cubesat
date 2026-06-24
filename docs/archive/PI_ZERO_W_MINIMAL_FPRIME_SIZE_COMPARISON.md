@@ -4,9 +4,9 @@
 
 This compares the smallest fresh F Prime starter deployment I could build for the latest `v3` and `v4` major lines while staying aligned with the repository's Raspberry Pi Zero W cross-build approach.
 
-- Base repository: `/Users/sozodennis/Developer/fprime-artemis-cubesat`
-- Worktree for F Prime `v3.6.4`: `/Users/sozodennis/Developer/fprime-artemis-cubesat-v3.6.4`
-- Worktree for F Prime `v4.0.0`: `/Users/sozodennis/Developer/fprime-artemis-cubesat-v4.0.0`
+- Base repository: `<repo-root>`
+- Worktree for F Prime `v3.6.4`: `<fprime-artemis-cubesat-v3.6.4-worktree>`
+- Worktree for F Prime `v4.0.0`: `<fprime-artemis-cubesat-v4.0.0-worktree>`
 - Cross-build style: repo-local Pi Zero W Dockerfile + repo-local Pi Zero W sysroot/toolchain wiring
 - Target class: ARMv6 hard-float Linux, Raspberry Pi Zero W style
 - Deployment topology: fresh minimal starter deployment, not `ArtemisRpiTeensyDeployment` and not the Neutron 2 UART/Teensy topology
@@ -17,7 +17,7 @@ This compares the smallest fresh F Prime starter deployment I could build for th
 
 - Release tag: `v3.6.4`
 - Branch: `codex/pi-minimal-fprime-v3.6.4`
-- Project root: `/Users/sozodennis/Developer/fprime-artemis-cubesat-v3.6.4/sizing/pi_minimal/fprime-minimal-v3`
+- Project root: `<fprime-artemis-cubesat-v3.6.4-worktree>/sizing/pi_minimal/fprime-minimal-v3`
 - Deployment: `PiMinimalV3Deployment`
 - Generated comm driver choice: `TcpClient`
 
@@ -25,7 +25,7 @@ This compares the smallest fresh F Prime starter deployment I could build for th
 
 - Release tag: `v4.0.0`
 - Branch: `codex/pi-minimal-fprime-v4.0.0`
-- Project root: `/Users/sozodennis/Developer/fprime-artemis-cubesat-v4.0.0/sizing/pi_minimal/fprime-minimal-v4`
+- Project root: `<fprime-artemis-cubesat-v4.0.0-worktree>/sizing/pi_minimal/fprime-minimal-v4`
 - Deployment: `PiMinimalV4Deployment`
 - Generated comm driver choice: `TcpClient`
 
@@ -33,8 +33,8 @@ This compares the smallest fresh F Prime starter deployment I could build for th
 
 Each project contains a local helper script:
 
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat-v3.6.4/sizing/pi_minimal/fprime-minimal-v3/tools/docker_cross_compile_pi_zero_w_size.sh`
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat-v4.0.0/sizing/pi_minimal/fprime-minimal-v4/tools/docker_cross_compile_pi_zero_w_size.sh`
+- `<fprime-artemis-cubesat-v3.6.4-worktree>/sizing/pi_minimal/fprime-minimal-v3/tools/docker_cross_compile_pi_zero_w_size.sh`
+- `<fprime-artemis-cubesat-v4.0.0-worktree>/sizing/pi_minimal/fprime-minimal-v4/tools/docker_cross_compile_pi_zero_w_size.sh`
 
 Each helper:
 
@@ -105,34 +105,34 @@ This report does not declare fit or no-fit for the final flight computer because
 ### F Prime v3.6.4
 
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat-v3.6.4/sizing/pi_minimal/fprime-minimal-v3
+cd <fprime-artemis-cubesat-v3.6.4-worktree>/sizing/pi_minimal/fprime-minimal-v3
 ./tools/docker_cross_compile_pi_zero_w_size.sh
 ```
 
 Verification outputs:
 
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat-v3.6.4/sizing/pi_minimal/fprime-minimal-v3/cross/pi-zero-w/verify/file.txt`
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat-v3.6.4/sizing/pi_minimal/fprime-minimal-v3/cross/pi-zero-w/verify/readelf-A.txt`
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat-v3.6.4/sizing/pi_minimal/fprime-minimal-v3/cross/pi-zero-w/verify/readelf-l.txt`
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat-v3.6.4/sizing/pi_minimal/fprime-minimal-v3/cross/pi-zero-w/verify/size-A.txt`
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat-v3.6.4/sizing/pi_minimal/fprime-minimal-v3/cross/pi-zero-w/verify/raw-bytes.txt`
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat-v3.6.4/sizing/pi_minimal/fprime-minimal-v3/cross/pi-zero-w/verify/stripped-bytes.txt`
+- `cross/pi-zero-w/verify/file.txt`
+- `cross/pi-zero-w/verify/readelf-A.txt`
+- `cross/pi-zero-w/verify/readelf-l.txt`
+- `cross/pi-zero-w/verify/size-A.txt`
+- `cross/pi-zero-w/verify/raw-bytes.txt`
+- `cross/pi-zero-w/verify/stripped-bytes.txt`
 
 ### F Prime v4.0.0
 
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat-v4.0.0/sizing/pi_minimal/fprime-minimal-v4
+cd <fprime-artemis-cubesat-v4.0.0-worktree>/sizing/pi_minimal/fprime-minimal-v4
 ./tools/docker_cross_compile_pi_zero_w_size.sh
 ```
 
 Verification outputs:
 
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat-v4.0.0/sizing/pi_minimal/fprime-minimal-v4/cross/pi-zero-w/verify/file.txt`
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat-v4.0.0/sizing/pi_minimal/fprime-minimal-v4/cross/pi-zero-w/verify/readelf-A.txt`
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat-v4.0.0/sizing/pi_minimal/fprime-minimal-v4/cross/pi-zero-w/verify/readelf-l.txt`
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat-v4.0.0/sizing/pi_minimal/fprime-minimal-v4/cross/pi-zero-w/verify/size-A.txt`
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat-v4.0.0/sizing/pi_minimal/fprime-minimal-v4/cross/pi-zero-w/verify/raw-bytes.txt`
-- `/Users/sozodennis/Developer/fprime-artemis-cubesat-v4.0.0/sizing/pi_minimal/fprime-minimal-v4/cross/pi-zero-w/verify/stripped-bytes.txt`
+- `cross/pi-zero-w/verify/file.txt`
+- `cross/pi-zero-w/verify/readelf-A.txt`
+- `cross/pi-zero-w/verify/readelf-l.txt`
+- `cross/pi-zero-w/verify/size-A.txt`
+- `cross/pi-zero-w/verify/raw-bytes.txt`
+- `cross/pi-zero-w/verify/stripped-bytes.txt`
 
 ## Notes
 
