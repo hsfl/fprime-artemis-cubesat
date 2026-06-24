@@ -7,6 +7,7 @@
 #ifndef Components_PayloadAdapter_Lepton_HPP
 #define Components_PayloadAdapter_Lepton_HPP
 
+#include "Components/PayloadAdapter_Lepton/LeptonCamera.hpp"
 #include "Components/PayloadAdapter_Lepton/PayloadAdapter_LeptonComponentAc.hpp"
 
 namespace Components {
@@ -29,13 +30,37 @@ class PayloadAdapter_Lepton final : public PayloadAdapter_LeptonComponentBase {
     // Handler implementations for commands
     // ----------------------------------------------------------------------
 
+    //! Handler implementation for command ENABLE
+    //!
+    //! Bring the Lepton camera up and start its continuous thermal stream.
+    void ENABLE_cmdHandler(FwOpcodeType opCode,  //!< The opcode
+                           U32 cmdSeq            //!< The command sequence number
+                           ) override;
+
+    //! Handler implementation for command DISABLE
+    //!
+    //! Stop the Lepton stream and release the camera.
+    void DISABLE_cmdHandler(FwOpcodeType opCode,  //!< The opcode
+                            U32 cmdSeq            //!< The command sequence number
+                            ) override;
+
     //! Handler implementation for command CAPTURE_IMAGE
     //!
-    //! Capture a thermal image from the Lepton camera and store it as a data product.
-    //! Currently a stub: fills the image with a test ramp instead of reading the camera.
+    //! Copy the latest streamed frame from the Lepton camera and store it as a
+    //! data product. Requires the camera to have been ENABLEd first.
     void CAPTURE_IMAGE_cmdHandler(FwOpcodeType opCode,  //!< The opcode
                                   U32 cmdSeq            //!< The command sequence number
                                   ) override;
+
+    // ----------------------------------------------------------------------
+    // Member variables
+    // ----------------------------------------------------------------------
+
+    //! Thermal camera driver (real libuvc on the Pi, ramp stub on dev hosts)
+    LeptonCamera m_camera;
+
+    //! Max time to wait for a valid frame after the stream is up (covers FFC)
+    static constexpr U32 CAPTURE_TIMEOUT_MS = 5000;
 };
 
 }  // namespace Components

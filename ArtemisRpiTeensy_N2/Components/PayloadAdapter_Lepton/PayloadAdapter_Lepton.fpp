@@ -9,6 +9,13 @@ module Components {
     @ Data Product Producer for Lepton Camera
     active component PayloadAdapter_Lepton {
 
+        @ Bring the Lepton camera up and start its continuous thermal stream.
+        @ Must be sent before CAPTURE_IMAGE.
+        async command ENABLE opcode 1
+
+        @ Stop the Lepton stream and release the camera.
+        async command DISABLE opcode 2
+
         @ Capture a thermal image from the Lepton camera and store it as a data product on the RPi
         async command CAPTURE_IMAGE opcode 0
 

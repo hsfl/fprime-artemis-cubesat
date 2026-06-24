@@ -21,7 +21,27 @@ PayloadAdapter_Lepton ::~PayloadAdapter_Lepton() {}
 // Handler implementations for commands
 // ----------------------------------------------------------------------
 
-// Implementation of CAPTURE_IMAGE command handler: captures a thermal image and stores it as a data product.
+// Implementation of ENABLE command handler: brings the camera up and starts streaming.
+void PayloadAdapter_Lepton ::ENABLE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    char reason[80] = {0};
+    const LeptonCamera::Status status = m_camera.open(reason, sizeof(reason));
+    if (LeptonCamera::OK != status) {
+        Fw::LogStringArg reasonArg(reason);
+        this->log_WARNING_HI_ImageCaptureFailed(reasonArg);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
+        return;
+    }
+    this->log_ACTIVITY_LO_LeptonReady();
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+// Implementation of DISABLE command handler: stops streaming and releases the camera.
+void PayloadAdapter_Lepton ::DISABLE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    m_camera.close();
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+// Implementation of CAPTURE_IMAGE command handler: grabs the latest streamed frame and stores it as a data product.
 void PayloadAdapter_Lepton ::CAPTURE_IMAGE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     // The data-product get port must be connected or there is nowhere to store the image.
     if (!this->isConnected_productGetOut_OutputPort(0)) {
@@ -29,15 +49,23 @@ void PayloadAdapter_Lepton ::CAPTURE_IMAGE_cmdHandler(FwOpcodeType opCode, U32 c
         return;
     }
 
-    // @TODO: implement capture with libuvc, add error handling, and check for camera readiness before capturing an image.
-    // for now: fills the image with dummy values
+    this->log_ACTIVITY_LO_ImageCaptureStart();
+
     ThermalImageRecordType record;
     const Fw::Time now = this->getTime();
     record.set_timeTag(Fw::TimeValue(now.getTimeBase(), now.getContext(), now.getSeconds(), now.getUSeconds()));
-    // Fill the record's pixel array in place (avoids a second 38 KB stack buffer).
-    U16(&pixels)[160 * 120] = record.get_value();
-    for (U32 i = 0; i < (160 * 120); i++) {
-        pixels[i] = static_cast<U16>(i);
+
+    // Copy the latest streamed frame straight into the record's pixel array
+    // (avoids a second 38 KB stack buffer). Requires a prior ENABLE.
+    U16(&pixels)[LeptonCamera::NUM_PIXELS] = record.get_value();
+    char reason[80] = {0};
+    const LeptonCamera::Status camStatus =
+        m_camera.getLatestFrame(pixels, LeptonCamera::NUM_PIXELS, CAPTURE_TIMEOUT_MS, reason, sizeof(reason));
+    if (LeptonCamera::OK != camStatus) {
+        Fw::LogStringArg reasonArg(reason);
+        this->log_WARNING_HI_ImageCaptureFailed(reasonArg);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
+        return;
     }
 
     // Allocate a data-product container large enough for one image record.
