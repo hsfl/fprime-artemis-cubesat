@@ -1,0 +1,4 @@
+interface:
+  display_name: "F Prime HIL Testing"
+  short_description: "Guided Artemis/Neutron 2 HIL bring-up and smoke testing"
+  default_prompt: "Use $fprime-hil-testing to guide a staged Artemis/Neutron 2 HIL bring-up, verify ports, SSH, GDS, payload receiver, and smoke-test evidence."
