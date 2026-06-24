@@ -532,7 +532,8 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - Script updates applied:
   - added `--local-only` mode (skip SSH deploy/smoke and reuse local sysroot)
   - changed container mount to repo root (`/repo`) so F' version generation can see real git metadata
-  - switched venv creation to `python3 -m venv --clear` to avoid stale shebang path issues after mount-path changes
+  - previously used `python3 -m venv --clear` to avoid stale shebang path issues after mount-path changes
+  - 2026-06-23: cross-build script now defaults to cached iteration and adds `--clean` for deliberate full refresh; normal runs reuse `.cross-venv-linux` when `fprime-util --help` succeeds and avoid forced F Prime regenerate, so repeated Python dependency downloads and unnecessary full rebuilds are avoided
 - Result:
   - binary remains ARMv6-compatible (`Tag_CPU_arch: v6KZ`, `Tag_FP_arch: VFPv2`)
   - runtime version events no longer fall back to `v3.5.0`; they now report framework from git (`v4.2.1-*`)

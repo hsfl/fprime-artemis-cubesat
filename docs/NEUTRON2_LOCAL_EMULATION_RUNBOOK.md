@@ -40,10 +40,20 @@ Not validated:
 
 ## Preflight
 
-Run from a clean terminal:
+### macOS
 
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat
+cd ~/Developer/fprime-artemis-cubesat
+. ArtemisRpiTeensy_N2/fprime-venv/bin/activate
+cd ArtemisRpiTeensy_N2
+fprime-util generate -f -DNEUTRON2_TOPOLOGY_PROFILE=local-demo
+fprime-util build
+```
+
+### Windows Laptop (WSL2)
+
+```bash
+cd ~/fprime-artemis-cubesat
 . ArtemisRpiTeensy_N2/fprime-venv/bin/activate
 cd ArtemisRpiTeensy_N2
 fprime-util generate -f -DNEUTRON2_TOPOLOGY_PROFILE=local-demo
@@ -53,8 +63,7 @@ fprime-util build
 Expected result:
 
 - build completes without errors
-- dictionary exists at:
-  `build-artifacts/Darwin/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json`
+- dictionary exists under `build-artifacts/.../ArtemisRpiTeensyDeployment/dict/`
 
 Topology profile note:
 
@@ -68,9 +77,17 @@ Topology profile note:
 
 Terminal 1: start the local F Prime app, PTY emulator, and GDS.
 
+macOS:
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-export NEUTRON_PAYLOAD_SIM_ROOT=/Users/sozodennis/Developer/fprime-artemis-cubesat/external/payload-neutron-simulation
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+export NEUTRON_PAYLOAD_SIM_ROOT="$PWD/../external/payload-neutron-simulation"
+./tools/run_local_emulation.sh --gui-port 5050
+```
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+export NEUTRON_PAYLOAD_SIM_ROOT="$PWD/../external/payload-neutron-simulation"
 ./tools/run_local_emulation.sh --gui-port 5050
 ```
 
@@ -80,8 +97,17 @@ channel 2 satellite-local RPC off the ground stream.
 
 Terminal 2: start the Neutron 2 payload viewer.
 
+macOS:
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat
+cd ~/Developer/fprime-artemis-cubesat
+python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
+  --capture-dir /tmp/neutron_payload_captures \
+  --port 8062
+```
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat
 python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
   --capture-dir /tmp/neutron_payload_captures \
   --port 8062
@@ -355,8 +381,15 @@ Use this before the lead demo to verify the whole laptop path quickly. The
 script always launches both GDS and the payload viewer; after verified payload
 downlink completion it opens/refocuses the viewer for visual inspection.
 
+macOS:
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+./tools/run_neutron2_local_demo.sh --delay 3 --capture-seconds 3 --exit-after-sequence
+```
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 ./tools/run_neutron2_local_demo.sh --delay 3 --capture-seconds 3 --exit-after-sequence
 ```
 
@@ -406,12 +439,23 @@ If the payload viewer does not update:
 If `PayloadAdapter_NeutronSim.CaptureFailed` appears:
 
 - confirm `NEUTRON_PAYLOAD_SIM_ROOT` points to:
-  `/Users/sozodennis/Developer/fprime-artemis-cubesat/external/payload-neutron-simulation`
+  `external/payload-neutron-simulation`
 
 If port `5050` is busy:
 
+macOS:
 ```bash
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 ./tools/run_local_emulation.sh --gui-port 5060
+cd ~/Developer/fprime-artemis-cubesat
+python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py --port 8062
+```
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+./tools/run_local_emulation.sh --gui-port 5060
+cd ~/fprime-artemis-cubesat
 python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py --port 8062
 ```
 

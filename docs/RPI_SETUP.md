@@ -97,10 +97,10 @@ If it prints a device link, UART is ready.
 
 ## 3) Build F' on the Pi
 
-From your repo root on the Pi:
+From the Pi:
 
 ```bash
-cd /path/to/fprime-artemis-cubesat
+cd ~/fprime-artemis-cubesat
 ```
 
 Create/activate the project virtual environment:
@@ -134,7 +134,7 @@ If build succeeds, your Pi can compile this F' project.
 Run the deployment:
 
 ```bash
-cd /path/to/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 ./build-artifacts/Linux/bin/ArtemisRpiTeensyDeployment -d /dev/serial0
 ```
 
@@ -149,15 +149,34 @@ Stop with `Ctrl+C`.
 
 ## Optional: build/upload Teensy firmware
 
-From repo root:
+### On The Pi
 
 ```bash
-cd /path/to/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+cd ~/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
 ./tools/arduino-cli/build.sh
-./tools/arduino-cli/upload.sh /dev/ttyACM0
+PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
+./tools/arduino-cli/upload.sh "$PORT"
 ```
 
-(Your Teensy port may not be `/dev/ttyACM0`; check with `ls /dev/ttyACM*`.)
+### From macOS Laptop
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+./tools/arduino-cli/build.sh
+PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
+./tools/arduino-cli/upload.sh "$PORT"
+```
+
+### From Windows Laptop (WSL2)
+
+Attach the Teensy USB device to WSL first, then run:
+
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+./tools/arduino-cli/build.sh
+PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
+./tools/arduino-cli/upload.sh "$PORT"
+```
 
 ---
 
@@ -179,4 +198,3 @@ Then log out and log back in.
   - Recheck TX/RX crossed wiring
   - Recheck common ground
   - Confirm both sides are `115200 8N1`
-

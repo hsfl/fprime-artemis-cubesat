@@ -21,7 +21,7 @@ Measured comparison artifacts from this repository's Pi-style Docker cross-build
 
 Reference measurement report:
 
-- [PI_ZERO_W_MINIMAL_FPRIME_SIZE_COMPARISON.md](/Users/sozodennis/Developer/fprime-artemis-cubesat/docs/archive/PI_ZERO_W_MINIMAL_FPRIME_SIZE_COMPARISON.md)
+- [PI_ZERO_W_MINIMAL_FPRIME_SIZE_COMPARISON.md](PI_ZERO_W_MINIMAL_FPRIME_SIZE_COMPARISON.md)
 
 ## Executive Finding
 

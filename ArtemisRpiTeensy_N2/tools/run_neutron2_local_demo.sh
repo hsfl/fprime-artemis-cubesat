@@ -31,7 +31,7 @@ Options:
   --viewer-port <port>       payload viewer port (default: 8062)
   --delay <seconds>          scheduled collection delay (default: 10)
   --capture-seconds <secs>   simulator capture duration (default: 10)
-  --dictionary <path>        topology dictionary path (default: latest Darwin dict)
+  --dictionary <path>        topology dictionary path (default: latest generated dict)
   --build-cache <path>       local-demo build cache (default: ArtemisRpiTeensy_N2/build-neutron2-local-demo)
   --skip-build               use existing binary/dictionary without regenerating the local-demo profile
   --exit-after-sequence      stop emulator/viewer after automated checks pass
