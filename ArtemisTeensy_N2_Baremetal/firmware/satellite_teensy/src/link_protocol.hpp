@@ -14,11 +14,13 @@ static constexpr uint8_t CHANNEL_RF_COUNT = 2;
 static constexpr uint8_t CHANNEL_COUNT = 3;
 
 static constexpr uint8_t TEENSY_TARGET_PDU = 1;
+static constexpr uint8_t TEENSY_TARGET_RF_STATUS = 2;
 static constexpr uint8_t TEENSY_STATUS_OK = 0;
 static constexpr uint8_t TEENSY_STATUS_BAD_REQUEST = 1;
 static constexpr uint8_t TEENSY_STATUS_BUSY = 2;
 static constexpr uint8_t TEENSY_STATUS_TIMEOUT = 3;
 static constexpr uint8_t TEENSY_STATUS_TARGET_ERROR = 4;
+static constexpr uint8_t TEENSY_RF_OP_LINK_STATS = 1;
 
 // UART wrapper payload carries opaque bytes tagged by virtual channel.
 static constexpr uint16_t FRAME_MAX_PAYLOAD = 220;

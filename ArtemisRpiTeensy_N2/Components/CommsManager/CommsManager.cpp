@@ -5,6 +5,8 @@ namespace Components {
 CommsManager::CommsManager(const char* const compName)
     : CommsManagerComponentBase(compName),
       m_linkState(0),
+      m_rssiDbm(-120),
+      m_rssiPingPending(false),
       m_pendingScienceBytes(0),
       m_radioBackend(0),
       m_linkPollCount(0),
@@ -23,11 +25,7 @@ void CommsManager::run_handler(FwIndexType portNum, U32 context) {
     static_cast<void>(portNum);
     static_cast<void>(context);
 
-    if (this->isConnected_adapterRequestOut_OutputPort(0)) {
-        const U32 normalizedLink = (this->m_linkState <= 3U) ? this->m_linkState : 0U;
-        // Adapter poll key contract: 1=down, 2=acquiring, 3=locked, 4=degraded
-        this->adapterRequestOut_out(0, normalizedLink + 1U);
-    }
+    this->requestAdapterStatus();
     if (this->isConnected_sohStatusOut_OutputPort(0)) {
         Components::HealthState health = Components::HealthState::UNKNOWN;
         if (this->m_linkState == 2U) {
@@ -44,12 +42,13 @@ void CommsManager::run_handler(FwIndexType portNum, U32 context) {
     this->tlmWrite_PendingScienceBytes(this->m_pendingScienceBytes);
     this->tlmWrite_ActiveRadioBackend(this->m_radioBackend);
     this->tlmWrite_LinkPollCount(this->m_linkPollCount);
+    this->tlmWrite_RssiDbm(this->m_rssiDbm);
 }
 
 void CommsManager::linkStatusIn_handler(FwIndexType portNum, U32 key) {
     static_cast<void>(portNum);
     this->m_linkState = key;
-    this->log_ACTIVITY_LO_LinkStateUpdated(this->m_linkState);
+    this->log_ACTIVITY_LO_LinkStateUpdated(this->m_linkState, this->m_rssiDbm);
 }
 
 void CommsManager::scienceReadyIn_handler(FwIndexType portNum, U32 productBytes) {
@@ -60,7 +59,16 @@ void CommsManager::scienceReadyIn_handler(FwIndexType portNum, U32 productBytes)
 void CommsManager::adapterStatusIn_handler(FwIndexType portNum, U32 key) {
     static_cast<void>(portNum);
     this->m_linkState = key;
-    this->log_ACTIVITY_LO_LinkStateUpdated(this->m_linkState);
+    this->log_ACTIVITY_LO_LinkStateUpdated(this->m_linkState, this->m_rssiDbm);
+    if (this->m_rssiPingPending) {
+        this->log_ACTIVITY_HI_LinkRssiPing(this->m_linkState, this->m_rssiDbm, this->m_linkPollCount);
+        this->m_rssiPingPending = false;
+    }
+}
+
+void CommsManager::rssiStatusIn_handler(FwIndexType portNum, I32 rssiDbm) {
+    static_cast<void>(portNum);
+    this->m_rssiDbm = rssiDbm;
 }
 
 void CommsManager::payloadDownlinkStatusIn_handler(FwIndexType portNum,
@@ -124,10 +132,14 @@ void CommsManager::REQUEST_SCIENCE_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 
 
 void CommsManager::REQUEST_LINK_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     this->m_linkPollCount += 1U;
-    if (this->isConnected_adapterRequestOut_OutputPort(0)) {
-        const U32 normalizedLink = (this->m_linkState <= 3U) ? this->m_linkState : 0U;
-        this->adapterRequestOut_out(0, normalizedLink + 1U);
-    }
+    this->requestAdapterStatus();
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void CommsManager::PING_LINK_RSSI_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    this->m_linkPollCount += 1U;
+    this->m_rssiPingPending = true;
+    this->requestAdapterStatus();
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
@@ -135,6 +147,14 @@ void CommsManager::SELECT_RADIO_BACKEND_cmdHandler(FwOpcodeType opCode, U32 cmdS
     this->m_radioBackend = (backend == 0U) ? 0U : 1U;
     this->log_ACTIVITY_HI_RadioBackendSelected(this->m_radioBackend);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void CommsManager::requestAdapterStatus() {
+    if (this->isConnected_adapterRequestOut_OutputPort(0)) {
+        const U32 normalizedLink = (this->m_linkState <= 3U) ? this->m_linkState : 0U;
+        // Adapter poll key contract: 1=down, 2=acquiring, 3=locked, 4=degraded
+        this->adapterRequestOut_out(0, normalizedLink + 1U);
+    }
 }
 
 }  // namespace Components

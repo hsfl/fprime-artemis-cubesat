@@ -20,6 +20,9 @@ module Components {
         @ Adapter status input
         sync input port adapterStatusIn: Svc.Ping
 
+        @ Adapter RSSI input
+        sync input port rssiStatusIn: Components.RssiStatus
+
         @ Payload downlink transfer status input
         sync input port payloadDownlinkStatusIn: Components.PayloadDownlinkStatus
 
@@ -44,6 +47,9 @@ module Components {
         @ Request latest link status from the selected radio adapter
         async command REQUEST_LINK_STATUS
 
+        @ Poll the radio adapter and log current RSSI in dBm
+        async command PING_LINK_RSSI
+
         @ Select logical radio backend. 0=RFM23BP, 1=SatNOGS.
         async command SELECT_RADIO_BACKEND(backend: U32)
 
@@ -59,6 +65,9 @@ module Components {
         @ Number of explicit link polls
         telemetry LinkPollCount: U32
 
+        @ Latest RF link RSSI in dBm
+        telemetry RssiDbm: I32
+
         @ Downlink request event
         event DownlinkRequested(bytes: U32) severity activity high format "Downlink requested for {} bytes"
 
@@ -69,7 +78,10 @@ module Components {
         event DownlinkFailed(stateValue: U32, lastError: U32) severity warning low format "Downlink failed state={} error={}"
 
         @ Link state event
-        event LinkStateUpdated(linkState: U32) severity activity low format "Comms link state updated {}"
+        event LinkStateUpdated(linkState: U32, rssiDbm: I32) severity activity low format "Comms link state updated {} rssi={}dBm"
+
+        @ RSSI ping event
+        event LinkRssiPing(linkState: U32, rssiDbm: I32, pollCount: U32) severity activity high format "Comms link RSSI ping state={} rssi={}dBm polls={}"
 
         @ Radio backend selection event
         event RadioBackendSelected(backend: U32) severity activity high format "Radio backend selected {}"

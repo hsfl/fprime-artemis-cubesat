@@ -11,6 +11,9 @@ module Components {
         @ Local Teensy subsystem RPC packets, wrapped as channel 2.
         guarded input port localSendIn: Fw.BufferSend
 
+        @ RF-status Teensy subsystem RPC packets, wrapped as channel 2.
+        guarded input port rfLocalSendIn: Fw.BufferSend
+
         @ Wrapped bytes received from the UART driver.
         sync input port drvReceiveIn: Drv.ByteStreamData
 
@@ -28,6 +31,9 @@ module Components {
 
         @ Unwrapped channel 2 packets sent to the local Teensy subsystem adapter.
         output port localRecvOut: Fw.BufferSend
+
+        @ Unwrapped channel 2 RF-status packets sent to the comms adapter.
+        output port rfLocalRecvOut: Fw.BufferSend
 
         @ Original UART receive buffer returned to the UART driver.
         output port drvReceiveReturnOut: Fw.BufferSend

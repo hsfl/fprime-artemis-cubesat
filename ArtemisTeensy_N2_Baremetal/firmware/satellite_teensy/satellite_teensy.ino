@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #include "src/link_counters.hpp"
+#include "src/local_teensy_router.hpp"
 #include "src/pdu_proxy.hpp"
 #include "src/relay_uart_rf.hpp"
 #include "src/rf23_driver.hpp"
@@ -27,6 +28,7 @@ static constexpr uint16_t CCSDS_TM_FRAME_BYTES = 128;
 LinkCounters g_linkCounters;
 Rf23Driver g_rfDriver(RADIO_CS, RADIO_INT, RADIO_RX_ON_PIN, RADIO_TX_ON_PIN);
 PduProxy g_pduProxy(Serial1);
+LocalTeensyRouter g_localRouter(g_pduProxy, g_rfDriver, g_linkCounters);
 static uint8_t g_rpiUartRxBuffer[RPI_UART_RX_BUFFER_SIZE];
 // Channelized bridge mode:
 // - channel 0: CCSDS/GDS bytes forwarded over RF
@@ -42,7 +44,7 @@ RelayConfig g_relayConfig{
     DOWNLINK_QUEUE_DEPTH,
     CCSDS_TM_FRAME_BYTES,
     link_protocol::CHANNEL_CCSDS};
-RelayUartRf g_relay(Serial2, g_rfDriver, g_linkCounters, g_relayConfig, nullptr, &g_pduProxy);
+RelayUartRf g_relay(Serial2, g_rfDriver, g_linkCounters, g_relayConfig, nullptr, &g_localRouter);
 static uint32_t g_radioTrafficLedUntilMs = 0;
 
 struct RadioTrafficSnapshot {

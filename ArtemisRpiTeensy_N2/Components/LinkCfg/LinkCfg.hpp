@@ -12,11 +12,13 @@ static constexpr U8 CHANNEL_TEENSY_LOCAL = 2;
 static constexpr U8 CHANNEL_COUNT = 3;
 
 static constexpr U8 TEENSY_TARGET_PDU = 1;
+static constexpr U8 TEENSY_TARGET_RF_STATUS = 2;
 static constexpr U8 TEENSY_STATUS_OK = 0;
 static constexpr U8 TEENSY_STATUS_BAD_REQUEST = 1;
 static constexpr U8 TEENSY_STATUS_BUSY = 2;
 static constexpr U8 TEENSY_STATUS_TIMEOUT = 3;
 static constexpr U8 TEENSY_STATUS_TARGET_ERROR = 4;
+static constexpr U8 TEENSY_RF_OP_LINK_STATS = 1;
 
 static constexpr U8 UART_FRAME_MAGIC_0 = 0xD4;
 static constexpr U8 UART_FRAME_MAGIC_1 = 0xC3;

@@ -50,6 +50,9 @@ module Components {
   @ Mission mode update from services that complete visible story transitions.
   port MissionModeUpdate(mode: MissionMode, detail: U32)
 
+  @ RF link-strength status in dBm.
+  port RssiStatus(rssiDbm: I32)
+
   @ Payload downlink transfer status from the channel-1 blob manager.
   port PayloadDownlinkStatus(
     stateValue: U32,

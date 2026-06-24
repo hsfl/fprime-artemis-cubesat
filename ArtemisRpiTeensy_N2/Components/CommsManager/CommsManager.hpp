@@ -16,6 +16,7 @@ class CommsManager final : public CommsManagerComponentBase {
     void linkStatusIn_handler(FwIndexType portNum, U32 key) override;
     void scienceReadyIn_handler(FwIndexType portNum, U32 productBytes) override;
     void adapterStatusIn_handler(FwIndexType portNum, U32 key) override;
+    void rssiStatusIn_handler(FwIndexType portNum, I32 rssiDbm) override;
     void payloadDownlinkStatusIn_handler(
         FwIndexType portNum,
         U32 state,
@@ -28,9 +29,13 @@ class CommsManager final : public CommsManagerComponentBase {
     ) override;
     void REQUEST_SCIENCE_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void REQUEST_LINK_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+    void PING_LINK_RSSI_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void SELECT_RADIO_BACKEND_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 backend) override;
+    void requestAdapterStatus();
 
     U32 m_linkState;
+    I32 m_rssiDbm;
+    bool m_rssiPingPending;
     U32 m_pendingScienceBytes;
     U32 m_radioBackend;
     U32 m_linkPollCount;

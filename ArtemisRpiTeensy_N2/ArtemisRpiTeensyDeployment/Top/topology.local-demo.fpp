@@ -201,6 +201,9 @@ module ArtemisRpiTeensyDeployment {
       thermalAdapterArtemis.statusOut -> thermalService.adapterStatusIn
 
       commsManager.adapterRequestOut -> commsAdapterTeensyRfm23.requestIn
+      commsAdapterTeensyRfm23.teensyRequestOut -> uartChannelMux.rfLocalSendIn
+      uartChannelMux.rfLocalRecvOut -> commsAdapterTeensyRfm23.teensyResponseIn
+      commsAdapterTeensyRfm23.rssiStatusOut -> commsManager.rssiStatusIn
       commsAdapterTeensyRfm23.statusOut[0] -> commsManager.adapterStatusIn
       commsAdapterTeensyRfm23.statusOut[1] -> teensyTransportService.adapterStatusIn
     }

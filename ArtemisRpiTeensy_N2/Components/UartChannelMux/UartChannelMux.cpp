@@ -47,6 +47,17 @@ void UartChannelMux::localSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuff
     }
 }
 
+void UartChannelMux::rfLocalSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) {
+    static_cast<void>(portNum);
+    const Drv::ByteStreamStatus status =
+        this->sendWrapped(LinkCfg::CHANNEL_TEENSY_LOCAL, fwBuffer.getData(), fwBuffer.getSize());
+    if (status != Drv::ByteStreamStatus::OP_OK) {
+        this->m_frameDrops++;
+        this->tlmWrite_FrameDrops(this->m_frameDrops);
+        this->log_WARNING_LO_FrameDropped(12);
+    }
+}
+
 void UartChannelMux::drvReceiveIn_handler(FwIndexType portNum,
                                           Fw::Buffer& buffer,
                                           const Drv::ByteStreamStatus& status) {
@@ -182,8 +193,13 @@ void UartChannelMux::handleFrame() {
         this->ccsdsRecvOut_out(0, frame, Drv::ByteStreamStatus::OP_OK);
     } else if ((this->m_rxChannel == LinkCfg::CHANNEL_PAYLOAD) && this->isConnected_payloadRecvOut_OutputPort(0)) {
         this->payloadRecvOut_out(0, frame);
-    } else if ((this->m_rxChannel == LinkCfg::CHANNEL_TEENSY_LOCAL) && this->isConnected_localRecvOut_OutputPort(0)) {
-        this->localRecvOut_out(0, frame);
+    } else if (this->m_rxChannel == LinkCfg::CHANNEL_TEENSY_LOCAL) {
+        const U8 target = (this->m_rxLength > 0) ? this->m_rxPayload[0] : 0;
+        if ((target == LinkCfg::TEENSY_TARGET_RF_STATUS) && this->isConnected_rfLocalRecvOut_OutputPort(0)) {
+            this->rfLocalRecvOut_out(0, frame);
+        } else if (this->isConnected_localRecvOut_OutputPort(0)) {
+            this->localRecvOut_out(0, frame);
+        }
     }
 
     this->m_framesRx++;
