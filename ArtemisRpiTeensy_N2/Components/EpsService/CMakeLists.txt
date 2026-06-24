@@ -3,4 +3,6 @@ register_fprime_library(
         ${CMAKE_CURRENT_LIST_DIR}/EpsService.fpp
     SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/EpsService.cpp
+    DEPENDS
+        Components_Types
 )

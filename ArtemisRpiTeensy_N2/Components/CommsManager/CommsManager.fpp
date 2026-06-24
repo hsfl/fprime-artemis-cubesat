@@ -15,22 +15,43 @@ module Components {
         sync input port linkStatusIn: Svc.Ping
 
         @ Science ready input from storage
-        sync input port scienceReadyIn: Svc.Ping
+        sync input port scienceReadyIn: Components.ScienceDownlinkReady
 
         @ Adapter status input
         sync input port adapterStatusIn: Svc.Ping
 
+        @ Adapter RSSI input
+        sync input port rssiStatusIn: Components.RssiStatus
+
+        @ Payload downlink transfer status input
+        sync input port payloadDownlinkStatusIn: Components.PayloadDownlinkStatus
+
         @ Downlink request output to storage
-        output port downlinkRequestOut: Svc.Ping
+        output port downlinkRequestOut: Components.ScienceDownlinkRequest
+
+        @ Generic payload downlink request output
+        output port payloadDownlinkRequestOut: Svc.Ping
 
         @ Adapter request output
         output port adapterRequestOut: Svc.Ping
 
         @ Status output to SoH manager
-        output port sohStatusOut: Svc.Ping
+        output port sohStatusOut: Components.HealthStatus
+
+        @ Mission mode update output
+        output port missionModeOut: Components.MissionModeUpdate
 
         @ Request science downlink
         async command REQUEST_SCIENCE_DOWNLINK
+
+        @ Request latest link status from the selected radio adapter
+        async command REQUEST_LINK_STATUS
+
+        @ Poll the radio adapter and log current RSSI in dBm
+        async command PING_LINK_RSSI
+
+        @ Select logical radio backend. 0=RFM23BP, 1=SatNOGS.
+        async command SELECT_RADIO_BACKEND(backend: U32)
 
         @ Current link state
         telemetry LinkState: U32
@@ -38,11 +59,32 @@ module Components {
         @ Pending science bytes
         telemetry PendingScienceBytes: U32
 
+        @ Selected logical radio backend
+        telemetry ActiveRadioBackend: U32
+
+        @ Number of explicit link polls
+        telemetry LinkPollCount: U32
+
+        @ Latest RF link RSSI in dBm
+        telemetry RssiDbm: I32
+
         @ Downlink request event
         event DownlinkRequested(bytes: U32) severity activity high format "Downlink requested for {} bytes"
 
+        @ Downlink completion event for the current synchronous/demo downlink path
+        event DownlinkFinished(bytes: U32) severity activity high format "Downlink finished for {} bytes"
+
+        @ Downlink failure or rejected request event
+        event DownlinkFailed(stateValue: U32, lastError: U32) severity warning low format "Downlink failed state={} error={}"
+
         @ Link state event
-        event LinkStateUpdated(linkState: U32) severity activity low format "Comms link state updated {}"
+        event LinkStateUpdated(linkState: U32, rssiDbm: I32) severity activity low format "Comms link state updated {} rssi={}dBm"
+
+        @ RSSI ping event
+        event LinkRssiPing(linkState: U32, rssiDbm: I32, pollCount: U32) severity activity high format "Comms link RSSI ping state={} rssi={}dBm polls={}"
+
+        @ Radio backend selection event
+        event RadioBackendSelected(backend: U32) severity activity high format "Radio backend selected {}"
 
         @ Port for requesting the current time
         time get port timeCaller

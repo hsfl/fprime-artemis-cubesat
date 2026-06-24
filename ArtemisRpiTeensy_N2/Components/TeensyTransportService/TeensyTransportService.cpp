@@ -32,7 +32,15 @@ void TeensyTransportService::run_handler(FwIndexType portNum, U32 context) {
         this->linkStatusOut_out(0, static_cast<U32>(this->m_linkState));
     }
     if (this->isConnected_sohStatusOut_OutputPort(0)) {
-        this->sohStatusOut_out(0, static_cast<U32>(this->m_linkState));
+        Components::HealthState health = Components::HealthState::UNKNOWN;
+        if (this->m_linkState == LinkState::LOCKED) {
+            health = Components::HealthState::OK;
+        } else if ((this->m_linkState == LinkState::ACQUIRING) || (this->m_linkState == LinkState::DEGRADED)) {
+            health = Components::HealthState::WARN;
+        } else if (this->m_linkState == LinkState::DOWN) {
+            health = Components::HealthState::FAIL;
+        }
+        this->sohStatusOut_out(0, health, static_cast<U32>(this->m_linkState));
     }
 }
 

@@ -23,7 +23,9 @@ void GpsService::run_handler(FwIndexType portNum, U32 context) {
         this->adapterRequestOut_out(0, this->m_serviceHeartbeat);
     }
     if (this->isConnected_sohStatusOut_OutputPort(0)) {
-        this->sohStatusOut_out(0, this->m_state);
+        const Components::HealthState health =
+            (this->m_state == 0U) ? Components::HealthState::UNKNOWN : Components::HealthState::OK;
+        this->sohStatusOut_out(0, health, this->m_state);
     }
 
     this->tlmWrite_GpsFixState(this->m_state);

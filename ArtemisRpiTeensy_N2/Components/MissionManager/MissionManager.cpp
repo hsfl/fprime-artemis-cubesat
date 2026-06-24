@@ -2,14 +2,9 @@
 
 namespace Components {
 
-enum MissionModes {
-    BASE_MODE = 0,
-    DATA_COLLECTION_PENDING = 1,
-};
-
 MissionManager::MissionManager(const char* const compName)
     : MissionManagerComponentBase(compName),
-      m_currentMode(BASE_MODE),
+      m_currentMode(Components::MissionMode::BASE),
       m_lastScheduledDelaySeconds(0),
       m_pingCount(0),
       m_modeHeartbeat(0) {}
@@ -31,8 +26,15 @@ void MissionManager::run_handler(FwIndexType portNum, U32 context) {
     this->tlmWrite_ModeHeartbeat(this->m_modeHeartbeat);
 }
 
+void MissionManager::modeUpdateIn_handler(FwIndexType portNum, const Components::MissionMode& mode, U32 detail) {
+    static_cast<void>(portNum);
+    static_cast<void>(detail);
+    this->m_currentMode = mode;
+    this->log_ACTIVITY_HI_ModeChanged(this->m_currentMode);
+}
+
 void MissionManager::ENTER_BASE_MODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    this->m_currentMode = BASE_MODE;
+    this->m_currentMode = Components::MissionMode::BASE;
     this->log_ACTIVITY_HI_ModeChanged(this->m_currentMode);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
@@ -44,7 +46,7 @@ void MissionManager::PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 token)
 }
 
 void MissionManager::SCHEDULE_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 delaySeconds) {
-    this->m_currentMode = DATA_COLLECTION_PENDING;
+    this->m_currentMode = Components::MissionMode::COLLECTION_PENDING;
     this->m_lastScheduledDelaySeconds = delaySeconds;
     this->log_ACTIVITY_HI_ModeChanged(this->m_currentMode);
     this->log_ACTIVITY_HI_CollectionScheduled(delaySeconds);

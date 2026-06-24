@@ -9,9 +9,9 @@ DICT_BASENAME="${DEPLOYMENT_NAME}TopologyDictionary.json"
 
 PI_HOST="${PI_HOST:-artemis-pi}"
 PI_SERVICE="${PI_SERVICE:-artemis-fprime.service}"
-GDS_DATA_PORT="${GDS_DATA_PORT:-/dev/cu.usbmodem115551201}"
-GDS_DEBUG_PORT="${GDS_DEBUG_PORT:-/dev/cu.usbmodem115551203}"
-SAT_DEBUG_PORT="${SAT_DEBUG_PORT:-/dev/cu.usbmodem115502201}"
+GDS_DATA_PORT="${GDS_DATA_PORT:-}"
+GDS_DEBUG_PORT="${GDS_DEBUG_PORT:-}"
+SAT_DEBUG_PORT="${SAT_DEBUG_PORT:-}"
 UART_BAUD="${UART_BAUD:-115200}"
 GUI_PORT="${GUI_PORT:-5051}"
 TOKEN="${TOKEN:-$(( (RANDOM % 9000) + 1000 ))}"
@@ -33,6 +33,9 @@ Options:
   --gui-port <port>     GDS GUI port when --start-gds is used (default: 5051)
   --dictionary <path>   Dictionary JSON path (default: Pi Zero W cross-build dict)
   --pi-host <host>      SSH host/alias for Pi (default: artemis-pi)
+  --gds-data-port <dev> Ground Teensy channel 0 data serial device
+  --gds-debug-port <dev> Ground Teensy debug serial device
+  --sat-debug-port <dev> Satellite Teensy debug serial device
   -h, --help            Show this help text
 
 Expected proof of success:
@@ -77,6 +80,18 @@ while [[ $# -gt 0 ]]; do
       PI_HOST="${2:-}"
       shift 2
       ;;
+    --gds-data-port)
+      GDS_DATA_PORT="${2:-}"
+      shift 2
+      ;;
+    --gds-debug-port)
+      GDS_DEBUG_PORT="${2:-}"
+      shift 2
+      ;;
+    --sat-debug-port)
+      SAT_DEBUG_PORT="${2:-}"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -89,6 +104,9 @@ done
 
 [[ -f "$VENV_ACTIVATE" ]] || fail "Missing venv: $VENV_ACTIVATE"
 [[ -f "$DICT_PATH" ]] || fail "Missing dictionary: $DICT_PATH"
+[[ -n "$GDS_DATA_PORT" ]] || fail "Set --gds-data-port or GDS_DATA_PORT"
+[[ -n "$GDS_DEBUG_PORT" ]] || fail "Set --gds-debug-port or GDS_DEBUG_PORT"
+[[ -n "$SAT_DEBUG_PORT" ]] || fail "Set --sat-debug-port or SAT_DEBUG_PORT"
 [[ -e "$GDS_DATA_PORT" ]] || fail "Missing ground data port: $GDS_DATA_PORT"
 [[ -e "$GDS_DEBUG_PORT" ]] || fail "Missing ground debug port: $GDS_DEBUG_PORT"
 [[ -e "$SAT_DEBUG_PORT" ]] || fail "Missing satellite debug port: $SAT_DEBUG_PORT"

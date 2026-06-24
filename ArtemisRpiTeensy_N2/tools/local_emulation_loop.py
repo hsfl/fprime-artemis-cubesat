@@ -8,8 +8,9 @@ on a single host. It creates two pseudo UART devices:
 - gds UART: passed to fprime-gds (--uart-device ...)
 
 Supported link modes:
-- direct: raw byte bridge app<->gds (recommended for simple local testing)
-- legacy-wrapper: Teensy-side wrapper/segment emulation
+- channelized: current UART channel mux plus RF segment/reassemble emulation
+- direct: raw byte bridge app<->gds for older no-mux topologies
+- legacy-wrapper: compatibility alias for channelized
 """
 
 from __future__ import annotations
@@ -32,10 +33,16 @@ from typing import Optional
 
 FRAME_MAGIC_0 = 0xD4
 FRAME_MAGIC_1 = 0xC3
+CHANNEL_CCSDS = 0
+CHANNEL_PAYLOAD = 1
+CHANNEL_TEENSY_LOCAL = 2
+CHANNEL_RF_COUNT = 2
+CHANNEL_COUNT = 3
 FRAME_MAX_PAYLOAD = 220
 FRAME_TIMEOUT_S = 0.250
 
-RF_SEGMENT_MAGIC = 0xA5
+RF_SEGMENT_MAGIC_CCSDS = 0xA5
+RF_SEGMENT_MAGIC_PAYLOAD = 0xA6
 RF_PACKET_MAX_LEN = 49
 RF_SEGMENT_HEADER_LEN = 5
 RF_SEGMENT_MAX_DATA = RF_PACKET_MAX_LEN - RF_SEGMENT_HEADER_LEN
@@ -64,17 +71,39 @@ def crc16_ccitt(payload: bytes) -> int:
     return crc
 
 
+def is_valid_channel(channel: int) -> bool:
+    return 0 <= channel < CHANNEL_COUNT
+
+
+def is_rf_channel(channel: int) -> bool:
+    return 0 <= channel < CHANNEL_RF_COUNT
+
+
+def rf_magic_for_channel(channel: int) -> int:
+    return RF_SEGMENT_MAGIC_PAYLOAD if channel == CHANNEL_PAYLOAD else RF_SEGMENT_MAGIC_CCSDS
+
+
+def channel_for_rf_magic(magic: int) -> Optional[int]:
+    if magic == RF_SEGMENT_MAGIC_CCSDS:
+        return CHANNEL_CCSDS
+    if magic == RF_SEGMENT_MAGIC_PAYLOAD:
+        return CHANNEL_PAYLOAD
+    return None
+
+
 class UartFrameParser:
     WAIT_MAGIC_0 = 0
     WAIT_MAGIC_1 = 1
-    WAIT_LEN_LO = 2
-    WAIT_LEN_HI = 3
-    WAIT_PAYLOAD = 4
-    WAIT_CRC_LO = 5
-    WAIT_CRC_HI = 6
+    WAIT_CHANNEL = 2
+    WAIT_LEN_LO = 3
+    WAIT_LEN_HI = 4
+    WAIT_PAYLOAD = 5
+    WAIT_CRC_LO = 6
+    WAIT_CRC_HI = 7
 
     def __init__(self) -> None:
         self.state = self.WAIT_MAGIC_0
+        self.channel = CHANNEL_CCSDS
         self.frame_length = 0
         self.frame_index = 0
         self.payload = bytearray()
@@ -88,6 +117,7 @@ class UartFrameParser:
 
     def _reset(self, timeout_reset: bool) -> None:
         self.state = self.WAIT_MAGIC_0
+        self.channel = CHANNEL_CCSDS
         self.frame_length = 0
         self.frame_index = 0
         self.payload.clear()
@@ -103,8 +133,8 @@ class UartFrameParser:
         if now - self.last_frame_byte_ts > FRAME_TIMEOUT_S:
             self._reset(timeout_reset=True)
 
-    def feed(self, data: bytes, now: float) -> list[bytes]:
-        outputs: list[bytes] = []
+    def feed(self, data: bytes, now: float) -> list[tuple[int, bytes]]:
+        outputs: list[tuple[int, bytes]] = []
         for b in data:
             if self.state != self.WAIT_MAGIC_0 and self.last_frame_byte_ts is not None:
                 if now - self.last_frame_byte_ts > FRAME_TIMEOUT_S:
@@ -118,8 +148,17 @@ class UartFrameParser:
 
             if self.state == self.WAIT_MAGIC_1:
                 if b == FRAME_MAGIC_1:
+                    self.state = self.WAIT_CHANNEL
+                else:
+                    self._reset(timeout_reset=False)
+                continue
+
+            if self.state == self.WAIT_CHANNEL:
+                if is_valid_channel(b):
+                    self.channel = b
                     self.state = self.WAIT_LEN_LO
                 else:
+                    self.framing_drops += 1
                     self._reset(timeout_reset=False)
                 continue
 
@@ -157,7 +196,7 @@ class UartFrameParser:
                 if crc16_ccitt(payload) != self.frame_crc:
                     self.crc_drops += 1
                 else:
-                    outputs.append(payload)
+                    outputs.append((self.channel, payload))
                 self._reset(timeout_reset=False)
 
         return outputs
@@ -167,8 +206,10 @@ class RfSegmenter:
     def __init__(self) -> None:
         self.next_msg_id = 0
 
-    def segment(self, payload: bytes) -> list[bytes]:
+    def segment(self, channel: int, payload: bytes) -> list[bytes]:
         if not payload:
+            return []
+        if not is_rf_channel(channel):
             return []
         if len(payload) > FRAME_MAX_PAYLOAD:
             return []
@@ -186,7 +227,7 @@ class RfSegmenter:
             chunk = payload[offset : offset + RF_SEGMENT_MAX_DATA]
             header = bytes(
                 [
-                    RF_SEGMENT_MAGIC,
+                    rf_magic_for_channel(channel),
                     msg_id,
                     seg_idx,
                     seg_count,
@@ -201,6 +242,7 @@ class RfSegmenter:
 class RfReassembler:
     def __init__(self) -> None:
         self.active = False
+        self.expected_channel = CHANNEL_CCSDS
         self.expected_msg_id = 0
         self.expected_seg_idx = 0
         self.expected_seg_count = 0
@@ -214,6 +256,7 @@ class RfReassembler:
 
     def _reset(self, timeout_reset: bool, drop_reset: bool) -> None:
         self.active = False
+        self.expected_channel = CHANNEL_CCSDS
         self.expected_msg_id = 0
         self.expected_seg_idx = 0
         self.expected_seg_count = 0
@@ -230,13 +273,15 @@ class RfReassembler:
         if now - self.last_segment_ts > RF_REASSEMBLY_TIMEOUT_S:
             self._reset(timeout_reset=True, drop_reset=True)
 
-    def feed(self, packet: bytes, now: float) -> Optional[bytes]:
+    def feed(self, packet: bytes, now: float) -> Optional[tuple[int, bytes]]:
         self.poll_timeout(now)
 
         if len(packet) < RF_SEGMENT_HEADER_LEN:
             self.framing_drops += 1
             return None
-        if packet[0] != RF_SEGMENT_MAGIC:
+
+        channel = channel_for_rf_magic(packet[0])
+        if channel is None:
             self.framing_drops += 1
             return None
 
@@ -260,6 +305,7 @@ class RfReassembler:
                 self.reassembly_drops += 1
                 return None
             self.active = True
+            self.expected_channel = channel
             self.expected_msg_id = msg_id
             self.expected_seg_idx = 0
             self.expected_seg_count = seg_count
@@ -267,6 +313,7 @@ class RfReassembler:
 
         if (
             msg_id != self.expected_msg_id
+            or channel != self.expected_channel
             or seg_count != self.expected_seg_count
             or seg_idx != self.expected_seg_idx
         ):
@@ -274,6 +321,7 @@ class RfReassembler:
             if seg_idx != 0:
                 return None
             self.active = True
+            self.expected_channel = channel
             self.expected_msg_id = msg_id
             self.expected_seg_idx = 0
             self.expected_seg_count = seg_count
@@ -291,8 +339,9 @@ class RfReassembler:
 
         if seg_idx + 1 == seg_count:
             complete = bytes(self.reassembly)
+            complete_channel = self.expected_channel
             self._reset(timeout_reset=False, drop_reset=False)
-            return complete
+            return complete_channel, complete
         return None
 
 
@@ -339,9 +388,13 @@ class LoopStats:
     rf_packets_gds_to_app: int = 0
     gds_bytes_out: int = 0
     app_bytes_out: int = 0
+    payload_bytes_observed: int = 0
+    local_frames_observed: int = 0
 
 
-def build_uart_frame(payload: bytes) -> bytes:
+def build_uart_frame(channel: int, payload: bytes) -> bytes:
+    if not is_valid_channel(channel):
+        raise ValueError("channel out of range")
     if len(payload) == 0 or len(payload) > FRAME_MAX_PAYLOAD:
         raise ValueError("payload length out of range")
     crc = crc16_ccitt(payload)
@@ -350,6 +403,7 @@ def build_uart_frame(payload: bytes) -> bytes:
         [
             FRAME_MAGIC_0,
             FRAME_MAGIC_1,
+            channel,
             length & 0xFF,
             (length >> 8) & 0xFF,
         ]
@@ -482,24 +536,33 @@ class EmulationLoop:
             return
 
         app_frames = self.app_uart_parser.feed(data, now)
-        for frame in app_frames:
+        for channel, frame in app_frames:
             self.stats.app_frames_in += 1
-            rf_packets = self.sat_to_ground_segmenter.segment(frame)
+            if channel == CHANNEL_TEENSY_LOCAL:
+                self.stats.local_frames_observed += 1
+                continue
+            rf_packets = self.sat_to_ground_segmenter.segment(channel, frame)
             self.stats.rf_packets_app_to_gds += len(rf_packets)
             for packet in rf_packets:
-                payload = self.ground_reassembler.feed(packet, now)
-                if payload is not None:
+                reassembled = self.ground_reassembler.feed(packet, now)
+                if reassembled is None:
+                    continue
+                out_channel, payload = reassembled
+                if out_channel == CHANNEL_CCSDS:
                     self.stats.gds_bytes_out += len(payload)
                     self._queue_write(self.gds_master_fd, payload)  # type: ignore[arg-type]
+                elif out_channel == CHANNEL_PAYLOAD:
+                    self.stats.payload_bytes_observed += len(payload)
 
     def _process_gds_message_to_app(self, message: bytes, now: float) -> None:
         self.stats.gds_messages_in += 1
-        rf_packets = self.ground_to_sat_segmenter.segment(message)
+        rf_packets = self.ground_to_sat_segmenter.segment(CHANNEL_CCSDS, message)
         self.stats.rf_packets_gds_to_app += len(rf_packets)
         for packet in rf_packets:
-            payload = self.sat_reassembler.feed(packet, now)
-            if payload is not None:
-                framed = build_uart_frame(payload)
+            reassembled = self.sat_reassembler.feed(packet, now)
+            if reassembled is not None:
+                channel, payload = reassembled
+                framed = build_uart_frame(channel, payload)
                 self.stats.app_bytes_out += len(framed)
                 self._queue_write(self.app_master_fd, framed)  # type: ignore[arg-type]
 
@@ -544,7 +607,7 @@ class EmulationLoop:
                     elif fd == self.gds_master_fd:
                         self._process_gds_to_app(data, now)
 
-                if self.link_mode == "legacy-wrapper":
+                if self.link_mode != "direct":
                     uplink_msg = self.gds_burst_aggregator.poll(now)
                     if uplink_msg is not None:
                         self._process_gds_message_to_app(uplink_msg, now)
@@ -610,6 +673,8 @@ class EmulationLoop:
         print(f"  gds_messages_in={self.stats.gds_messages_in}")
         print(f"  rf_packets_gds_to_app={self.stats.rf_packets_gds_to_app}")
         print(f"  app_bytes_out={self.stats.app_bytes_out}")
+        print(f"  payload_bytes_observed={self.stats.payload_bytes_observed}")
+        print(f"  local_frames_observed={self.stats.local_frames_observed}")
         print(
             "  uart_parser: "
             f"crc_drops={self.app_uart_parser.crc_drops} "
@@ -730,9 +795,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--link-mode",
-        choices=("direct", "legacy-wrapper"),
-        default="direct",
-        help='Byte bridge mode: "direct" (recommended) or "legacy-wrapper" (default: direct)',
+        choices=("channelized", "direct", "legacy-wrapper"),
+        default="channelized",
+        help=(
+            'Byte bridge mode: "channelized" for the current UART mux, '
+            '"direct" for older no-mux topologies, or "legacy-wrapper" as a '
+            'compatibility alias for channelized (default: channelized)'
+        ),
     )
     parser.add_argument(
         "--no-app",
@@ -835,8 +904,10 @@ def main() -> int:
     if args.link_mode == "direct":
         print("  app raw bytes <-> gds raw bytes (direct local bridge)")
     else:
-        print("  app (LinuxUartDriver) -> uart wrapper -> RF segment/reassemble -> gds raw bytes")
-        print("  gds raw bytes -> burst packetization -> RF segment/reassemble -> uart wrapper -> app")
+        print("  app channel 0 wrapper -> RF segment/reassemble -> gds raw bytes")
+        print("  app channel 1 wrapper -> RF segment/reassemble -> payload stream observed locally")
+        print("  app channel 2 wrapper -> satellite-local RPC observed locally, not forwarded")
+        print("  gds raw bytes -> burst packetization -> RF channel 0 -> channel wrapper -> app")
     if not args.no_gds:
         print(f"[emulation] open GDS at http://127.0.0.1:{args.gui_port}")
     rc = loop.run()

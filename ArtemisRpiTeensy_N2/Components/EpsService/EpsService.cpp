@@ -4,7 +4,16 @@ namespace Components {
 
 EpsService::EpsService(const char* const compName)
     : EpsServiceComponentBase(compName),
-      m_state(0),
+      m_health(Components::HealthState::UNKNOWN),
+      m_linkState(0),
+      m_protocolVersion(0),
+      m_outputBitmap(0),
+      m_resetCause(0),
+      m_faultBitmap(0),
+      m_uptimeSeconds(0),
+      m_capabilities(0),
+      m_lastPduStatus(0),
+      m_lastOpcode(0),
       m_serviceHeartbeat(0) {}
 
 EpsService::~EpsService() {}
@@ -20,27 +29,149 @@ void EpsService::run_handler(FwIndexType portNum, U32 context) {
     this->m_serviceHeartbeat += 1;
 
     if (this->isConnected_adapterRequestOut_OutputPort(0)) {
-        this->adapterRequestOut_out(0, this->m_serviceHeartbeat);
+        this->sendRequest(Components::EpsRequest::GET_SUMMARY_STATUS, 0, 0, 0);
     }
     if (this->isConnected_sohStatusOut_OutputPort(0)) {
-        this->sohStatusOut_out(0, this->m_state);
+        this->sohStatusOut_out(0, this->m_health, this->m_outputBitmap);
     }
 
-    this->tlmWrite_EpsHealthState(this->m_state);
-    this->tlmWrite_ServiceHeartbeat(this->m_serviceHeartbeat);
+    this->writeTelemetry();
 }
 
-void EpsService::adapterStatusIn_handler(FwIndexType portNum, U32 key) {
+void EpsService::adapterStatusIn_handler(
+    FwIndexType portNum,
+    const Components::HealthState& health,
+    U8 linkState,
+    U8 protocolVersion,
+    U16 outputBitmap,
+    U8 resetCause,
+    U8 faultBitmap,
+    U32 uptimeSeconds,
+    U8 capabilities,
+    U8 pduStatus,
+    U8 lastOpcode
+) {
     static_cast<void>(portNum);
-    this->m_state = key;
-    this->log_ACTIVITY_LO_EpsStatusUpdated(this->m_state);
+    this->m_health = health;
+    this->m_linkState = linkState;
+    this->m_protocolVersion = protocolVersion;
+    this->m_outputBitmap = outputBitmap;
+    this->m_resetCause = resetCause;
+    this->m_faultBitmap = faultBitmap;
+    this->m_uptimeSeconds = uptimeSeconds;
+    this->m_capabilities = capabilities;
+    this->m_lastPduStatus = pduStatus;
+    this->m_lastOpcode = lastOpcode;
+    this->writeTelemetry();
+    this->log_ACTIVITY_LO_EpsStatusUpdated(this->m_health, this->m_outputBitmap, this->m_faultBitmap);
+    if (this->isConnected_sohStatusOut_OutputPort(0)) {
+        this->sohStatusOut_out(0, this->m_health, this->m_outputBitmap);
+    }
 }
 
 void EpsService::REQUEST_EPS_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    if (this->isConnected_adapterRequestOut_OutputPort(0)) {
-        this->adapterRequestOut_out(0, this->m_serviceHeartbeat + 1);
-    }
+    this->sendRequest(Components::EpsRequest::GET_SUMMARY_STATUS, 0, 0, 0);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void EpsService::PING_PDU_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    this->sendRequest(Components::EpsRequest::PING, 0, 0, 0);
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void EpsService::REQUEST_PDU_PROTOCOL_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    this->sendRequest(Components::EpsRequest::GET_PROTOCOL_INFO, 0, 0, 0);
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void EpsService::REQUEST_PDU_OUTPUT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 outputId) {
+    if (outputId > MAX_U8_VALUE) {
+        this->log_WARNING_LO_EpsCommandRejected(1, outputId);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+        return;
+    }
+    this->sendRequest(Components::EpsRequest::GET_OUTPUT_STATE, static_cast<U8>(outputId), 0, 0);
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void EpsService::SET_PDU_OUTPUT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 outputId, U32 state, U32 confirm) {
+    if (confirm != CONFIRM_VALUE) {
+        this->log_WARNING_LO_EpsCommandRejected(2, confirm);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+        return;
+    }
+    if (!this->isSafeOutputId(outputId) || (state > 1U)) {
+        this->log_WARNING_LO_EpsCommandRejected(3, outputId);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+        return;
+    }
+    this->sendRequest(Components::EpsRequest::SET_OUTPUT_STATE, static_cast<U8>(outputId), static_cast<U8>(state), 0);
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void EpsService::POWER_CYCLE_PDU_OUTPUT_cmdHandler(
+    FwOpcodeType opCode,
+    U32 cmdSeq,
+    U32 outputId,
+    U32 offMs,
+    U32 confirm
+) {
+    if (confirm != CONFIRM_VALUE) {
+        this->log_WARNING_LO_EpsCommandRejected(2, confirm);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+        return;
+    }
+    if (!this->isSafeOutputId(outputId) || (offMs > MAX_POWER_CYCLE_MS)) {
+        this->log_WARNING_LO_EpsCommandRejected(4, outputId);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+        return;
+    }
+    this->sendRequest(
+        Components::EpsRequest::POWER_CYCLE_OUTPUT,
+        static_cast<U8>(outputId),
+        0,
+        static_cast<U16>(offMs));
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void EpsService::REQUEST_CHARGER_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    this->sendRequest(Components::EpsRequest::GET_CHARGER_STATUS, 0, 0, 0);
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void EpsService::SET_CHARGER_STATE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 enable, U32 confirm) {
+    if (confirm != CONFIRM_VALUE) {
+        this->log_WARNING_LO_EpsCommandRejected(2, confirm);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+        return;
+    }
+    this->sendRequest(Components::EpsRequest::SET_CHARGER_STATE, 0, (enable == 0U) ? 0U : 1U, 0);
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void EpsService::sendRequest(Components::EpsRequest request, U8 outputId, U8 state, U16 durationMs) {
+    if (this->isConnected_adapterRequestOut_OutputPort(0)) {
+        this->adapterRequestOut_out(0, request, outputId, state, durationMs);
+    }
+}
+
+bool EpsService::isSafeOutputId(U32 outputId) const {
+    // Safe public switched rails only. Burn-wire and H-bridge controls stay out
+    // of the mission-operator command surface until dedicated HIL procedures exist.
+    return (outputId >= 1U) && (outputId <= 8U) && (outputId != 6U);
+}
+
+void EpsService::writeTelemetry() {
+    this->tlmWrite_EpsHealthState(this->m_health);
+    this->tlmWrite_PduLinkState(this->m_linkState);
+    this->tlmWrite_PduProtocolVersion(this->m_protocolVersion);
+    this->tlmWrite_PduOutputBitmap(this->m_outputBitmap);
+    this->tlmWrite_PduResetCause(this->m_resetCause);
+    this->tlmWrite_PduFaultBitmap(this->m_faultBitmap);
+    this->tlmWrite_PduUptimeSeconds(this->m_uptimeSeconds);
+    this->tlmWrite_LastPduStatus(this->m_lastPduStatus);
+    this->tlmWrite_LastPduOpcode(this->m_lastOpcode);
+    this->tlmWrite_ServiceHeartbeat(this->m_serviceHeartbeat);
 }
 
 }  // namespace Components

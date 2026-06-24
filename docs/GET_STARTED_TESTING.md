@@ -2,7 +2,7 @@
 
 This is a temporary first-pass test flow for students.
 
-Assumes `/Users/sozodennis/Developer/fprime-artemis-cubesat/docs/RPI_SETUP.md` is already completed.
+Assumes `docs/RPI_SETUP.md` is already completed.
 
 ## MVP intent
 
@@ -19,7 +19,7 @@ Assumes `/Users/sozodennis/Developer/fprime-artemis-cubesat/docs/RPI_SETUP.md` i
    - Verified CLI note: `--communication-selection uart` is a valid option in local `fprime-gds --help`.
    - Command:
    ```bash
-   cd /path/to/fprime-artemis-cubesat/ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment
+   cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment
    . ../fprime-venv/bin/activate
    fprime-gds --no-app --communication-selection none
    ```
@@ -33,7 +33,7 @@ Assumes `/Users/sozodennis/Developer/fprime-artemis-cubesat/docs/RPI_SETUP.md` i
 3. **F' bytes between RPi -> Teensy -> laptop (no radio)**
    - Goal: laptop receives the same stream over USB from Teensy.
    - Current status: **superseded by the two-Teensy RF bridge path**.
-   - Why: nominal MVP/HIL uses both Teensy bridges in transparent raw-byte tunnel mode; the custom UART wrapper (`0xD4 0xC3 + len + crc16`) is fallback/legacy only.
+   - Why: nominal MVP/HIL uses both Teensy bridges with tagged virtual channels; channel 0 preserves the GDS CCSDS stream while channel 2 stays local to the satellite Teensy for PDU/EPS.
    - GDS must use `ComCcsds` endpoint framing:
    ```bash
    fprime-gds --no-app \
@@ -59,9 +59,9 @@ On the satellite Teensy, USB serial is for logs/debug only.
 On the ground Teensy, USB serial is the raw-byte GDS UART endpoint.
 
 Also important:
-- Current Teensy UART/RF contract is documented in `/Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md`.
-- Nominal packet framing is end-to-end `ComCcsds` / `space-packet-space-data-link`; Teensy firmware only tunnels raw bytes and segments/reassembles the RF hop.
-- The custom UART wrapper is fallback/legacy only.
+- Current Teensy UART/RF contract is documented in `ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md`.
+- Nominal endpoint framing is still end-to-end `ComCcsds` / `space-packet-space-data-link`.
+- The Pi <-> satellite Teensy UART adds a channel tag below that endpoint layer: channel 0 for CCSDS over RF, channel 1 for payload over RF, channel 2 for satellite-local PDU/EPS RPC.
 
 ## Verified GDS communication flags (local check)
 
@@ -71,24 +71,36 @@ From local CLI help (`fprime-gds --help`):
 - `--uart-baud BAUD`
 - `--uart-skip-port-check`
 
-## 1) Build software
+## 1) Build Software
 
-### On Raspberry Pi (F')
+### Raspberry Pi F'
 
 ```bash
-cd /path/to/fprime-artemis-cubesat
+cd ~/fprime-artemis-cubesat
 . ArtemisRpiTeensy_N2/fprime-venv/bin/activate
 cd ArtemisRpiTeensy_N2
 fprime-util generate -f
 fprime-util build
 ```
 
-### On your laptop or Pi (Teensy firmware)
+### macOS Laptop Teensy Firmware
 
 ```bash
-cd /path/to/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+cd ~/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
 ./tools/arduino-cli/build.sh
-./tools/arduino-cli/upload.sh /dev/ttyACM0
+PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
+./tools/arduino-cli/upload.sh "$PORT"
+```
+
+### Windows Laptop Teensy Firmware (WSL2)
+
+Attach the Teensy USB device to WSL first, then run:
+
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+./tools/arduino-cli/build.sh
+PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
+./tools/arduino-cli/upload.sh "$PORT"
 ```
 
 ## 2) Power-on order (important)
@@ -113,7 +125,7 @@ If those are missing, stop and fix Teensy first.
 SSH into the Pi and run:
 
 ```bash
-cd /path/to/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 ./build-artifacts/Linux/bin/ArtemisRpiTeensyDeployment -d /dev/serial0
 ```
 
@@ -129,7 +141,7 @@ Leave this terminal running.
 Open a second SSH terminal to the Pi:
 
 ```bash
-cd /path/to/fprime-artemis-cubesat/ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment
 . ../fprime-venv/bin/activate
 fprime-gds --no-app
 ```
@@ -140,8 +152,20 @@ Note: `--no-app` is used because the app is already running in step 4.
 
 Use SSH port forwarding from laptop:
 
+macOS:
 ```bash
-ssh -L 5000:127.0.0.1:5000 <user>@<rpi-ip>
+ssh -L 5000:127.0.0.1:5000 pi@artemis-pi.local
+```
+
+Windows PowerShell:
+```powershell
+ssh -L 5000:127.0.0.1:5000 pi@artemis-pi.local
+```
+
+If mDNS does not resolve `artemis-pi.local`, use the Pi IP address:
+
+```bash
+ssh -L 5000:127.0.0.1:5000 pi@192.168.0.152
 ```
 
 Then open on laptop:
@@ -159,7 +183,7 @@ Pass if all are true:
 ## 8) If something fails
 
 - No `/dev/serial0` on Pi:
-  - Recheck UART setup in `/Users/sozodennis/Developer/fprime-artemis-cubesat/docs/RPI_SETUP.md`
+  - Recheck UART setup in `docs/RPI_SETUP.md`
 - Deployment exits immediately:
   - Recheck UART wiring and common ground.
 - GDS page not opening:

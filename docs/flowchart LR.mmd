@@ -10,7 +10,7 @@ flowchart LR
     %% put out into components: EPS, COMMS, THERMAL, GPS, Teensy, Payload, ADCS,  Mission%%
     FSW["ArtemisRpiTeensy_N2 F' Deployment (ArtemisRpiTeensyDeployment)"]:::fw
     LINUXUART["Drv.LinuxUartDriver /dev/serial0"]:::fw
-    APP["Custom Components MissionManager, ScienceManager, SohManager, TeensyTransportService"]:::fw
+    APP["Custom Components MissionManager, ScienceManager, SohManager, UartChannelMux, PayloadDownlinkManager, EpsService"]:::fw
     FSW --> APP
     FSW --> LINUXUART
   end
@@ -18,8 +18,8 @@ flowchart LR
 
   subgraph SAT["Satellite Teensy (Baremetal)"]
     SATFW["ArtemisTeensy_N2_Baremetal satellite_teensy.ino"]:::fw
-    SATUART["Transparent raw-byte UART tunnel"]:::link
-    SATRF["RF23BP Segmenter/Reassembler msg_id/seg_idx/seg_count"]:::link
+    SATUART["Channelized UART wrapper 0xD4 0xC3 + channel + len + crc16"]:::link
+    SATRF["RF23BP Segmenter/Reassembler channels 0 and 1"]:::link
     PDU["PDU Subsystem"]:::subsystem
     TEMP["Temp Sensors"]:::subsystem
     IMU["IMU"]:::subsystem
@@ -36,7 +36,7 @@ flowchart LR
   subgraph GRD["Ground Teensy (RF/USB)"]
     GRDFW["GDS_Teensy gds_teensy.ino"]:::fw
     GRDRF["RF23BP Reassembly + Segmentation"]:::link
-    GRDUSB["USB Serial Bridge Raw F' bytes / burst uplink"]:::link
+    GRDUSB["USB serial: channel 0 to GDS, channel 1 payload receiver"]:::link
     GRDFW --> GRDRF
     GRDFW --> GRDUSB
   end
@@ -54,6 +54,6 @@ flowchart LR
 
   N1USB -->|"RS422 to USB (2.0)"| FSW
 
-  LINUXUART <-->|"Raw ComCcsds / space-packet bytes"| SATUART
-  SATRF <-->|"RF segmented transport"| GRDRF
+  LINUXUART <-->|"Tagged virtual channels 0/1/2"| SATUART
+  SATRF <-->|"RF segmented channels 0/1"| GRDRF
   GRDUSB <-->|"USB serial"| GDS

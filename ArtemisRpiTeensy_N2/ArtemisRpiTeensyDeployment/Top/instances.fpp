@@ -96,6 +96,16 @@ module ArtemisRpiTeensyDeployment {
     stack size Default.STACK_SIZE \
     priority 30
 
+  instance thermalService: Components.ThermalService base id 0x1000F000 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 29
+
+  instance payloadDownlinkManager: Components.PayloadDownlinkManager base id 0x10030000 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 28
+
   # ----------------------------------------------------------------------
   # Queued component instances
   # ----------------------------------------------------------------------
@@ -117,12 +127,16 @@ module ArtemisRpiTeensyDeployment {
 
   instance epsAdapterArtemis: Components.EpsAdapter_Artemis base id 0x10020000
 
-  instance payloadAdapterN1Legacy: Components.PayloadAdapter_N1Legacy base id 0x10021000
+  instance payloadAdapterNeutronSim: Components.PayloadAdapter_NeutronSim base id 0x10021000
 
   instance adcsAdapterD2S2: Components.AdcsAdapter_D2S2 base id 0x10022000
 
   instance gpsAdapterArtemis: Components.GpsAdapter_Artemis base id 0x10023000
 
   instance commsAdapterTeensyRfm23: Components.CommsAdapter_TeensyRfm23 base id 0x10024000
+
+  instance thermalAdapterArtemis: Components.ThermalAdapter_Artemis base id 0x10025000
+
+  instance uartChannelMux: Components.UartChannelMux base id 0x10026000
 
 }

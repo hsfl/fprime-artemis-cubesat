@@ -1,281 +1,595 @@
 # RF MVP Demo Runbook
 
-Date: 2026-04-24  
-Purpose: freeze the known-good RF MVP demo path and provide a repeatable smoke test.
+BLUF: use this to manually demonstrate the Neutron 2 RF demo story with the
+real Raspberry Pi, satellite Teensy, ground Teensy, and RFM23BP link.
 
-## BLUF
+This runbook shows:
 
-The demo path to freeze is:
+- `fprime-gds` commanding over the ground Teensy channel 0 data port
+- RF uplink from laptop to Raspberry Pi flight software
+- live F Prime event and telemetry downlink over RF
+- optional RFM23BP RSSI status through F Prime
+- operator-scheduled 30 second payload collection
+- channel 1 payload reconstruction on the ground laptop
+- payload viewer review of the reconstructed `.bin` file
+- local payload hash matching the Pi latest payload file
 
-```text
-fprime-gds on Mac
--> ground Teensy USB data port
--> RFM23BP RF hop
--> satellite Teensy
--> Raspberry Pi /dev/serial0
--> F Prime ArtemisRpiTeensyDeployment
+## What This Does And Does Not Prove
+
+Validated:
+
+- laptop GDS to ground Teensy channel 0 path
+- RFM23BP command uplink and telemetry/event downlink
+- Raspberry Pi runtime on `/dev/serial0`
+- Base Mode command path
+- SOH snapshot command path
+- 30 second scheduled collection path
+- simulated Neutron 2 payload capture on the Pi
+- storage/downlink handoff events
+- channel 1 payload transfer through the RF bridge
+- ground-side payload reconstruction with CRC
+- payload viewer parsing CSV bytes from a `.bin` product
+
+Not validated:
+
+- stock F Prime file downlink
+- high-rate telemetry
+- real Neutron payload board data source
+- production SatNOGS radio behavior
+- full mission timing
+
+## Output Files
+
+Keep these paths straight during the demo:
+
+- Pi latest payload:
+  `/tmp/neutron_payload_captures/latest_payload.bin`
+- Pi latest payload target:
+  `ssh artemis-pi 'readlink -f /tmp/neutron_payload_captures/latest_payload.bin'`
+- ground reconstructed payload:
+  `/tmp/neutron_hil/<run-name>/payload_30s.bin`
+- payload receiver proof:
+  the receiver prints `complete: ... output=<path>`
+- viewer JSON summary:
+  `python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py --summary <payload.bin>`
+
+The downlinked file can be named `.bin`; the bytes inside are Neutron 2 CSV
+content. The viewer sniffs the CSV fields inside `.bin` files.
+
+Viewer file-selection note:
+
+- the browser UI has a dropdown for files in the watched capture directory
+- the browser UI does not have an arbitrary file picker
+- to open one exact file, start the viewer with `--file <path>`
+- to watch a run folder, start the viewer with `--capture-dir <folder>`
+
+## Hardware Map
+
+Recheck ports every session. Do not assume another laptop's USB names.
+
+macOS examples:
+
+```bash
+ls -l /dev/cu.usbmodem* /dev/tty.usbmodem* 2>/dev/null
+python3 -m serial.tools.list_ports -v
 ```
 
-Known-good proof:
+Current common triple-serial mapping:
 
-```text
-missionManager.PING reaches the Pi
-Pi journal prints MissionManager pong token=<token>
-GDS receives valid CCSDS TM frames
+| Port | Purpose |
+| --- | --- |
+| first ground Teensy triple-serial port | GDS channel 0 data |
+| second ground Teensy triple-serial port | ground Teensy debug counters |
+| third ground Teensy triple-serial port | payload channel 1 receiver |
+| satellite Teensy single serial port | satellite debug counters |
+
+Example values from one HIL bench run:
+
+```bash
+GDS_DATA_PORT=/dev/cu.usbmodem115551201
+GDS_DEBUG_PORT=/dev/cu.usbmodem115551203
+GDS_PAYLOAD_PORT=/dev/cu.usbmodem115551205
+SAT_DEBUG_PORT=/dev/cu.usbmodem115502201
 ```
 
-## Known-Good Hardware Map
+Windows laptop:
 
-| Device | Port / address | Purpose |
-| --- | --- | --- |
-| Ground Teensy | `/dev/cu.usbmodem115551201` | byte-clean GDS data stream |
-| Ground Teensy | `/dev/cu.usbmodem115551203` | debug counter stream |
-| Ground Teensy | `usb:1100000` | Arduino CLI upload port |
-| Satellite Teensy | `/dev/cu.usbmodem115502201` | debug counter stream |
-| Satellite Teensy | `usb:100000` | Arduino CLI upload port |
-| Raspberry Pi | `artemis-pi`, `192.168.0.152` | F Prime target |
+- use WSL2 for GDS, payload receiver, and USB serial workflows
+- use native Windows browser to open `http://127.0.0.1:5050` and
+  `http://127.0.0.1:8062`
+- attach the ground Teensy USB device to WSL with `usbipd-win`
+- inside WSL, use `/dev/ttyACM*` or `/dev/ttyUSB*`, not `COM3`
 
-Do not upload by `/dev/cu.usbmodem*` when both Teensys are connected. Use the physical Teensy upload ports.
-
-## Known-Good Pi Runtime
-
-Systemd service:
-
-```sh
-artemis-fprime.service
+```bash
+ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null
 ```
 
-Expected service command:
+## Preflight
 
-```sh
-/home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0
+### macOS
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat
+. ArtemisRpiTeensy_N2/fprime-venv/bin/activate
+
+GDS_DATA_PORT=/dev/cu.usbmodem115551201
+GDS_DEBUG_PORT=/dev/cu.usbmodem115551203
+GDS_PAYLOAD_PORT=/dev/cu.usbmodem115551205
+SAT_DEBUG_PORT=/dev/cu.usbmodem115502201
+
+lsof "$GDS_DATA_PORT" "$GDS_DEBUG_PORT" "$GDS_PAYLOAD_PORT" "$SAT_DEBUG_PORT" 2>/dev/null || true
+ssh artemis-pi 'systemctl is-active artemis-fprime.service; pgrep -af ArtemisRpiTeensyDeployment'
 ```
 
-Current deployment symlink target:
+### Windows Laptop (WSL2)
 
-```text
-/home/pi/artemis/current/ArtemisRpiTeensyDeployment
--> /home/pi/artemis/cross/ArtemisRpiTeensyDeployment
+```bash
+cd ~/fprime-artemis-cubesat
+. ArtemisRpiTeensy_N2/fprime-venv/bin/activate
+
+ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null
+GDS_DATA_PORT=/dev/ttyACM0
+GDS_PAYLOAD_PORT=/dev/ttyACM2
+
+lsof "$GDS_DATA_PORT" "$GDS_PAYLOAD_PORT" 2>/dev/null || true
+ssh artemis-pi 'systemctl is-active artemis-fprime.service; pgrep -af ArtemisRpiTeensyDeployment'
 ```
 
-Check it:
+Expected result:
 
-```sh
-ssh artemis-pi 'systemctl is-active artemis-fprime.service'
-ssh artemis-pi 'readlink -f /home/pi/artemis/current/ArtemisRpiTeensyDeployment'
-```
-
-Expected:
-
-```text
-active
-/home/pi/artemis/cross/ArtemisRpiTeensyDeployment
-```
-
-## Known-Good Local Dictionary
-
-Use the Pi Zero W cross-build dictionary:
-
-```text
-ArtemisRpiTeensy_N2/build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json
-```
-
-Important current RF MVP config:
-
-```text
-ComCfg.TmFrameFixedSize = 128
-FW_COM_BUFFER_MAX_SIZE = 96
-FW_LOG_STRING_MAX_SIZE = 80
-```
-
-These are intentionally small for the RF demo. They are project-owned overrides in:
-
-```text
-ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/RfMvpConfig/
-```
+- Pi service is `active`
+- one Pi deployment process is running with `-d /dev/serial0`
+- no stale local process owns the GDS data port or payload port
+- dictionary exists at:
+  `ArtemisRpiTeensy_N2/build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json`
 
 ## Start GDS
 
-From repo root:
+Terminal 1: start `fprime-gds`.
 
-```sh
-cd ArtemisRpiTeensy_N2
+macOS:
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 . fprime-venv/bin/activate
-fprime-gds -n \
-  --communication-selection uart \
-  --uart-device /dev/cu.usbmodem115551201 \
-  --uart-baud 115200 \
-  --framing-selection space-packet-space-data-link \
-  --dictionary build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json \
-  --gui-port 5051 \
-  --log-to-stdout \
-  --log-level-gds INFO
+GDS_DATA_PORT=/dev/cu.usbmodem115551201
+
+./tools/run_gds_uart.sh \
+  --port "$GDS_DATA_PORT" \
+  --baud 115200 \
+  --gui-port 5050 \
+  --dictionary build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json
+```
+
+Windows WSL2:
+
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+. fprime-venv/bin/activate
+GDS_DATA_PORT=/dev/ttyACM0
+
+./tools/run_gds_uart.sh \
+  --port "$GDS_DATA_PORT" \
+  --baud 115200 \
+  --gui-port 5050 \
+  --dictionary build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json
 ```
 
 Open:
 
 ```text
-http://localhost:5051
+http://127.0.0.1:5050
 ```
 
-Notes:
+GDS pages to keep ready:
 
-- Use `5051` if `5050` or `5000` is already occupied.
-- APID sequence warnings can still appear. That means GDS is decoding frames but some packets are being dropped.
-- Repeated checksum spam means the byte stream is not frame-clean and the RF chain should be rechecked.
+- Commanding
+- Events
+- Channels or Charts
 
-## Smoke Test Script
+Useful channels:
 
-Script:
+- `missionManager.CurrentMode`
+- `scienceManager.PendingDelaySeconds`
+- `scienceManager.CollectionCount`
+- `storageService.StoredProducts`
+- `commsManager.PendingScienceBytes`
+- `commsManager.LinkState`
+- `commsManager.RssiDbm`
+- `payloadDownlinkManager.ProgressPercent`
+
+## Start Payload Receiver
+
+Terminal 2: start this before requesting science downlink.
+
+macOS:
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+. fprime-venv/bin/activate
+GDS_PAYLOAD_PORT=/dev/cu.usbmodem115551205
+RUN_DIR=/tmp/neutron_hil/rf_demo_$(date +%Y%m%d_%H%M%S)
+mkdir -p "$RUN_DIR"
+echo "$RUN_DIR" | tee /tmp/neutron_hil/latest_rf_demo_dir
+
+python -u tools/payload_receiver.py \
+  --port "$GDS_PAYLOAD_PORT" \
+  --baud 115200 \
+  --output "$RUN_DIR/payload_30s.bin" \
+  --timeout 240
+```
+
+Windows WSL2:
+
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+. fprime-venv/bin/activate
+GDS_PAYLOAD_PORT=/dev/ttyACM2
+RUN_DIR=/tmp/neutron_hil/rf_demo_$(date +%Y%m%d_%H%M%S)
+mkdir -p "$RUN_DIR"
+echo "$RUN_DIR" | tee /tmp/neutron_hil/latest_rf_demo_dir
+
+python -u tools/payload_receiver.py \
+  --port "$GDS_PAYLOAD_PORT" \
+  --baud 115200 \
+  --output "$RUN_DIR/payload_30s.bin" \
+  --timeout 240
+```
+
+Expected receiver output:
 
 ```text
-ArtemisRpiTeensy_N2/tools/demo_rf_mvp_smoke.sh
+header: product=<id> transfer=<id> bytes=<n> packets=<n> crc=0x....
+retry: start=<n> count=<n> bitmap_bytes=<n>
+progress: N/N
+complete: product=<id> transfer=<id> bytes=<n> packets=<n> crc=0x.... output=/tmp/neutron_hil/.../payload_30s.bin
 ```
 
-### Check only
+`retry:` lines are normal on the RF link. The receiver only passes when it prints
+`complete:` and exits `0`.
 
-This verifies ports, dictionary, and Pi service without sending a command:
+## Start Payload Viewer
 
-```sh
-cd ArtemisRpiTeensy_N2
-./tools/demo_rf_mvp_smoke.sh --no-command
+Terminal 3: start the viewer. The viewer can be started before or after the
+payload file exists.
+
+To watch the run folder:
+
+macOS:
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat
+RUN_DIR="$(cat /tmp/neutron_hil/latest_rf_demo_dir)"
+python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
+  --capture-dir "$RUN_DIR" \
+  --port 8062
 ```
 
-### Start GDS and send ping
+Windows WSL2:
 
-This starts GDS in the background, then sends the ping:
-
-```sh
-cd ArtemisRpiTeensy_N2
-./tools/demo_rf_mvp_smoke.sh --start-gds --token 4245
+```bash
+cd ~/fprime-artemis-cubesat
+RUN_DIR="$(cat /tmp/neutron_hil/latest_rf_demo_dir)"
+python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
+  --capture-dir "$RUN_DIR" \
+  --port 8062
 ```
 
-GDS log path is printed by the script under:
+To open one exact file after the receiver completes:
+
+```bash
+python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
+  --file "$RUN_DIR/payload_30s.bin" \
+  --port 8062
+```
+
+Open:
 
 ```text
-ArtemisRpiTeensy_N2/tools/logs/
+http://127.0.0.1:8062
 ```
 
-### Send ping through already-running GDS
+Expected viewer behavior:
 
-If GDS is already running:
+- newest supported `.csv` or `.bin` file is selected automatically
+- dropdown lists files from `--capture-dir` plus the optional `--file`
+- status text shows the selected source path
+- metrics show nonzero rows
+- chart shows counts over `t_s`
 
-```sh
-cd ArtemisRpiTeensy_N2
-./tools/demo_rf_mvp_smoke.sh --token 4245
+## Manual Demo Script
+
+Terminal 4: send commands through the already-running GDS session.
+
+macOS:
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+. fprime-venv/bin/activate
+DICT=build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json
+```
+
+Windows WSL2:
+
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+. fprime-venv/bin/activate
+DICT=build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json
+```
+
+### 1. Base Mode
+
+```bash
+fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.ENTER_BASE_MODE \
+  --dictionary "$DICT" --log-level-gds ERROR
+```
+
+Expected event:
+
+```text
+MissionManager.ModeChanged mode=BASE
+```
+
+### 2. SOH Snapshot
+
+```bash
+fprime-cli command-send ArtemisRpiTeensyDeployment.sohManager.EMIT_SOH_SNAPSHOT \
+  --dictionary "$DICT" --log-level-gds ERROR
+```
+
+Expected behavior:
+
+- SOH events/channels appear in GDS
+- telemetry continues moving
+
+### 3. Optional RSSI Check
+
+```bash
+fprime-cli command-send ArtemisRpiTeensyDeployment.commsManager.PING_LINK_RSSI \
+  --dictionary "$DICT" --log-level-gds ERROR
+```
+
+Expected Pi journal event:
+
+```text
+CommsManager.LinkRssiPing state=<state> rssi=<value>dBm
+```
+
+Example from the bench:
+
+```text
+Comms link RSSI ping state=2 rssi=-5dBm
+```
+
+### 4. Configure 30 Second Capture
+
+```bash
+fprime-cli command-send ArtemisRpiTeensyDeployment.scienceManager.CONFIGURE_CAPTURE_DURATION \
+  --arguments 30 \
+  --dictionary "$DICT" --log-level-gds ERROR
+```
+
+Expected event:
+
+```text
+ScienceManager.CaptureDurationConfigured durationSeconds=30
+```
+
+### 5. Schedule Collection
+
+```bash
+fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.SCHEDULE_COLLECTION \
+  --arguments 4 \
+  --dictionary "$DICT" --log-level-gds ERROR
+```
+
+Expected events:
+
+```text
+MissionManager.CollectionScheduled delaySeconds=4
+ScienceManager.CollectionTriggered delaySeconds=4
+```
+
+Wait about 40 seconds for the 4 second delay and 30 second capture window.
+
+Expected events:
+
+```text
+ScienceManager.ScienceProductReady productSize=<n>
+StorageService.ScienceStored productCount=<n> size=<n>
+```
+
+For a 30 second simulated capture, expect about 30 CSV rows and a few hundred
+bytes.
+
+### 6. Report Latest Dataset
+
+```bash
+fprime-cli command-send ArtemisRpiTeensyDeployment.storageService.REPORT_LATEST_DATASET \
+  --dictionary "$DICT" --log-level-gds ERROR
+```
+
+Expected event:
+
+```text
+StorageService.LatestDataset productCount=<n> size=<n>
+```
+
+### 7. Request Science Downlink
+
+Make sure the payload receiver is still running, then send:
+
+```bash
+fprime-cli command-send ArtemisRpiTeensyDeployment.commsManager.REQUEST_SCIENCE_DOWNLINK \
+  --dictionary "$DICT" --log-level-gds ERROR
+```
+
+Expected events:
+
+```text
+CommsManager.DownlinkRequested bytes=<n>
+StorageService.DownlinkPrepared downlinkBytes=<n>
+PayloadDownlinkManager.PayloadDownlinkStarted product=<n> bytes=<n> packets=<n>
+PayloadDownlinkManager.PayloadDownlinkComplete transfer=<n> packetsSent=<n>
+CommsManager.DownlinkFinished bytes=<n>
+```
+
+Expected receiver completion:
+
+```text
+complete: product=<id> transfer=<id> bytes=<n> packets=<n> crc=0x.... output=$RUN_DIR/payload_30s.bin
+```
+
+## Verify Payload File
+
+Run this from the repo root after receiver completion.
+
+macOS:
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat
+RUN_DIR="$(cat /tmp/neutron_hil/latest_rf_demo_dir)"
+LOCAL="$RUN_DIR/payload_30s.bin"
+
+printf 'local  '; shasum -a 256 "$LOCAL"
+printf 'remote '; ssh artemis-pi 'sha256sum /tmp/neutron_payload_captures/latest_payload.bin'
+ssh artemis-pi 'readlink -f /tmp/neutron_payload_captures/latest_payload.bin; wc -c /tmp/neutron_payload_captures/latest_payload.bin'
+python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py --summary "$LOCAL"
+```
+
+Windows WSL2:
+
+```bash
+cd ~/fprime-artemis-cubesat
+RUN_DIR="$(cat /tmp/neutron_hil/latest_rf_demo_dir)"
+LOCAL="$RUN_DIR/payload_30s.bin"
+
+printf 'local  '; sha256sum "$LOCAL"
+printf 'remote '; ssh artemis-pi 'sha256sum /tmp/neutron_payload_captures/latest_payload.bin'
+ssh artemis-pi 'readlink -f /tmp/neutron_payload_captures/latest_payload.bin; wc -c /tmp/neutron_payload_captures/latest_payload.bin'
+python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py --summary "$LOCAL"
+```
+
+Pass criteria:
+
+- receiver exits `0`
+- local and remote hashes match
+- byte count is nonzero
+- viewer summary prints valid JSON
+- `rows` is nonzero
+- for the 30 second demo, `rows` is normally `30`
+
+Example passing summary:
+
+```json
+{
+  "rows": 30,
+  "total_counts": 140,
+  "start_t_s": 666,
+  "end_t_s": 695
+}
+```
+
+## Verify Pi Journal
+
+```bash
+ssh artemis-pi '
+  journalctl -u artemis-fprime.service --since "5 minutes ago" --no-pager |
+    egrep "CaptureDurationConfigured|CollectionScheduled|ScienceProductReady|ScienceStored|LatestDataset|DownlinkRequested|PayloadDownlinkStarted|PayloadDownlinkComplete|DownlinkFinished|LinkRssiPing|UnexpectedSequenceCount" |
+    tail -120
+'
 ```
 
 Expected proof:
 
-```text
-MissionManager pong token=4245 count=1
-Opcode 0x10006001 dispatched
-Opcode 0x10006001 completed
-[demo-smoke] PASS: command path verified with token=4245
-```
+- `CaptureDurationConfigured ... 30s`
+- `CollectionScheduled ... 4s`
+- `ScienceProductReady`
+- `ScienceStored`
+- `LatestDataset`
+- `DownlinkRequested`
+- `PayloadDownlinkStarted`
+- `PayloadDownlinkComplete`
+- `DownlinkFinished`
 
-## Manual Ping Command
-
-If the script fails and you want the raw command:
-
-```sh
-cd ArtemisRpiTeensy_N2
-. fprime-venv/bin/activate
-fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.PING \
-  --arguments 4245 \
-  --dictionary build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json \
-  --log-level-gds ERROR
-```
-
-Then check Pi journal:
-
-```sh
-ssh artemis-pi 'journalctl -u artemis-fprime.service --since "30 seconds ago" --no-pager | egrep "MissionManager|PING|pong|OpCode|completed|ERROR|WARNING" | tail -100'
-```
-
-## Teensy Build/Upload Commands
-
-Ground Teensy:
-
-```sh
-cd GDS_Teensy
-export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
-arduino-cli compile --clean \
-  --fqbn teensy:avr:teensy41:usb=serial2 \
-  --libraries "$PWD/../ArtemisTeensy_N2_Baremetal/firmware/libs" \
-  --build-path "$PWD/build/arduino-cli-gds-teensy-debug" \
-  "$PWD/firmware/gds_teensy"
-arduino-cli upload -v \
-  --fqbn teensy:avr:teensy41:usb=serial2 \
-  -p usb:1100000 \
-  --input-dir "$PWD/build/arduino-cli-gds-teensy-debug" \
-  "$PWD/firmware/gds_teensy"
-```
-
-Satellite Teensy:
-
-```sh
-cd ArtemisTeensy_N2_Baremetal
-export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
-arduino-cli compile --clean \
-  --fqbn teensy:avr:teensy41 \
-  --libraries "$PWD/firmware/libs" \
-  --build-path "$PWD/build/arduino-cli-satellite-debug" \
-  "$PWD/firmware/satellite_teensy"
-arduino-cli upload -v \
-  --fqbn teensy:avr:teensy41 \
-  -p usb:100000 \
-  --input-dir "$PWD/build/arduino-cli-satellite-debug" \
-  "$PWD/firmware/satellite_teensy"
-```
-
-Stop the Pi service before reflashing the satellite Teensy:
-
-```sh
-ssh artemis-pi 'sudo systemctl stop artemis-fprime.service'
-```
-
-Restart after upload:
-
-```sh
-ssh artemis-pi 'sudo systemctl start artemis-fprime.service'
-```
-
-## Demo Interpretation
-
-Passing MVP means:
-
-- GDS starts against the ground Teensy data port.
-- `demo_rf_mvp_smoke.sh --token <token>` passes.
-- Pi journal shows `MissionManager pong token=<token>`.
-- GDS shows some telemetry/event decode.
-
-Not required for this freeze:
-
-- clean file downlink through stock F Prime `FileDownlink.SendFile`
-- high-rate telemetry
-- large payload downlink through GDS
-
-For payload files, use the custom downlink guidance in:
+Warnings like this can happen during RF testing:
 
 ```text
-docs/PAYLOAD_DOWNLINK_PROTOCOL_ADVICE.md
+Unexpected sequence count received. Packets may have been dropped.
 ```
 
-## Do Not Change Before Demo Unless Needed
+That means the RF/GDS stream is lossy, not necessarily dead. Confirm the command
+or event reached the Pi before retrying.
 
-Avoid changing:
+## Fast Troubleshooting
 
-- RF packet size/header format
-- ACK/retry timing
-- `ComCfg.TmFrameFixedSize`
-- F Prime topology telemetry throttling
-- Teensy upload FQBNs
-- GDS framing mode
+If GDS opens but commands do not reach the Pi:
 
-If a change is required, rerun:
+- check Pi journal for `OpCodeDispatched`
+- if GDS command log shows the command but the Pi does not, the RF uplink likely dropped it
+- retry with spaced attempts, not a fast spam loop
+- keep watching `UnexpectedSequenceCount` warnings
 
-```sh
-cd ArtemisRpiTeensy_N2
-./tools/demo_rf_mvp_smoke.sh --start-gds --token 4245
+If telemetry is blank:
+
+- confirm GDS uses `space-packet-space-data-link`
+- confirm the ground data port is the first triple-serial port
+- stop stale `fprime-gds` processes using the same serial device
+
+If payload receiver prints `incomplete`:
+
+- rerun the receiver before sending downlink again
+- use a longer timeout such as `--timeout 240`
+- `retry:` lines are normal; failure is only when the receiver exits before `complete:`
+- for a direct retry of the same Pi latest payload, use:
+
+```bash
+BYTES="$(ssh artemis-pi 'wc -c < /tmp/neutron_payload_captures/latest_payload.bin')"
+fprime-cli command-send ArtemisRpiTeensyDeployment.payloadDownlinkManager.START_PAYLOAD_DOWNLINK \
+  --arguments 99 "$BYTES" \
+  --dictionary "$DICT" --log-level-gds ERROR
+```
+
+That uses the current byte count from:
+
+```bash
+ssh artemis-pi 'wc -c /tmp/neutron_payload_captures/latest_payload.bin'
+```
+
+If the viewer shows the wrong file:
+
+- check the status path shown in the viewer
+- restart with `--file "$RUN_DIR/payload_30s.bin"`
+- or restart with `--capture-dir "$RUN_DIR"` and refresh
+
+If the payload file exists but viewer says it is invalid:
+
+- confirm the file contains CSV bytes:
+
+```bash
+head "$RUN_DIR/payload_30s.bin"
+```
+
+Expected first line:
+
+```text
+t_s,counts,flag
+```
+
+## Cleanup
+
+Stop local tools with `Ctrl-C`.
+
+GDS and receiver logs/files are run artifacts. Keep useful payloads, then remove
+old files when done:
+
+```bash
+rm -rf /tmp/neutron_hil/rf_demo_*
+```
+
+On the Pi, old simulator captures can be removed from GDS:
+
+```text
+ArtemisRpiTeensyDeployment.storageService.REMOVE_OLD_DATASETS
+confirm = 1
 ```

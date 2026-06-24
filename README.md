@@ -21,7 +21,7 @@ The current target is a shortened FlatSat FSR end-to-end demo based on the team'
 4. While still in base mode, send a command that schedules a short data-collection action, for example `10` seconds from now.
 5. Trigger the data-collection script/command using simulated or temporary payload data if real payload integration is not ready.
 6. After collection completes, transition to a science-data transmit path and downlink the collected payload/science data.
-7. On the ground PC, use `fprime-gds` as the MVP demo ground tool to review the downlinked science data. Longer term, the end-goal ground presentation stack is `Yamcs` or another mission-control style analysis/display tool.
+7. On the ground PC, use `fprime-gds` for command/event/telemetry visibility and the Neutron 2 payload viewer for visual review of the downlinked science data. Longer term, the end-goal ground presentation stack is `Yamcs` or another mission-control style analysis/display tool.
 
 ### Demo scope assumptions
 
@@ -31,18 +31,18 @@ The current target is a shortened FlatSat FSR end-to-end demo based on the team'
 - Ground-station presentation quality matters: live telemetry, command acknowledgement, and visible science-data review are part of the success criteria.
 
 Current relay milestone:
-- one UART channel (`115200 8N1`) on RPi<->satellite Teensy carrying raw `ComCcsds` / space-packet bytes
-- both Teensy bridges run transparent raw-byte tunnel mode for the nominal MVP/HIL path
-- segmented RF transport between satellite and ground Teensy
-- raw reassembled F' bytes emitted on ground USB UART for `fprime-gds`
-- simple uplink burst packetization from ground USB UART to RF
-- legacy custom UART wrapper mode (`0xD4 0xC3 + len + crc16`) remains fallback-only and is not mixed into the nominal path
+- one physical UART (`115200 8N1`) on RPi<->satellite Teensy with tagged virtual channels
+- channel 0 carries normal F Prime/GDS CCSDS bytes over RF
+- channel 1 carries payload/science packets over RF, sized for the current RFM23BP packet budget
+- channel 2 carries satellite-Teensy-local subsystem RPC such as EPS/PDU; it is consumed by the satellite Teensy and is not forwarded over RF
+- the Pi-side UART wrapper is `0xD4 0xC3 + channel + len + payload + crc16`
+- ground USB exposes channel 0 to `fprime-gds`; payload channel 1 is received separately by the payload receiver tool when the ground Teensy triple-serial path is enabled
 
 ## Repository layout
 
 - `ArtemisRpiTeensy_N2/`
   - Active F' project (promoted in place from starter sample)
-  - Includes deployment and custom components such as `MissionManager`, `ScienceManager`, `SohManager`, `TeensyTransportService`, `CommsAdapter_TeensyRfm23`, and `PingResponder`
+  - Includes deployment and custom components such as `MissionManager`, `ScienceManager`, `SoHManager`, `ThermalService`, `UartChannelMux`, `PayloadDownlinkManager`, `EpsService`, and `EpsAdapter_Artemis`
 - `ArtemisTeensy_N2_Baremetal/`
   - Satellite Teensy relay firmware workspace (Arduino CLI workflow)
 - `GDS_Teensy/`
@@ -54,67 +54,108 @@ Current relay milestone:
 - `docs/agents_notes.md`
   - Current implementation status and next-agent guidance
 - `EMULATION.md`
-  - Local Mac-only closed-loop emulation workflow (no hardware)
+  - Local laptop closed-loop emulation workflow (no hardware)
+- `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md`
+  - Windows laptop setup for student developers and testing/viewer users
 
-## Build and run
+## Build and Run
 
-### 1) Build F' (RPi side)
+### macOS Laptop
+
+Use this when the repo is cloned at `~/Developer/fprime-artemis-cubesat`.
+
 ```bash
-cd <repo-root>
+cd ~/Developer/fprime-artemis-cubesat
 . ArtemisRpiTeensy_N2/fprime-venv/bin/activate
 cd ArtemisRpiTeensy_N2
 fprime-util generate -f
 fprime-util build
 ```
 
-Run deployment:
+Build satellite Teensy bridge:
 ```bash
+cd ~/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+./tools/arduino-cli/build.sh
+```
+
+Build ground Teensy bridge:
+```bash
+cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
+./tools/arduino-cli/build.sh
+```
+
+Run local laptop emulation:
+```bash
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+./tools/run_local_emulation.sh
+```
+
+### Windows Laptop (WSL2)
+
+Use this when the repo is cloned inside Ubuntu/WSL at `~/fprime-artemis-cubesat`.
+
+```bash
+cd ~/fprime-artemis-cubesat
+. ArtemisRpiTeensy_N2/fprime-venv/bin/activate
 cd ArtemisRpiTeensy_N2
-./build-artifacts/Darwin/ArtemisRpiTeensyDeployment/bin/ArtemisRpiTeensyDeployment -d /dev/serial0
+fprime-util generate -f
+fprime-util build
 ```
 
-### 2) Build satellite Teensy bridge
+Build satellite Teensy bridge:
 ```bash
-cd ArtemisTeensy_N2_Baremetal
+cd ~/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
 ./tools/arduino-cli/build.sh
 ```
 
-Upload (example port):
+Build ground Teensy bridge:
 ```bash
-cd ArtemisTeensy_N2_Baremetal
-./tools/arduino-cli/upload.sh /dev/ttyACM0
-```
-
-### 3) Build ground Teensy bridge
-```bash
-cd GDS_Teensy
+cd ~/fprime-artemis-cubesat/GDS_Teensy
 ./tools/arduino-cli/build.sh
 ```
 
-Upload (example port):
+Run local laptop emulation:
 ```bash
-cd GDS_Teensy
-./tools/arduino-cli/upload.sh /dev/ttyACM1
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+./tools/run_local_emulation.sh
 ```
+
+### Raspberry Pi Target
+
+Use this on the Pi after cloning the repo at `~/fprime-artemis-cubesat`.
+
+```bash
+cd ~/fprime-artemis-cubesat
+. ArtemisRpiTeensy_N2/fprime-venv/bin/activate
+cd ArtemisRpiTeensy_N2
+fprime-util generate -f
+fprime-util build
+./build-artifacts/Linux/bin/ArtemisRpiTeensyDeployment -d /dev/serial0
+```
+
+Windows note: use WSL2 for F' build/development work. Native Windows is fine for the browser/Python payload viewer path.
 
 ## Status
 
 Implemented:
 - F' deployment migrated to Linux UART transport.
-- Satellite Teensy relay with transparent raw-byte UART tunnel mode and RF segmentation/reassembly.
-- Ground Teensy relay with transparent raw-byte USB tunnel mode and RF reassembly.
-- Ground Teensy simple uplink path (USB raw byte burst -> RF segmentation).
+- Satellite and ground Teensy relay firmware with channelized UART framing plus RF segmentation/reassembly.
+- Channel 0 CCSDS/GDS path, channel 1 payload/science path, and channel 2 satellite-local EPS/PDU RPC path.
+- Ground Teensy simple uplink path (USB raw byte burst -> RF segmentation for channels that cross RF).
 - Updated UART/RF transport contract documentation.
+- RPi-hosted neutron payload simulator wired through `PayloadService` and `PayloadAdapter_NeutronSim`, including a latest-capture handoff for downlink.
+- File-backed `PayloadDownlinkManager` and payload receiver tooling for arbitrary payload bytes over channel 1.
+- Artemis EPS/PDU command adapter over channel 2 using the PDU v2 protocol from `external/artemis-pdu`, with timeout/recovery handling.
 
 Not implemented yet:
-- Generic payload component connected to F'.
-- Full proxy components for PDU/GPS/IMU telemetry + commands.
+- HIL validation of channel 2 against the real PDU and HIL validation of channel 0/1 over the RFM23BP pair.
+- Broader EPS/PDU telemetry beyond the current command/status path, plus thermal, GPS, and IMU telemetry + command adapter behavior.
 - Full uplink robustness (deterministic packet-boundary extraction and retry/ack strategy).
-- Full demo-state orchestration for `Base Mode` -> scheduled collection -> science downlink.
+- Full demo-state orchestration polish for `Base Mode` -> scheduled collection -> science downlink.
 - Ground-side science-data analysis/presentation workflow finalized for the judges' demo.
 
 ## Notes
 
-- Use `docs/FPRIME_ARTEMIS_CUBESAT.md` for the original implementation plan.
+- Use `docs/archive/` for historical implementation plans, sizing memos, and RF debug notes.
 - Use `docs/build_runbook.md` for operational command sequence.
 - Use `docs/GDS_TEENSY_RUNBOOK.md` for ground Teensy + UART GDS workflow and troubleshooting.

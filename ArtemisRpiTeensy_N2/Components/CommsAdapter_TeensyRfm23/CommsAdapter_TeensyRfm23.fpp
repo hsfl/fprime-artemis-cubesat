@@ -11,8 +11,17 @@ module Components {
         @ Adapter request input
         sync input port requestIn: Svc.Ping
 
+        @ Teensy-local RF status response input from UART channel 2.
+        sync input port teensyResponseIn: Fw.BufferSend
+
         @ Adapter status output
         output port statusOut: [2] Svc.Ping
+
+        @ Current RSSI output
+        output port rssiStatusOut: Components.RssiStatus
+
+        @ Teensy-local RF status request output to UART channel 2.
+        output port teensyRequestOut: Fw.BufferSend
 
         @ Last handled request key
         telemetry LastRequestKey: U32
@@ -23,16 +32,16 @@ module Components {
         @ Current link state from Teensy transport poll contract (0=down, 1=acquiring, 2=locked, 3=degraded)
         telemetry LinkState: U32
 
-        @ RF RSSI estimate derived from current link state
+        @ RF RSSI in dBm reported by the satellite Teensy RadioHead driver
         telemetry RssiDbm: I32
 
-        @ RF receive packet counter estimate
+        @ RF receive packet counter reported by the satellite Teensy
         telemetry RfRxPackets: U32
 
-        @ RF transmit packet counter estimate
+        @ RF transmit packet counter reported by the satellite Teensy
         telemetry RfTxPackets: U32
 
-        @ RF transmit drop counter estimate
+        @ RF transmit drop counter reported by the satellite Teensy
         telemetry RfTxDrops: U32
 
         @ Request handling event

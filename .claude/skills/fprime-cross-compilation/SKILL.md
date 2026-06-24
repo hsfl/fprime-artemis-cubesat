@@ -11,6 +11,37 @@ description: "Cross-compile F' (F Prime) deployments for ARM/Linux targets, espe
 
 **Critical landmine — ARMv6, not ARMv7:** The Raspberry Pi Zero W uses an ARMv6 CPU (BCM2835). Do NOT use `aarch64-linux` or standard `arm-hf-linux` toolchains — they target ARMv7+ and will produce binaries that SIGILL on the Pi Zero W. You must use an ARMv6-compatible toolchain (e.g. `arm-linux-gnueabihf` from the Raspberry Pi Foundation toolchain, not the ARM GNU toolchain). See `docs/CROSS_COMPILE_HANDOFF_PI_ZERO_W.md` for the exact toolchain path and CMake platform file.
 
+### KISS workflow for this repo
+
+Run from the active F' project root:
+
+```sh
+cd ArtemisRpiTeensy_N2
+./tools/docker_cross_compile_pi_zero_w.sh
+```
+
+Default mode is the normal iterative path. It reuses the Docker image, Pi
+sysroot, `.cross-venv-linux` Python environment, and F Prime build cache when
+present, then still builds and verifies the final ARMv6 binary with `readelf`.
+
+Use local-only when you only need the ARM artifact and dictionary:
+
+```sh
+./tools/docker_cross_compile_pi_zero_w.sh --local-only
+```
+
+Use clean mode when the toolchain, sysroot, Docker base image, or Python
+dependencies may be stale:
+
+```sh
+./tools/docker_cross_compile_pi_zero_w.sh --clean
+```
+
+`--clean` refreshes the sysroot, rebuilds the Docker image, recreates the cross
+Python venv, and force-regenerates the F Prime build cache. Do not use it for
+every small C++/FPP iteration; the slow part is usually Python dependency setup,
+and forced regeneration also throws away incremental compile state.
+
 ## Quick start (macOS on Apple Silicon)
 
 1) Ensure Docker or Rancher Desktop is running.
