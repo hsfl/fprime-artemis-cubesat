@@ -114,13 +114,13 @@ Use this PR body:
 
 ```markdown
 ## What changed
-- 
+-
 
 ## How I tested it
-- 
+-
 
 ## Notes for reviewer
-- Base branch: 
+- Base branch:
 ```
 
 Avoid overclaiming. If tests were not run, write:
