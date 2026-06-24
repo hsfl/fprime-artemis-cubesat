@@ -41,6 +41,8 @@ class PayloadDownlinkManager final : public PayloadDownlinkManagerComponentBase 
     bool prepareSource(U32 byteCount);
     void emitTelemetry();
     void emitStatus();
+    void writeProgressTelemetry();
+    void emitCompletionSummaryIfDue();
     bool sendHeaderPacket();
     bool sendDataPacket(U32 packetIndex);
     bool sendEndPacket();
@@ -64,10 +66,12 @@ class PayloadDownlinkManager final : public PayloadDownlinkManagerComponentBase 
     U32 m_totalPackets;
     U32 m_nextPacketIndex;
     U32 m_packetsSent;
+    U32 m_progressPercent;
     U32 m_retryRound;
     U32 m_packetsMissing;
     U32 m_lastError;
     U32 m_nextProgressPercent;
+    U32 m_completionSummaryEventsRemaining;
     U16 m_blobCrc;
     bool m_sentHeader;
     bool m_sentEnd;

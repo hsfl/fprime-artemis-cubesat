@@ -12,6 +12,7 @@ namespace {
 constexpr U32 MAX_BLOB_BYTES = 1024U * 1024U;
 constexpr U32 PACKETS_PER_RUN = 1;
 constexpr U32 RETRY_PACKETS_PER_RUN = 1;
+constexpr U32 COMPLETION_SUMMARY_EVENT_REPEATS = 30;
 constexpr const char* PAYLOAD_SOURCE_ENV = "NEUTRON_PAYLOAD_DOWNLINK_FILE";
 constexpr const char* DEFAULT_PAYLOAD_SOURCE = "/tmp/neutron_payload_captures/latest_payload.bin";
 constexpr const char* CAPTURE_DIR = "/tmp/neutron_payload_captures";
@@ -96,10 +97,12 @@ PayloadDownlinkManager::PayloadDownlinkManager(const char* const compName)
       m_totalPackets(0),
       m_nextPacketIndex(0),
       m_packetsSent(0),
+      m_progressPercent(0),
       m_retryRound(0),
       m_packetsMissing(0),
       m_lastError(0),
       m_nextProgressPercent(10),
+      m_completionSummaryEventsRemaining(0),
       m_blobCrc(0),
       m_sentHeader(false),
       m_sentEnd(false),
@@ -138,6 +141,12 @@ void PayloadDownlinkManager::run_handler(FwIndexType portNum, U32 context) {
         this->m_retryCursor = 0;
     }
 
+    if (this->m_state == STATE_DONE) {
+        this->emitCompletionSummaryIfDue();
+        this->emitTelemetry();
+        return;
+    }
+
     if (this->m_state == STATE_DOWNLINKING) {
         if (!this->m_sentHeader) {
             if (!this->sendHeaderPacket()) {
@@ -168,6 +177,8 @@ void PayloadDownlinkManager::run_handler(FwIndexType portNum, U32 context) {
             }
             this->m_sentEnd = true;
             this->m_state = STATE_DONE;
+            this->m_progressPercent = 100U;
+            this->m_completionSummaryEventsRemaining = COMPLETION_SUMMARY_EVENT_REPEATS;
             this->log_ACTIVITY_HI_PayloadDownlinkComplete(this->m_transferId, this->m_packetsSent);
             this->emitStatus();
         }
@@ -238,6 +249,8 @@ void PayloadDownlinkManager::ABORT_PAYLOAD_DOWNLINK_cmdHandler(FwOpcodeType opCo
 
 void PayloadDownlinkManager::GET_PAYLOAD_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     this->emitTelemetry();
+    this->log_ACTIVITY_HI_PayloadDownlinkProgress(
+        this->m_transferId, this->m_progressPercent, this->m_nextPacketIndex, this->m_totalPackets);
     this->log_ACTIVITY_LO_PayloadStatus(this->m_state, this->m_packetsSent, this->m_totalPackets, this->m_lastError);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
@@ -265,10 +278,12 @@ bool PayloadDownlinkManager::resetTransfer(U32 productId, U32 byteCount) {
         (byteCount + LinkCfg::PAYLOAD_PACKET_DATA_BYTES - 1U) / LinkCfg::PAYLOAD_PACKET_DATA_BYTES;
     this->m_nextPacketIndex = 0;
     this->m_packetsSent = 0;
+    this->m_progressPercent = 0;
     this->m_retryRound = 0;
     this->m_packetsMissing = 0;
     this->m_lastError = 0;
     this->m_nextProgressPercent = 10U;
+    this->m_completionSummaryEventsRemaining = 0;
     this->m_blobCrc = sourceCrc;
     this->m_sentHeader = false;
     this->m_sentEnd = false;
@@ -308,6 +323,7 @@ void PayloadDownlinkManager::emitTelemetry() {
     this->tlmWrite_TotalBytes(this->m_totalBytes);
     this->tlmWrite_TotalPackets(this->m_totalPackets);
     this->tlmWrite_PacketsSent(this->m_packetsSent);
+    this->writeProgressTelemetry();
     this->tlmWrite_RetryRound(this->m_retryRound);
     this->tlmWrite_PacketsMissing(this->m_packetsMissing);
     this->tlmWrite_LastError(this->m_lastError);
@@ -325,6 +341,21 @@ void PayloadDownlinkManager::emitStatus() {
             this->m_totalPackets,
             this->m_lastError);
     }
+}
+
+void PayloadDownlinkManager::writeProgressTelemetry() {
+    this->tlmWrite_ProgressPercent(this->m_progressPercent);
+    this->tlmWrite_ProgressPacketsSent(this->m_nextPacketIndex);
+    this->tlmWrite_ProgressTotalPackets(this->m_totalPackets);
+}
+
+void PayloadDownlinkManager::emitCompletionSummaryIfDue() {
+    if (this->m_completionSummaryEventsRemaining == 0U) {
+        return;
+    }
+    this->log_ACTIVITY_HI_PayloadDownlinkProgress(
+        this->m_transferId, 100U, this->m_nextPacketIndex, this->m_totalPackets);
+    this->m_completionSummaryEventsRemaining--;
 }
 
 bool PayloadDownlinkManager::sendHeaderPacket() {
@@ -403,10 +434,18 @@ void PayloadDownlinkManager::emitProgressIfDue() {
         bytesSent = this->m_totalBytes;
     }
     const U32 percentComplete = (bytesSent * 100U) / this->m_totalBytes;
-    while (this->m_nextProgressPercent < 100U && percentComplete >= this->m_nextProgressPercent) {
-        this->log_ACTIVITY_LO_PayloadDownlinkProgress(
-            this->m_transferId, this->m_nextProgressPercent, this->m_nextPacketIndex, this->m_totalPackets);
-        this->m_nextProgressPercent += 10U;
+    if (percentComplete >= this->m_nextProgressPercent) {
+        U32 reportedPercent = percentComplete - (percentComplete % 10U);
+        if (reportedPercent >= 100U) {
+            reportedPercent = 90U;
+        }
+        if (reportedPercent < this->m_nextProgressPercent) {
+            reportedPercent = this->m_nextProgressPercent;
+        }
+        this->m_progressPercent = reportedPercent;
+        this->log_ACTIVITY_HI_PayloadDownlinkProgress(
+            this->m_transferId, reportedPercent, this->m_nextPacketIndex, this->m_totalPackets);
+        this->m_nextProgressPercent = reportedPercent + 10U;
     }
 }
 

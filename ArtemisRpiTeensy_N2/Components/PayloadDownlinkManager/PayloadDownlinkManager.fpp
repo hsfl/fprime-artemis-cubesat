@@ -50,6 +50,15 @@ module Components {
         @ Number of data packets sent, including retry packets.
         telemetry PacketsSent: U32
 
+        @ Latest nominal payload downlink progress percent.
+        telemetry ProgressPercent: U32
+
+        @ Nominal payload data packets sent for progress display.
+        telemetry ProgressPacketsSent: U32
+
+        @ Nominal payload data packets expected for progress display.
+        telemetry ProgressTotalPackets: U32
+
         @ Retry rounds serviced.
         telemetry RetryRound: U32
 
@@ -67,9 +76,9 @@ module Components {
         event PayloadDownlinkComplete(transferId: U32, packetsSent: U32) \
             severity activity high format "Payload downlink complete transfer={} packetsSent={}"
 
-        @ Payload downlink progress, throttled to nominal 10 percent increments.
+        @ Payload downlink progress, throttled to nominal 10 percent increments with short 100 percent replay after completion.
         event PayloadDownlinkProgress(transferId: U32, percentComplete: U32, packetsSent: U32, totalPackets: U32) \
-            severity activity low format "Payload downlink progress transfer={} percent={} packets={}/{}"
+            severity activity high format "Payload downlink progress transfer={} percent={} packets={}/{}"
 
         @ Payload downlink failed.
         event PayloadDownlinkFailed(reason: U32, detail: U32) \
