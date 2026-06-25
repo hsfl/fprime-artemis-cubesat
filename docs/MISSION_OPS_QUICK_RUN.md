@@ -2,6 +2,9 @@
 
 BLUF: mission ops should use scripts, not hand-assemble F Prime commands.
 
+Use `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` when the quick run fails and
+you need to identify which layer owns the issue.
+
 ## Laptop Rehearsal
 
 Use this when the FlatSat bench is not available.
@@ -65,3 +68,6 @@ HIL validates what laptop rehearsal cannot:
 3. If payload progress appears but no file is viewable, check `tools/payload_receiver.py` or the local capture directory.
 4. If HIL channel 2 fails, treat it as EPS/PDU adapter or satellite-Teensy-local RPC work first, not as a ground RF problem.
 5. If PDU behavior changes while the ICD settles, update `EpsAdapter_Artemis` first. Refactor `EpsService` only if the mission-facing EPS command contract becomes misleading.
+
+For the full layer-by-layer checklist, use
+`docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md`.

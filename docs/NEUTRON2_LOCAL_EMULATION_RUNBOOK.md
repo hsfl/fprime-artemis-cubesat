@@ -3,6 +3,10 @@
 BLUF: use this to manually demonstrate the Neutron 2 demo story on one laptop,
 without hardware-in-the-loop.
 
+If the local demo fails, use `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` to
+identify whether the issue is build, GDS/dictionary, mission flow, payload
+capture, storage, downlink, or viewer state.
+
 This runbook shows:
 
 - F Prime app running locally

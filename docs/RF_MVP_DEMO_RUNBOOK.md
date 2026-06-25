@@ -523,6 +523,10 @@ or event reached the Pi before retrying.
 
 ## Fast Troubleshooting
 
+For a broader layer map across GDS, F Prime services, UART mux, RF, payload
+receiver, viewer, and EPS/PDU channel 2, see
+`docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md`.
+
 If GDS opens but commands do not reach the Pi:
 
 - check Pi journal for `OpCodeDispatched`

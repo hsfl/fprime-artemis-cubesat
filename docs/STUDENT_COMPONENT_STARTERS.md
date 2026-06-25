@@ -9,6 +9,9 @@ Related architecture review:
 - `docs/SERVICE_ADAPTER_ARCHITECTURE_REVIEW.md` records the service/adapter
   invariant, current "real vs placeholder" map, and follow-on cleanup plan.
 - `docs/MISSION_OPS_QUICK_RUN.md` is the short operator-facing run/checklist.
+- `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` explains where to look first
+  when a command, event, telemetry channel, payload downlink, viewer, or
+  EPS/PDU path fails.
 
 Topology profiles:
 

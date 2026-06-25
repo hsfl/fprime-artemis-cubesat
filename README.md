@@ -75,6 +75,9 @@ Teensy bridge firmware.
   - Windows laptop setup for student developers and testing/viewer users
 - `docs/MISSION_OPS_QUICK_RUN.md`
   - One-page local rehearsal and FlatSat/HIL operator checklist
+- `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md`
+  - Where to look first when commands, telemetry, payload downlink, or EPS/PDU
+    behavior fails
 
 Standard no-HIL local regression before handoff:
 

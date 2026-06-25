@@ -127,6 +127,9 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - `./tools/validate_local.sh` checks generated headers, transport drift, local
   Python tests, F Prime local-demo build, component UTs, and the automated
   local demo sequence.
+- `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` is the software triage map for
+  GDS/dictionary, mission services, payload capture, storage, channel 1
+  downlink, Teensy/RF counters, viewer files, and EPS/PDU channel 2.
 - Contract documentation:
   - `ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md`
   - `GDS_Teensy/docs/transport_contract.md`
