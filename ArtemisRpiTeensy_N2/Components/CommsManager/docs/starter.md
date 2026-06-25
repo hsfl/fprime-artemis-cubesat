@@ -17,18 +17,15 @@ Power note: SatNOGS rail control belongs in PDU, not COMMS. Expect 3.3 V, 5 V, a
 ## Commands
 
 - `REQUEST_LINK_STATUS`
-- `SELECT_RADIO_BACKEND(backend)`
+- `PING_LINK_RSSI`
 - `REQUEST_SCIENCE_DOWNLINK`
-
-Backend values:
-- `0`: RFM23BP
-- `1`: SatNOGS
 
 ## Abstraction Rule
 
-- `CommsManager` owns link state, backend selection, and downlink requests.
+- `CommsManager` owns link state and downlink requests.
 - `CommsAdapter_TeensyRfm23` owns current RFM23BP behavior.
 - Future SatNOGS protocol goes in a SatNOGS adapter, not this manager.
+- Radio adapter choice is a topology/build profile decision, not a runtime command.
 
 ## Next Work
 

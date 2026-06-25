@@ -73,6 +73,14 @@ Teensy bridge firmware.
   - Local laptop closed-loop emulation workflow (no hardware)
 - `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md`
   - Windows laptop setup for student developers and testing/viewer users
+- `docs/MISSION_OPS_QUICK_RUN.md`
+  - One-page local rehearsal and FlatSat/HIL operator checklist
+
+Standard no-HIL local regression before handoff:
+
+```bash
+./tools/validate_local.sh
+```
 
 ## Build and Run
 

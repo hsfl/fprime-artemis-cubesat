@@ -221,6 +221,24 @@ Unless the user says otherwise, agents should assume the following:
 - `fprime-gds` is the ground-tool default for the MVP demonstration.
 - `Yamcs` is a longer-term target, not the current required ground stack.
 
+## EPS/PDU Boundary Note
+
+For the MVP, the EPS service and Artemis PDU adapter boundary is intentionally
+pragmatic. The new PDU is planned for F Prime-driven testing, so some
+PDU-shaped diagnostics and rail semantics may appear near the EPS service while
+the ICD settles.
+
+This is acceptable when:
+
+- mission operators see generic EPS/rail commands rather than raw PDU packets
+- `EpsAdapter_Artemis` owns the PDU v2 protocol and channel 2 local RPC details
+- HIL notes clearly say when behavior is real PDU response versus local
+  emulation
+
+If the PDU grows into a fuller subsystem contract, refactor the adapter/service
+split then. The MVP priority is an understandable, reproducible EPS path that
+can exercise the real PDU through F Prime.
+
 ## Agent Guidance
 
 Read this document before making architecture claims, subsystem plans, or demo-flow decisions.

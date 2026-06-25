@@ -40,6 +40,18 @@ Not validated:
 
 ## Preflight
 
+For the standard one-command local validation, run:
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat
+./tools/validate_local.sh
+```
+
+That script checks generated transport headers, local Python tests, the F Prime
+native `local-demo` build, component unit tests, and the automated demo
+sequence. Use the manual steps below when you need to inspect or operate the
+demo interactively.
+
 ### macOS
 
 ```bash
@@ -70,6 +82,8 @@ Topology profile note:
 - `hil` is the default merge-safe profile.
 - `local-demo` enables the laptop demo rate-group path.
 - `./tools/run_neutron2_local_demo.sh` builds `local-demo` automatically.
+- `./tools/validate_local.sh` is the standard no-HIL regression command before
+  handing local changes to mission ops or another student.
 - after local demo work, rebuild with `-DNEUTRON2_TOPOLOGY_PROFILE=hil` before
   treating the binary as the HIL/default image.
 

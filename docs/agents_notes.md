@@ -121,6 +121,12 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - Endpoints (GDS and F' app) use `ComCcsds` framing (`space-packet-space-data-link`).
 - The Pi <-> satellite Teensy hop is channelized below the F Prime/GDS endpoint layer; `fprime-gds` still sees a byte-pure CCSDS stream.
 - RF transport carries only channel 0 and channel 1. Channel 2 is consumed locally by the satellite Teensy.
+- Transport constants are generated from `config/transport_constants.json`.
+  Regenerate with `python3 tools/generate_transport_constants.py`; do not
+  hand-edit `LinkCfg.hpp` or either Teensy `link_protocol.hpp`.
+- `./tools/validate_local.sh` checks generated headers, transport drift, local
+  Python tests, F Prime local-demo build, component UTs, and the automated
+  local demo sequence.
 - Contract documentation:
   - `ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md`
   - `GDS_Teensy/docs/transport_contract.md`
@@ -864,6 +870,11 @@ section:
 ## EPS/PDU adapter notes
 
 - F Prime now exposes the mission-facing EPS/PDU path through `EpsService` and `EpsAdapter_Artemis`.
+- The EPS/PDU boundary is intentionally pragmatic for MVP because the new PDU
+  is planned for F Prime-driven testing. Keep generic mission-facing commands
+  in `EpsService`, keep PDU v2 protocol details in `EpsAdapter_Artemis`, and
+  refactor/cull the service surface later if the proven hardware contract
+  demands a sharper split.
 - The adapter uses the PDU v2 framed UART protocol from `external/artemis-pdu/src/pdu_protocol_v2.h`.
 - The adapter no longer opens a separate Pi serial device for the PDU.
 - EPS/PDU requests are wrapped as channel 2 local RPC packets over the existing Pi <-> satellite Teensy UART.
@@ -872,11 +883,11 @@ section:
 - `TransportFailureCount` tracks bad local envelopes, timeouts, target errors, malformed PDU frames, and busy/not-connected send attempts.
 - Operator-safe commands currently exposed:
   - `REQUEST_EPS_STATUS`
-  - `PING_PDU`
-  - `REQUEST_PDU_PROTOCOL`
-  - `REQUEST_PDU_OUTPUT`
-  - `SET_PDU_OUTPUT` with `confirm=1`
-  - `POWER_CYCLE_PDU_OUTPUT` with `confirm=1`
+  - `PING_EPS_ADAPTER`
+  - `REQUEST_EPS_ADAPTER_INFO`
+  - `REQUEST_EPS_RAIL`
+  - `SET_EPS_RAIL_STATE` with `confirm=1`
+  - `POWER_CYCLE_EPS_RAIL` with `confirm=1`
   - `REQUEST_CHARGER_STATUS`
   - `SET_CHARGER_STATE` with `confirm=1`
 - Missing confirmation or unsafe/out-of-range PDU command arguments return

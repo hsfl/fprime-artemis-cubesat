@@ -183,7 +183,7 @@ The transfer protocol (header/data/end/retry-bitmap) is radio-agnostic by constr
 
 ### Seam D — Payload hardware (adapter/service pattern, already in place)
 
-`PayloadAdapter_N1Legacy` -> `PayloadService` -> `ScienceManager` -> `StorageService` already follows the repo's adapter/service convention (same as EPS/GPS/ADCS). Swapping the Neutron 1 legacy board for a future payload = new `PayloadAdapter_X` implementing the same service-facing ports. The downlink plane never sees the payload type — it sees a staged file with a size and a CRC.
+`PayloadAdapter_NeutronSim` -> `PayloadService` -> `ScienceManager` -> `StorageService` already follows the repo's adapter/service convention (same as EPS/GPS/ADCS). Swapping the local simulator for a future payload = new `PayloadAdapter_X` implementing the same service-facing ports. The downlink plane never sees the payload type; it sees a `ScienceProductDescriptor` with product ID, size, source kind, source path, and CRC. `PayloadAdapter_N1Legacy` is reference-only and is not built by default.
 
 ### Radio swap scenarios summarized
 

@@ -1,0 +1,51 @@
+{
+  "frame": {
+    "magic_0": 212,
+    "magic_1": 195,
+    "max_payload": 220,
+    "timeout_ms": 250
+  },
+  "channels": {
+    "ccsds": 0,
+    "payload": 1,
+    "teensy_local": 2,
+    "rf_count": 2,
+    "satellite_count": 3,
+    "ground_count": 2
+  },
+  "teensy_rpc": {
+    "target_pdu": 1,
+    "target_rf_status": 2,
+    "status_ok": 0,
+    "status_bad_request": 1,
+    "status_busy": 2,
+    "status_timeout": 3,
+    "status_target_error": 4,
+    "rf_op_link_stats": 1
+  },
+  "rf": {
+    "segment_magic_ccsds": 165,
+    "segment_magic_payload": 166,
+    "ack_segment_index": 255,
+    "packet_max_len": 49,
+    "segment_header_len": 5,
+    "reassembly_timeout_ms": 500,
+    "inter_segment_gap_ms": 8,
+    "ack_retries": 4,
+    "ack_timeout_ms": 80
+  },
+  "payload": {
+    "magic_0": 78,
+    "magic_1": 50,
+    "packet_data_bytes": 35
+  },
+  "command": {
+    "prefix": "#",
+    "max_len": 64,
+    "ping": "PING",
+    "link_status": "LINK_STATUS",
+    "reset_counters": "RESET_COUNTERS",
+    "pong_response": "#PONG\n",
+    "reset_ok_response": "#OK RESET_COUNTERS\n"
+  }
+}
