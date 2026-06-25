@@ -2,12 +2,21 @@
 
 This guide is for new students.
 
-Goal: get a Raspberry Pi running the F' app in this repo, using UART to talk to the Teensy.
+Goal: get the satellite Raspberry Pi running the F' app in this repo, using the
+single UART link to talk to the satellite Teensy.
+
+For the current Artemis prototype, assume the target is a Raspberry Pi Zero W.
+That means 32-bit Raspberry Pi OS and ARMv6 compatibility matter. Do not install
+a 64-bit OS for the Pi Zero W path.
+
+Normal iteration should use the Docker cross-compile flow in
+`docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md`; native builds on the Pi work,
+but they are slow and should be treated as the simple fallback/manual path.
 
 You only need to do 4 things:
 1. Flash Raspberry Pi OS
 2. Enable UART
-3. Build F' on the Pi
+3. Build or deploy F' for the Pi
 4. Run a quick test
 
 ---
@@ -30,7 +39,7 @@ Use **Raspberry Pi Imager** on your laptop.
 
 1. Open Raspberry Pi Imager.
 2. Choose device: your Pi model.
-3. Choose OS: **Raspberry Pi OS (64-bit)**.
+3. Choose OS: **Raspberry Pi OS Lite (32-bit)** for Raspberry Pi Zero W.
 4. Choose storage: your SD card.
 5. Click **Next** and complete setup.
 
@@ -97,6 +106,11 @@ If it prints a device link, UART is ready.
 
 ## 3) Build F' on the Pi
 
+This native build path is simple but slow. Prefer the cross-compile guide for
+normal development:
+
+- `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md`
+
 From the Pi:
 
 ```bash
@@ -113,8 +127,8 @@ python3 -m venv ArtemisRpiTeensy_N2/fprime-venv
 Install tools (safe to re-run):
 
 ```bash
-pip install --upgrade pip
-pip install fprime-tools
+python -m pip install --upgrade pip
+python -m pip install -r ArtemisRpiTeensy_N2/lib/fprime/requirements.txt
 ```
 
 Build:

@@ -4,10 +4,23 @@ F' implementation workspace for the Neutron 2 team.
 
 ## What this project is
 
-This repository is building a split architecture:
-- **Raspberry Pi:** runs F' flight software (`ArtemisRpiTeensy_N2`).
-- **Satellite Teensy:** baremetal bridge (`ArtemisTeensy_N2_Baremetal`) for RPi UART and RF23BP transport.
-- **Ground Teensy:** baremetal RF bridge (`GDS_Teensy`) that reassembles RF segments to USB and packetizes simple USB uplink bursts back to RF.
+This repository is building the Neutron 2 FlatSat demo on Artemis prototype
+hardware.
+
+- **Satellite Raspberry Pi:** runs the F' flight-software deployment
+  (`ArtemisRpiTeensy_N2`). This is the mission brain: modes, commands,
+  telemetry, payload collection orchestration, storage, and science downlink
+  requests.
+- **Satellite Teensy:** runs baremetal bridge/control firmware
+  (`ArtemisTeensy_N2_Baremetal`). This handles the microcontroller-side
+  subsystem/radio work: the single Pi UART, local subsystem RPC such as EPS/PDU,
+  and the RFM23BP link.
+- **Ground Teensy:** runs baremetal RF/USB bridge firmware (`GDS_Teensy`). It
+  reassembles RF packets to laptop USB streams and packetizes uplink bytes back
+  over RF.
+- **Ground laptop:** uses `fprime-gds` for the current MVP command, event, and
+  telemetry surface, plus the Neutron 2 payload viewer for reconstructed science
+  files.
 
 ## Target demo
 
@@ -38,6 +51,11 @@ Current relay milestone:
 - the Pi-side UART wrapper is `0xD4 0xC3 + channel + len + payload + crc16`
 - ground USB exposes channel 0 to `fprime-gds`; payload channel 1 is received separately by the payload receiver tool when the ground Teensy triple-serial path is enabled
 
+This UART mux exists because the current hardware implementation gives the Pi
+one practical UART path to the satellite Teensy. Keep mission behavior in F'
+components and keep UART/RF details behind adapters, `UartChannelMux`, and the
+Teensy bridge firmware.
+
 ## Repository layout
 
 - `ArtemisRpiTeensy_N2/`
@@ -47,8 +65,6 @@ Current relay milestone:
   - Satellite Teensy relay firmware workspace (Arduino CLI workflow)
 - `GDS_Teensy/`
   - Ground-station Teensy firmware workspace (Arduino CLI workflow)
-- `espcor_teensy_demo/`
-  - Legacy/reference demo code (reference-only)
 - `docs/`
   - Runbooks and integration notes
 - `docs/agents_notes.md`
@@ -59,6 +75,11 @@ Current relay milestone:
   - Windows laptop setup for student developers and testing/viewer users
 
 ## Build and Run
+
+For the Raspberry Pi Zero W, prefer the Docker cross-compile path for normal
+iteration. Native Pi builds work, but they are slow. Use `rpi_build.instructions`
+as the fallback/manual path and
+`docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md` for the faster handoff path.
 
 ### macOS Laptop
 
@@ -122,7 +143,8 @@ cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 
 ### Raspberry Pi Target
 
-Use this on the Pi after cloning the repo at `~/fprime-artemis-cubesat`.
+Use this on the Pi after cloning the repo at `~/fprime-artemis-cubesat`. This is
+the manual/native path; cross-compile is preferred for normal iteration.
 
 ```bash
 cd ~/fprime-artemis-cubesat
@@ -135,6 +157,18 @@ fprime-util build
 
 Windows note: use WSL2 for F' build/development work. Native Windows is fine for the browser/Python payload viewer path.
 
+## F Prime Version
+
+This branch is pinned to F Prime `v4.2.1`:
+
+```bash
+git -C ArtemisRpiTeensy_N2/lib/fprime describe --tags --dirty --always --long
+```
+
+Use `describe --tags` when checking the framework version. F Prime `v4.2.x` tags
+are lightweight tags, so plain `git describe` or parent `git submodule status`
+can misleadingly report a `v3.1.1-...` description for the same commit.
+
 ## Status
 
 Implemented:
@@ -146,16 +180,23 @@ Implemented:
 - RPi-hosted neutron payload simulator wired through `PayloadService` and `PayloadAdapter_NeutronSim`, including a latest-capture handoff for downlink.
 - File-backed `PayloadDownlinkManager` and payload receiver tooling for arbitrary payload bytes over channel 1.
 - Artemis EPS/PDU command adapter over channel 2 using the PDU v2 protocol from `external/artemis-pdu`, with timeout/recovery handling.
+- HIL proof of the shortened demo story over the real RPi UART, satellite
+  Teensy, RFM23BP pair, ground Teensy, `fprime-gds`, payload receiver, and
+  payload viewer path. See `docs/RF_MVP_DEMO_RUNBOOK.md`.
 
 Not implemented yet:
-- HIL validation of channel 2 against the real PDU and HIL validation of channel 0/1 over the RFM23BP pair.
+- HIL validation of channel 2 against the real PDU.
+- RF/GDS cleanup to reduce APID sequence-count warnings on lossy channel 0 traffic.
 - Broader EPS/PDU telemetry beyond the current command/status path, plus thermal, GPS, and IMU telemetry + command adapter behavior.
 - Full uplink robustness (deterministic packet-boundary extraction and retry/ack strategy).
 - Full demo-state orchestration polish for `Base Mode` -> scheduled collection -> science downlink.
-- Ground-side science-data analysis/presentation workflow finalized for the judges' demo.
+- Longer-term ground-side presentation beyond the current `fprime-gds` plus
+  Neutron 2 payload viewer MVP.
 
 ## Notes
 
 - Use `docs/archive/` for historical implementation plans, sizing memos, and RF debug notes.
-- Use `docs/build_runbook.md` for operational command sequence.
-- Use `docs/GDS_TEENSY_RUNBOOK.md` for ground Teensy + UART GDS workflow and troubleshooting.
+- Use `docs/SYSTEM_ARCHITECTURE.md` for the current Neutron 2-on-Artemis architecture.
+- Use `docs/RF_MVP_DEMO_RUNBOOK.md` for the real hardware demo flow.
+- Use `EMULATION.md` and `docs/NEUTRON2_LOCAL_EMULATION_RUNBOOK.md` for laptop-only rehearsal.
+- Use `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md` for Windows student setup.

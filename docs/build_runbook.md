@@ -130,7 +130,7 @@ Local laptop closed-loop emulation (no hardware) is documented in:
 ## Fault Handling Checks
 1. Disconnect UART cable while app is running and verify app process remains alive.
 2. Reconnect UART and verify `TeensyTransportService` telemetry continues updating.
-3. If explicitly testing legacy wrapper mode, send malformed wrapper bytes to Teensy UART and verify framing/CRC counters increase.
+3. If explicitly testing UART mux fault handling, send malformed wrapper bytes to Teensy UART and verify framing/CRC counters increase.
 
 ## Raspberry Pi Native Build + Run
 For student-friendly setup over local Wi-Fi (find Pi IP + SSH + native build + run), use:

@@ -79,7 +79,8 @@ That packet count is not impossible. But it requires a transfer protocol that ca
 
 ## What EPSCOR Proved
 
-The EPSCOR demo in `espcor_teensy_demo` did not use stock F Prime file downlink.
+The EPSCOR reference under `external/epscorc3m` did not use stock F Prime file
+downlink.
 
 It used a custom payload protocol:
 

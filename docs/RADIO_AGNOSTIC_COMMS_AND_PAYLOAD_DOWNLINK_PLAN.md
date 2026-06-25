@@ -221,6 +221,7 @@ Agent skills should live in-repo at `.claude/skills/` (auto-discovered by Claude
 - `docs/RF_MVP_DEMO_RUNBOOK.md` — frozen known-good path + smoke test
 - `docs/agents_notes.md` — session history; 2026-04-24 entries explain why ch0 keeps per-segment ACK
 - `docs/archive/rf_refactor.md` — RF reliability constraints (RadioHead 50-byte cap, segment math)
-- `espcor_teensy_demo/EPSCOR_TEENSY_DEMO.md` — proven payload protocol precedent
+- `external/epscorc3m/` — proven payload/RF protocol precedent from the current
+  Artemis baremetal reference
 - `ArtemisRpiTeensy_N2/lib/fprime/docs/reference/communication-adapter-interface.md` — Seam A contract
 - `ArtemisRpiTeensy_N2/lib/fprime/docs/user-manual/design-patterns/` — adapter/manager/subtopology patterns used here
