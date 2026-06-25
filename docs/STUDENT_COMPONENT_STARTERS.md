@@ -4,14 +4,23 @@ BLUF: service components stay mission-facing and hardware-agnostic. Hardware det
 
 Target handoff: v1.0 June 30, 2026
 
-Related architecture review:
+## Architecture Invariant
 
-- `docs/SERVICE_ADAPTER_ARCHITECTURE_REVIEW.md` records the service/adapter
-  invariant, current "real vs placeholder" map, and follow-on cleanup plan.
+The service is a hardware-agnostic contract derived from mission needs. Every
+hardware-specific fact lives below it, in exactly one adapter.
+
+If this holds, the team develops on simulated or Artemis prototype hardware now
+and swaps adapters later without rewriting mission logic. Adapter selection is a
+build-time topology choice, not a runtime command.
+
+Related docs:
+
 - `docs/MISSION_OPS_QUICK_RUN.md` is the short operator-facing run/checklist.
 - `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` explains where to look first
   when a command, event, telemetry channel, payload downlink, viewer, or
   EPS/PDU path fails.
+- `docs/archive/SERVICE_ADAPTER_ARCHITECTURE_REVIEW_2026-06-25.md` is the
+  historical record of the cleanup that established these rules.
 
 Topology profiles:
 
@@ -29,14 +38,32 @@ Topology profiles:
 | COMMS | Dennis, Joe, Kenoi | `CommsManager` | `CommsAdapter_TeensyRfm23` now, future SatNOGS adapter later | Wired |
 | EPS | Dennis, Isaiah | `EpsService` | `EpsAdapter_Artemis` now, real EPS/PDU adapter behavior as ICD settles | Wired |
 | ADCS | Piper | `AdcsService` | `AdcsAdapter_D2S2` now, future ADCS adapter later | Wired |
+| GPS | TBD | `GpsService` | `GpsAdapter_Artemis` now, future GPS hardware adapter later | Wired |
 | Thermal | TBD | `ThermalService` | `ThermalAdapter_Artemis` now, real sensor/heater path later | Wired |
+
+## Real vs Placeholder Map
+
+| Area | Current contract | Adapter / hardware | Student-facing truth |
+| --- | --- | --- | --- |
+| Mission flow | Real MVP story: base mode, scheduled collect, science ready, downlink | no hardware adapter | Work on clear mode/event/command behavior. |
+| Payload | Real enough for demo: capture duration in, `ScienceProductDescriptor` out | `PayloadAdapter_NeutronSim`; real board later | Copy this service/adapter shape. The simulator is not the flight payload. |
+| COMMS | Mission-level link/downlink state | `CommsAdapter_TeensyRfm23`; SatNOGS later | RFM23BP is the MVP path. No runtime radio switching. |
+| EPS | Generic service command/status surface | `EpsAdapter_Artemis` over channel 2 to Artemis PDU | Keep rail-command safety guards; PDU terms stay in the adapter. |
+| ADCS | Thin service placeholder | `AdcsAdapter_D2S2` | Define the mission-ops contract before real ADCS hardware. |
+| GPS | Thin service/model path | `GpsAdapter_Artemis` | Keep fix/time needs generic; do not bake in a kit-specific module. |
+| Thermal | Thin service/model path | `ThermalAdapter_Artemis` | Keep SOH/status small until the real sensor/heater path is stable. |
+| Storage/downlink | Descriptor path works end to end | adapter-owned source path + CRC | Keep descriptor metadata intact through storage, comms, and downlink. |
 
 ## Rule
 
-- Services own commands, state, telemetry, events, and CONOP-level behavior.
-- Adapters own board protocols, buses, radios, packet formats, and hardware quirks.
+- Services own commands, state, telemetry, events, and CONOP-level behavior, in
+  hardware-agnostic terms. Avoid vendor/board/bus/radio/protocol words (`PDU`,
+  `RFM23`, `D2S2`) in service ports or telemetry names.
+- Adapters own board protocols, buses, radios, packet formats, timing quirks, and hardware constants.
 - Mission talks to services, not directly to payload boards, radios, EPS/PDU firmware, or ADCS hardware.
-- Missing hardware gets a simulator adapter selected by topology profile, not a runtime command.
+- One adapter per subsystem, wired at build time. Missing hardware gets a simulator adapter selected by topology profile, not a runtime command.
+- New subsystem work copies the payload pattern first: `PayloadService` plus `PayloadAdapter_NeutronSim`.
+- Design the service from mission operations first. The adapter can wait for hardware; the contract should not.
 
 ## Base Case
 

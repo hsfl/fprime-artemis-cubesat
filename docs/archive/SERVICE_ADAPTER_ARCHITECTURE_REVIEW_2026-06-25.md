@@ -1,4 +1,9 @@
-# Service/Adapter Architecture Review
+# Service/Adapter Architecture Review (Archived Snapshot)
+
+> Archived 2026-06-25. Point-in-time record of the service/adapter cleanup.
+> The durable rules — architecture invariant, real-vs-placeholder map, and
+> subsystem guardrails — now live in `docs/STUDENT_COMPONENT_STARTERS.md`.
+> Open follow-ups live in `docs/agents_notes.md`. Kept here for history only.
 
 Date: 2026-06-25
 

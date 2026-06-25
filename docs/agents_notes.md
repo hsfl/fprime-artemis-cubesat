@@ -896,3 +896,23 @@ section:
 - Missing confirmation or unsafe/out-of-range PDU command arguments return
   `VALIDATION_ERROR` in GDS command history and emit `EpsCommandRejected`.
 - Burn-wire and torque-coil commands are intentionally not exposed through `EpsService` yet; add those only with a dedicated HIL/runbook procedure.
+
+## Service/Adapter Cleanup — Open Follow-ups (2026-06-25)
+
+The service/adapter architecture cleanup landed: de-leaked `EpsService`,
+`ScienceProductDescriptor` threaded end to end, active/async payload adapter,
+`MissionManager`-validated mode transitions with a unit test, and
+single-source transport constants (`config/transport_constants.json` +
+`tools/generate_transport_constants.py` + `tools/check_transport_constants.py`).
+Durable rules now live in `docs/STUDENT_COMPONENT_STARTERS.md`; the dated review
+snapshot is archived at
+`docs/archive/SERVICE_ADAPTER_ARCHITECTURE_REVIEW_2026-06-25.md`.
+
+Still open (not demo-blocking):
+- Define one standard service-to-adapter port-pair template, modeled on the
+  payload path, so the thin subsystems (ADCS, GPS, thermal, comms) get a
+  consistent contract when they are built out.
+- Add focused unit tests for `ScienceManager` and `CommsManager` decision logic
+  (`MissionManager` mode validation is already covered).
+- Optional hardening: wire `tools/check_transport_constants.py` into CI or a
+  pre-commit hook so generated transport headers cannot drift from the manifest.
