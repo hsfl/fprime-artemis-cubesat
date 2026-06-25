@@ -28,7 +28,10 @@ void MissionManager::run_handler(FwIndexType portNum, U32 context) {
 
 void MissionManager::modeUpdateIn_handler(FwIndexType portNum, const Components::MissionMode& mode, U32 detail) {
     static_cast<void>(portNum);
-    static_cast<void>(detail);
+    if (!this->isAllowedTransition(mode)) {
+        this->log_WARNING_LO_ModeUpdateRejected(mode, this->m_currentMode, detail);
+        return;
+    }
     this->m_currentMode = mode;
     this->log_ACTIVITY_HI_ModeChanged(this->m_currentMode);
 }
@@ -54,6 +57,31 @@ void MissionManager::SCHEDULE_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmd
         this->collectionRequestOut_out(0, delaySeconds);
     }
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+bool MissionManager::isAllowedTransition(Components::MissionMode requested) const {
+    if (requested == this->m_currentMode) {
+        return true;
+    }
+    if (requested == Components::MissionMode::BASE) {
+        return true;
+    }
+
+    switch (this->m_currentMode) {
+        case Components::MissionMode::BASE:
+            return (requested == Components::MissionMode::COLLECTION_PENDING) ||
+                   (requested == Components::MissionMode::COLLECTING);
+        case Components::MissionMode::COLLECTION_PENDING:
+            return requested == Components::MissionMode::COLLECTING;
+        case Components::MissionMode::COLLECTING:
+            return requested == Components::MissionMode::SCIENCE_READY;
+        case Components::MissionMode::SCIENCE_READY:
+            return requested == Components::MissionMode::DOWNLINKING;
+        case Components::MissionMode::DOWNLINKING:
+            return requested == Components::MissionMode::BASE;
+        default:
+            return false;
+    }
 }
 
 }  // namespace Components

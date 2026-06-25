@@ -23,53 +23,53 @@ module Components {
         @ Request latest EPS status from adapter
         async command REQUEST_EPS_STATUS
 
-        @ Ping the PDU protocol endpoint
-        async command PING_PDU
+        @ Ping the EPS adapter endpoint
+        async command PING_EPS_ADAPTER
 
-        @ Request PDU protocol version/capabilities
-        async command REQUEST_PDU_PROTOCOL
+        @ Request EPS adapter protocol version/capabilities
+        async command REQUEST_EPS_ADAPTER_INFO
 
-        @ Request one PDU output state by output ID
-        async command REQUEST_PDU_OUTPUT(outputId: U32)
+        @ Request one EPS rail state by rail/output ID
+        async command REQUEST_EPS_RAIL(outputId: U32)
 
-        @ Set one safe PDU output state. confirm must be 1.
-        async command SET_PDU_OUTPUT(outputId: U32, desiredState: U32, confirm: U32)
+        @ Set one safe EPS rail state. confirm must be 1.
+        async command SET_EPS_RAIL_STATE(outputId: U32, desiredState: U32, confirm: U32)
 
-        @ Power-cycle one safe PDU output. confirm must be 1.
-        async command POWER_CYCLE_PDU_OUTPUT(outputId: U32, offMs: U32, confirm: U32)
+        @ Power-cycle one safe EPS rail. confirm must be 1.
+        async command POWER_CYCLE_EPS_RAIL(outputId: U32, offMs: U32, confirm: U32)
 
-        @ Request PDU charger status
+        @ Request EPS charger status
         async command REQUEST_CHARGER_STATUS
 
-        @ Set PDU charger state. confirm must be 1.
+        @ Set EPS charger state. confirm must be 1.
         async command SET_CHARGER_STATE(enable: U32, confirm: U32)
 
         @ Current EPS state
         telemetry EpsHealthState: Components.HealthState
 
         @ Latest adapter link state. 0=not configured, 1=queued to Teensy, 2=protocol OK, 3=error, 4=busy.
-        telemetry PduLinkState: U32
+        telemetry AdapterLinkState: U32
 
-        @ Latest PDU protocol version
-        telemetry PduProtocolVersion: U32
+        @ Latest EPS adapter protocol version
+        telemetry AdapterProtocolVersion: U32
 
-        @ Latest switched output bitmap from summary status
-        telemetry PduOutputBitmap: U32
+        @ Latest switched rail bitmap from summary status
+        telemetry RailStateBitmap: U32
 
-        @ Latest PDU reset cause
-        telemetry PduResetCause: U32
+        @ Latest adapter reset cause
+        telemetry AdapterResetCause: U32
 
-        @ Latest PDU fault bitmap
-        telemetry PduFaultBitmap: U32
+        @ Latest adapter fault bitmap
+        telemetry AdapterFaultBitmap: U32
 
-        @ Latest PDU uptime in seconds
-        telemetry PduUptimeSeconds: U32
+        @ Latest adapter uptime in seconds
+        telemetry AdapterUptimeSeconds: U32
 
-        @ Latest PDU protocol status code
-        telemetry LastPduStatus: U32
+        @ Latest adapter protocol status code
+        telemetry LastAdapterStatus: U32
 
-        @ Latest PDU opcode handled by adapter
-        telemetry LastPduOpcode: U32
+        @ Latest adapter opcode handled
+        telemetry LastAdapterOpcode: U32
 
         @ Service heartbeat
         telemetry ServiceHeartbeat: U32

@@ -196,19 +196,23 @@ void PayloadDownlinkManager::packetIn_handler(FwIndexType portNum, Fw::Buffer& f
     this->handleRetryRequest(fwBuffer.getData(), fwBuffer.getSize());
 }
 
-void PayloadDownlinkManager::downlinkRequestIn_handler(FwIndexType portNum, U32 key) {
+void PayloadDownlinkManager::downlinkRequestIn_handler(FwIndexType portNum,
+                                                       U32 productId,
+                                                       U32 productBytes,
+                                                       const Components::ScienceProductSource& sourceKind,
+                                                       const Fw::StringBase& sourcePath,
+                                                       U32 sourceCrc) {
     static_cast<void>(portNum);
-    if (key == 0U) {
+    static_cast<void>(sourceKind);
+    if (productBytes == 0U) {
         this->failTransfer(8U, 0U);
         return;
     }
-    const U32 byteCount = key;
-    const U32 productId = static_cast<U32>(this->m_transferId) + 1U;
-    if (byteCount > MAX_BLOB_BYTES) {
-        this->failTransfer(2U, byteCount);
+    if (productBytes > MAX_BLOB_BYTES) {
+        this->failTransfer(2U, productBytes);
         return;
     }
-    if (!this->resetTransfer(productId, byteCount)) {
+    if (!this->resetTransfer(productId, productBytes, sourcePath.toChar(), sourceCrc)) {
         return;
     }
     this->log_ACTIVITY_HI_PayloadDownlinkStarted(this->m_productId, this->m_totalBytes, this->m_totalPackets);
@@ -231,7 +235,7 @@ void PayloadDownlinkManager::START_PAYLOAD_DOWNLINK_cmdHandler(FwOpcodeType opCo
         return;
     }
 
-    if (!this->resetTransfer(productId, normalizedBytes)) {
+    if (!this->resetTransfer(productId, normalizedBytes, std::string(), 0U)) {
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
         return;
     }
@@ -255,8 +259,11 @@ void PayloadDownlinkManager::GET_PAYLOAD_STATUS_cmdHandler(FwOpcodeType opCode, 
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
-bool PayloadDownlinkManager::resetTransfer(U32 productId, U32 byteCount) {
-    if (!this->prepareSource(byteCount)) {
+bool PayloadDownlinkManager::resetTransfer(U32 productId,
+                                           U32 byteCount,
+                                           const std::string& preferredSourcePath,
+                                           U32 expectedSourceCrc) {
+    if (!this->prepareSource(byteCount, preferredSourcePath)) {
         const U32 reason = (this->m_lastError != 0U) ? this->m_lastError : 7U;
         this->failTransfer(reason, byteCount);
         return false;
@@ -264,6 +271,10 @@ bool PayloadDownlinkManager::resetTransfer(U32 productId, U32 byteCount) {
     U16 sourceCrc = 0;
     if (!this->computeSourceCrc(byteCount, sourceCrc)) {
         this->failTransfer(7U, byteCount);
+        return false;
+    }
+    if ((expectedSourceCrc != 0U) && (static_cast<U16>(expectedSourceCrc) != sourceCrc)) {
+        this->failTransfer(11U, expectedSourceCrc);
         return false;
     }
 
@@ -292,9 +303,16 @@ bool PayloadDownlinkManager::resetTransfer(U32 productId, U32 byteCount) {
     return true;
 }
 
-bool PayloadDownlinkManager::prepareSource(U32 byteCount) {
+bool PayloadDownlinkManager::prepareSource(U32 byteCount, const std::string& preferredSourcePath) {
     U32 sourceBytes = 0;
-    const std::string sourcePath = resolvePayloadSource(sourceBytes);
+    std::string sourcePath;
+    if (!preferredSourcePath.empty()) {
+        if (fileSizeBytes(preferredSourcePath, sourceBytes)) {
+            sourcePath = preferredSourcePath;
+        }
+    } else {
+        sourcePath = resolvePayloadSource(sourceBytes);
+    }
     if (sourcePath.empty()) {
         this->m_sourceReady = false;
         this->m_sourceBytes = 0;

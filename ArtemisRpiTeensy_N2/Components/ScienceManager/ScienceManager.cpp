@@ -42,12 +42,17 @@ void ScienceManager::requestIn_handler(FwIndexType portNum, U32 delaySeconds) {
     this->log_ACTIVITY_HI_CollectionTriggered(delaySeconds);
 }
 
-void ScienceManager::payloadStatusIn_handler(FwIndexType portNum, U32 productBytes) {
+void ScienceManager::payloadStatusIn_handler(FwIndexType portNum,
+                                             U32 productId,
+                                             U32 productBytes,
+                                             const Components::ScienceProductSource& sourceKind,
+                                             const Fw::StringBase& sourcePath,
+                                             U32 sourceCrc) {
     static_cast<void>(portNum);
     this->m_collectionCount += 1;
     this->log_ACTIVITY_HI_ScienceProductReady(productBytes);
     if (this->isConnected_scienceProductOut_OutputPort(0)) {
-        this->scienceProductOut_out(0, productBytes);
+        this->scienceProductOut_out(0, productId, productBytes, sourceKind, sourcePath, sourceCrc);
     }
     if (this->isConnected_missionModeOut_OutputPort(0)) {
         this->missionModeOut_out(0, Components::MissionMode::SCIENCE_READY, productBytes);

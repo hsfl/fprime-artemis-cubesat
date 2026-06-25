@@ -17,7 +17,7 @@ module Components {
     FAIL = 3
   }
 
-  @ EPS/PDU adapter request opcode.
+  @ EPS adapter request opcode. Specific adapters map these logical requests to hardware protocols.
   enum EpsRequest : U8 {
     GET_SUMMARY_STATUS = 0
     PING = 1
@@ -35,14 +35,40 @@ module Components {
   @ Payload capture request in seconds.
   port PayloadCaptureRequest(durationSeconds: U32)
 
-  @ Science product handoff, represented by product size in bytes for the MVP.
-  port ScienceProduct(productBytes: U32)
+  @ Source class for a produced science dataset.
+  enum ScienceProductSource : U8 {
+    UNKNOWN = 0
+    NEUTRON_SIM = 1
+    REAL_PAYLOAD = 2
+    TEST = 3
+  }
+
+  @ Science product descriptor handoff. The source path is an adapter-owned local file path.
+  port ScienceProductDescriptor(
+    productId: U32,
+    productBytes: U32,
+    sourceKind: ScienceProductSource,
+    sourcePath: string size 192,
+    sourceCrc: U32
+  )
 
   @ Storage-to-comms science availability notification.
-  port ScienceDownlinkReady(productBytes: U32)
+  port ScienceDownlinkReady(
+    productId: U32,
+    productBytes: U32,
+    sourceKind: ScienceProductSource,
+    sourcePath: string size 192,
+    sourceCrc: U32
+  )
 
   @ Comms-to-storage science downlink request.
-  port ScienceDownlinkRequest(productBytes: U32)
+  port ScienceDownlinkRequest(
+    productId: U32,
+    productBytes: U32,
+    sourceKind: ScienceProductSource,
+    sourcePath: string size 192,
+    sourceCrc: U32
+  )
 
   @ Normalized subsystem health report with subsystem-specific detail.
   port HealthStatus(healthState: HealthState, detail: U32)
@@ -64,20 +90,20 @@ module Components {
     lastError: U32
   )
 
-  @ EPS/PDU command from mission-facing EPS service to hardware adapter.
+  @ EPS command from mission-facing EPS service to hardware adapter.
   port EpsCommand(epsRequest: EpsRequest, outputId: U8, commandedState: U8, durationMs: U16)
 
-  @ EPS/PDU status from hardware adapter to mission-facing EPS service.
+  @ EPS status from hardware adapter to mission-facing EPS service.
   port EpsStatus(
     healthState: HealthState,
     linkState: U8,
-    protocolVersion: U8,
-    outputBitmap: U16,
+    adapterProtocolVersion: U8,
+    railStateBitmap: U16,
     resetCause: U8,
     faultBitmap: U8,
     uptimeSeconds: U32,
     capabilities: U8,
-    pduStatus: U8,
-    lastOpcode: U8
+    adapterStatus: U8,
+    lastAdapterOpcode: U8
   )
 }

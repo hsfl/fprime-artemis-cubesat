@@ -12,7 +12,7 @@ module Components {
         sync input port run: Svc.Sched
 
         @ Science product input from ScienceManager
-        sync input port requestIn: Components.ScienceProduct
+        sync input port requestIn: Components.ScienceProductDescriptor
 
         @ Downlink request input from CommsManager
         sync input port downlinkRequestIn: Components.ScienceDownlinkRequest

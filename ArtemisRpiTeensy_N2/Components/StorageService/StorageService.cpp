@@ -36,6 +36,10 @@ StorageService::StorageService(const char* const compName)
       m_historyCount(0),
       m_removedDatasetFiles(0),
       m_removeDatasetFailures(0),
+      m_lastProductId(0),
+      m_lastSourceKind(Components::ScienceProductSource::UNKNOWN),
+      m_lastSourcePath(""),
+      m_lastSourceCrc(0),
       m_history{} {}
 
 StorageService::~StorageService() {}
@@ -60,23 +64,51 @@ void StorageService::run_handler(FwIndexType portNum, U32 context) {
     }
 }
 
-void StorageService::requestIn_handler(FwIndexType portNum, U32 productBytes) {
+void StorageService::requestIn_handler(FwIndexType portNum,
+                                       U32 productId,
+                                       U32 productBytes,
+                                       const Components::ScienceProductSource& sourceKind,
+                                       const Fw::StringBase& sourcePath,
+                                       U32 sourceCrc) {
     static_cast<void>(portNum);
     this->m_storedProducts += 1;
+    this->m_lastProductId = productId;
     this->m_lastProductSize = productBytes;
-    this->rememberProduct(this->m_storedProducts, this->m_lastProductSize);
+    this->m_lastSourceKind = sourceKind;
+    this->m_lastSourcePath = sourcePath;
+    this->m_lastSourceCrc = sourceCrc;
+    this->rememberProduct(this->m_storedProducts, this->m_lastProductId, this->m_lastProductSize);
     this->log_ACTIVITY_HI_ScienceStored(this->m_storedProducts, this->m_lastProductSize);
     if (this->isConnected_downlinkReadyOut_OutputPort(0)) {
-        this->downlinkReadyOut_out(0, this->m_lastProductSize);
+        this->downlinkReadyOut_out(0,
+                                   this->m_lastProductId,
+                                   this->m_lastProductSize,
+                                   this->m_lastSourceKind,
+                                   this->m_lastSourcePath,
+                                   this->m_lastSourceCrc);
     }
 }
 
-void StorageService::downlinkRequestIn_handler(FwIndexType portNum, U32 productBytes) {
+void StorageService::downlinkRequestIn_handler(FwIndexType portNum,
+                                               U32 productId,
+                                               U32 productBytes,
+                                               const Components::ScienceProductSource& sourceKind,
+                                               const Fw::StringBase& sourcePath,
+                                               U32 sourceCrc) {
     static_cast<void>(portNum);
-    static_cast<void>(productBytes);
+    this->m_lastProductId = productId;
+    this->m_lastProductSize = productBytes;
+    this->m_lastSourceKind = sourceKind;
+    this->m_lastSourcePath = sourcePath;
+    this->m_lastSourceCrc = sourceCrc;
     this->log_ACTIVITY_LO_DownlinkPrepared(this->m_lastProductSize);
     if (this->isConnected_downlinkReadyOut_OutputPort(0)) {
-        this->downlinkReadyOut_out(0, this->m_lastProductSize);
+        this->downlinkReadyOut_out(0,
+                                   this->m_lastProductId,
+                                   this->m_lastProductSize,
+                                   this->m_lastSourceKind,
+                                   this->m_lastSourcePath,
+                                   this->m_lastSourceCrc);
     }
 }
 
@@ -110,6 +142,10 @@ void StorageService::REMOVE_OLD_DATASETS_cmdHandler(FwOpcodeType opCode, U32 cmd
     this->m_removeDatasetFailures = failedFiles;
     this->m_storedProducts = 0;
     this->m_lastProductSize = 0;
+    this->m_lastProductId = 0;
+    this->m_lastSourceKind = Components::ScienceProductSource::UNKNOWN;
+    this->m_lastSourcePath = "";
+    this->m_lastSourceCrc = 0;
     this->clearHistory();
 
     this->tlmWrite_StoredProducts(this->m_storedProducts);
@@ -121,8 +157,8 @@ void StorageService::REMOVE_OLD_DATASETS_cmdHandler(FwOpcodeType opCode, U32 cmd
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
-void StorageService::rememberProduct(U32 productCount, U32 productBytes) {
-    this->m_history[this->m_historyNext] = ProductRecord{productCount, productBytes};
+void StorageService::rememberProduct(U32 productCount, U32 productId, U32 productBytes) {
+    this->m_history[this->m_historyNext] = ProductRecord{productCount, productId, productBytes};
     this->m_historyNext = (this->m_historyNext + 1U) % HISTORY_CAPACITY;
     if (this->m_historyCount < HISTORY_CAPACITY) {
         this->m_historyCount += 1;
@@ -160,7 +196,7 @@ void StorageService::clearHistory() {
     this->m_historyNext = 0;
     this->m_historyCount = 0;
     for (U32 index = 0; index < HISTORY_CAPACITY; ++index) {
-        this->m_history[index] = ProductRecord{0, 0};
+        this->m_history[index] = ProductRecord{0, 0, 0};
     }
 }
 

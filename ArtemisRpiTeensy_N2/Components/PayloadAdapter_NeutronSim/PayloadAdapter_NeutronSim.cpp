@@ -26,7 +26,9 @@ PayloadAdapter_NeutronSim::PayloadAdapter_NeutronSim(const char* const compName)
       m_lastTotalCounts(0),
       m_lastSaaRows(0),
       m_lastProductBytes(0),
-      m_lastExitStatus(0) {}
+      m_lastExitStatus(0),
+      m_lastProductId(0),
+      m_lastProductCrc(0) {}
 
 PayloadAdapter_NeutronSim::~PayloadAdapter_NeutronSim() {}
 
@@ -45,6 +47,11 @@ void PayloadAdapter_NeutronSim::requestIn_handler(FwIndexType portNum, U32 durat
     if ((summary.exitStatus == 0U) && !summary.outputPath.empty() && !publishLatestCapture(summary.outputPath)) {
         summary.exitStatus = 126U;
     }
+    U32 sourceCrc = 0;
+    if ((summary.exitStatus == 0U) && !computeFileCrc16(summary.outputPath, sourceCrc)) {
+        summary.exitStatus = 125U;
+    }
+    const U32 productId = this->m_lastProductId + 1U;
 
     this->m_lastDurationSeconds = durationSeconds;
     this->m_lastRowsCaptured = summary.rows;
@@ -52,6 +59,8 @@ void PayloadAdapter_NeutronSim::requestIn_handler(FwIndexType portNum, U32 durat
     this->m_lastSaaRows = summary.saaRows;
     this->m_lastProductBytes = summary.productBytes;
     this->m_lastExitStatus = summary.exitStatus;
+    this->m_lastProductId = (summary.exitStatus == 0U) ? productId : this->m_lastProductId;
+    this->m_lastProductCrc = sourceCrc;
 
     this->tlmWrite_LastDurationSeconds(this->m_lastDurationSeconds);
     this->tlmWrite_LastRowsCaptured(this->m_lastRowsCaptured);
@@ -59,16 +68,21 @@ void PayloadAdapter_NeutronSim::requestIn_handler(FwIndexType portNum, U32 durat
     this->tlmWrite_LastSaaRows(this->m_lastSaaRows);
     this->tlmWrite_LastProductBytes(this->m_lastProductBytes);
     this->tlmWrite_LastExitStatus(this->m_lastExitStatus);
+    this->tlmWrite_LastProductId(this->m_lastProductId);
+    this->tlmWrite_LastProductCrc(this->m_lastProductCrc);
 
     if (summary.exitStatus == 0U) {
-        this->log_ACTIVITY_HI_CaptureComplete(durationSeconds, summary.rows, summary.productBytes);
+        this->log_ACTIVITY_HI_CaptureComplete(durationSeconds, summary.rows, summary.productBytes, productId);
         if (this->isConnected_statusOut_OutputPort(0)) {
-            this->statusOut_out(0, summary.productBytes);
+            const Fw::String sourcePath(summary.outputPath.c_str());
+            this->statusOut_out(
+                0, productId, summary.productBytes, Components::ScienceProductSource::NEUTRON_SIM, sourcePath, sourceCrc);
         }
     } else {
         this->log_WARNING_HI_CaptureFailed(durationSeconds, summary.exitStatus);
         if (this->isConnected_statusOut_OutputPort(0)) {
-            this->statusOut_out(0, 0);
+            const Fw::String emptyPath("");
+            this->statusOut_out(0, 0U, 0U, Components::ScienceProductSource::UNKNOWN, emptyPath, 0U);
         }
     }
 }
@@ -167,6 +181,29 @@ bool PayloadAdapter_NeutronSim::publishLatestCapture(const std::string& outputPa
     }
     (void)::unlink(DEFAULT_LATEST_PAYLOAD);
     return (::symlink(outputPath.c_str(), DEFAULT_LATEST_PAYLOAD) == 0);
+}
+
+bool PayloadAdapter_NeutronSim::computeFileCrc16(const std::string& outputPath, U32& crcOut) {
+    FILE* file = std::fopen(outputPath.c_str(), "rb");
+    if (file == nullptr) {
+        return false;
+    }
+
+    U16 crc = 0xFFFFU;
+    int value = 0;
+    while ((value = std::fgetc(file)) != EOF) {
+        crc ^= static_cast<U16>(static_cast<U8>(value)) << 8U;
+        for (U8 bit = 0; bit < 8; bit++) {
+            if ((crc & 0x8000U) != 0) {
+                crc = static_cast<U16>((crc << 1U) ^ 0x1021U);
+            } else {
+                crc = static_cast<U16>(crc << 1U);
+            }
+        }
+    }
+    (void)std::fclose(file);
+    crcOut = static_cast<U32>(crc);
+    return true;
 }
 
 U32 PayloadAdapter_NeutronSim::parseU32(const std::string& value) {
