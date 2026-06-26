@@ -115,6 +115,47 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - Build status:
   - `./tools/arduino-cli/build.sh` passes for `teensy:avr:teensy41`
 
+### 4) Live HIL Bench Status (2026-06-26)
+- Current bench smoke test is working after reflashing both Teensys with
+  explicit physical upload IDs:
+  - ground Teensy: `usb:100000`
+  - satellite Teensy: `usb:2100000`
+- Current USB map after the successful channel-1 smoke:
+  - ground channel 0 / GDS: `/dev/cu.usbmodem115551201`
+  - ground debug: `/dev/cu.usbmodem115551203`
+  - ground channel 1 / payload receiver: `/dev/cu.usbmodem115551205`
+  - satellite debug: `/dev/cu.usbmodem115502201`
+- Confirmed smoke evidence:
+  - Pi service runs `/home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0`
+  - `fprime-gds` over ground channel 0 can command the Pi through RF
+  - `missionManager.PING` dispatches, logs `MissionManager pong`, and completes
+  - retried full-flow commands can reach the Pi over the lossy RF path
+  - Pi-side demo flow can produce and store a simulated science payload
+  - Pi-side `PayloadDownlinkManager` can report `PayloadDownlinkComplete` and
+    `DownlinkFinished` for the staged payload
+  - `payload_receiver.py` reconstructs channel-1 RF payload files on the laptop
+- RF looks significantly healthier than the earlier wedged state, but it is
+  still lossy; use command retries and journal/GDS confirmation instead of
+  assuming a single command send landed.
+- Channel-1 receiver issue fixed/verified:
+  - Root cause candidate was channel 1 using best-effort RF sends while channel 0
+    used per-segment ACK/retry. Payload channel 1 now uses the same RF
+    segment ACK/retry path.
+  - Successful run: 2026-06-26 11:28 HST, receiver output
+    `complete: product=2 transfer=1 bytes=67 packets=2 crc=0x890e`
+    at `/tmp/neutron_hil/rf_ack_payload_20260626_112746/payload_5s.bin`.
+  - Local reconstructed SHA-256 matched Pi
+    `/tmp/neutron_payload_captures/latest_payload.bin`:
+    `be92e314c7f40c8b708920ac882c9eb0a1a9f4efccd1ef5d95684d99d822dfa1`.
+  - Channel-specific counters confirmed the route:
+    satellite `payload_uart_rx=110 payload_rf_tx_msg=4 payload_rf_tx_seg=4`;
+    ground `payload_rf_rx_msg=4 payload_rf_rx_seg=4 payload_uart_tx=110`.
+- Useful fallback for demo display only:
+  - a Pi-copied payload can be shown in
+    `ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py`
+  - label that as a Pi-side science-product fallback, not a verified channel-1
+    RF reconstruction
+
 ## Important Clarification: Framing
 
 - End-to-end payload is still opaque F' bytes.

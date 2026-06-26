@@ -338,3 +338,12 @@ Stop and gather evidence before:
 `ArtemisRpiTeensy_N2/logs/.../recv.bin` is channel 0 GDS traffic. The science
 payload proof is the output file from `tools/payload_receiver.py` or the local
 simulator capture.
+
+If the Pi reports `PayloadDownlinkComplete` but `payload_receiver.py` reports
+`received=0 total=0 missing=0`, the payload was not proven. Check channel-1
+Teensy counters:
+
+- satellite `payload_uart_rx` and `payload_rf_tx_msg`
+- ground `payload_rf_rx_msg` and `payload_uart_tx`
+
+All four must advance during a real channel-1 downlink.

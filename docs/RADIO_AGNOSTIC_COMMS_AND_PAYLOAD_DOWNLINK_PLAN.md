@@ -26,14 +26,19 @@ Two goals coexist in this repo and they must not be confused:
 
 Practical test for any change: *"If we swapped the RFM23BP for a 256-byte-MTU UART radio tomorrow, how many files would this change touch?"* If the answer includes mission logic, the design is wrong.
 
-## Current State (updated 2026-06-18)
+## Current State (updated 2026-06-26)
 
 - F Prime deployment (`ArtemisRpiTeensy_N2`) runs on Pi Zero W, cross-compiled, systemd-managed.
 - End-to-end RF command path proven: `fprime-gds` -> ground Teensy -> RFM23BP -> satellite Teensy -> Pi `/dev/serial0` -> `missionManager.PING` pong.
 - GDS decodes valid 128-byte CCSDS TM frames after per-segment RF ACK was added; residual APID sequence warnings = occasional dropped packets under sustained downlink.
+- Channel 1 payload traffic also uses per-segment RF ACK/retry. This is required
+  because payload-level retry only works after the receiver gets enough header
+  state to know what is missing.
 - Demo path is frozen per `docs/RF_MVP_DEMO_RUNBOOK.md`.
 - `REQUEST_SCIENCE_DOWNLINK` now starts the file-backed channel 1 `PayloadDownlinkManager` path and reports completion through `CommsManager` after the payload manager completes.
-- The channel 1 path transfers real staged payload bytes but is not a stock GDS `#Downlink` file transfer.
+- The channel 1 path transfers real staged payload bytes and reconstructs them
+  with `tools/payload_receiver.py`, but is not a stock GDS `#Downlink` file
+  transfer.
 - `docs/PAYLOAD_DOWNLINK_PROTOCOL_ADVICE.md` already concluded: do not push the ~40,368-byte product through stock `Svc.FileDownlink` over this link. This plan is the concrete architecture for its "Option 1".
 
 ## The Core Problem: One Medium, Two Traffic Classes
