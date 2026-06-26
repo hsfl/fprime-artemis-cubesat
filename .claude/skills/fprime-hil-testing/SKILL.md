@@ -90,6 +90,63 @@ If system Python lacks `pyserial`, use the repo venv Python after activating
 If WSL2 does not show the Teensy devices, attach them from Windows with
 `usbipd-win`, then re-run the WSL2 checks.
 
+## Teensy Upload Targeting: Mandatory
+
+Never upload to a Teensy by `/dev/cu.usbmodem*`, `/dev/tty.usbmodem*`,
+`/dev/ttyACM*`, or `/dev/ttyUSB*` when more than one Teensy is connected.
+Arduino/Teensy CLI can report success while using auto-search against the wrong
+physical board. This can leave the ground board enumerating as triple serial but
+running the wrong or stale behavior, which looks like a dead RF/GDS link.
+
+Before any Teensy upload, list physical Teensy upload IDs:
+
+```bash
+arduino-cli board list
+```
+
+Current HIL bench mapping:
+
+```text
+ground Teensy upload ID    = usb:100000
+satellite Teensy upload ID = usb:2100000
+```
+
+Use those `usb:*` IDs for uploads:
+
+```bash
+cd GDS_Teensy
+./tools/arduino-cli/build.sh
+./tools/arduino-cli/upload.sh usb:100000
+
+cd ../ArtemisTeensy_N2_Baremetal
+./tools/arduino-cli/build.sh
+./tools/arduino-cli/upload.sh usb:2100000
+```
+
+If an upload wrapper refuses a serial-device upload while multiple Teensys are
+connected, that refusal is correct. Do not bypass it by retrying with another
+`/dev/*` serial path. Use `arduino-cli board list`, identify the `usb:*` target,
+and upload by that physical ID.
+
+After flashing, prove behavior, not just enumeration:
+
+```bash
+python3 -m serial.tools.list_ports -v
+timeout 5 cat <ground-debug-port>
+timeout 5 cat <sat-debug-port>
+```
+
+Expected post-flash proof:
+
+```text
+ground debug prints [GDS_Teensy] counters
+ground data port shows nonzero raw bytes when GDS is not attached and RF downlink is active
+satellite debug prints [ArtemisTeensy] counters
+```
+
+Do not treat triple-serial enumeration alone as proof that the correct ground
+firmware is running.
+
 ## Stage 1: Ground Teensy
 
 Tell the user to plug in only the ground/GDS Teensy, then enumerate serial
@@ -130,12 +187,14 @@ Only reflash when the user asks for it or evidence says the firmware is wrong:
 
 ```bash
 cd GDS_Teensy
+arduino-cli board list
 ./tools/arduino-cli/build.sh
-./tools/arduino-cli/upload.sh <ground-port-or-upload-id>
+./tools/arduino-cli/upload.sh usb:100000
 ```
 
-After flashing, re-enumerate serial ports. Do not continue until the ground
-port roles are clear.
+After flashing, re-enumerate serial ports and sample the debug stream. Do not
+continue until the ground port roles are clear and the ground debug stream is
+printing `[GDS_Teensy] counters`.
 
 ## Stage 2: Satellite Teensy
 
@@ -147,8 +206,9 @@ Build and upload only to the satellite board:
 
 ```bash
 cd ArtemisTeensy_N2_Baremetal
+arduino-cli board list
 ./tools/arduino-cli/build.sh
-./tools/arduino-cli/upload.sh <satellite-port-or-upload-id>
+./tools/arduino-cli/upload.sh usb:2100000
 ```
 
 Stop before repeated upload retries if Teensy needs a physical PROGRAM press.
@@ -268,6 +328,39 @@ rf_tx_drops / rf_retries / rf_ack_timeouts rise
 That points at ground-to-satellite RF uplink/ACK behavior, not the payload
 receiver.
 
+If GDS shows no live decoded bytes after flashing the ground Teensy, check the
+ground ports before blaming RF:
+
+```bash
+lsof "$GDS_DATA_PORT" "$GDS_DEBUG_PORT" "$GDS_PAYLOAD_PORT" 2>/dev/null || true
+timeout 5 cat "$GDS_DEBUG_PORT"
+timeout 5 cat "$GDS_DATA_PORT"
+```
+
+If the ground triple serial ports enumerate but all ground streams are silent
+while the satellite debug stream shows increasing `rf_tx_pkt`, suspect a wrong
+or stale ground upload first. Reflash the ground board by physical upload ID:
+
+```bash
+cd GDS_Teensy
+./tools/arduino-cli/build.sh
+./tools/arduino-cli/upload.sh usb:100000
+```
+
+Known false-positive failure mode:
+
+```text
+ground enumerates as Triple Serial
+GDS HTTP opens
+event.log/channel.log/recv.bin remain empty
+satellite rf_tx_pkt, rf_retries, rf_ack_timeouts keep increasing
+ground debug/data streams are silent
+```
+
+This is not a GDS green-dot problem. It means the ground bridge is not producing
+data for GDS, commonly because the wrong board was targeted by an ambiguous
+serial-device upload.
+
 ## Stage 7: Payload Receiver And Viewer
 
 The viewer only displays files. It does not reconstruct downlinks. Start
@@ -373,6 +466,7 @@ Stop and ask before:
 
 - repeated Teensy upload attempts that need manual PROGRAM
 - reflashing when evidence does not point to stale or wrong firmware
+- uploading by serial device path while multiple Teensys are connected
 - killing an existing GDS process the user asked to keep open
 - switching from `n2pi` to `artemis-pi` when the user named a specific target
 - claiming merge/demo readiness from a single narrow smoke test
@@ -381,6 +475,7 @@ Never treat these as payload proof:
 
 ```text
 triple serial exists
+ground triple serial exists but debug/data streams are silent
 fprime-cli returned success
 GDS recv.bin exists
 viewer opened with no capture file
