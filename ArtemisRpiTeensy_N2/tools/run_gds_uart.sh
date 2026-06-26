@@ -9,8 +9,11 @@ DICT_BASENAME="${DEPLOYMENT_NAME}TopologyDictionary.json"
 PORT="/dev/cu.usbmodem115551201"
 BAUD="115200"
 GUI_PORT="5050"
+# Default to the cross-compiled dictionary that matches the binary running on the Pi,
+# not the host (Darwin) build. The Pi runs the pi-zero-w-armv6hf cross build.
 FRAMING="space-packet-space-data-link"
-DICT_PATH="${ROOT_DIR}/build-artifacts/Darwin/${DEPLOYMENT_NAME}/dict/${DICT_BASENAME}"
+CROSS_TARGET="pi-zero-w-armv6hf"
+DICT_PATH="${ROOT_DIR}/build-artifacts/${CROSS_TARGET}/${DEPLOYMENT_NAME}/dict/${DICT_BASENAME}"
 DRY_RUN="false"
 
 usage() {
@@ -74,7 +77,8 @@ if [[ ! -f "$VENV_ACTIVATE" ]]; then
 fi
 
 if [[ ! -f "$DICT_PATH" ]]; then
-  AUTO_DICT="$(find "$ROOT_DIR/build-artifacts" -type f -path "*/${DEPLOYMENT_NAME}/dict/${DICT_BASENAME}" | head -1 || true)"
+  # Fall back to the most recently built dictionary so we don't silently pick a stale host build.
+  AUTO_DICT="$(find "$ROOT_DIR/build-artifacts" -type f -path "*/${DEPLOYMENT_NAME}/dict/${DICT_BASENAME}" -exec stat -f '%m %N' {} + 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2- || true)"
   if [[ -n "${AUTO_DICT}" ]]; then
     DICT_PATH="$AUTO_DICT"
   else
