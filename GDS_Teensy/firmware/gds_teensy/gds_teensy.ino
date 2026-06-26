@@ -112,6 +112,18 @@ void debugPrintCounters(const char* prefix) {
   SerialUSB1.print(g_linkCounters.rfRxSegments);
   SerialUSB1.print(" rf_tx_seg=");
   SerialUSB1.print(g_linkCounters.rfTxSegments);
+  SerialUSB1.print(" payload_uart_rx=");
+  SerialUSB1.print(g_linkCounters.payloadUartRxBytes);
+  SerialUSB1.print(" payload_uart_tx=");
+  SerialUSB1.print(g_linkCounters.payloadUartTxBytes);
+  SerialUSB1.print(" payload_rf_rx_msg=");
+  SerialUSB1.print(g_linkCounters.payloadRfRxMessages);
+  SerialUSB1.print(" payload_rf_tx_msg=");
+  SerialUSB1.print(g_linkCounters.payloadRfTxMessages);
+  SerialUSB1.print(" payload_rf_rx_seg=");
+  SerialUSB1.print(g_linkCounters.payloadRfRxSegments);
+  SerialUSB1.print(" payload_rf_tx_seg=");
+  SerialUSB1.print(g_linkCounters.payloadRfTxSegments);
   SerialUSB1.print(" rf_tx_drops=");
   SerialUSB1.print(g_linkCounters.rfTxDrops);
   SerialUSB1.print(" rf_msg_id_gaps=");
