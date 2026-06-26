@@ -10,6 +10,11 @@ TEST(Nominal, AcceptsNominalDemoStoryTransitions) {
     tester.testAcceptsNominalDemoStoryTransitions();
 }
 
+TEST(Nominal, AcceptsManualDownlinkRetryFromBase) {
+    Components::MissionManagerTester tester;
+    tester.testAcceptsManualDownlinkRetryFromBase();
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

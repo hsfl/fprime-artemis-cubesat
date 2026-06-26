@@ -44,7 +44,7 @@ class PayloadDownlinkManager final : public PayloadDownlinkManagerComponentBase 
 
     bool resetTransfer(U32 productId, U32 byteCount, const std::string& preferredSourcePath, U32 expectedSourceCrc);
     bool prepareSource(U32 byteCount, const std::string& preferredSourcePath);
-    void emitTelemetry();
+    void emitTelemetry(bool force = false);
     void emitStatus();
     void writeProgressTelemetry();
     void emitCompletionSummaryIfDue();
@@ -83,6 +83,8 @@ class PayloadDownlinkManager final : public PayloadDownlinkManagerComponentBase 
     bool m_sourceReady;
     U32 m_sourceBytes;
     std::string m_sourcePath;
+    U32 m_runTicks;
+    U32 m_lastTelemetryTick;
     U32 m_retryPackets[MAX_RETRY_PACKETS];
     U32 m_retryCount;
     U32 m_retryCursor;

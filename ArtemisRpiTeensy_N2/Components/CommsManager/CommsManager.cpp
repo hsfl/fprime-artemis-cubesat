@@ -7,6 +7,7 @@ CommsManager::CommsManager(const char* const compName)
       m_linkState(0),
       m_rssiDbm(-120),
       m_rssiPingPending(false),
+      m_linkStatusPollPending(false),
       m_pendingProductId(0),
       m_pendingScienceBytes(0),
       m_pendingSourceKind(Components::ScienceProductSource::UNKNOWN),
@@ -49,8 +50,11 @@ void CommsManager::run_handler(FwIndexType portNum, U32 context) {
 
 void CommsManager::linkStatusIn_handler(FwIndexType portNum, U32 key) {
     static_cast<void>(portNum);
+    const U32 previousLinkState = this->m_linkState;
     this->m_linkState = key;
-    this->log_ACTIVITY_LO_LinkStateUpdated(this->m_linkState, this->m_rssiDbm);
+    if (this->m_linkState != previousLinkState) {
+        this->log_ACTIVITY_LO_LinkStateUpdated(this->m_linkState, this->m_rssiDbm);
+    }
 }
 
 void CommsManager::scienceReadyIn_handler(FwIndexType portNum,
@@ -69,8 +73,12 @@ void CommsManager::scienceReadyIn_handler(FwIndexType portNum,
 
 void CommsManager::adapterStatusIn_handler(FwIndexType portNum, U32 key) {
     static_cast<void>(portNum);
+    const U32 previousLinkState = this->m_linkState;
     this->m_linkState = key;
-    this->log_ACTIVITY_LO_LinkStateUpdated(this->m_linkState, this->m_rssiDbm);
+    if ((this->m_linkState != previousLinkState) || this->m_linkStatusPollPending || this->m_rssiPingPending) {
+        this->log_ACTIVITY_LO_LinkStateUpdated(this->m_linkState, this->m_rssiDbm);
+    }
+    this->m_linkStatusPollPending = false;
     if (this->m_rssiPingPending) {
         this->log_ACTIVITY_HI_LinkRssiPing(this->m_linkState, this->m_rssiDbm, this->m_linkPollCount);
         this->m_rssiPingPending = false;
@@ -157,6 +165,7 @@ void CommsManager::REQUEST_SCIENCE_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 
 
 void CommsManager::REQUEST_LINK_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     this->m_linkPollCount += 1U;
+    this->m_linkStatusPollPending = true;
     this->requestAdapterStatus();
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }

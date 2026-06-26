@@ -9,6 +9,8 @@ TeensyTransportService::TeensyTransportService(const char* const compName)
       m_downlinkFrames(0),
       m_lastDownlinkFrames(0),
       m_lastProgressHeartbeat(0),
+      m_lastTelemetryHeartbeat(0),
+      m_lastReportedLinkState(LinkState::DOWN),
       m_linkState(LinkState::DOWN) {}
 
 TeensyTransportService::~TeensyTransportService() {}
@@ -23,15 +25,17 @@ void TeensyTransportService::run_handler(FwIndexType portNum, U32 context) {
     static_cast<void>(context);
     this->m_linkHeartbeat += 1;
     this->updateLinkState();
+    const bool linkStateChanged = this->m_linkState != this->m_lastReportedLinkState;
 
-    this->tlmWrite_LinkHeartbeat(this->m_linkHeartbeat);
-    this->tlmWrite_UplinkFrames(this->m_uplinkFrames);
-    this->tlmWrite_DownlinkFrames(this->m_downlinkFrames);
+    if (linkStateChanged || this->shouldWriteTelemetry()) {
+        this->writeTelemetry();
+        this->m_lastTelemetryHeartbeat = this->m_linkHeartbeat;
+    }
 
-    if (this->isConnected_linkStatusOut_OutputPort(0)) {
+    if (linkStateChanged && this->isConnected_linkStatusOut_OutputPort(0)) {
         this->linkStatusOut_out(0, static_cast<U32>(this->m_linkState));
     }
-    if (this->isConnected_sohStatusOut_OutputPort(0)) {
+    if (linkStateChanged && this->isConnected_sohStatusOut_OutputPort(0)) {
         Components::HealthState health = Components::HealthState::UNKNOWN;
         if (this->m_linkState == LinkState::LOCKED) {
             health = Components::HealthState::OK;
@@ -41,6 +45,9 @@ void TeensyTransportService::run_handler(FwIndexType portNum, U32 context) {
             health = Components::HealthState::FAIL;
         }
         this->sohStatusOut_out(0, health, static_cast<U32>(this->m_linkState));
+    }
+    if (linkStateChanged) {
+        this->m_lastReportedLinkState = this->m_linkState;
     }
 }
 
@@ -65,6 +72,8 @@ void TeensyTransportService::RESET_COUNTERS_cmdHandler(FwOpcodeType opCode, U32 
     this->m_downlinkFrames = 0;
     this->m_lastDownlinkFrames = 0;
     this->m_lastProgressHeartbeat = 0;
+    this->m_lastTelemetryHeartbeat = 0;
+    this->m_lastReportedLinkState = LinkState::DOWN;
     this->m_linkState = LinkState::DOWN;
     this->log_ACTIVITY_LO_CountersReset();
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
@@ -93,6 +102,17 @@ void TeensyTransportService::updateLinkState() {
     } else {
         this->m_linkState = LinkState::LOCKED;
     }
+}
+
+void TeensyTransportService::writeTelemetry() {
+    this->tlmWrite_LinkHeartbeat(this->m_linkHeartbeat);
+    this->tlmWrite_UplinkFrames(this->m_uplinkFrames);
+    this->tlmWrite_DownlinkFrames(this->m_downlinkFrames);
+}
+
+bool TeensyTransportService::shouldWriteTelemetry() const {
+    constexpr U32 TELEMETRY_PERIOD_TICKS = 30U;
+    return (this->m_linkHeartbeat - this->m_lastTelemetryHeartbeat) >= TELEMETRY_PERIOD_TICKS;
 }
 
 }  // namespace Components

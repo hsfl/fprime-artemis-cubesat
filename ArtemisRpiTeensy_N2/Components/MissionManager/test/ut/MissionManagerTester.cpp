@@ -16,17 +16,19 @@ MissionManagerTester::~MissionManagerTester() {
 void MissionManagerTester::testRejectsInvalidServiceTransition() {
     this->clearHistory();
 
-    this->invoke_to_modeUpdateIn(0, Components::MissionMode::DOWNLINKING, 42);
+    this->invoke_to_modeUpdateIn(0, Components::MissionMode::SCIENCE_READY, 42);
 
     ASSERT_EVENTS_ModeUpdateRejected_SIZE(1);
     ASSERT_EVENTS_ModeUpdateRejected(
         0,
-        Components::MissionMode::DOWNLINKING,
+        Components::MissionMode::SCIENCE_READY,
         Components::MissionMode::BASE,
         42);
     ASSERT_EVENTS_ModeChanged_SIZE(0);
 
-    this->invoke_to_run(0, 0);
+    for (U32 tick = 0; tick < 30; ++tick) {
+        this->invoke_to_run(0, 0);
+    }
     ASSERT_TLM_CurrentMode(0, Components::MissionMode::BASE);
 }
 
@@ -56,9 +58,24 @@ void MissionManagerTester::testAcceptsNominalDemoStoryTransitions() {
     ASSERT_EVENTS_ModeChanged(3, Components::MissionMode::DOWNLINKING);
     ASSERT_EVENTS_ModeChanged(4, Components::MissionMode::BASE);
 
-    this->invoke_to_run(0, 0);
-    ASSERT_TLM_CurrentMode(0, Components::MissionMode::BASE);
-    ASSERT_TLM_LastScheduledDelaySeconds(0, 10);
+    ASSERT_TLM_CurrentMode(0, Components::MissionMode::COLLECTION_PENDING);
+    ASSERT_TLM_CurrentMode(4, Components::MissionMode::BASE);
+    ASSERT_TLM_LastScheduledDelaySeconds(4, 10);
+}
+
+void MissionManagerTester::testAcceptsManualDownlinkRetryFromBase() {
+    this->clearHistory();
+
+    this->invoke_to_modeUpdateIn(1, Components::MissionMode::DOWNLINKING, 128);
+
+    ASSERT_EVENTS_ModeUpdateRejected_SIZE(0);
+    ASSERT_EVENTS_ModeChanged_SIZE(1);
+    ASSERT_EVENTS_ModeChanged(0, Components::MissionMode::DOWNLINKING);
+
+    this->invoke_to_modeUpdateIn(1, Components::MissionMode::BASE, 0);
+
+    ASSERT_EVENTS_ModeChanged_SIZE(2);
+    ASSERT_EVENTS_ModeChanged(1, Components::MissionMode::BASE);
 }
 
 }  // namespace Components

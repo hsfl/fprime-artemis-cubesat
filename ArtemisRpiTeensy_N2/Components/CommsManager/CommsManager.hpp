@@ -42,6 +42,7 @@ class CommsManager final : public CommsManagerComponentBase {
     U32 m_linkState;
     I32 m_rssiDbm;
     bool m_rssiPingPending;
+    bool m_linkStatusPollPending;
     U32 m_pendingProductId;
     U32 m_pendingScienceBytes;
     Components::ScienceProductSource m_pendingSourceKind;

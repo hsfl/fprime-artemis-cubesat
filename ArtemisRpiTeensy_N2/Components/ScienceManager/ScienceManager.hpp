@@ -23,10 +23,13 @@ class ScienceManager final : public ScienceManagerComponentBase {
     void START_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void CONFIGURE_CAPTURE_DURATION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
     void SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
+    void writeTelemetry();
 
     U32 m_pendingDelaySeconds;
     U32 m_captureDurationSeconds;
     U32 m_collectionCount;
+    U32 m_runTicks;
+    U32 m_lastTelemetryTick;
 };
 
 }  // namespace Components
