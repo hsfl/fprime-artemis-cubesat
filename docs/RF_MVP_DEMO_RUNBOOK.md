@@ -248,6 +248,13 @@ complete: product=<id> transfer=<id> bytes=<n> packets=<n> crc=0x.... output=/tm
 `retry:` lines are normal on the RF link. The receiver only passes when it prints
 `complete:` and exits `0`.
 
+Channel 1 now uses the same RF per-segment ACK/retry path as channel 0. If the
+Pi logs `PayloadDownlinkComplete` but the receiver prints
+`incomplete: received=0 total=0 missing=0`, treat it as a Teensy relay/channel-1
+fault, not as successful payload proof. Check the debug counters for
+`payload_uart_rx`, `payload_rf_tx_msg`, `payload_rf_rx_msg`, and
+`payload_uart_tx`.
+
 ## Start Payload Viewer
 
 Terminal 3: start the viewer. The viewer can be started before or after the
@@ -522,6 +529,10 @@ That means the RF/GDS stream is lossy, not necessarily dead. Confirm the command
 or event reached the Pi before retrying.
 
 ## Fast Troubleshooting
+
+For a broader layer map across GDS, F Prime services, UART mux, RF, payload
+receiver, viewer, and EPS/PDU channel 2, see
+`docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md`.
 
 If GDS opens but commands do not reach the Pi:
 

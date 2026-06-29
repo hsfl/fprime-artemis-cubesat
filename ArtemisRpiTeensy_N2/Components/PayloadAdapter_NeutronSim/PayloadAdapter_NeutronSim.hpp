@@ -30,6 +30,7 @@ class PayloadAdapter_NeutronSim final : public PayloadAdapter_NeutronSimComponen
     static std::string shellQuote(const std::string& value);
     static void parseSummaryLine(const std::string& line, CaptureSummary& summary);
     static bool publishLatestCapture(const std::string& outputPath);
+    static bool computeFileCrc16(const std::string& outputPath, U32& crcOut);
     static U32 parseU32(const std::string& value);
 
     U32 m_lastDurationSeconds;
@@ -38,6 +39,8 @@ class PayloadAdapter_NeutronSim final : public PayloadAdapter_NeutronSimComponen
     U32 m_lastSaaRows;
     U32 m_lastProductBytes;
     U32 m_lastExitStatus;
+    U32 m_lastProductId;
+    U32 m_lastProductCrc;
 };
 
 }  // namespace Components

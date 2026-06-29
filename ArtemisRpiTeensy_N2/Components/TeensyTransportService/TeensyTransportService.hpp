@@ -24,12 +24,16 @@ class TeensyTransportService final : public TeensyTransportServiceComponentBase 
     void LINK_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void RESET_COUNTERS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void updateLinkState();
+    void writeTelemetry();
+    bool shouldWriteTelemetry() const;
 
     U32 m_linkHeartbeat;
     U32 m_uplinkFrames;
     U32 m_downlinkFrames;
     U32 m_lastDownlinkFrames;
     U32 m_lastProgressHeartbeat;
+    U32 m_lastTelemetryHeartbeat;
+    LinkState m_lastReportedLinkState;
     LinkState m_linkState;
 };
 

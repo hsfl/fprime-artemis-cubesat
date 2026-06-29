@@ -1,6 +1,9 @@
 #ifndef ARTEMIS_TEENSY_LINK_PROTOCOL_HPP
 #define ARTEMIS_TEENSY_LINK_PROTOCOL_HPP
 
+// Generated from config/transport_constants.json by tools/generate_transport_constants.py.
+// Do not hand-edit constants here; update the manifest and regenerate.
+
 #include <Arduino.h>
 
 namespace link_protocol {

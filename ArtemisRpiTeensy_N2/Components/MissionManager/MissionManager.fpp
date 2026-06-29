@@ -41,6 +41,9 @@ module Components {
         @ Mission mode transition
         event ModeChanged(mode: Components.MissionMode) severity activity high format "Mission mode changed to {}"
 
+        @ Invalid service-requested mission mode transition rejected
+        event ModeUpdateRejected(requested: Components.MissionMode, current: Components.MissionMode, detail: U32) severity warning low format "Rejected mode update requested={} current={} detail={}"
+
         @ Ping response event
         event Pong(token: U32, count: U32) severity activity low format "MissionManager pong token={} count={}"
 

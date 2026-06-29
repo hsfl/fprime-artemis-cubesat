@@ -106,6 +106,11 @@ module ArtemisRpiTeensyDeployment {
     stack size Default.STACK_SIZE \
     priority 28
 
+  instance payloadAdapterNeutronSim: Components.PayloadAdapter_NeutronSim base id 0x10021000 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 27
+
   # ----------------------------------------------------------------------
   # Queued component instances
   # ----------------------------------------------------------------------
@@ -126,8 +131,6 @@ module ArtemisRpiTeensyDeployment {
   instance comDriver: Drv.LinuxUartDriver base id 0x10014000
 
   instance epsAdapterArtemis: Components.EpsAdapter_Artemis base id 0x10020000
-
-  instance payloadAdapterNeutronSim: Components.PayloadAdapter_NeutronSim base id 0x10021000
 
   instance adcsAdapterD2S2: Components.AdcsAdapter_D2S2 base id 0x10022000
 

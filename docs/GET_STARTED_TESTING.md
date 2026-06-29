@@ -17,6 +17,8 @@ Use these docs first:
   - good for command/event/telemetry and payload-flow rehearsal
 - `docs/NEUTRON2_LOCAL_EMULATION_RUNBOOK.md`
   - manual walkthrough of the local Neutron 2 demo story
+- `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md`
+  - layer-by-layer software troubleshooting when a runbook fails
 - `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md`
   - Windows student setup
   - native Windows for browser/viewer tasks

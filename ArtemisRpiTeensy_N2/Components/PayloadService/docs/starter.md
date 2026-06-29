@@ -19,19 +19,20 @@ Power note: the real payload will require 28 V. PDU owns rail control; Payload o
 - `REQUEST_PAYLOAD_STATUS`
 - `CONFIGURE_PAYLOAD(sampleCount, periodMs)`
 - `START_PAYLOAD_COLLECTION(collectionId)`
-- `SET_PAYLOAD_SIM_MODE(enable)`
+- `SCIENCE_CAPTURE(durationSeconds)`
 
 ## Abstraction Rule
 
 - `PayloadService` owns commands, collection state, telemetry, and events.
 - Current adapter behavior is emulated on the Raspberry Pi.
+- Adapter choice is a topology/build profile decision, not a runtime command.
 - Future real payload protocol goes in an adapter, not this service.
 
 ## Next Work
 
 - Verify whether payload power is external.
 - Confirm the 28 V payload power contract with PDU.
-- Keep simulated mode usable until the board arrives.
+- Keep the emulated adapter usable until the board arrives.
 - Keep generated science data small for the RFM23BP link.
 - Replace emulated adapter behavior when the payload ICD is real.
 

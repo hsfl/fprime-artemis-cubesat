@@ -17,21 +17,21 @@ class EpsService final : public EpsServiceComponentBase {
         FwIndexType portNum,
         const Components::HealthState& health,
         U8 linkState,
-        U8 protocolVersion,
-        U16 outputBitmap,
+        U8 adapterProtocolVersion,
+        U16 railStateBitmap,
         U8 resetCause,
         U8 faultBitmap,
         U32 uptimeSeconds,
         U8 capabilities,
-        U8 pduStatus,
-        U8 lastOpcode
+        U8 adapterStatus,
+        U8 lastAdapterOpcode
     ) override;
     void REQUEST_EPS_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
-    void PING_PDU_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
-    void REQUEST_PDU_PROTOCOL_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
-    void REQUEST_PDU_OUTPUT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 outputId) override;
-    void SET_PDU_OUTPUT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 outputId, U32 state, U32 confirm) override;
-    void POWER_CYCLE_PDU_OUTPUT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 outputId, U32 offMs, U32 confirm) override;
+    void PING_EPS_ADAPTER_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+    void REQUEST_EPS_ADAPTER_INFO_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+    void REQUEST_EPS_RAIL_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 outputId) override;
+    void SET_EPS_RAIL_STATE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 outputId, U32 state, U32 confirm) override;
+    void POWER_CYCLE_EPS_RAIL_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 outputId, U32 offMs, U32 confirm) override;
     void REQUEST_CHARGER_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void SET_CHARGER_STATE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 enable, U32 confirm) override;
 
@@ -50,7 +50,7 @@ class EpsService final : public EpsServiceComponentBase {
     U8 m_faultBitmap;
     U32 m_uptimeSeconds;
     U8 m_capabilities;
-    U8 m_lastPduStatus;
+    U8 m_lastAdapterStatus;
     U8 m_lastOpcode;
     U32 m_serviceHeartbeat;
 };

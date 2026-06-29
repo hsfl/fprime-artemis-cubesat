@@ -12,7 +12,7 @@ EpsService::EpsService(const char* const compName)
       m_faultBitmap(0),
       m_uptimeSeconds(0),
       m_capabilities(0),
-      m_lastPduStatus(0),
+      m_lastAdapterStatus(0),
       m_lastOpcode(0),
       m_serviceHeartbeat(0) {}
 
@@ -42,26 +42,26 @@ void EpsService::adapterStatusIn_handler(
     FwIndexType portNum,
     const Components::HealthState& health,
     U8 linkState,
-    U8 protocolVersion,
-    U16 outputBitmap,
+    U8 adapterProtocolVersion,
+    U16 railStateBitmap,
     U8 resetCause,
     U8 faultBitmap,
     U32 uptimeSeconds,
     U8 capabilities,
-    U8 pduStatus,
-    U8 lastOpcode
+    U8 adapterStatus,
+    U8 lastAdapterOpcode
 ) {
     static_cast<void>(portNum);
     this->m_health = health;
     this->m_linkState = linkState;
-    this->m_protocolVersion = protocolVersion;
-    this->m_outputBitmap = outputBitmap;
+    this->m_protocolVersion = adapterProtocolVersion;
+    this->m_outputBitmap = railStateBitmap;
     this->m_resetCause = resetCause;
     this->m_faultBitmap = faultBitmap;
     this->m_uptimeSeconds = uptimeSeconds;
     this->m_capabilities = capabilities;
-    this->m_lastPduStatus = pduStatus;
-    this->m_lastOpcode = lastOpcode;
+    this->m_lastAdapterStatus = adapterStatus;
+    this->m_lastOpcode = lastAdapterOpcode;
     this->writeTelemetry();
     this->log_ACTIVITY_LO_EpsStatusUpdated(this->m_health, this->m_outputBitmap, this->m_faultBitmap);
     if (this->isConnected_sohStatusOut_OutputPort(0)) {
@@ -74,17 +74,17 @@ void EpsService::REQUEST_EPS_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) 
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
-void EpsService::PING_PDU_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+void EpsService::PING_EPS_ADAPTER_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     this->sendRequest(Components::EpsRequest::PING, 0, 0, 0);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
-void EpsService::REQUEST_PDU_PROTOCOL_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+void EpsService::REQUEST_EPS_ADAPTER_INFO_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     this->sendRequest(Components::EpsRequest::GET_PROTOCOL_INFO, 0, 0, 0);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
-void EpsService::REQUEST_PDU_OUTPUT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 outputId) {
+void EpsService::REQUEST_EPS_RAIL_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 outputId) {
     if (outputId > MAX_U8_VALUE) {
         this->log_WARNING_LO_EpsCommandRejected(1, outputId);
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
@@ -94,7 +94,7 @@ void EpsService::REQUEST_PDU_OUTPUT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, 
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
-void EpsService::SET_PDU_OUTPUT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 outputId, U32 state, U32 confirm) {
+void EpsService::SET_EPS_RAIL_STATE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 outputId, U32 state, U32 confirm) {
     if (confirm != CONFIRM_VALUE) {
         this->log_WARNING_LO_EpsCommandRejected(2, confirm);
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
@@ -109,7 +109,7 @@ void EpsService::SET_PDU_OUTPUT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
-void EpsService::POWER_CYCLE_PDU_OUTPUT_cmdHandler(
+void EpsService::POWER_CYCLE_EPS_RAIL_cmdHandler(
     FwOpcodeType opCode,
     U32 cmdSeq,
     U32 outputId,
@@ -163,14 +163,14 @@ bool EpsService::isSafeOutputId(U32 outputId) const {
 
 void EpsService::writeTelemetry() {
     this->tlmWrite_EpsHealthState(this->m_health);
-    this->tlmWrite_PduLinkState(this->m_linkState);
-    this->tlmWrite_PduProtocolVersion(this->m_protocolVersion);
-    this->tlmWrite_PduOutputBitmap(this->m_outputBitmap);
-    this->tlmWrite_PduResetCause(this->m_resetCause);
-    this->tlmWrite_PduFaultBitmap(this->m_faultBitmap);
-    this->tlmWrite_PduUptimeSeconds(this->m_uptimeSeconds);
-    this->tlmWrite_LastPduStatus(this->m_lastPduStatus);
-    this->tlmWrite_LastPduOpcode(this->m_lastOpcode);
+    this->tlmWrite_AdapterLinkState(this->m_linkState);
+    this->tlmWrite_AdapterProtocolVersion(this->m_protocolVersion);
+    this->tlmWrite_RailStateBitmap(this->m_outputBitmap);
+    this->tlmWrite_AdapterResetCause(this->m_resetCause);
+    this->tlmWrite_AdapterFaultBitmap(this->m_faultBitmap);
+    this->tlmWrite_AdapterUptimeSeconds(this->m_uptimeSeconds);
+    this->tlmWrite_LastAdapterStatus(this->m_lastAdapterStatus);
+    this->tlmWrite_LastAdapterOpcode(this->m_lastOpcode);
     this->tlmWrite_ServiceHeartbeat(this->m_serviceHeartbeat);
 }
 

@@ -13,8 +13,18 @@ class StorageService final : public StorageServiceComponentBase {
   private:
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void run_handler(FwIndexType portNum, U32 context) override;
-    void requestIn_handler(FwIndexType portNum, U32 productBytes) override;
-    void downlinkRequestIn_handler(FwIndexType portNum, U32 productBytes) override;
+    void requestIn_handler(FwIndexType portNum,
+                           U32 productId,
+                           U32 productBytes,
+                           const Components::ScienceProductSource& sourceKind,
+                           const Fw::StringBase& sourcePath,
+                           U32 sourceCrc) override;
+    void downlinkRequestIn_handler(FwIndexType portNum,
+                                   U32 productId,
+                                   U32 productBytes,
+                                   const Components::ScienceProductSource& sourceKind,
+                                   const Fw::StringBase& sourcePath,
+                                   U32 sourceCrc) override;
     void REPORT_STORAGE_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void REPORT_LATEST_DATASET_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void REPORT_STORAGE_HISTORY_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
@@ -22,10 +32,11 @@ class StorageService final : public StorageServiceComponentBase {
 
     struct ProductRecord {
         U32 productCount;
+        U32 productId;
         U32 productBytes;
     };
 
-    void rememberProduct(U32 productCount, U32 productBytes);
+    void rememberProduct(U32 productCount, U32 productId, U32 productBytes);
     void reportLatest() const;
     void reportHistory() const;
     U32 historyDepth() const;
@@ -40,6 +51,10 @@ class StorageService final : public StorageServiceComponentBase {
     U32 m_historyCount;
     U32 m_removedDatasetFiles;
     U32 m_removeDatasetFailures;
+    U32 m_lastProductId;
+    Components::ScienceProductSource m_lastSourceKind;
+    Fw::String m_lastSourcePath;
+    U32 m_lastSourceCrc;
     ProductRecord m_history[HISTORY_CAPACITY];
 };
 

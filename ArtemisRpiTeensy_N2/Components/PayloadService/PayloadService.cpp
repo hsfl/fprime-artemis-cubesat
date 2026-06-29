@@ -9,7 +9,6 @@ PayloadService::PayloadService(const char* const compName)
       m_lastCaptureDurationSeconds(600),
       m_sampleCount(1),
       m_samplePeriodMs(1000),
-      m_simModeEnabled(1),
       m_serviceHeartbeat(0) {}
 
 PayloadService::~PayloadService() {}
@@ -33,7 +32,6 @@ void PayloadService::run_handler(FwIndexType portNum, U32 context) {
     this->tlmWrite_LastCaptureDurationSeconds(this->m_lastCaptureDurationSeconds);
     this->tlmWrite_SampleCount(this->m_sampleCount);
     this->tlmWrite_SamplePeriodMs(this->m_samplePeriodMs);
-    this->tlmWrite_SimModeEnabled(this->m_simModeEnabled);
     this->tlmWrite_ServiceHeartbeat(this->m_serviceHeartbeat);
 }
 
@@ -47,12 +45,17 @@ void PayloadService::requestIn_handler(FwIndexType portNum, U32 durationSeconds)
     }
 }
 
-void PayloadService::adapterStatusIn_handler(FwIndexType portNum, U32 productBytes) {
+void PayloadService::adapterStatusIn_handler(FwIndexType portNum,
+                                             U32 productId,
+                                             U32 productBytes,
+                                             const Components::ScienceProductSource& sourceKind,
+                                             const Fw::StringBase& sourcePath,
+                                             U32 sourceCrc) {
     static_cast<void>(portNum);
     this->m_lastPayloadValue = productBytes;
     this->log_ACTIVITY_LO_PayloadStatusUpdated(productBytes);
     if (this->isConnected_statusOut_OutputPort(0)) {
-        this->statusOut_out(0, productBytes);
+        this->statusOut_out(0, productId, productBytes, sourceKind, sourcePath, sourceCrc);
     }
     if (this->isConnected_sohStatusOut_OutputPort(0)) {
         const Components::HealthState health =
@@ -95,12 +98,6 @@ void PayloadService::SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
     if (this->isConnected_adapterRequestOut_OutputPort(0)) {
         this->adapterRequestOut_out(0, durationSeconds);
     }
-    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
-}
-
-void PayloadService::SET_PAYLOAD_SIM_MODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 enable) {
-    this->m_simModeEnabled = (enable == 0U) ? 0U : 1U;
-    this->log_ACTIVITY_HI_PayloadSimModeChanged(this->m_simModeEnabled);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 

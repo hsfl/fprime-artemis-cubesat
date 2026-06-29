@@ -15,13 +15,13 @@ module Components {
         sync input port requestIn: Components.CollectionRequest
 
         @ Payload status input from PayloadService
-        sync input port payloadStatusIn: Components.ScienceProduct
+        sync input port payloadStatusIn: Components.ScienceProductDescriptor
 
         @ Forwarded collection request to PayloadService
         output port payloadRequestOut: Components.PayloadCaptureRequest
 
         @ Science product handoff to StorageService
-        output port scienceProductOut: Components.ScienceProduct
+        output port scienceProductOut: Components.ScienceProductDescriptor
 
         @ Mission mode update output
         output port missionModeOut: Components.MissionModeUpdate

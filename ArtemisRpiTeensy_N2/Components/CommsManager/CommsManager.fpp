@@ -30,7 +30,7 @@ module Components {
         output port downlinkRequestOut: Components.ScienceDownlinkRequest
 
         @ Generic payload downlink request output
-        output port payloadDownlinkRequestOut: Svc.Ping
+        output port payloadDownlinkRequestOut: Components.ScienceDownlinkRequest
 
         @ Adapter request output
         output port adapterRequestOut: Svc.Ping
@@ -50,17 +50,11 @@ module Components {
         @ Poll the radio adapter and log current RSSI in dBm
         async command PING_LINK_RSSI
 
-        @ Select logical radio backend. 0=RFM23BP, 1=SatNOGS.
-        async command SELECT_RADIO_BACKEND(backend: U32)
-
         @ Current link state
         telemetry LinkState: U32
 
         @ Pending science bytes
         telemetry PendingScienceBytes: U32
-
-        @ Selected logical radio backend
-        telemetry ActiveRadioBackend: U32
 
         @ Number of explicit link polls
         telemetry LinkPollCount: U32
@@ -82,9 +76,6 @@ module Components {
 
         @ RSSI ping event
         event LinkRssiPing(linkState: U32, rssiDbm: I32, pollCount: U32) severity activity high format "Comms link RSSI ping state={} rssi={}dBm polls={}"
-
-        @ Radio backend selection event
-        event RadioBackendSelected(backend: U32) severity activity high format "Radio backend selected {}"
 
         @ Port for requesting the current time
         time get port timeCaller

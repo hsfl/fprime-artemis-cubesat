@@ -14,8 +14,8 @@ module Components {
         @ Retry/control packets from the ground payload receiver.
         sync input port packetIn: Fw.BufferSend
 
-        @ Mission downlink request carrying the staged generic blob byte count.
-        async input port downlinkRequestIn: Svc.Ping
+        @ Mission downlink request carrying the staged science-product descriptor.
+        async input port downlinkRequestIn: Components.ScienceDownlinkRequest
 
         @ Payload protocol packets to the UART channel mux.
         output port packetOut: Fw.BufferSend

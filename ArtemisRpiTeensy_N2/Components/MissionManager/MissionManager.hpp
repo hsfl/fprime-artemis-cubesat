@@ -18,10 +18,14 @@ class MissionManager final : public MissionManagerComponentBase {
     void PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 token) override;
     void SCHEDULE_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 delaySeconds) override;
 
+    bool isAllowedTransition(Components::MissionMode requested) const;
+    void writeTelemetry();
+
     Components::MissionMode m_currentMode;
     U32 m_lastScheduledDelaySeconds;
     U32 m_pingCount;
     U32 m_modeHeartbeat;
+    U32 m_lastTelemetryHeartbeat;
 };
 
 }  // namespace Components

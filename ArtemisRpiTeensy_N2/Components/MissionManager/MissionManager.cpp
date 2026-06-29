@@ -7,7 +7,8 @@ MissionManager::MissionManager(const char* const compName)
       m_currentMode(Components::MissionMode::BASE),
       m_lastScheduledDelaySeconds(0),
       m_pingCount(0),
-      m_modeHeartbeat(0) {}
+      m_modeHeartbeat(0),
+      m_lastTelemetryHeartbeat(0) {}
 
 MissionManager::~MissionManager() {}
 
@@ -20,27 +21,34 @@ void MissionManager::run_handler(FwIndexType portNum, U32 context) {
     static_cast<void>(portNum);
     static_cast<void>(context);
     this->m_modeHeartbeat += 1;
-    this->tlmWrite_CurrentMode(this->m_currentMode);
-    this->tlmWrite_LastScheduledDelaySeconds(this->m_lastScheduledDelaySeconds);
-    this->tlmWrite_PingCount(this->m_pingCount);
-    this->tlmWrite_ModeHeartbeat(this->m_modeHeartbeat);
+    constexpr U32 TELEMETRY_PERIOD_TICKS = 30U;
+    if ((this->m_modeHeartbeat - this->m_lastTelemetryHeartbeat) >= TELEMETRY_PERIOD_TICKS) {
+        this->writeTelemetry();
+        this->m_lastTelemetryHeartbeat = this->m_modeHeartbeat;
+    }
 }
 
 void MissionManager::modeUpdateIn_handler(FwIndexType portNum, const Components::MissionMode& mode, U32 detail) {
     static_cast<void>(portNum);
-    static_cast<void>(detail);
+    if (!this->isAllowedTransition(mode)) {
+        this->log_WARNING_LO_ModeUpdateRejected(mode, this->m_currentMode, detail);
+        return;
+    }
     this->m_currentMode = mode;
+    this->writeTelemetry();
     this->log_ACTIVITY_HI_ModeChanged(this->m_currentMode);
 }
 
 void MissionManager::ENTER_BASE_MODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     this->m_currentMode = Components::MissionMode::BASE;
+    this->writeTelemetry();
     this->log_ACTIVITY_HI_ModeChanged(this->m_currentMode);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
 void MissionManager::PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 token) {
     this->m_pingCount += 1;
+    this->writeTelemetry();
     this->log_ACTIVITY_LO_Pong(token, this->m_pingCount);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
@@ -48,12 +56,46 @@ void MissionManager::PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 token)
 void MissionManager::SCHEDULE_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 delaySeconds) {
     this->m_currentMode = Components::MissionMode::COLLECTION_PENDING;
     this->m_lastScheduledDelaySeconds = delaySeconds;
+    this->writeTelemetry();
     this->log_ACTIVITY_HI_ModeChanged(this->m_currentMode);
     this->log_ACTIVITY_HI_CollectionScheduled(delaySeconds);
     if (this->isConnected_collectionRequestOut_OutputPort(0)) {
         this->collectionRequestOut_out(0, delaySeconds);
     }
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+bool MissionManager::isAllowedTransition(Components::MissionMode requested) const {
+    if (requested == this->m_currentMode) {
+        return true;
+    }
+    if (requested == Components::MissionMode::BASE) {
+        return true;
+    }
+
+    switch (this->m_currentMode) {
+        case Components::MissionMode::BASE:
+            return (requested == Components::MissionMode::COLLECTION_PENDING) ||
+                   (requested == Components::MissionMode::COLLECTING) ||
+                   (requested == Components::MissionMode::DOWNLINKING);
+        case Components::MissionMode::COLLECTION_PENDING:
+            return requested == Components::MissionMode::COLLECTING;
+        case Components::MissionMode::COLLECTING:
+            return requested == Components::MissionMode::SCIENCE_READY;
+        case Components::MissionMode::SCIENCE_READY:
+            return requested == Components::MissionMode::DOWNLINKING;
+        case Components::MissionMode::DOWNLINKING:
+            return requested == Components::MissionMode::BASE;
+        default:
+            return false;
+    }
+}
+
+void MissionManager::writeTelemetry() {
+    this->tlmWrite_CurrentMode(this->m_currentMode);
+    this->tlmWrite_LastScheduledDelaySeconds(this->m_lastScheduledDelaySeconds);
+    this->tlmWrite_PingCount(this->m_pingCount);
+    this->tlmWrite_ModeHeartbeat(this->m_modeHeartbeat);
 }
 
 }  // namespace Components

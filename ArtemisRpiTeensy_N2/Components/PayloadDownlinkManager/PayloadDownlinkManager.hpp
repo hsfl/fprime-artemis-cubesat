@@ -32,14 +32,19 @@ class PayloadDownlinkManager final : public PayloadDownlinkManagerComponentBase 
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void run_handler(FwIndexType portNum, U32 context) override;
     void packetIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
-    void downlinkRequestIn_handler(FwIndexType portNum, U32 key) override;
+    void downlinkRequestIn_handler(FwIndexType portNum,
+                                   U32 productId,
+                                   U32 productBytes,
+                                   const Components::ScienceProductSource& sourceKind,
+                                   const Fw::StringBase& sourcePath,
+                                   U32 sourceCrc) override;
     void START_PAYLOAD_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 productId, U32 byteCount) override;
     void ABORT_PAYLOAD_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void GET_PAYLOAD_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
 
-    bool resetTransfer(U32 productId, U32 byteCount);
-    bool prepareSource(U32 byteCount);
-    void emitTelemetry();
+    bool resetTransfer(U32 productId, U32 byteCount, const std::string& preferredSourcePath, U32 expectedSourceCrc);
+    bool prepareSource(U32 byteCount, const std::string& preferredSourcePath);
+    void emitTelemetry(bool force = false);
     void emitStatus();
     void writeProgressTelemetry();
     void emitCompletionSummaryIfDue();
@@ -78,6 +83,8 @@ class PayloadDownlinkManager final : public PayloadDownlinkManagerComponentBase 
     bool m_sourceReady;
     U32 m_sourceBytes;
     std::string m_sourcePath;
+    U32 m_runTicks;
+    U32 m_lastTelemetryTick;
     U32 m_retryPackets[MAX_RETRY_PACKETS];
     U32 m_retryCount;
     U32 m_retryCursor;

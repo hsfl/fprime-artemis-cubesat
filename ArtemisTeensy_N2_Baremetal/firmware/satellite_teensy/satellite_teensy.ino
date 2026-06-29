@@ -105,6 +105,18 @@ void debugPrintCounters(const char* prefix) {
   Serial.print(g_linkCounters.rfRxSegments);
   Serial.print(" rf_tx_seg=");
   Serial.print(g_linkCounters.rfTxSegments);
+  Serial.print(" payload_uart_rx=");
+  Serial.print(g_linkCounters.payloadUartRxBytes);
+  Serial.print(" payload_uart_tx=");
+  Serial.print(g_linkCounters.payloadUartTxBytes);
+  Serial.print(" payload_rf_rx_msg=");
+  Serial.print(g_linkCounters.payloadRfRxMessages);
+  Serial.print(" payload_rf_tx_msg=");
+  Serial.print(g_linkCounters.payloadRfTxMessages);
+  Serial.print(" payload_rf_rx_seg=");
+  Serial.print(g_linkCounters.payloadRfRxSegments);
+  Serial.print(" payload_rf_tx_seg=");
+  Serial.print(g_linkCounters.payloadRfTxSegments);
   Serial.print(" rf_tx_drops=");
   Serial.print(g_linkCounters.rfTxDrops);
   Serial.print(" rf_msg_id_gaps=");

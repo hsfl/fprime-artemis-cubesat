@@ -78,7 +78,7 @@ These services should expose commands, events, telemetry, and ports in subsystem
 These are the replaceable hardware-specific implementations.
 
 - `EpsAdapter_Artemis`
-- `PayloadAdapter_N1Legacy`
+- `PayloadAdapter_NeutronSim`
 - `AdcsAdapter_D2S2`
 - `GpsAdapter_Artemis`
 - `ThermalAdapter_Artemis`
@@ -114,7 +114,7 @@ Later replacements may include:
 ### Adapter / HAL layer
 
 - `EpsAdapter_Artemis`
-- `PayloadAdapter_N1Legacy`
+- `PayloadAdapter_NeutronSim`
 - `AdcsAdapter_D2S2`
 - `GpsAdapter_Artemis`
 - `ThermalAdapter_Artemis`

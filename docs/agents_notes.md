@@ -115,12 +115,62 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - Build status:
   - `./tools/arduino-cli/build.sh` passes for `teensy:avr:teensy41`
 
+### 4) Live HIL Bench Status (2026-06-26)
+- Current bench smoke test is working after reflashing both Teensys with
+  explicit physical upload IDs:
+  - ground Teensy: `usb:100000`
+  - satellite Teensy: `usb:2100000`
+- Current USB map after the successful channel-1 smoke:
+  - ground channel 0 / GDS: `/dev/cu.usbmodem115551201`
+  - ground debug: `/dev/cu.usbmodem115551203`
+  - ground channel 1 / payload receiver: `/dev/cu.usbmodem115551205`
+  - satellite debug: `/dev/cu.usbmodem115502201`
+- Confirmed smoke evidence:
+  - Pi service runs `/home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0`
+  - `fprime-gds` over ground channel 0 can command the Pi through RF
+  - `missionManager.PING` dispatches, logs `MissionManager pong`, and completes
+  - retried full-flow commands can reach the Pi over the lossy RF path
+  - Pi-side demo flow can produce and store a simulated science payload
+  - Pi-side `PayloadDownlinkManager` can report `PayloadDownlinkComplete` and
+    `DownlinkFinished` for the staged payload
+  - `payload_receiver.py` reconstructs channel-1 RF payload files on the laptop
+- RF looks significantly healthier than the earlier wedged state, but it is
+  still lossy; use command retries and journal/GDS confirmation instead of
+  assuming a single command send landed.
+- Channel-1 receiver issue fixed/verified:
+  - Root cause candidate was channel 1 using best-effort RF sends while channel 0
+    used per-segment ACK/retry. Payload channel 1 now uses the same RF
+    segment ACK/retry path.
+  - Successful run: 2026-06-26 11:28 HST, receiver output
+    `complete: product=2 transfer=1 bytes=67 packets=2 crc=0x890e`
+    at `/tmp/neutron_hil/rf_ack_payload_20260626_112746/payload_5s.bin`.
+  - Local reconstructed SHA-256 matched Pi
+    `/tmp/neutron_payload_captures/latest_payload.bin`:
+    `be92e314c7f40c8b708920ac882c9eb0a1a9f4efccd1ef5d95684d99d822dfa1`.
+  - Channel-specific counters confirmed the route:
+    satellite `payload_uart_rx=110 payload_rf_tx_msg=4 payload_rf_tx_seg=4`;
+    ground `payload_rf_rx_msg=4 payload_rf_rx_seg=4 payload_uart_tx=110`.
+- Useful fallback for demo display only:
+  - a Pi-copied payload can be shown in
+    `ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py`
+  - label that as a Pi-side science-product fallback, not a verified channel-1
+    RF reconstruction
+
 ## Important Clarification: Framing
 
 - End-to-end payload is still opaque F' bytes.
 - Endpoints (GDS and F' app) use `ComCcsds` framing (`space-packet-space-data-link`).
 - The Pi <-> satellite Teensy hop is channelized below the F Prime/GDS endpoint layer; `fprime-gds` still sees a byte-pure CCSDS stream.
 - RF transport carries only channel 0 and channel 1. Channel 2 is consumed locally by the satellite Teensy.
+- Transport constants are generated from `config/transport_constants.json`.
+  Regenerate with `python3 tools/generate_transport_constants.py`; do not
+  hand-edit `LinkCfg.hpp` or either Teensy `link_protocol.hpp`.
+- `./tools/validate_local.sh` checks generated headers, transport drift, local
+  Python tests, F Prime local-demo build, component UTs, and the automated
+  local demo sequence.
+- `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` is the software triage map for
+  GDS/dictionary, mission services, payload capture, storage, channel 1
+  downlink, Teensy/RF counters, viewer files, and EPS/PDU channel 2.
 - Contract documentation:
   - `ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md`
   - `GDS_Teensy/docs/transport_contract.md`
@@ -864,6 +914,11 @@ section:
 ## EPS/PDU adapter notes
 
 - F Prime now exposes the mission-facing EPS/PDU path through `EpsService` and `EpsAdapter_Artemis`.
+- The EPS/PDU boundary is intentionally pragmatic for MVP because the new PDU
+  is planned for F Prime-driven testing. Keep generic mission-facing commands
+  in `EpsService`, keep PDU v2 protocol details in `EpsAdapter_Artemis`, and
+  refactor/cull the service surface later if the proven hardware contract
+  demands a sharper split.
 - The adapter uses the PDU v2 framed UART protocol from `external/artemis-pdu/src/pdu_protocol_v2.h`.
 - The adapter no longer opens a separate Pi serial device for the PDU.
 - EPS/PDU requests are wrapped as channel 2 local RPC packets over the existing Pi <-> satellite Teensy UART.
@@ -872,13 +927,33 @@ section:
 - `TransportFailureCount` tracks bad local envelopes, timeouts, target errors, malformed PDU frames, and busy/not-connected send attempts.
 - Operator-safe commands currently exposed:
   - `REQUEST_EPS_STATUS`
-  - `PING_PDU`
-  - `REQUEST_PDU_PROTOCOL`
-  - `REQUEST_PDU_OUTPUT`
-  - `SET_PDU_OUTPUT` with `confirm=1`
-  - `POWER_CYCLE_PDU_OUTPUT` with `confirm=1`
+  - `PING_EPS_ADAPTER`
+  - `REQUEST_EPS_ADAPTER_INFO`
+  - `REQUEST_EPS_RAIL`
+  - `SET_EPS_RAIL_STATE` with `confirm=1`
+  - `POWER_CYCLE_EPS_RAIL` with `confirm=1`
   - `REQUEST_CHARGER_STATUS`
   - `SET_CHARGER_STATE` with `confirm=1`
 - Missing confirmation or unsafe/out-of-range PDU command arguments return
   `VALIDATION_ERROR` in GDS command history and emit `EpsCommandRejected`.
 - Burn-wire and torque-coil commands are intentionally not exposed through `EpsService` yet; add those only with a dedicated HIL/runbook procedure.
+
+## Service/Adapter Cleanup — Open Follow-ups (2026-06-25)
+
+The service/adapter architecture cleanup landed: de-leaked `EpsService`,
+`ScienceProductDescriptor` threaded end to end, active/async payload adapter,
+`MissionManager`-validated mode transitions with a unit test, and
+single-source transport constants (`config/transport_constants.json` +
+`tools/generate_transport_constants.py` + `tools/check_transport_constants.py`).
+Durable rules now live in `docs/STUDENT_COMPONENT_STARTERS.md`; the dated review
+snapshot is archived at
+`docs/archive/SERVICE_ADAPTER_ARCHITECTURE_REVIEW_2026-06-25.md`.
+
+Still open (not demo-blocking):
+- Define one standard service-to-adapter port-pair template, modeled on the
+  payload path, so the thin subsystems (ADCS, GPS, thermal, comms) get a
+  consistent contract when they are built out.
+- Add focused unit tests for `ScienceManager` and `CommsManager` decision logic
+  (`MissionManager` mode validation is already covered).
+- Optional hardening: wire `tools/check_transport_constants.py` into CI or a
+  pre-commit hook so generated transport headers cannot drift from the manifest.

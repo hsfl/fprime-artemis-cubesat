@@ -3,6 +3,10 @@
 BLUF: use this to manually demonstrate the Neutron 2 demo story on one laptop,
 without hardware-in-the-loop.
 
+If the local demo fails, use `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` to
+identify whether the issue is build, GDS/dictionary, mission flow, payload
+capture, storage, downlink, or viewer state.
+
 This runbook shows:
 
 - F Prime app running locally
@@ -40,6 +44,18 @@ Not validated:
 
 ## Preflight
 
+For the standard one-command local validation, run:
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat
+./tools/validate_local.sh
+```
+
+That script checks generated transport headers, local Python tests, the F Prime
+native `local-demo` build, component unit tests, and the automated demo
+sequence. Use the manual steps below when you need to inspect or operate the
+demo interactively.
+
 ### macOS
 
 ```bash
@@ -70,6 +86,8 @@ Topology profile note:
 - `hil` is the default merge-safe profile.
 - `local-demo` enables the laptop demo rate-group path.
 - `./tools/run_neutron2_local_demo.sh` builds `local-demo` automatically.
+- `./tools/validate_local.sh` is the standard no-HIL regression command before
+  handing local changes to mission ops or another student.
 - after local demo work, rebuild with `-DNEUTRON2_TOPOLOGY_PROFILE=hil` before
   treating the binary as the HIL/default image.
 
