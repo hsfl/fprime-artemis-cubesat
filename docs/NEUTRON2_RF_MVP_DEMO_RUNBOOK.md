@@ -260,13 +260,20 @@ fault, not as successful payload proof. Check the debug counters for
 Terminal 3: start the viewer. The viewer can be started before or after the
 payload file exists.
 
-To watch the run folder:
+Important: the viewer serves one folder for as long as that process is running.
+If an old viewer is already active on port `8062`, it can keep showing an older
+run directory even after a new payload receiver completes. Restart only the
+viewer and point it at the run directory written by the payload receiver:
 
 macOS:
 
 ```bash
 cd ~/Developer/fprime-artemis-cubesat
 RUN_DIR="$(cat /tmp/neutron_hil/latest_rf_demo_dir)"
+echo "viewer run dir: $RUN_DIR"
+ls -l "$RUN_DIR"
+
+pkill -f 'ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py' 2>/dev/null || true
 python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
   --capture-dir "$RUN_DIR" \
   --port 8062
@@ -277,6 +284,10 @@ Windows WSL2:
 ```bash
 cd ~/fprime-artemis-cubesat
 RUN_DIR="$(cat /tmp/neutron_hil/latest_rf_demo_dir)"
+echo "viewer run dir: $RUN_DIR"
+ls -l "$RUN_DIR"
+
+pkill -f 'ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py' 2>/dev/null || true
 python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
   --capture-dir "$RUN_DIR" \
   --port 8062
@@ -285,7 +296,11 @@ python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
 To open one exact file after the receiver completes:
 
 ```bash
+RUN_DIR="$(cat /tmp/neutron_hil/latest_rf_demo_dir)"
+ls -l "$RUN_DIR/payload_30s.bin"
+pkill -f 'ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py' 2>/dev/null || true
 python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py \
+  --capture-dir "$RUN_DIR" \
   --file "$RUN_DIR/payload_30s.bin" \
   --port 8062
 ```
@@ -570,8 +585,9 @@ ssh artemis-pi 'wc -c /tmp/neutron_payload_captures/latest_payload.bin'
 If the viewer shows the wrong file:
 
 - check the status path shown in the viewer
-- restart with `--file "$RUN_DIR/payload_30s.bin"`
-- or restart with `--capture-dir "$RUN_DIR"` and refresh
+- stop the old viewer process on `8062`
+- reload `RUN_DIR` from `/tmp/neutron_hil/latest_rf_demo_dir`
+- restart with `--capture-dir "$RUN_DIR" --file "$RUN_DIR/payload_30s.bin"`
 
 If the payload file exists but viewer says it is invalid:
 
