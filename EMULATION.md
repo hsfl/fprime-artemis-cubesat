@@ -5,6 +5,7 @@ This is the fastest local end-user test loop for this repo:
 - run flight app + local link emulator + `fprime-gds` on one laptop
 - watch live-changing telemetry
 - send one simple ping command and get a pong event/command response
+- run the Neutron 2 simulated payload path and review the captured CSV in the local payload viewer
 
 All transport stays local over pseudo-terminals (`pty`).
 
@@ -34,6 +35,36 @@ fprime-util generate -f
 fprime-util build
 ```
 
+## Topology Profile Toggle
+
+The deployment has two build-time topology profiles:
+
+- `hil` is the default merge-safe profile.
+- `local-demo` enables the laptop demo rate-group path for `ScienceManager`,
+  `SoHManager`, `PayloadService`, and `StorageService`, while keeping noisy
+  subsystem polling off.
+
+Switching profiles requires regenerate + rebuild.
+
+Default/HIL build:
+
+```bash
+cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+fprime-util generate -f -DNEUTRON2_TOPOLOGY_PROFILE=hil
+fprime-util build
+```
+
+Local-demo build:
+
+```bash
+cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+fprime-util generate -f -DNEUTRON2_TOPOLOGY_PROFILE=local-demo
+fprime-util build
+```
+
+The Neutron 2 demo launcher does this local-demo generate/build automatically
+unless `--skip-build` is supplied.
+
 ## One-command launch
 
 ```bash
@@ -46,6 +77,54 @@ Then open:
 - `http://127.0.0.1:5050`
 
 Stop all processes with `Ctrl-C` in the launcher terminal.
+
+## One-command Neutron 2 MVP Demo
+
+For a lead-facing manual walkthrough, use:
+
+- `docs/NEUTRON2_LOCAL_EMULATION_RUNBOOK.md`
+
+Use this for the laptop-only demo story before HIL testing. It starts local
+emulation, starts the Neutron 2 payload viewer, sends the demo command sequence,
+and verifies that a new simulated payload CSV was generated and parsed.
+
+```bash
+cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+./tools/run_neutron2_local_demo.sh
+```
+
+Open:
+
+- GDS: `http://127.0.0.1:5050`
+- Neutron 2 payload viewer: `http://127.0.0.1:8062`
+
+The automated sequence is:
+
+1. `MissionManager.ENTER_BASE_MODE`
+2. `SoHManager.EMIT_SOH_SNAPSHOT`
+3. `ScienceManager.CONFIGURE_CAPTURE_DURATION(<capture seconds>)`
+4. `MissionManager.SCHEDULE_COLLECTION(<delay seconds>)`
+5. `StorageService.REPORT_LATEST_DATASET`
+6. `StorageService.REPORT_STORAGE_HISTORY`
+7. `CommsManager.REQUEST_SCIENCE_DOWNLINK`
+
+Default timing is a 10-second schedule delay and a 10-second simulated capture.
+For a quick non-interactive check:
+
+```bash
+./tools/run_neutron2_local_demo.sh --delay 3 --capture-seconds 3 --exit-after-sequence
+```
+
+The pass condition is intentionally laptop-local:
+
+- GDS accepts the command sequence.
+- `PayloadAdapter_NeutronSim` writes a new CSV under `/tmp/neutron_payload_captures`.
+- `ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py --summary` parses that CSV.
+
+In this branch, GDS is the command/event/telemetry surface and the Neutron 2
+viewer is the science-data review surface. `REQUEST_SCIENCE_DOWNLINK` is still
+the current F Prime handoff/progress event path; bulk RF/file transfer remains a
+later HIL/downlink implementation concern.
 
 ## End-user manual test (minimal)
 
@@ -110,20 +189,26 @@ Use this when you want to demonstrate the timed collection story in GDS.
 Optional follow-on command:
 
 - Send `REQUEST_SCIENCE_DOWNLINK` on `commsManager`
-- Expect `ArtemisRpiTeensyDeployment.commsManager.DownlinkRequested` and `ArtemisRpiTeensyDeployment.storageService.DownlinkPrepared`
-- Current behavior is handshake-only (events/channels), not a real file transfer in GDS `#Downlink`.
+- Expect `ArtemisRpiTeensyDeployment.commsManager.DownlinkRequested`,
+  `ArtemisRpiTeensyDeployment.storageService.DownlinkPrepared`, and
+  `ArtemisRpiTeensyDeployment.commsManager.DownlinkFinished`
+- Current F Prime behavior is handshake/progress-only (events/channels), not a real file transfer in GDS `#Downlink`.
+- Review the generated science CSV in the Neutron 2 payload viewer at `http://127.0.0.1:8062`.
 
 If chart lines do not move, verify the chart is not paused (toggle play/pause in the chart widget).
 
-## Next Step: Real File Downlink Path
+## Next Step: Real Downlink Path
 
-Current `REQUEST_SCIENCE_DOWNLINK` validates command/event flow only. To finish end-user downlink UX in `http://127.0.0.1:5050/#Downlink`, implement and wire a real `Svc::FileDownlink` transfer path.
+Current `REQUEST_SCIENCE_DOWNLINK` validates command/event flow only. For HIL,
+the payload CSV must be moved over the selected downlink path and then opened by
+the Neutron 2 payload viewer.
 
 Done criteria:
 
-1. Triggering science downlink causes an actual file transfer session.
-2. GDS `#Downlink` shows active/progress/completed file entries.
-3. Downloaded file exists on the laptop and matches expected test content.
+1. Triggering science downlink causes an actual payload transfer.
+2. GDS shows command/event/telemetry progress without corrupting the CCSDS stream.
+3. Reconstructed CSV exists on the laptop and matches expected test content.
+4. The Neutron 2 payload viewer opens the reconstructed CSV.
 
 ## Useful options
 
@@ -187,3 +272,5 @@ fprime-gds -n \
 
 - `/Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2/tools/run_local_emulation.sh`
 - `/Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2/tools/local_emulation_loop.py`
+- `/Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2/tools/run_neutron2_local_demo.sh`
+- `/Users/sozodennis/Developer/fprime-artemis-cubesat/ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py`

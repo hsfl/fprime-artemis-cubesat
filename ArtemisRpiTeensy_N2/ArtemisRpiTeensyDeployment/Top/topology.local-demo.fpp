@@ -19,7 +19,7 @@ module ArtemisRpiTeensyDeployment {
     import ComCcsds.Subtopology
     import DataProducts.Subtopology
     import FileHandling.Subtopology
-    
+
   # ----------------------------------------------------------------------
   # Instances used in the topology
   # ----------------------------------------------------------------------
@@ -80,7 +80,6 @@ module ArtemisRpiTeensyDeployment {
       # Router to Command Dispatcher
       ComCcsds.fprimeRouter.commandOut -> CdhCore.cmdDisp.seqCmdBuff
       CdhCore.cmdDisp.seqCmdStatus -> ComCcsds.fprimeRouter.cmdResponseIn
-      
     }
 
     connections ComCcsds_FileHandling {
@@ -97,11 +96,11 @@ module ArtemisRpiTeensyDeployment {
       # ComDriver buffer allocations
       comDriver.allocate      -> ComCcsds.commsBufferManager.bufferGetCallee
       comDriver.deallocate    -> ComCcsds.commsBufferManager.bufferSendIn
-      
+
       # ComDriver <-> ComStub (Uplink)
       comDriver.$recv                     -> ComCcsds.comStub.drvReceiveIn
       ComCcsds.comStub.drvReceiveReturnOut -> comDriver.recvReturnIn
-      
+
       # ComStub <-> ComDriver (Downlink)
       ComCcsds.comStub.drvSendOut      -> comDriver.$send
       comDriver.ready         -> ComCcsds.comStub.drvConnected
@@ -127,20 +126,21 @@ module ArtemisRpiTeensyDeployment {
       rateGroup1.RateGroupMemberOut[4] -> ComCcsds.aggregator.timeout
       rateGroup1.RateGroupMemberOut[5] -> teensyTransportService.run
       rateGroup1.RateGroupMemberOut[6] -> missionManager.run
-      # HIL/default profile: keep demo-only managers off the periodic path unless
-      # building with NEUTRON2_TOPOLOGY_PROFILE=local-demo.
-      # rateGroup1.RateGroupMemberOut[7] -> scienceManager.run
-      # rateGroup1.RateGroupMemberOut[8] -> sohManager.run
+      # Local emulation branch: run the minimum laptop demo-state path.
+      rateGroup1.RateGroupMemberOut[7] -> scienceManager.run
+      rateGroup1.RateGroupMemberOut[8] -> sohManager.run
+      # Keep commsManager.run disabled here: it polls the adapter and can flood local GDS events.
       # rateGroup1.RateGroupMemberOut[9] -> commsManager.run
 
       # Rate group 2
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup2] -> rateGroup2.CycleIn
       rateGroup2.RateGroupMemberOut[0] -> cmdSeq.schedIn
+      # RF/HIL subsystem polling stays off for laptop-only demo stability.
       # rateGroup2.RateGroupMemberOut[1] -> epsService.run
-      # rateGroup2.RateGroupMemberOut[2] -> payloadService.run
+      rateGroup2.RateGroupMemberOut[2] -> payloadService.run
       # rateGroup2.RateGroupMemberOut[3] -> adcsService.run
       # rateGroup2.RateGroupMemberOut[4] -> gpsService.run
-      # rateGroup2.RateGroupMemberOut[5] -> storageService.run
+      rateGroup2.RateGroupMemberOut[5] -> storageService.run
       # rateGroup2.RateGroupMemberOut[6] -> thermalService.run
 
       # Rate group 3

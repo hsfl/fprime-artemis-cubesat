@@ -29,7 +29,10 @@ Default behavior:
   - Windows: `%TEMP%\neutron_payload_captures`
 - opens `http://127.0.0.1:8062`
 - shows newest CSV first
-- warns when old downlink CSVs are accumulating
+- watches for new CSV products and automatically opens the newest file
+- always reminds operators that capture files are run artifacts to archive/delete
+  as needed
+- warns more strongly when old downlink CSVs are accumulating
 
 Open one file directly:
 
@@ -66,6 +69,8 @@ py -3 ground-station\neutron2-payload-viewer\neutron2_payload_viewer.py --no-ope
 - SAA mean versus background mean
 - counts-vs-time plot with SAA intervals highlighted
 - first rows table for sanity checking the file
+- bottom data notes explaining CSV fields, summary metrics, and how to interpret
+  the SAA/background regions
 
 ## File Format
 
@@ -97,8 +102,10 @@ neutron_capture_YYYYMMDDTHHMMSSZ_00000_00600_001.csv
 neutron_capture_YYYYMMDDTHHMMSSZ_00000_00600_002.csv
 ```
 
-When the folder gets crowded, the viewer shows a cleanup notice. For simulator
-products on the RPi, operators can use:
+The default capture folder is an OS temp location, but automatic cleanup is not
+an operations guarantee. Treat these files as run artifacts. The viewer shows a
+persistent cleanup reminder, and when the folder gets crowded it shows a stronger
+cleanup notice. For simulator products on the RPi, operators can use:
 
 ```text
 StorageService.REMOVE_OLD_DATASETS(confirm=1)

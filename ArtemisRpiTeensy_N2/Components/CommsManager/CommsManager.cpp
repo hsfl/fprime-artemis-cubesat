@@ -53,10 +53,11 @@ void CommsManager::adapterStatusIn_handler(FwIndexType portNum, U32 key) {
 }
 
 void CommsManager::REQUEST_SCIENCE_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    this->log_ACTIVITY_HI_DownlinkRequested(this->m_pendingScienceBytes);
     if (this->isConnected_downlinkRequestOut_OutputPort(0)) {
         this->downlinkRequestOut_out(0, this->m_pendingScienceBytes);
+        this->log_ACTIVITY_HI_DownlinkFinished(this->m_pendingScienceBytes);
     }
-    this->log_ACTIVITY_HI_DownlinkRequested(this->m_pendingScienceBytes);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 

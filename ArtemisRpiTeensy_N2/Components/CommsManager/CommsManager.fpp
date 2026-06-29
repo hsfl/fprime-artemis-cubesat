@@ -53,6 +53,9 @@ module Components {
         @ Downlink request event
         event DownlinkRequested(bytes: U32) severity activity high format "Downlink requested for {} bytes"
 
+        @ Downlink completion event for the current synchronous/demo downlink path
+        event DownlinkFinished(bytes: U32) severity activity high format "Downlink finished for {} bytes"
+
         @ Link state event
         event LinkStateUpdated(linkState: U32) severity activity low format "Comms link state updated {}"
 
