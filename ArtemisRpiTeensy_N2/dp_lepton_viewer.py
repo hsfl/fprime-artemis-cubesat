@@ -5,13 +5,14 @@
 # Pipeline:
 #   note: make sure fprime-venv is activated, and numpy/matplotlib are installed in the venv
 #   1. shell out to `fprime-dp decode --bin-file <fdp> --dictionary <dict> --output <json>`
+
 #   2. pull the 19,200-pixel thermal array out of the decoded JSON
 #   3. reshape to 120x160, convert centi-Kelvin -> degrees C
 #   4. write a CSV (compatible with thermal_data_viewer.py) and a PNG
 #
 # Usage:
-#   python dp_viewer.py <path/to/file.fdp>
-#   python dp_viewer.py <path/tofile.fdp> --dictionary <path/to/Dictionary.json>
+#   python dp_lepton_viewer.py <path/to/file.fdp>
+#   python dp_lepton_viewer.py <path/tofile.fdp> --dictionary <path/to/Dictionary.json>
 
 import argparse
 import glob
@@ -126,7 +127,7 @@ def main():
     parser = argparse.ArgumentParser(description="Decode + view a Lepton thermal data product (.fdp)")
     parser.add_argument("bin_file", help="path to the .fdp data product file")
     parser.add_argument("--dictionary", help="path to the deployment JSON dictionary (auto-detected if omitted)")
-    parser.add_argument("--outdir", default=".", help="output directory for .json/.csv/.png (default: cwd)")
+    parser.add_argument("--outdir", default="./data", help="output directory for .json/.csv/.png (default: cwd)")
     parser.add_argument("--no-show", action="store_true", help="save the PNG but don't open a window")
     args = parser.parse_args()
 
@@ -161,6 +162,7 @@ def main():
     captured_at = find_captured_at(decoded)
 
     # 4a. CSV (thermal_data_viewer.py-compatible: optional # metadata then grid)
+    # TODO: add GPS and IMU data if present in the record
     with open(out_csv, "w") as f:
         if captured_at:
             f.write(f"# CAPTURED_AT,{captured_at}\n")
