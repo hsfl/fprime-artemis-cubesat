@@ -12,6 +12,7 @@ REMOTE_DIR="${PI_ZERO_W_REMOTE_DIR:-/home/pi/artemis/cross}"
 SYNC_SYSROOT="true"
 BUILD_IMAGE="true"
 LOCAL_ONLY="false"
+COPY_ONLY="false"
 
 usage() {
   cat <<'EOF'
@@ -40,6 +41,8 @@ Options:
   --skip-sync           Reuse an existing sysroot without rsync
   --skip-image-build    Reuse the existing Docker image tag
   --local-only          Build + verify locally only (skip SSH deploy/smoke)
+  --copy-only           Skip sync/build; deploy the previously built binary and
+                        run the remote smoke test only (requires a prior build)
   -h, --help            Show this help text
 EOF
 }
@@ -70,6 +73,10 @@ while [[ $# -gt 0 ]]; do
       LOCAL_ONLY="true"
       shift
       ;;
+    --copy-only)
+      COPY_ONLY="true"
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -82,6 +89,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ "$COPY_ONLY" == "true" && "$LOCAL_ONLY" == "true" ]]; then
+  echo "--copy-only and --local-only are mutually exclusive" >&2
+  exit 2
+fi
+
 mkdir -p "$VERIFY_DIR"
 
 echo "Cross-build target configuration"
@@ -90,7 +102,13 @@ echo "  sysroot: $SYSROOT_DIR"
 echo "  remote dir: $REMOTE_DIR"
 echo "  docker image: $IMAGE_TAG"
 echo "  local only: $LOCAL_ONLY"
+echo "  copy only: $COPY_ONLY"
 echo
+
+# --copy-only skips the entire sync/build pipeline below and reuses the binary
+# recorded by a previous run; the build body is left un-indented because the
+# container heredoc's closing 'EOF' must stay at column 0.
+if [[ "$COPY_ONLY" != "true" ]]; then
 
 if [[ "$LOCAL_ONLY" == "true" && "$SYNC_SYSROOT" == "true" ]]; then
   echo "Local-only mode selected; skipping sysroot sync (reusing existing sysroot)"
@@ -179,8 +197,22 @@ docker run --rm \
 
 rm -f "$CONTAINER_SCRIPT"
 
+fi  # end sync/build pipeline (skipped when --copy-only)
+
+if [[ ! -f "$VERIFY_DIR/binary-path.txt" ]]; then
+  echo "No previously built binary recorded at $VERIFY_DIR/binary-path.txt" >&2
+  echo "Run a full build first (without --copy-only) before using --copy-only." >&2
+  exit 1
+fi
+
 BIN_PATH="$(cat "$VERIFY_DIR/binary-path.txt")"
 BIN_PATH="${BIN_PATH/#\/repo\/ArtemisRpiTeensy_N2/$ROOT_DIR}"
+
+if [[ ! -f "$BIN_PATH" ]]; then
+  echo "Recorded binary no longer exists: $BIN_PATH" >&2
+  echo "Run a full build first (without --copy-only)." >&2
+  exit 1
+fi
 
 echo "Local binary verification"
 cat "$VERIFY_DIR/file.txt"
