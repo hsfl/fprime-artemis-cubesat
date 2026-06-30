@@ -22,7 +22,82 @@ hardware.
   telemetry surface, plus the Neutron 2 payload viewer for reconstructed science
   files.
 
+## Hardware test bench stack
+
+This section describes the physical hardware that makes up the current Neutron 2
+test bench, written for students and new team members so the hardware context
+behind the software is clear. The prototype is based on the
+[Artemis CubeSat Kit](https://sites.google.com/hawaii.edu/artemiscubesatkit).
+
+The bench is intentionally a **two-node mirror**: the ground station and the
+satellite are built from the same kitted hardware. This keeps the radio code and
+bring-up procedure identical on both ends.
+
+### Two identical nodes: ground station and satellite
+
+Both the ground station and the satellite are built on the same OBC (On-Board
+Computer) board and carry the same compute and radio kit:
+
+| Item | Detail |
+|------|--------|
+| OBC board | Version 4.23 (both nodes) |
+| Microcontroller | Teensy 4.1 |
+| Single-board computer | Raspberry Pi Zero W |
+| Radio | RFM23BP (RFM23BP transceiver / radio head) |
+| Antenna | Antenna board with good (non-rusty) antennas |
+
+So the bench is **two OBC boards**, each kitted with a Teensy 4.1 and a Raspberry
+Pi Zero W — one acting as the **ground station**, the other as the **satellite**.
+
+Roles inside each node:
+
+- The **Raspberry Pi Zero W** runs the higher-level software (on the satellite,
+  the F Prime flight-software deployment).
+- The **Teensy 4.1** is required to interface with the **RFM23BP** radio — it
+  drives the radio head and the RF link.
+- The **antenna board** carries the antennas for the RF link.
+
+That is the whole RF path on each node: Pi <-> Teensy 4.1 <-> RFM23BP <-> antenna.
+
+### Power / EPS hardware
+
+What we have on hand:
+
+- **PDU:** Version 2.2.
+- **Battery board:** Version 2.
+
+**Current power reality:** so far we have **only tested USB-powered** OBC/Teensy
+on both the ground station and the satellite. The PDU, battery board, and solar
+panels are not yet integrated into the bring-up.
+
+**Eventually** we want to power the bench from the real bus: bring up the
+**PDU** and **battery board**, and maybe **solar panels** — i.e. use the entire
+[Artemis CubeSat Kit](https://sites.google.com/hawaii.edu/artemiscubesatkit) bus
+instead of USB power.
+
+### Future direction: stay on the RFM23BP radio head for now
+
+A longer-term option is to move the ground station **away from a carbon-copy of
+the satellite** and toward a **Software Defined Radio (SDR)**. We are
+intentionally **not** doing that right now.
+
+Reasons to stay on the current RFM23BP radio for now:
+
+- **Lower maintenance:** Going SDR means someone has to learn and maintain the
+  SDR stack, and effectively relearn how RF comms works at a lower level.
+- **Code reuse:** Keeping the same RFM23BP radio head lets us reuse the existing
+  RadioHead-library-based radio code on both nodes instead of rewriting the link
+  layer.
+- **Two identical nodes are simpler:** Building the ground station from the same
+  kit as the satellite means one bring-up procedure and one radio codebase.
+
+In short: an SDR is a "someday" upgrade, not a near-term need. Until the benefit
+clearly outweighs the added learning and maintenance burden, we keep the
+RFM23BP + RadioHead path on both the ground station and the satellite.
+
 ## Target demo
+
+![FlatSat FSR end-to-end demo plan](docs/images/flatsat-fsr-end-to-end-demo-plan.png)
 
 The current target is a shortened FlatSat FSR end-to-end demo based on the team's system diagram and operator flow. The live demo is not a full mission implementation; it is a controlled proof-of-concept showing command, telemetry, timed data collection, and science-data downlink across the full Raspberry Pi -> satellite Teensy -> RF -> ground Teensy -> ground station chain.
 
@@ -43,54 +118,70 @@ The current target is a shortened FlatSat FSR end-to-end demo based on the team'
 - Simulated payload data is acceptable until a real payload data source is stable enough for the demo.
 - Ground-station presentation quality matters: live telemetry, command acknowledgement, and visible science-data review are part of the success criteria.
 
-Current relay milestone:
-- one physical UART (`115200 8N1`) on RPi<->satellite Teensy with tagged virtual channels
-- channel 0 carries normal F Prime/GDS CCSDS bytes over RF
-- channel 1 carries payload/science packets over RF, sized for the current RFM23BP packet budget
-- channel 2 carries satellite-Teensy-local subsystem RPC such as EPS/PDU; it is consumed by the satellite Teensy and is not forwarded over RF
-- the Pi-side UART wrapper is `0xD4 0xC3 + channel + len + payload + crc16`
-- ground USB exposes channel 0 to `fprime-gds`; payload channel 1 is received separately by the payload receiver tool when the ground Teensy triple-serial path is enabled
+## F Prime Version
 
-This UART mux exists because the current hardware implementation gives the Pi
-one practical UART path to the satellite Teensy. Keep mission behavior in F'
-components and keep UART/RF details behind adapters, `UartChannelMux`, and the
-Teensy bridge firmware.
+This branch is pinned to F Prime `v4.2.1`:
+
+```bash
+git -C ArtemisRpiTeensy_N2/lib/fprime describe --tags --dirty --always --long
+```
+
+Use `describe --tags` when checking the framework version. F Prime `v4.2.x` tags
+are lightweight tags, so plain `git describe` or parent `git submodule status`
+can misleadingly report a `v3.1.1-...` description for the same commit.
 
 ## Repository layout
 
+Where to find things:
+
 - `ArtemisRpiTeensy_N2/`
-  - Active F' project (promoted in place from starter sample)
-  - Includes deployment and custom components such as `MissionManager`, `ScienceManager`, `SoHManager`, `ThermalService`, `UartChannelMux`, `PayloadDownlinkManager`, `EpsService`, and `EpsAdapter_Artemis`
+  - Active F' flight-software project (promoted in place from the starter sample).
+  - Includes the deployment and custom components such as `MissionManager`, `ScienceManager`, `SoHManager`, `ThermalService`, `UartChannelMux`, `PayloadDownlinkManager`, `EpsService`, and `EpsAdapter_Artemis`.
+  - F Prime framework lives in `ArtemisRpiTeensy_N2/lib/fprime` (pinned submodule).
 - `ArtemisTeensy_N2_Baremetal/`
-  - Satellite Teensy relay firmware workspace (Arduino CLI workflow)
+  - Satellite Teensy relay firmware workspace (Arduino CLI workflow).
 - `GDS_Teensy/`
-  - Ground-station Teensy firmware workspace (Arduino CLI workflow)
+  - Ground-station Teensy relay firmware workspace (Arduino CLI workflow).
+- `ground-station/neutron2-payload-viewer/`
+  - Neutron 2 payload/science viewer used on the ground laptop.
+- `student_onboarding/`
+  - Standalone student exercises (e.g. `basic_radio_ping_pong`).
+- `external/`
+  - Vendored reference repos: `artemis-pdu` (PDU firmware/ICD/bench tooling), `payload-neutron-simulation` (simulated payload source), plus `epscorc3m` and `artemis-cubesat-examples` (reference only).
+- `config/transport_constants.json`
+  - Single source of truth for the UART/RF transport constants.
+- `tools/`
+  - Repo-level helper scripts (`validate_local.sh`, transport-constant generate/check).
 - `docs/`
-  - Runbooks and integration notes
-- `docs/agents_notes.md`
-  - Current implementation status and next-agent guidance
-- `EMULATION.md`
-  - Local laptop closed-loop emulation workflow (no hardware)
-- `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md`
-  - Windows laptop setup for student developers and testing/viewer users
-- `docs/MISSION_OPS_QUICK_RUN.md`
-  - One-page local rehearsal and FlatSat/HIL operator checklist
-- `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md`
-  - Where to look first when commands, telemetry, payload downlink, or EPS/PDU
-    behavior fails
+  - Architecture, runbooks, and integration notes (see [Read next](#read-next)).
 
-Standard no-HIL local regression before handoff:
+## Read next
 
-```bash
-./tools/validate_local.sh
-```
+New here? Read these roughly in order to fully understand the project:
 
-## Build and Run
+1. `docs/SYSTEM_ARCHITECTURE.md` — current Neutron 2-on-Artemis architecture, the service/adapter component model, the RF/transport design, and an end-to-end command/telemetry trace. **Read this first.**
+2. `docs/GLOSSARY.md` — every acronym and term used across the repo (SOH, CCSDS, APID, D2S2, OBC, PDU, HAL, ...). Keep it open while reading the rest.
+3. `docs/FPRIME_GROUND_INTERFACES_PRIMER.md` — F´ literacy: commands, events, telemetry, and parameters, and how to add each.
+4. `docs/OPTIMAL_FPRIME_COMPONENT_TOPOLOGY_PLAN.md` — component and topology plan.
+5. `docs/TIME_AND_SCHEDULING.md` — rate groups, the clock, and how the "collect in N seconds" countdown works.
+6. `EMULATION.md` and `docs/NEUTRON2_LOCAL_EMULATION_RUNBOOK.md` — laptop-only closed-loop emulation (no hardware).
+7. `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md` — the real hardware-in-the-loop (HIL) demo flow.
+8. `docs/HARDWARE_PORT_MAP_AND_POWER.md` — which USB/serial device is which, and how to power the bench safely.
+9. `docs/MISSION_OPS_QUICK_RUN.md` — one-page local rehearsal and FlatSat/HIL operator checklist.
+10. `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md` — Windows laptop setup for student developers and viewer users.
+11. `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md` and `docs/RPI_BUILD.md` — building the Pi Zero W flight binary (cross-compile preferred; native is the manual fallback).
+12. `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` — where to look first when commands, telemetry, payload downlink, or EPS/PDU behavior fails.
+13. `docs/agents_notes.md` — current implementation status and next-agent guidance.
 
-For the Raspberry Pi Zero W, prefer the Docker cross-compile path for normal
-iteration. Native Pi builds work, but they are slow. Use `rpi_build.instructions`
-as the fallback/manual path and
-`docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md` for the faster handoff path.
+## Build and run (local emulation)
+
+This section covers the **local laptop emulation** build/run loop (no flight
+hardware). For the full hardware run, see
+[Hardware-in-the-loop (HIL) testing](#hardware-in-the-loop-hil-testing) below.
+
+For building the Raspberry Pi Zero W flight binary, default to the Docker
+cross-compile path in `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md`. Use
+`docs/RPI_BUILD.md` only if you need the slower manual native-on-Pi build.
 
 ### macOS Laptop
 
@@ -152,10 +243,11 @@ cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 ./tools/run_local_emulation.sh
 ```
 
-### Raspberry Pi Target
+### Raspberry Pi Target (manual native build)
 
 Use this on the Pi after cloning the repo at `~/fprime-artemis-cubesat`. This is
-the manual/native path; cross-compile is preferred for normal iteration.
+the manual/native path; the cross-compile guide above is preferred for normal
+iteration.
 
 ```bash
 cd ~/fprime-artemis-cubesat
@@ -168,17 +260,19 @@ fprime-util build
 
 Windows note: use WSL2 for F' build/development work. Native Windows is fine for the browser/Python payload viewer path.
 
-## F Prime Version
-
-This branch is pinned to F Prime `v4.2.1`:
+Standard no-HIL local regression before handoff:
 
 ```bash
-git -C ArtemisRpiTeensy_N2/lib/fprime describe --tags --dirty --always --long
+./tools/validate_local.sh
 ```
 
-Use `describe --tags` when checking the framework version. F Prime `v4.2.x` tags
-are lightweight tags, so plain `git describe` or parent `git submodule status`
-can misleadingly report a `v3.1.1-...` description for the same commit.
+## Hardware-in-the-loop (HIL) testing
+
+The build-and-run section above is laptop emulation only. For the **full demo on
+real hardware** — RPi UART, satellite Teensy, RFM23BP pair, ground Teensy,
+`fprime-gds`, and the payload receiver/viewer — follow
+`docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`, with `docs/MISSION_OPS_QUICK_RUN.md` as
+the operator checklist.
 
 ## Status
 
@@ -193,7 +287,7 @@ Implemented:
 - Artemis EPS/PDU command adapter over channel 2 using the PDU v2 protocol from `external/artemis-pdu`, with timeout/recovery handling.
 - HIL proof of the shortened demo story over the real RPi UART, satellite
   Teensy, RFM23BP pair, ground Teensy, `fprime-gds`, payload receiver, and
-  payload viewer path. See `docs/RF_MVP_DEMO_RUNBOOK.md`.
+  payload viewer path. See `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`.
 
 Not implemented yet:
 - HIL validation of channel 2 against the real PDU.
@@ -207,7 +301,8 @@ Not implemented yet:
 ## Notes
 
 - Use `docs/archive/` for historical implementation plans, sizing memos, and RF debug notes.
-- Use `docs/SYSTEM_ARCHITECTURE.md` for the current Neutron 2-on-Artemis architecture.
-- Use `docs/RF_MVP_DEMO_RUNBOOK.md` for the real hardware demo flow.
-- Use `EMULATION.md` and `docs/NEUTRON2_LOCAL_EMULATION_RUNBOOK.md` for laptop-only rehearsal.
-- Use `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md` for Windows student setup.
+- See [Read next](#read-next) above for the architecture, runbook, emulation, and setup docs.
+- The UART channel mux and RF transport (one Pi↔Teensy UART, three channels, the
+  ground triple-serial mapping, and the Manager → Service → Adapter HAL pattern)
+  are documented in `docs/SYSTEM_ARCHITECTURE.md` under **Transport Architecture:
+  One UART, Three Channels** and **Flight Software Architecture**.
