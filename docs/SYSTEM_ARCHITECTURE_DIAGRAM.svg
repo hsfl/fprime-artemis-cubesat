@@ -99,8 +99,8 @@
 
   <rect x="860" y="380" width="230" height="96" rx="20" fill="#eaf2ff" stroke="#3c659f" stroke-width="2"/>
   <text class="label" x="888" y="412">PLD</text>
-  <text class="body" x="888" y="434">Legacy Neutron 1</text>
-  <text class="body" x="888" y="452">Payload board</text>
+  <text class="body" x="888" y="434">Neutron 2 simulator</text>
+  <text class="body" x="888" y="452">dev board later</text>
 
   <rect x="860" y="540" width="230" height="96" rx="20" fill="#eaf2ff" stroke="#3c659f" stroke-width="2"/>
   <text class="label" x="888" y="572">GPS</text>
