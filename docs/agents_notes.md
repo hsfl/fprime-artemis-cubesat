@@ -562,7 +562,7 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 ## Design Plan Pointer (2026-06-09)
 
 - New plan doc for the remaining payload-downlink work and the long-term radio-swap architecture:
-  - `docs/RADIO_AGNOSTIC_COMMS_AND_PAYLOAD_DOWNLINK_PLAN.md`
+  - `docs/archive/RADIO_AGNOSTIC_COMMS_AND_PAYLOAD_DOWNLINK_PLAN.md`
 - Read it before touching payload downlink, the Teensy link protocol, or comms topology.
 - Core decisions captured there:
   - payload bulk data moves on a second stateless virtual channel over the existing RF bridge (per-frame channel tags, no link mode switching)

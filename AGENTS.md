@@ -54,7 +54,7 @@ Use this project with the `fprime-swe` skill and follow these steps exactly.
 - Read `docs/agents_notes.md` for latest implementation details and pending TODO items.
 - For subsystem/component architecture details, point agents to:
   - `docs/SYSTEM_ARCHITECTURE.md`
-  - `docs/OPTIMAL_FPRIME_COMPONENT_TOPOLOGY_PLAN.md`
+  - `docs/archive/OPTIMAL_FPRIME_COMPONENT_TOPOLOGY_PLAN.md`
   - `docs/STUDENT_COMPONENT_STARTERS.md`
   Keep detailed architecture in those docs rather than duplicating it here.
 - Treat the shortened FlatSat FSR end-to-end demo as the current target mission narrative:
