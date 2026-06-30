@@ -119,7 +119,7 @@ fprime-util build
 
 ## RPi Native Build (Minimal)
 - Use manual native build + run instructions:
-  - `rpi_build.instructions`
+  - `docs/RPI_BUILD.md`
 - Build policy:
   - build on the Raspberry Pi target and run the locally built binary.
 

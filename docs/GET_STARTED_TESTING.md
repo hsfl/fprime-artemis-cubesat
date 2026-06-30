@@ -98,7 +98,7 @@ cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 ./tools/docker_cross_compile_pi_zero_w.sh
 ```
 
-Native Pi fallback is documented in `rpi_build.instructions`.
+Native Pi fallback is documented in `docs/RPI_BUILD.md`.
 
 ### macOS Laptop Teensy Firmware
 

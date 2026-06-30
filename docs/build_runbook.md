@@ -100,7 +100,7 @@ PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
 
 ## Raspberry Pi Target
 
-Use `rpi_build.instructions` for the full native setup. This path builds directly on the target Pi and avoids architecture mismatch issues on Pi Zero W.
+Use `docs/RPI_BUILD.md` for the full native setup. This path builds directly on the target Pi and avoids architecture mismatch issues on Pi Zero W.
 
 Run deployment:
 ```bash
@@ -135,4 +135,4 @@ Local laptop closed-loop emulation (no hardware) is documented in:
 ## Raspberry Pi Native Build + Run
 For student-friendly setup over local Wi-Fi (find Pi IP + SSH + native build + run), use:
 
-- `rpi_build.instructions`
+- `docs/RPI_BUILD.md`

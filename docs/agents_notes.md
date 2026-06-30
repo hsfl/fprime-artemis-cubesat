@@ -61,7 +61,7 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 
 ### 1b) Raspberry Pi Build Path
 - Source-of-truth runbook:
-  - `rpi_build.instructions`
+  - `docs/RPI_BUILD.md`
 - Confirmed compatibility finding (2026-02-20):
   - Target hardware: `Raspberry Pi Zero W Rev 1.1` (`armv6l`)
   - ARMv7 binaries fail on Pi Zero W with `Illegal instruction`
@@ -546,7 +546,7 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - Build runbook:
   - `docs/build_runbook.md`
 - Raspberry Pi native build runbook:
-  - `rpi_build.instructions`
+  - `docs/RPI_BUILD.md`
 
 ## Agent Reminders
 
