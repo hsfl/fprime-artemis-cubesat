@@ -57,7 +57,7 @@ class PayloadAdapter_Lepton final : public PayloadAdapter_LeptonComponentBase {
     // ----------------------------------------------------------------------
 
     //! Thermal camera driver (real libuvc on the Pi, ramp stub on dev hosts)
-    LeptonCamera m_camera;
+    LeptonCamera camera;
 
     //! Max time to wait for a valid frame after the stream is up (covers FFC)
     static constexpr U32 CAPTURE_TIMEOUT_MS = 5000;

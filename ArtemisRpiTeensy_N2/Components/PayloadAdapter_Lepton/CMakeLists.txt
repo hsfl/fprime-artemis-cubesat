@@ -38,7 +38,8 @@ register_fprime_library(
 find_library(UVC_LIB NAMES uvc)
 find_path(UVC_INCLUDE_DIR NAMES libuvc/libuvc.h)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND UVC_LIB AND UVC_INCLUDE_DIR)
+# if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND UVC_LIB AND UVC_INCLUDE_DIR)
+if(UVC_LIB AND UVC_INCLUDE_DIR)
     message(STATUS "PayloadAdapter_Lepton: libuvc enabled (${UVC_LIB}) -- real Lepton capture")
     target_compile_definitions(${FPRIME_CURRENT_MODULE} PRIVATE LEPTON_USE_LIBUVC=1)
     target_include_directories(${FPRIME_CURRENT_MODULE} PRIVATE "${UVC_INCLUDE_DIR}")

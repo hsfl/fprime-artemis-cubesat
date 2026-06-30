@@ -9,6 +9,11 @@
 // the shared substrate for single capture (now) and burst / video / livestream
 // (later) -- all of which are just consumers of the latest-frame buffer.
 //
+// 3 main functions exposed to payload adapter:
+//   * open()           - bring the camera up and start streaming`
+//   * getLatestFrame() - copy the most recent valid frame into a user buffer
+//   * close()          - stop streaming and release the camera
+// 
 // Two build variants share this exact header:
 //   * Real libuvc path  (compiled when CMake's find_library(uvc) succeeds,
 //     i.e. on the Raspberry Pi target)            -> #ifdef LEPTON_USE_LIBUVC
@@ -36,20 +41,21 @@ class LeptonCamera final {
     static constexpr U32 NUM_PIXELS = WIDTH * HEIGHT;  // 19,200
 
     enum Status {
-        OK,             //!< Operation succeeded
-        DEVICE_ERROR,   //!< libuvc init/find/open/stream configuration failed
-        NOT_STREAMING,  //!< getLatestFrame() called before a successful open()
-        FRAME_TIMEOUT   //!< No valid (non-FFC) frame became available in time
+        OK,               //!< camera is streaming and a valid frame is available
+        LIBUVC_ERROR,     //!< libuvc init/find/open/stream configuration failed
+        STREAM_NOT_READY, //!< getLatestFrame() called before a successful open()
+        FRAME_TIMEOUT     //!< No valid (non-FFC) frame became available in time
     };
 
+    // constructor/destructor
     LeptonCamera();
     ~LeptonCamera();
 
-    //! Owns libuvc handles and a mutex: non-copyable.
+    // make class non-copyable bc of libuvc handles and mutex
     LeptonCamera(const LeptonCamera&) = delete;
     LeptonCamera& operator=(const LeptonCamera&) = delete;
 
-    //! Bring the camera up and start the continuous Y16 stream.
+    //! Bring the camera up and start the continuous Y16 stream, returns status.
     //! Idempotent: a second call while already streaming returns OK.
     //! @param reason      buffer to receive a short failure reason (NUL-terminated)
     //! @param reasonSize  size of reason buffer in bytes
@@ -58,8 +64,7 @@ class LeptonCamera final {
     //! Copy the most recent valid frame into out (NUM_PIXELS U16, little-endian).
     //! Returns immediately if a fresh frame is already buffered; otherwise waits
     //! up to timeoutMs for one (covers the Flat-Field-Correction settle right
-    //! after open()). Cheap to call repeatedly -- this is what burst / video /
-    //! livestream consumers will use.
+    //! after open()).
     //! @param out         destination buffer, must hold at least numPixels U16
     //! @param numPixels   capacity of out; must equal NUM_PIXELS
     //! @param timeoutMs   max time to wait for a frame to be available

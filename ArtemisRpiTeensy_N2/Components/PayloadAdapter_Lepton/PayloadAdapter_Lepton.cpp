@@ -24,7 +24,7 @@ PayloadAdapter_Lepton ::~PayloadAdapter_Lepton() {}
 // Implementation of ENABLE command handler: brings the camera up and starts streaming.
 void PayloadAdapter_Lepton ::ENABLE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     char reason[80] = {0};
-    const LeptonCamera::Status status = m_camera.open(reason, sizeof(reason));
+    const LeptonCamera::Status status = camera.open(reason, sizeof(reason)); // returns DEVICE_ERROR if the camera is not connected or fails to stream
     if (LeptonCamera::OK != status) {
         Fw::LogStringArg reasonArg(reason);
         this->log_WARNING_HI_ImageCaptureFailed(reasonArg);
@@ -37,7 +37,7 @@ void PayloadAdapter_Lepton ::ENABLE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) 
 
 // Implementation of DISABLE command handler: stops streaming and releases the camera.
 void PayloadAdapter_Lepton ::DISABLE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    m_camera.close();
+    camera.close();
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
@@ -56,11 +56,13 @@ void PayloadAdapter_Lepton ::CAPTURE_IMAGE_cmdHandler(FwOpcodeType opCode, U32 c
     record.set_timeTag(Fw::TimeValue(now.getTimeBase(), now.getContext(), now.getSeconds(), now.getUSeconds()));
 
     // Copy the latest streamed frame straight into the record's pixel array
-    // (avoids a second 38 KB stack buffer). Requires a prior ENABLE.
+    // (avoids a second 38 KB stack buffer). Requires a prior ENABLE (i.e. camera status is OK)
     U16(&pixels)[LeptonCamera::NUM_PIXELS] = record.get_value();
     char reason[80] = {0};
     const LeptonCamera::Status camStatus =
-        m_camera.getLatestFrame(pixels, LeptonCamera::NUM_PIXELS, CAPTURE_TIMEOUT_MS, reason, sizeof(reason));
+        camera.getLatestFrame(pixels, LeptonCamera::NUM_PIXELS, CAPTURE_TIMEOUT_MS, reason, sizeof(reason));
+
+    // capture fails
     if (LeptonCamera::OK != camStatus) {
         Fw::LogStringArg reasonArg(reason);
         this->log_WARNING_HI_ImageCaptureFailed(reasonArg);
@@ -73,6 +75,8 @@ void PayloadAdapter_Lepton ::CAPTURE_IMAGE_cmdHandler(FwOpcodeType opCode, U32 c
         ThermalImageRecordType::SERIALIZED_SIZE + static_cast<FwSizeType>(sizeof(FwDpIdType));
     DpContainer container;
     const Fw::Success status = this->dpGet_ThermalImageContainer(dpSize, container);
+
+    // If the container allocation fails, log a warning and return an execution error.
     if (Fw::Success::FAILURE == status) {
         this->log_WARNING_HI_DpMemoryFailure(dpSize);
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
