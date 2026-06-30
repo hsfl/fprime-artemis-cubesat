@@ -74,6 +74,12 @@ void PayloadAdapter_Lepton ::CAPTURE_IMAGE_cmdHandler(FwOpcodeType opCode, U32 c
     const FwSizeType dpSize =
         ThermalImageRecordType::SERIALIZED_SIZE + static_cast<FwSizeType>(sizeof(FwDpIdType));
     DpContainer container;
+
+    // TODO: this will throw a NoBuffsAvailable exception if dpBufferStoreSize is too small (default is 10000).
+    // right now the fix is to update dpBufferStoreSize in
+    // lib/fprime/Svc/Subtopologies/DataProducts/DataProductsConfig/DataProductsConfig.fpp to 48000
+    // eventually we should implement a more robust solution as git submodule update will overwrite
+    // the config file and we will have to remember to change it back
     const Fw::Success status = this->dpGet_ThermalImageContainer(dpSize, container);
 
     // If the container allocation fails, log a warning and return an execution error.
