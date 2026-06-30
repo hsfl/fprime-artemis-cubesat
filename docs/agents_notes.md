@@ -957,3 +957,21 @@ Still open (not demo-blocking):
   (`MissionManager` mode validation is already covered).
 - Optional hardening: wire `tools/check_transport_constants.py` into CI or a
   pre-commit hook so generated transport headers cannot drift from the manifest.
+
+## Architecture ↔ F´ App-Man-Drv Cross-Reference (2026-06-29)
+
+- `docs/SYSTEM_ARCHITECTURE.md` now states explicitly that our
+  Manager → Service → Adapter "HAL" **is** F´'s built-in
+  Application-Manager-Driver (App-Man-Drv) pattern, not a bespoke invention.
+  See the new "This is F´'s Application-Manager-Driver pattern" subsection
+  (mapping table + vocabulary warning) and the "Implementation notes"
+  subsection under the Manager → Service → Adapter section.
+- Term mapping: our **Manager** = F´ **Application**, our **Service** = F´
+  **Manager** (device manager), our **Adapter** = F´ **Driver**. The word
+  "Manager" points at opposite ends of the stack in the two vocabularies —
+  watch for this when reading upstream F´ tutorials / `fprime-sensors`.
+- Implementation guidance added: use stock `Drv.LinuxI2cDriver` /
+  `LinuxSpiDriver` / `LinuxGpioDriver` for subsystems on the Pi's own bus
+  (our channel-2 Teensy-RPC adapters are bespoke for a hardware reason), and
+  check `fprime-sensors` for ready-made device managers before writing a new
+  `*Adapter_*`.

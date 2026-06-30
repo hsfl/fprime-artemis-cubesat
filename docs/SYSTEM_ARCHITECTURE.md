@@ -79,6 +79,20 @@ We still need to build, demonstrate, and iterate now, then **swap in real hardwa
 
 > **Mission talks to services. Services talk to adapters. Adapters talk to hardware.**
 
+### This is F´'s Application-Manager-Driver pattern (we didn't invent it)
+
+Good news for anyone worried this is bespoke over-engineering: **it isn't a custom invention — it's F´'s own built-in hardware-abstraction pattern.** F´ calls it the **Application-Manager-Driver (App-Man-Drv)** pattern, documented in the framework at [`lib/fprime/.../design-patterns/app-man-drv.md`](../ArtemisRpiTeensy_N2/lib/fprime/docs/user-manual/design-patterns/app-man-drv.md) and [`how-to/develop-device-driver.md`](../ArtemisRpiTeensy_N2/lib/fprime/docs/how-to/develop-device-driver.md). Our three tiers map onto it almost 1:1 — we just use demo-friendlier names:
+
+| Our term | F´ App-Man-Drv term | Role |
+| --- | --- | --- |
+| **Manager** (`MissionManager`, `ScienceManager`, `CommsManager`) | **Application** | Mission/mode logic; cross-cutting; talks only to the tier below |
+| **Service** (`EpsService`, `PayloadService`, `GpsService`) | **Manager** (device manager) | Subsystem-generic command/telemetry contract; hardware-independent |
+| **Adapter** (`EpsAdapter_Artemis`, `PayloadAdapter_NeutronSim`) | **Driver** (device/bus driver) | Hardware + protocol glue; the only tier that changes per hardware |
+
+> ⚠️ **Vocabulary warning — read this before you read upstream F´ docs:** the word **"Manager" points at opposite ends of the stack** in the two vocabularies. *Our* "Manager" is F´'s "Application"; F´'s "Manager" is *our* "Service." So when the JPL LedBlinker tutorial, `fprime-sensors`, or the device-driver how-to says "Manager," they mean what this repo calls a **Service**. Don't let it trip you up.
+
+What makes this a *real* HAL — and not just decorative indirection — is the same mechanism F´ relies on: the swap boundary uses a **shared port interface**. F´ drivers are swappable because `LinuxI2cDriver` and `ZephyrI2cDriver` both speak the same `Drv.I2c` interface. We do the equivalent: `EpsService` and `EpsAdapter_Artemis` both speak the mirrored `Components.EpsCommand` / `Components.EpsStatus` ports defined in [`Components/Types/Types.fpp`](../ArtemisRpiTeensy_N2/Components/Types/Types.fpp). A new adapter only has to honor those ports, then you re-wire one topology connection — the service is untouched. That shared-port boundary is exactly why the "sim now, real board later" swap works, and the framework docs explicitly call out *simulation and testing* as a reason to layer this way.
+
 ### Why this is worth it (the tradeoff)
 
 - **Benefit:** when the loaned Neutron 2 payload board, the SatNOGS comms board, or the final EPS arrives, we write a **new adapter** and re-wire one connection in the topology. Managers and services are untouched, so the mission demo keeps working. We can develop against the hardware we have today and drop in flight hardware with no major refactor.
@@ -90,6 +104,13 @@ We still need to build, demonstrate, and iterate now, then **swap in real hardwa
 - New subsystem capability or telemetry contract → edit/add a **Service**.
 - New or swapped hardware/sim → add an **Adapter**, keep the service contract identical, and re-wire it in `Top/topology.fpp`.
 - If you find yourself putting hardware/protocol bytes in a manager or service, that logic belongs in an adapter.
+
+### Implementation notes (use the framework, don't fight it)
+
+Two notes to keep adapters aligned with stock F´ rather than reinventing it:
+
+1. **For subsystems on the Pi's own bus, use F´'s built-in bus drivers.** If a device is directly reachable from the Pi over I²C/SPI/GPIO (*not* routed behind the satellite Teensy), prefer `Drv.LinuxI2cDriver`, `Drv.LinuxSpiDriver`, or `Drv.LinuxGpioDriver` as the lower half of the adapter, plus a thin device manager — don't hand-roll the bus access. Our current EPS/GPS/thermal adapters are bespoke because they go through the **channel 2 Teensy RPC** (a hardware constraint of the one-UART OBC board), which justifies the custom code *there*. But for anything the Pi can talk to directly, use the framework driver.
+2. **Check `fprime-sensors` before writing a new adapter.** The community library [`fprime-sensors`](https://github.com/fprime-community/fprime-sensors) ships ready-made device managers (IMU, magnetometer, etc.) as Manager+Driver pairs. When the real GPS/IMU/thermal boards arrive, see whether a drop-in already exists before building a `*Adapter_*` from scratch.
 
 ## OBC Detail
 
