@@ -72,24 +72,38 @@ void debugPrintCounters(const char* prefix) {
 void setup() {
   Serial.begin(DEBUG_UART_BAUD);
 
-  // Match EPSCOR payload baseline: assert Pi power-enable at boot.
-  pinMode(RPI_ENABLE_PIN, OUTPUT);
-  digitalWrite(RPI_ENABLE_PIN, HIGH);
+  // LED on early as a "firmware alive" indicator.
   pinMode(TEENSY_LED_PIN, OUTPUT);
   digitalWrite(TEENSY_LED_PIN, HIGH);
-  Serial.println("[ArtemisTeensy] RPI power enable asserted (pin 36 HIGH)");
   Serial.println("[ArtemisTeensy] LED asserted (pin 13 HIGH)");
 
   Serial2.addMemoryForRead(g_rpiUartRxBuffer, sizeof(g_rpiUartRxBuffer));
+  Serial.println("[ArtemisTeensy] Serial2 RX buffer size: " +
+                 String(sizeof(g_rpiUartRxBuffer)) + " bytes");
   Serial2.begin(UART_BAUD);
+  Serial.println("[ArtemisTeensy] Serial2 UART started at " + String(UART_BAUD) + " baud");
+
+  // Bring up the radio on a stable rail BEFORE enabling Pi power. The Pi's
+  // power-on inrush can brown out a shared supply and stall the RF23BP
+  // chip-ready handshake during init (this previously hung boot here). The
+  // init is now timeout-guarded, so a missing/unready radio degrades to a
+  // UART-only bridge instead of blocking.
   const bool radioOk = g_rfDriver.begin();
+  Serial.println("[ArtemisTeensy] RF23 begin() returned " + String(radioOk ? "OK" : "FAIL"));
   g_relay.begin();
+  Serial.println("[ArtemisTeensy] Relay bridge initialized (raw UART byte tunnel + RF segmentation)");
 
   if (radioOk) {
     Serial.println("[ArtemisTeensy] Relay bridge ready (raw UART byte tunnel + RF segmentation)");
   } else {
-    Serial.println("[ArtemisTeensy] RF23 init failed; relay running without RF");
+    Serial.println("[ArtemisTeensy] RF23 init failed/timed out; relay running without RF");
   }
+
+  // Radio is up (or cleanly skipped); now power the Pi.
+  pinMode(RPI_ENABLE_PIN, OUTPUT);
+  digitalWrite(RPI_ENABLE_PIN, HIGH);
+  Serial.println("[ArtemisTeensy] RPI power enable asserted (pin 36 HIGH)");
+
   debugPrintCounters("[ArtemisTeensy] counters");
 }
 

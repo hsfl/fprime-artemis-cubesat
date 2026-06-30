@@ -40,6 +40,7 @@ class RelayUartRf {
   };
 
   void processUartByte(uint8_t b);
+  bool handleHandshakeByte(uint8_t b);
   void processRawUartByte(uint8_t b);
   void flushRawUartIfStale();
   void processCommandByte(uint8_t b);
@@ -88,6 +89,15 @@ class RelayUartRf {
   char m_commandBuffer[link_protocol::COMMAND_MAX_LEN];
   size_t m_commandIndex;
   uint32_t m_lastFrameByteMs;
+
+  // Boot-time Pi<->Teensy link handshake. Before the link is established the
+  // Teensy answers the Pi's '#PING' locally with '#PONG' (never relayed over
+  // RF) so the Pi can confirm the UART is alive before starting F'. Once a
+  // PONG is sent the link latches established and byte inspection stops: the
+  // bridge is a pure transparent tunnel from then on, so '#' bytes inside F'
+  // binary traffic can never be misread as a command.
+  bool m_inHandshake;
+  bool m_linkEstablished;
 
   uint8_t m_nextMsgId;
   bool m_seenRxMsgId;

@@ -14,7 +14,7 @@ Rf23Driver::Rf23Driver(int csPin, int irqPin, uint8_t rxOnPin, uint8_t txOnPin)
   m_radioPins.tx_on_pin = txOnPin;
 }
 
-bool Rf23Driver::begin() { return artemis::rf23bp::initRadio(m_radio, m_radioPins, m_radioProfile, nullptr); }
+bool Rf23Driver::begin() { return artemis::rf23bp::initRadio(m_radio, m_radioPins, m_radioProfile, &Serial); }
 
 bool Rf23Driver::available() {
   return m_radio.available();

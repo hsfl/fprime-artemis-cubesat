@@ -43,6 +43,11 @@ struct RadioProfile {
   uint8_t tx_power = RH_RF22_RF23BP_TXPOW_30DBM;
   bool start_in_receive = true;
   unsigned long settle_us = 300;
+  // Upper bound for the RF23BP chip-ready handshake. RadioHead's RH_RF22::init()
+  // waits for chip-ready with an unbounded busy-loop, which hangs boot forever if
+  // the radio answers SPI but never stabilizes (brown-out / dead crystal). We
+  // probe chip-ready with this timeout first and skip the blocking init on failure.
+  uint16_t chip_ready_timeout_ms = 100;
 };
 
 // Snapshot of interrupt status registers.
@@ -130,18 +135,92 @@ inline void setupAmpPins(const RadioPins& pins, const RadioProfile& profile) {
   }
 }
 
+// Raw SPI1 register read for the chip-ready probe below (RadioHead keeps its
+// own spiRead() protected, so we drive SPI1 directly). RF22 read: send
+// (reg & 0x7f), then clock out the value. Mode 0, MSB first.
+inline uint8_t rf22SpiRead(uint8_t cs_pin, uint8_t reg) {
+  SPI1.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+  digitalWrite(cs_pin, LOW);
+  SPI1.transfer(reg & 0x7f);
+  const uint8_t value = SPI1.transfer(0x00);
+  digitalWrite(cs_pin, HIGH);
+  SPI1.endTransaction();
+  return value;
+}
+
+// Raw SPI1 register write. RF22 write: send (reg | 0x80), then the value.
+inline void rf22SpiWrite(uint8_t cs_pin, uint8_t reg, uint8_t value) {
+  SPI1.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+  digitalWrite(cs_pin, LOW);
+  SPI1.transfer(reg | 0x80);
+  SPI1.transfer(value);
+  digitalWrite(cs_pin, HIGH);
+  SPI1.endTransaction();
+}
+
+// Bounded replacement for the unbounded chip-ready wait inside RH_RF22::init().
+// Returns true only if the radio answers a valid device type AND asserts
+// chip-ready within timeout_ms. On false, the caller must NOT call radio.init()
+// (it would busy-loop forever). Assumes setupSpi1() has already run.
+inline bool rf22ProbeReady(const RadioPins& pins, uint16_t timeout_ms, Print* log) {
+  pinMode(pins.cs_pin, OUTPUT);
+  digitalWrite(pins.cs_pin, HIGH);
+
+  // Software reset to a known state (mirrors RH_RF22::reset()).
+  rf22SpiWrite(pins.cs_pin, RH_RF22_REG_07_OPERATING_MODE1, RH_RF22_SWRES);
+  delay(1);  // SWReset settle time is nominally ~100us.
+
+  // Device-type sanity check (0x08 = RX/TRX). Catches "no radio / dead SPI".
+  const uint8_t device_type = rf22SpiRead(pins.cs_pin, RH_RF22_REG_00_DEVICE_TYPE);
+  if (device_type != RH_RF22_DEVICE_TYPE_RX_TRX &&
+      device_type != RH_RF22_DEVICE_TYPE_TX) {
+    if (log != nullptr) {
+      log->print(F("RF23BP not detected (device type=0x"));
+      log->print(device_type, HEX);
+      log->println(F(")"));
+    }
+    return false;
+  }
+
+  // Wait for chip-ready WITH a timeout -- this is the part RadioHead does
+  // unbounded. Reading INTERRUPT_STATUS2 clears the bit; RH_RF22::init() issues
+  // its own SWRES afterward, which re-asserts chip-ready, so this is safe.
+  const uint32_t start_ms = millis();
+  while (!(rf22SpiRead(pins.cs_pin, RH_RF22_REG_04_INTERRUPT_STATUS2) &
+           RH_RF22_ICHIPRDY)) {
+    if ((millis() - start_ms) >= timeout_ms) {
+      if (log != nullptr) {
+        log->println(F("RF23BP chip-ready timeout (SPI answered, chip never ready)"));
+      }
+      return false;
+    }
+  }
+  return true;
+}
+
 // One-call radio init:
 // 1) amp pin setup
 // 2) SPI1 setup
-// 3) RH_RF22 init + frequency/modem/tx power
-// 4) enter RX or IDLE based on profile
+// 3) bounded chip-ready probe (guards RadioHead's unbounded wait)
+// 4) RH_RF22 init + frequency/modem/tx power
+// 5) enter RX or IDLE based on profile
 inline bool initRadio(RH_RF22& radio, const RadioPins& pins = RadioPins(),
                       const RadioProfile& profile = RadioProfile(),
                       Print* log = nullptr) {
+  if (log != nullptr) log->println(F("[initRadio] setupAmpPins..."));
   setupAmpPins(pins, profile);
+  if (log != nullptr) log->println(F("[initRadio] setupSpi1..."));
   setupSpi1(pins.spi1);
   delay(10);
 
+  // Guard against RH_RF22::init()'s unbounded chip-ready busy-loop: only call it
+  // once we've confirmed (with a timeout) that the radio will actually go ready.
+  if (log != nullptr) log->println(F("[initRadio] rf22ProbeReady..."));
+  if (!rf22ProbeReady(pins, profile.chip_ready_timeout_ms, log)) {
+    return false;
+  }
+
+  if (log != nullptr) log->println(F("[initRadio] radio.init()..."));
   if (!radio.init()) {
     if (log != nullptr) {
       log->println(F("RF23BP init failed"));

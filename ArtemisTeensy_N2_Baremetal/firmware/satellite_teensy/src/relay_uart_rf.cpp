@@ -20,6 +20,8 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
       m_inCommandMode(false),
       m_commandIndex(0),
       m_lastFrameByteMs(0),
+      m_inHandshake(false),
+      m_linkEstablished(false),
       m_nextMsgId(0),
       m_seenRxMsgId(false),
       m_lastRxMsgId(0),
@@ -55,6 +57,8 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
 void RelayUartRf::begin() {
   resetFrameParser(false);
   resetReassembly(false, false);
+  m_inHandshake = false;
+  m_linkEstablished = false;
 }
 
 void RelayUartRf::poll() {
@@ -62,6 +66,11 @@ void RelayUartRf::poll() {
     while (m_linkIo.available() > 0) {
       const uint8_t b = static_cast<uint8_t>(m_linkIo.read());
       m_counters.uartRxBytes += 1;
+      // Pre-link, intercept the Pi's '#PING' handshake locally instead of
+      // relaying it; once the link is established this is skipped entirely.
+      if (!m_linkEstablished && handleHandshakeByte(b)) {
+        continue;
+      }
       if (m_config.uartInputFramed) {
         processUartByte(b);
       } else {
@@ -89,6 +98,40 @@ void RelayUartRf::processUartByte(uint8_t b) {
   }
 
   processFrameByte(b);
+}
+
+bool RelayUartRf::handleHandshakeByte(uint8_t b) {
+  // Returns true if the byte was consumed by the boot handshake (and must not
+  // be relayed). Only called while the link is not yet established, so there is
+  // no concurrent F' traffic to collide with. A '#'-prefixed, newline-
+  // terminated command line is answered locally; '#PING' -> '#PONG' latches the
+  // link established, after which poll() stops inspecting bytes altogether.
+  if (!m_inHandshake) {
+    if (b != static_cast<uint8_t>(link_protocol::COMMAND_PREFIX)) {
+      return false;  // not a handshake; relay as normal link traffic
+    }
+    m_inHandshake = true;
+    m_commandIndex = 0;
+    memset(m_commandBuffer, 0, sizeof(m_commandBuffer));
+    return true;
+  }
+
+  if (b == '\n' || b == '\r') {
+    m_commandBuffer[m_commandIndex] = '\0';
+    m_inHandshake = false;
+    if (strcmp(m_commandBuffer, link_protocol::CMD_PING) == 0) {
+      const size_t n = strlen(link_protocol::RESP_PONG);
+      m_linkIo.write(reinterpret_cast<const uint8_t*>(link_protocol::RESP_PONG), n);
+      m_counters.uartTxBytes += static_cast<uint32_t>(n);
+      m_linkEstablished = true;
+    }
+    return true;
+  }
+
+  if (m_commandIndex + 1 < sizeof(m_commandBuffer)) {
+    m_commandBuffer[m_commandIndex++] = static_cast<char>(b);
+  }
+  return true;
 }
 
 void RelayUartRf::processRawUartByte(uint8_t b) {
