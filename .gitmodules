@@ -1,3 +1,15 @@
 [submodule "ArtemisRpiTeensy_N2/lib/fprime"]
 	path = ArtemisRpiTeensy_N2/lib/fprime
 	url = https://github.com/nasa/fprime.git
+[submodule "external/artemis-pdu"]
+	path = external/artemis-pdu
+	url = https://github.com/hsfl/artemis-cubesat-pdu-firmware.git
+	branch = codex/pdu-protocol-refactor
+[submodule "external/epscorc3m"]
+	path = external/epscorc3m
+	url = https://github.com/hsfl/epscor-c3m-payload.git
+	branch = master
+[submodule "external/artemis-cubesat-examples"]
+	path = external/artemis-cubesat-examples
+	url = https://github.com/hsfl/artemis-cubesat.git
+	branch = master

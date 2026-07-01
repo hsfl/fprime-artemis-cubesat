@@ -3,4 +3,7 @@ register_fprime_library(
         ${CMAKE_CURRENT_LIST_DIR}/CommsAdapter_TeensyRfm23.fpp
     SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/CommsAdapter_TeensyRfm23.cpp
+    DEPENDS
+        Components_Types
+        Components_LinkCfg
 )

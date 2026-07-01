@@ -70,24 +70,46 @@ Both sketches include a short amp settle delay before and after each RF state ch
 
 Build the ground sketch from the ground workspace so Arduino CLI uses the same Teensy package cache as the project:
 
+### macOS
+
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/GDS_Teensy
+cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
 export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
 arduino-cli compile \
   --fqbn teensy:avr:teensy41 \
   --build-path "$PWD/build/basic-radio-ping-pong-ground" \
-  /Users/sozodennis/Developer/fprime-artemis-cubesat/student_onboarding/basic_radio_ping_pong/ground_radio_ping_pong
+  ../student_onboarding/basic_radio_ping_pong/ground_radio_ping_pong
 ```
 
 Build the satellite sketch from the satellite workspace:
 
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+cd ~/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
 export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
 arduino-cli compile \
   --fqbn teensy:avr:teensy41 \
   --build-path "$PWD/build/basic-radio-ping-pong-satellite" \
-  /Users/sozodennis/Developer/fprime-artemis-cubesat/student_onboarding/basic_radio_ping_pong/satellite_radio_ping_pong
+  ../student_onboarding/basic_radio_ping_pong/satellite_radio_ping_pong
+```
+
+### Windows Laptop (WSL2)
+
+```bash
+cd ~/fprime-artemis-cubesat/GDS_Teensy
+export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
+arduino-cli compile \
+  --fqbn teensy:avr:teensy41 \
+  --build-path "$PWD/build/basic-radio-ping-pong-ground" \
+  ../student_onboarding/basic_radio_ping_pong/ground_radio_ping_pong
+```
+
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
+arduino-cli compile \
+  --fqbn teensy:avr:teensy41 \
+  --build-path "$PWD/build/basic-radio-ping-pong-satellite" \
+  ../student_onboarding/basic_radio_ping_pong/satellite_radio_ping_pong
 ```
 
 ## Upload

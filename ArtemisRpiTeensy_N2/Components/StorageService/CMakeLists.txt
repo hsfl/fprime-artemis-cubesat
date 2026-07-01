@@ -3,4 +3,6 @@ register_fprime_library(
         ${CMAKE_CURRENT_LIST_DIR}/StorageService.fpp
     SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/StorageService.cpp
+    DEPENDS
+        Components_Types
 )

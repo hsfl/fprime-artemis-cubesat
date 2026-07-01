@@ -27,3 +27,7 @@ bool Rf23Driver::recv(uint8_t* buf, uint8_t* len) {
 bool Rf23Driver::send(const uint8_t* data, uint8_t len) {
   return artemis::rf23bp::sendPacket(m_radio, m_radioPins, m_radioProfile, data, len);
 }
+
+artemis::rf23bp::LinkStats Rf23Driver::linkStats() {
+  return artemis::rf23bp::readLinkStats(m_radio);
+}

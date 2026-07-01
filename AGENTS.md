@@ -18,13 +18,22 @@ IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for an
 
 ## Agent Skills
 
-Project skills live in `.claude/skills/` and are auto-loaded by Claude Code. Codex-style agents (which read AGENTS.md but don't auto-load skills) should consult these files directly:
+Project skills are shared through `.agents/skills/` for Codex-style agents and `.claude/skills/` for Claude Code. Keep these skill folders symlinked so both agent surfaces use the same skill files. Codex-style agents should consult `.agents/skills/` directly; Claude Code can auto-load from `.claude/skills/`.
 
 | Skill | File | Use when... |
 |-------|------|-------------|
-| `fprime-swe` | [`.claude/skills/fprime-swe/SKILL.md`](.claude/skills/fprime-swe/SKILL.md) | Developing F' components, ports, topologies, running builds, or using fprime-util |
-| `fprime-docs-search` | [`.claude/skills/fprime-docs-search/SKILL.md`](.claude/skills/fprime-docs-search/SKILL.md) | Looking up F' framework docs — check repo-local docs at `ArtemisRpiTeensy_N2/lib/fprime/docs` first |
-| `fprime-cross-compilation` | [`.claude/skills/fprime-cross-compilation/SKILL.md`](.claude/skills/fprime-cross-compilation/SKILL.md) | Cross-compiling for ARM targets; Pi Zero W ARMv6 landmine documented here |
+| `fprime-swe` | [`.agents/skills/fprime-swe/SKILL.md`](.agents/skills/fprime-swe/SKILL.md) | Developing F' components, ports, topologies, running builds, or using fprime-util |
+| `fprime-docs-search` | [`.agents/skills/fprime-docs-search/SKILL.md`](.agents/skills/fprime-docs-search/SKILL.md) | Looking up F' framework docs — check repo-local docs at `ArtemisRpiTeensy_N2/lib/fprime/docs` first |
+| `fprime-cross-compilation` | [`.agents/skills/fprime-cross-compilation/SKILL.md`](.agents/skills/fprime-cross-compilation/SKILL.md) | Cross-compiling for ARM targets; Pi Zero W ARMv6 landmine documented here |
+| `student-git-handoff` | [`.agents/skills/student-git-handoff/SKILL.md`](.agents/skills/student-git-handoff/SKILL.md) | Helping non-technical students use GitHub feature branches, commits, pushes, and pull requests with Software Dev Lead-approved base branches |
+
+## Student Platform Policy
+
+- All new software choices, tools, scripts, dependencies, and workflows must support student use on macOS first, then Windows.
+- F Prime development on Windows means WSL unless an official native-Windows path is documented for the specific tool. Do not present native PowerShell/CMD F Prime builds as the default student path.
+- Prefer cross-platform tools with clear macOS and Windows installation paths. Avoid Linux-only assumptions unless the workflow is explicitly target-hardware-only or includes a documented macOS/Windows path through Docker, WSL, or a VM.
+- When adding student-facing commands, include macOS examples first and Windows notes second when the commands differ.
+- For non-technical testing users, prefer browser/Python-standard-library tools that run natively on Windows. Require WSL only for F Prime build/developer workflows, not for simple ground-side viewers, payload review, or demo-data inspection.
 
 ## F' Agent Usage Guide
 
@@ -32,11 +41,22 @@ Use this project with the `fprime-swe` skill and follow these steps exactly.
 
 ## Current Project Quick Start (Read First)
 
+- Before making assumptions about the repo state, run:
+  ```bash
+  git status --short --branch
+  git submodule status --recursive
+  ```
+  Treat the active branch and local uncommitted files as the current working context. Do not assume the checkout is on `main`, `neutron_2`, `students/component-starter-base`, or any Codex feature branch without verifying.
 - Read `docs/SYSTEM_ARCHITECTURE.md` first.
   - This is the required system-level crosswalk between the Neutron 2 target architecture and the Artemis-based prototype used for the current demo.
   - Do not continue with subsystem or architecture work until this file has been read.
 - Read `README.md` for the top-level architecture and current status.
 - Read `docs/agents_notes.md` for latest implementation details and pending TODO items.
+- For subsystem/component architecture details, point agents to:
+  - `docs/SYSTEM_ARCHITECTURE.md`
+  - `docs/archive/OPTIMAL_FPRIME_COMPONENT_TOPOLOGY_PLAN.md`
+  - `docs/STUDENT_COMPONENT_STARTERS.md`
+  Keep detailed architecture in those docs rather than duplicating it here.
 - Treat the shortened FlatSat FSR end-to-end demo as the current target mission narrative:
   1. boot into `Base Mode`
   2. determine mock ground-contact timing with `D2S2` inputs
@@ -51,22 +71,17 @@ Use this project with the `fprime-swe` skill and follow these steps exactly.
   - `ArtemisTeensy_N2_Baremetal`
 - Active ground-station Teensy workspace is:
   - `GDS_Teensy`
-- `espcor_teensy_demo` is reference-only unless explicitly requested:
-  - `espcor_teensy_demo`
 
 ## Quick Start
 1. Activate the venv before any F' command:
    ```bash
    . ArtemisRpiTeensy_N2/fprime-venv/bin/activate
    ```
-2. Ensure a build cache exists (required before generators):
+2. Configure and build from the active F' project root:
    ```bash
    cd ArtemisRpiTeensy_N2
-   fprime-util generate
-   ```
-   If it already exists, use:
-   ```bash
    fprime-util generate -f
+   fprime-util build
    ```
 
 ## Creating Components
@@ -104,36 +119,46 @@ fprime-util build
 
 ## RPi Native Build (Minimal)
 - Use manual native build + run instructions:
-  - `rpi_build.instructions`
+  - `docs/RPI_BUILD.md`
 - Build policy:
   - build on the Raspberry Pi target and run the locally built binary.
 
 ## Run `fprime-gds` over UART (RPi/Operator Side)
 
 Preferred launcher (repo-maintained defaults):
+macOS:
 ```bash
-cd ArtemisRpiTeensy_N2
-./tools/run_gds_uart.sh
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
+./tools/run_gds_uart.sh --port "$PORT"
+```
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
+./tools/run_gds_uart.sh --port "$PORT"
 ```
 
 Script defaults:
-- UART device: `/dev/cu.usbmodem115551201`
+- UART device: auto-detected when exactly one supported serial device is present;
+  otherwise pass `--port <device>`
 - UART baud: `115200`
 - GUI port: `5050`
-- dictionary: `build-artifacts/Darwin/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json`
+- dictionary: auto-detected under `build-artifacts` when not supplied
 
 Useful overrides:
 ```bash
-./tools/run_gds_uart.sh --port /dev/cu.usbmodemXXXX --baud 115200
+./tools/run_gds_uart.sh --port "$PORT" --baud 115200
 ./tools/run_gds_uart.sh --gui-port 5050
-./tools/run_gds_uart.sh --dictionary /abs/path/to/TopologyDictionary.json
+./tools/run_gds_uart.sh --dictionary build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json
 ./tools/run_gds_uart.sh --dry-run
 ```
 
 Notes:
 - On macOS, port `5000` may already be occupied by Control Center/AirPlay Receiver. Use non-5000 GUI ports (default script port is `5050`).
 - If using raw CLI instead of script, pass UART args explicitly:
-  - `fprime-gds -n --communication-selection uart --uart-device <device> --uart-baud 115200 --framing-selection space-packet-space-data-link`
+  - `fprime-gds -n --communication-selection uart --uart-device "$PORT" --uart-baud 115200 --framing-selection space-packet-space-data-link`
 
 ## Common Pitfalls
 - Running generators without a build cache.
@@ -150,17 +175,32 @@ Use this section when working in the Teensy bridge workspace:
 
 ### Build (Arduino CLI)
 Run from the baremetal project root:
+macOS:
 ```bash
-cd ArtemisTeensy_N2_Baremetal
+cd ~/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+./tools/arduino-cli/build.sh
+```
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
 ./tools/arduino-cli/build.sh
 ```
 
 ### Upload (Arduino CLI)
+macOS:
 ```bash
-cd ArtemisTeensy_N2_Baremetal
-./tools/arduino-cli/upload.sh /dev/ttyACM0
+cd ~/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
+./tools/arduino-cli/upload.sh "$PORT"
 ```
-- Replace `/dev/ttyACM0` with the actual connected Teensy port.
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
+./tools/arduino-cli/upload.sh "$PORT"
+```
 
 ### Teensy Source of Truth
 - Main sketch:
@@ -174,7 +214,6 @@ cd ArtemisTeensy_N2_Baremetal
 ### Teensy Common Pitfalls
 - Running `arduino-cli` from outside `ArtemisTeensy_N2_Baremetal` (wrong config path).
 - Editing generated build cache under `ArtemisTeensy_N2_Baremetal/build/` instead of source files.
-- Treating `espcor_teensy_demo/` as active code; it is reference-only unless explicitly requested.
 - Changing UART settings without updating both firmware and UART contract docs.
 
 ## Ground Teensy (`GDS_Teensy`) Agent Usage Guide
@@ -184,18 +223,33 @@ Use this section when working in the ground bridge workspace:
 
 ### Build (Arduino CLI)
 Run from `GDS_Teensy`:
+macOS:
 ```bash
-cd GDS_Teensy
+cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
+./tools/arduino-cli/build.sh
+```
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/GDS_Teensy
 ./tools/arduino-cli/build.sh
 ```
 
 ### Upload (Arduino CLI)
 Run from `GDS_Teensy`:
+macOS:
 ```bash
-cd GDS_Teensy
-./tools/arduino-cli/upload.sh /dev/cu.usbmodemXXXX
+cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
+PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
+./tools/arduino-cli/upload.sh "$PORT"
 ```
-- Use the actual detected USB modem/ACM port.
+
+Windows WSL2:
+```bash
+cd ~/fprime-artemis-cubesat/GDS_Teensy
+PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
+./tools/arduino-cli/upload.sh "$PORT"
+```
 - `upload.sh` expects artifacts from `build.sh` in `build/arduino-cli`.
 
 ### Ground Teensy Source of Truth
@@ -218,6 +272,13 @@ cd GDS_Teensy
 
 ### Lessons Learned
 - Keep `ArtemisRpiTeensy_N2/lib/fprime` as a root-managed Git submodule; avoid nested standalone repos inside the workspace.
+- For external subsystems, submodule whole implementation repos under `external/` only when they own real firmware, ICDs, bench tools, or hardware protocol code. Do not make constants-only repos the primary source of truth.
+- Current external/reference repos:
+  - `external/artemis-pdu/` is the PDU firmware/ICD/bench-tooling reference and current EPS/PDU implementation context.
+  - `external/epscorc3m/` is the more current full Artemis CubeSat baremetal demo reference; it documents practical integration footguns, but it is not the target F Prime architecture.
+  - `external/artemis-cubesat-examples/` is legacy Artemis CubeSat sample code. Use it for subsystem interface examples only; do not copy its Teensy-main-computer architecture into this F Prime project, where the Raspberry Pi hosts the F Prime deployment.
+  - `external/payload-neutron-simulation/` is the current local simulated-payload source for no-HIL/demo work.
+- Future submodule priority: `external/satnogs-radio/` once the SatNOGS repo/dev board is real, and `external/payload/` only once the real payload-board repo exists. Do not add ADCS/GPS/IMU/thermal submodules until they have standalone firmware/tooling repos.
 - If using `fprime-util new --deployment` for validation, register it in `project.cmake` during the prompt so build targets exist.
 - In this repo, prefer `fprime-util generate -f` to avoid stale build-cache failures.
 - For deployment smoke validation, direct CMake target build is reliable:
@@ -225,21 +286,31 @@ cd GDS_Teensy
 - Remove temporary smoke deployments after validation unless explicitly requested to keep them.
 
 ### Recommended Development Flow
-1. Read `README.md` and `docs/agents_notes.md` for current architecture/state.
-2. Activate F' venv:
+1. Check active branch/worktree and submodule state:
+   - `git status --short --branch`
+   - `git submodule status --recursive`
+2. Read `README.md`, `docs/SYSTEM_ARCHITECTURE.md`, and `docs/agents_notes.md` for current architecture/state.
+3. Activate F' venv:
    - `. ArtemisRpiTeensy_N2/fprime-venv/bin/activate`
-3. Validate F' build:
+4. Validate F' build:
    - `cd ArtemisRpiTeensy_N2`
    - `fprime-util generate -f`
    - `fprime-util build`
-4. Validate Teensy compile:
+5. Validate Teensy compile:
    - `cd ../ArtemisTeensy_N2_Baremetal`
    - `./tools/arduino-cli/build.sh`
-5. Re-run both validations after topology/driver changes.
-6. Before commit/push:
+6. Re-run both validations after topology/driver changes.
+7. Before commit/push:
    - verify submodule SHA is intentional (`git submodule status --recursive`)
    - verify no build/cache artifacts are staged (`git status --short`)
    - verify remote branch naming is push-compatible (avoid `dev/x` if `dev` branch already exists remotely)
+
+### Student Branch / Handoff Rules
+- `students/component-starter-base` is the shared student starter branch, created from `neutron_2`; verify the current branch before making student-facing edits.
+- Keep student-facing docs KISS: clear, concise, consistent, and explicit about what students should edit.
+- Use service/adapter terminology from `docs/SYSTEM_ARCHITECTURE.md` and `docs/STUDENT_COMPONENT_STARTERS.md`; do not restate the full architecture here.
+- Placeholder or request-state commands must not imply real hardware actuation. Say plainly when a component records intent only.
+- When helping students with GitHub flow, use the `student-git-handoff` skill and keep their work on feature branches from the approved student base.
 
 ### Demo-First Decision Rule
 - Prefer the smallest implementation that supports the live demo story.
@@ -255,9 +326,9 @@ cd GDS_Teensy
 
 ### Runtime Smoke Flow (RPi)
 - Binary:
-  - `ArtemisRpiTeensy_N2/build-artifacts/Darwin/ArtemisRpiTeensyDeployment/bin/ArtemisRpiTeensyDeployment`
+  - `ArtemisRpiTeensy_N2/build-artifacts/Linux/bin/ArtemisRpiTeensyDeployment`
 - Run:
-  - `./ArtemisRpiTeensyDeployment -d /dev/serial0`
+  - `cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2 && ./build-artifacts/Linux/bin/ArtemisRpiTeensyDeployment -d /dev/serial0`
 - Minimum pass criteria:
   - startup banner appears
   - no immediate init assertion

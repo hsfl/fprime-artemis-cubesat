@@ -12,6 +12,7 @@ class Rf23Driver {
   bool available();
   bool recv(uint8_t* buf, uint8_t* len);
   bool send(const uint8_t* data, uint8_t len);
+  artemis::rf23bp::LinkStats linkStats();
 
  private:
   int m_csPin;

@@ -1,6 +1,8 @@
 #include <Arduino.h>
 
 #include "src/link_counters.hpp"
+#include "src/local_teensy_router.hpp"
+#include "src/pdu_proxy.hpp"
 #include "src/relay_uart_rf.hpp"
 #include "src/rf23_driver.hpp"
 
@@ -13,23 +15,77 @@ static constexpr uint8_t RPI_ENABLE_PIN = 36;
 static constexpr uint8_t TEENSY_LED_PIN = 13;
 
 static constexpr uint32_t UART_BAUD = 115200;
+static constexpr uint32_t PDU_UART_BAUD = 9600;
 static constexpr uint32_t DEBUG_UART_BAUD = 115200;
 static constexpr uint16_t RAW_UART_FLUSH_MS = 12;
 static constexpr uint8_t UPLINK_QUEUE_DEPTH = 32;
 static constexpr uint8_t DOWNLINK_QUEUE_DEPTH = 32;
 static constexpr uint32_t DEBUG_STATUS_PERIOD_MS = 1000;
+static constexpr uint32_t RADIO_TRAFFIC_LED_BLINK_MS = 60;
 static constexpr size_t RPI_UART_RX_BUFFER_SIZE = 4096;
 static constexpr uint16_t CCSDS_TM_FRAME_BYTES = 128;
 
 LinkCounters g_linkCounters;
 Rf23Driver g_rfDriver(RADIO_CS, RADIO_INT, RADIO_RX_ON_PIN, RADIO_TX_ON_PIN);
+PduProxy g_pduProxy(Serial1);
+LocalTeensyRouter g_localRouter(g_pduProxy, g_rfDriver, g_linkCounters);
 static uint8_t g_rpiUartRxBuffer[RPI_UART_RX_BUFFER_SIZE];
-// Transparent bridge mode for HIL:
-// - raw UART bytes from Pi are RF-relayed as payload
-// - RF-reassembled bytes are emitted raw to Pi UART
+// Channelized bridge mode:
+// - channel 0: CCSDS/GDS bytes forwarded over RF
+// - channel 1: payload blob packets forwarded over RF
+// - channel 2: Teensy-local subsystem RPC, terminated on this Teensy
 RelayConfig g_relayConfig{
-    true, false, false, false, RAW_UART_FLUSH_MS, UPLINK_QUEUE_DEPTH, DOWNLINK_QUEUE_DEPTH, CCSDS_TM_FRAME_BYTES};
-RelayUartRf g_relay(Serial2, g_rfDriver, g_linkCounters, g_relayConfig);
+    true,
+    true,
+    false,
+    true,
+    RAW_UART_FLUSH_MS,
+    UPLINK_QUEUE_DEPTH,
+    DOWNLINK_QUEUE_DEPTH,
+    CCSDS_TM_FRAME_BYTES,
+    link_protocol::CHANNEL_CCSDS};
+RelayUartRf g_relay(Serial2, g_rfDriver, g_linkCounters, g_relayConfig, nullptr, &g_localRouter);
+static uint32_t g_radioTrafficLedUntilMs = 0;
+
+struct RadioTrafficSnapshot {
+  uint32_t rxPackets = 0;
+  uint32_t txPackets = 0;
+  uint32_t ackRx = 0;
+  uint32_t ackTx = 0;
+  uint32_t retries = 0;
+  uint32_t ackTimeouts = 0;
+  uint32_t txDrops = 0;
+};
+
+RadioTrafficSnapshot radioTrafficSnapshot() {
+  return {
+      g_linkCounters.rfRxPackets,
+      g_linkCounters.rfTxPackets,
+      g_linkCounters.rfAckRx,
+      g_linkCounters.rfAckTx,
+      g_linkCounters.rfRetries,
+      g_linkCounters.rfAckTimeouts,
+      g_linkCounters.rfTxDrops,
+  };
+}
+
+bool radioTrafficChanged(const RadioTrafficSnapshot& a, const RadioTrafficSnapshot& b) {
+  return a.rxPackets != b.rxPackets || a.txPackets != b.txPackets || a.ackRx != b.ackRx ||
+         a.ackTx != b.ackTx || a.retries != b.retries || a.ackTimeouts != b.ackTimeouts ||
+         a.txDrops != b.txDrops;
+}
+
+void updateRadioTrafficLed(uint32_t now) {
+  static RadioTrafficSnapshot lastTraffic = radioTrafficSnapshot();
+  const RadioTrafficSnapshot currentTraffic = radioTrafficSnapshot();
+  if (radioTrafficChanged(currentTraffic, lastTraffic)) {
+    lastTraffic = currentTraffic;
+    g_radioTrafficLedUntilMs = now + RADIO_TRAFFIC_LED_BLINK_MS;
+    digitalWrite(TEENSY_LED_PIN, LOW);
+  } else if (static_cast<int32_t>(now - g_radioTrafficLedUntilMs) >= 0) {
+    digitalWrite(TEENSY_LED_PIN, HIGH);
+  }
+}
 
 void debugPrintCounters(const char* prefix) {
   Serial.print(prefix);
@@ -49,6 +105,18 @@ void debugPrintCounters(const char* prefix) {
   Serial.print(g_linkCounters.rfRxSegments);
   Serial.print(" rf_tx_seg=");
   Serial.print(g_linkCounters.rfTxSegments);
+  Serial.print(" payload_uart_rx=");
+  Serial.print(g_linkCounters.payloadUartRxBytes);
+  Serial.print(" payload_uart_tx=");
+  Serial.print(g_linkCounters.payloadUartTxBytes);
+  Serial.print(" payload_rf_rx_msg=");
+  Serial.print(g_linkCounters.payloadRfRxMessages);
+  Serial.print(" payload_rf_tx_msg=");
+  Serial.print(g_linkCounters.payloadRfTxMessages);
+  Serial.print(" payload_rf_rx_seg=");
+  Serial.print(g_linkCounters.payloadRfRxSegments);
+  Serial.print(" payload_rf_tx_seg=");
+  Serial.print(g_linkCounters.payloadRfTxSegments);
   Serial.print(" rf_tx_drops=");
   Serial.print(g_linkCounters.rfTxDrops);
   Serial.print(" rf_msg_id_gaps=");
@@ -80,8 +148,11 @@ void setup() {
   Serial2.addMemoryForRead(g_rpiUartRxBuffer, sizeof(g_rpiUartRxBuffer));
   Serial.println("[ArtemisTeensy] Serial2 RX buffer size: " +
                  String(sizeof(g_rpiUartRxBuffer)) + " bytes");
+
   Serial2.begin(UART_BAUD);
   Serial.println("[ArtemisTeensy] Serial2 UART started at " + String(UART_BAUD) + " baud");
+
+  g_pduProxy.begin(PDU_UART_BAUD);
 
   // Bring up the radio on a stable rail BEFORE enabling Pi power. The Pi's
   // power-on inrush can brown out a shared supply and stall the RF23BP
@@ -94,7 +165,7 @@ void setup() {
   Serial.println("[ArtemisTeensy] Relay bridge initialized (raw UART byte tunnel + RF segmentation)");
 
   if (radioOk) {
-    Serial.println("[ArtemisTeensy] Relay bridge ready (raw UART byte tunnel + RF segmentation)");
+    Serial.println("[ArtemisTeensy] Relay bridge ready (channelized UART + RF segmentation + local PDU proxy)");
   } else {
     Serial.println("[ArtemisTeensy] RF23 init failed/timed out; relay running without RF");
   }
@@ -113,6 +184,8 @@ void loop() {
   g_relay.poll();
 
   const uint32_t now = millis();
+  updateRadioTrafficLed(now);
+
   if ((now - lastDebugStatusMs) >= DEBUG_STATUS_PERIOD_MS) {
     debugPrintCounters("[ArtemisTeensy] counters");
     lastDebugStatusMs = now;

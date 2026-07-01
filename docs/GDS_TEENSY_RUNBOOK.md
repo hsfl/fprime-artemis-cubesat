@@ -18,57 +18,101 @@ Ground-station Teensy workflow for RF bridge + laptop UART integration.
 
 ## 1) Build Ground Teensy Firmware
 
+### macOS
+
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/GDS_Teensy
+cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
 ./tools/arduino-cli/build.sh
 ```
 
 Manual equivalent:
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/GDS_Teensy
+cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
+export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
+arduino-cli compile --fqbn teensy:avr:teensy41 --build-path "$PWD/build/arduino-cli" "$PWD/firmware/gds_teensy"
+```
+
+### Windows Laptop (WSL2)
+
+```bash
+cd ~/fprime-artemis-cubesat/GDS_Teensy
+./tools/arduino-cli/build.sh
+```
+
+Manual equivalent:
+```bash
+cd ~/fprime-artemis-cubesat/GDS_Teensy
 export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
 arduino-cli compile --fqbn teensy:avr:teensy41 --build-path "$PWD/build/arduino-cli" "$PWD/firmware/gds_teensy"
 ```
 
 ## 2) Upload Ground Teensy Firmware
 
+### macOS
+
 Find device:
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/GDS_Teensy
+cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
 export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
 arduino-cli board list
 ```
 
 Upload:
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/GDS_Teensy
-./tools/arduino-cli/upload.sh /dev/cu.usbmodemXXXX
+cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
+PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
+./tools/arduino-cli/upload.sh "$PORT"
 ```
 
-Notes:
-- On macOS, port is usually `/dev/cu.usbmodem*`.
-- On Linux, port is usually `/dev/ttyACM*`.
+### Windows Laptop (WSL2)
+
+Attach the Teensy USB device to WSL first, then run:
+
+```bash
+cd ~/fprime-artemis-cubesat/GDS_Teensy
+export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
+arduino-cli board list
+PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
+./tools/arduino-cli/upload.sh "$PORT"
+```
 
 ## 3) Optional Serial Monitor Check
 
+### macOS
+
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/GDS_Teensy
+cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
 export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
-arduino-cli monitor -p /dev/cu.usbmodemXXXX -c baudrate=115200
+PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
+arduino-cli monitor -p "$PORT" -c baudrate=115200
+```
+
+### Windows Laptop (WSL2)
+
+```bash
+cd ~/fprime-artemis-cubesat/GDS_Teensy
+export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
+PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
+arduino-cli monitor -p "$PORT" -c baudrate=115200
 ```
 
 ## 4) Run `fprime-gds` over UART
 
-Use repo launcher:
+### macOS
+
 ```bash
-cd /Users/sozodennis/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-./tools/run_gds_uart.sh
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
+./tools/run_gds_uart.sh --port "$PORT"
 ```
 
-Defaults in launcher:
-- UART device: `/dev/cu.usbmodem115551201`
-- UART baud: `115200`
-- GUI port: `5050`
+### Windows Laptop (WSL2)
+
+```bash
+cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
+./tools/run_gds_uart.sh --port "$PORT"
+```
 
 Open UI:
 - `http://127.0.0.1:5050`
@@ -78,8 +122,15 @@ Open UI:
 1. Compile link errors with many `usb_serial_*` / `yield` undefined references
    - Cause: stale build cache.
    - Fix:
+   macOS:
    ```bash
-   cd /Users/sozodennis/Developer/fprime-artemis-cubesat/GDS_Teensy
+   cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
+   rm -rf build/arduino-cli
+   ./tools/arduino-cli/build.sh
+   ```
+   Windows WSL2:
+   ```bash
+   cd ~/fprime-artemis-cubesat/GDS_Teensy
    rm -rf build/arduino-cli
    ./tools/arduino-cli/build.sh
    ```
@@ -96,4 +147,3 @@ Open UI:
 4. Browser shows `403` at `127.0.0.1:5000`
    - Cause: another service bound to `5000` (commonly macOS Control Center/AirPlay Receiver).
    - Fix: use launcher default `5050` or set `--gui-port <port>`.
-

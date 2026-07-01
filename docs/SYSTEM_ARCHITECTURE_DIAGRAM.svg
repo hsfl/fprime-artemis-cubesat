@@ -80,7 +80,7 @@
   <rect x="420" y="562" width="224" height="124" rx="12" fill="#ffffff" stroke="#4a8a4a" stroke-width="1.2"/>
   <text class="caption" x="434" y="576">Hardware adapters / HAL</text>
   <text class="micro" x="434" y="592">EpsAdapter_Artemis</text>
-  <text class="micro" x="434" y="606">PayloadAdapter_N1Legacy</text>
+  <text class="micro" x="434" y="606">PayloadAdapter_NeutronSim</text>
   <text class="micro" x="434" y="620">AdcsAdapter_D2S2</text>
   <text class="micro" x="434" y="634">GpsAdapter_Artemis</text>
   <text class="micro" x="434" y="648">CommsAdapter_TeensyRfm23</text>
@@ -99,8 +99,8 @@
 
   <rect x="860" y="380" width="230" height="96" rx="20" fill="#eaf2ff" stroke="#3c659f" stroke-width="2"/>
   <text class="label" x="888" y="412">PLD</text>
-  <text class="body" x="888" y="434">Legacy Neutron 1</text>
-  <text class="body" x="888" y="452">Payload board</text>
+  <text class="body" x="888" y="434">Neutron 2 simulator</text>
+  <text class="body" x="888" y="452">dev board later</text>
 
   <rect x="860" y="540" width="230" height="96" rx="20" fill="#eaf2ff" stroke="#3c659f" stroke-width="2"/>
   <text class="label" x="888" y="572">GPS</text>

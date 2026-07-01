@@ -1,12 +1,22 @@
 # GDS_Teensy
 
-Ground-station Teensy baremetal workspace for RF23BP receive + reassembly.
+Ground-station Teensy baremetal workspace for the Neutron 2 RF MVP bridge.
+
+Detailed docs live in:
+
+- `../docs/GDS_TEENSY_RUNBOOK.md`
+- `docs/transport_contract.md`
 
 ## Scope
-- Receives segmented RF payloads from satellite Teensy.
-- Reassembles original opaque F' message bytes.
-- Streams reassembled bytes over USB serial (`115200`) to laptop `fprime-gds` UART device.
-- Accepts raw USB UART bytes from laptop and packetizes them into RF messages (timeout/buffer based) for simple uplink commands.
+
+- Receives RF channel 0 from the satellite Teensy and streams raw CCSDS bytes
+  over USB `Serial` for laptop `fprime-gds`.
+- Receives RF channel 1 payload/science bytes and streams them to the payload
+  USB serial path when triple-serial USB is enabled.
+- Accepts raw GDS uplink bytes from laptop USB `Serial`, batches them, and
+  transmits them over RF channel 0.
+- Does not handle channel 2. Channel 2 is satellite-local Pi <-> Teensy
+  subsystem RPC, currently EPS/PDU.
 
 ## Build (Arduino CLI)
 ```bash
@@ -22,7 +32,8 @@ cd GDS_Teensy
 
 ## Source Layout
 - `firmware/gds_teensy/gds_teensy.ino`: top-level sketch.
-- `firmware/gds_teensy/src/relay_uart_rf.*`: RF segment reassembly + UART egress.
+- `firmware/gds_teensy/src/relay_uart_rf.*`: RF segment reassembly, channel 0
+  UART egress, and channel 1 payload egress.
 - `firmware/gds_teensy/src/rf23_driver.*`: RF23BP wrapper.
 - `firmware/gds_teensy/src/link_protocol.hpp`: framing and RF segment constants.
 - `firmware/gds_teensy/src/link_counters.hpp`: link observability counters.

@@ -9,8 +9,9 @@ SYSROOT_DIR="${PI_ZERO_W_SYSROOT_DIR:-$ROOT_DIR/cross/pi-zero-w/sysroot}"
 VERIFY_DIR="$ROOT_DIR/cross/pi-zero-w/verify"
 DEPLOYMENT_NAME="ArtemisRpiTeensyDeployment"
 REMOTE_DIR="${PI_ZERO_W_REMOTE_DIR:-/home/pi/artemis/cross}"
-SYNC_SYSROOT="true"
-BUILD_IMAGE="true"
+SYNC_SYSROOT="auto"
+BUILD_IMAGE="auto"
+CLEAN="false"
 LOCAL_ONLY="false"
 COPY_ONLY="false"
 
@@ -28,6 +29,16 @@ Update these for your own setup before the first run:
   3. Optional local sysroot location: export PI_ZERO_W_SYSROOT_DIR or pass --sysroot
 
 Examples:
+  # Fast normal build: reuse Docker image, sysroot, and Python venv when present.
+  ./tools/docker_cross_compile_pi_zero_w.sh
+
+  # Fast local build + ARMv6 verification only.
+  ./tools/docker_cross_compile_pi_zero_w.sh --local-only
+
+  # Full rebuild: refresh sysroot, rebuild image, recreate Python venv,
+  # and force-regenerate the F Prime build cache.
+  ./tools/docker_cross_compile_pi_zero_w.sh --clean
+
   export PI_ZERO_W_SSH_HOST=pi@192.168.1.44
   export PI_ZERO_W_REMOTE_DIR=/home/pi/artemis/cross
   ./tools/docker_cross_compile_pi_zero_w.sh
@@ -38,6 +49,7 @@ Options:
   --host <ssh-host>     SSH host alias or user@host
   --sysroot <path>      Sysroot directory (default: cross/pi-zero-w/sysroot)
   --remote-dir <path>   Remote deploy directory on the Pi
+  --clean               Refresh sysroot, image, venv, and F Prime build cache
   --skip-sync           Reuse an existing sysroot without rsync
   --skip-image-build    Reuse the existing Docker image tag
   --local-only          Build + verify locally only (skip SSH deploy/smoke)
@@ -60,6 +72,10 @@ while [[ $# -gt 0 ]]; do
     --remote-dir)
       REMOTE_DIR="${2:-}"
       shift 2
+      ;;
+    --clean)
+      CLEAN="true"
+      shift
       ;;
     --skip-sync)
       SYNC_SYSROOT="false"
@@ -101,6 +117,7 @@ echo "  ssh host: $HOST"
 echo "  sysroot: $SYSROOT_DIR"
 echo "  remote dir: $REMOTE_DIR"
 echo "  docker image: $IMAGE_TAG"
+echo "  clean: $CLEAN"
 echo "  local only: $LOCAL_ONLY"
 echo "  copy only: $COPY_ONLY"
 echo
@@ -110,9 +127,31 @@ echo
 # container heredoc's closing 'EOF' must stay at column 0.
 if [[ "$COPY_ONLY" != "true" ]]; then
 
-if [[ "$LOCAL_ONLY" == "true" && "$SYNC_SYSROOT" == "true" ]]; then
-  echo "Local-only mode selected; skipping sysroot sync (reusing existing sysroot)"
+if [[ "$CLEAN" == "true" ]]; then
+  if [[ "$SYNC_SYSROOT" == "auto" ]]; then
+    SYNC_SYSROOT="true"
+  fi
+  if [[ "$BUILD_IMAGE" == "auto" ]]; then
+    BUILD_IMAGE="true"
+  fi
+fi
+
+if [[ "$LOCAL_ONLY" == "true" && "$SYNC_SYSROOT" == "auto" ]]; then
+  echo "Local-only mode selected; reusing existing sysroot"
+>>>>>>> d3eff1367fa0a0d2e373685656d402b1d9c6e59b
   SYNC_SYSROOT="false"
+fi
+
+if [[ "$SYNC_SYSROOT" == "auto" ]]; then
+  if [[ -d "$SYSROOT_DIR/usr/lib/arm-linux-gnueabihf" &&
+        -e "$SYSROOT_DIR/lib/ld-linux-armhf.so.3" &&
+        -d "$SYSROOT_DIR/usr/lib/gcc/arm-linux-gnueabihf" ]]; then
+    echo "Reusing existing Pi Zero W sysroot"
+    SYNC_SYSROOT="false"
+  else
+    echo "Pi Zero W sysroot is missing or incomplete; syncing from target"
+    SYNC_SYSROOT="true"
+  fi
 fi
 
 if [[ "$SYNC_SYSROOT" == "true" ]]; then
@@ -134,8 +173,22 @@ if [[ ! -d "$SYSROOT_DIR/usr/lib/gcc/arm-linux-gnueabihf" ]]; then
   exit 1
 fi
 
+if [[ "$BUILD_IMAGE" == "auto" ]]; then
+  if docker image inspect "$IMAGE_TAG" >/dev/null 2>&1; then
+    echo "Reusing existing Docker image: $IMAGE_TAG"
+    BUILD_IMAGE="false"
+  else
+    echo "Docker image is missing; building $IMAGE_TAG"
+    BUILD_IMAGE="true"
+  fi
+fi
+
 if [[ "$BUILD_IMAGE" == "true" ]]; then
-  docker build --progress=plain -t "$IMAGE_TAG" -f "$ROOT_DIR/cross/pi-zero-w/docker/Dockerfile" "$ROOT_DIR"
+  DOCKER_BUILD_ARGS=(--progress=plain -t "$IMAGE_TAG" -f "$ROOT_DIR/cross/pi-zero-w/docker/Dockerfile")
+  if [[ "$CLEAN" == "true" ]]; then
+    DOCKER_BUILD_ARGS=(--no-cache "${DOCKER_BUILD_ARGS[@]}")
+  fi
+  docker build "${DOCKER_BUILD_ARGS[@]}" "$ROOT_DIR"
 fi
 
 CONTAINER_SCRIPT="$(mktemp)"
@@ -147,22 +200,43 @@ ROOT_DIR="/repo/ArtemisRpiTeensy_N2"
 SYSROOT_DIR="$ROOT_DIR/cross/pi-zero-w/sysroot"
 VERIFY_DIR="$ROOT_DIR/cross/pi-zero-w/verify"
 TOOLCHAIN="pi-zero-w-armv6hf"
+BUILD_DIR="$ROOT_DIR/build-fprime-automatic-$TOOLCHAIN"
 BUILD_VENV="$ROOT_DIR/.cross-venv-linux"
 DEPLOYMENT_NAME="ArtemisRpiTeensyDeployment"
 
-python3 -m venv --clear "$BUILD_VENV"
+if [[ "${CLEAN_VENV:-false}" == "true" ]]; then
+  rm -rf "$BUILD_VENV"
+fi
+
+if [[ ! -x "$BUILD_VENV/bin/python" ]]; then
+  python3 -m venv "$BUILD_VENV"
+fi
+
 # shellcheck disable=SC1090
 . "$BUILD_VENV/bin/activate"
-python -m pip install --upgrade pip
-python -m pip install -r "$ROOT_DIR/lib/fprime/requirements.txt"
+
+if ! fprime-util --help >/dev/null 2>&1 || [[ "${CLEAN_VENV:-false}" == "true" ]]; then
+  python -m pip install --upgrade pip
+  python -m pip install -r "$ROOT_DIR/lib/fprime/requirements.txt"
+fi
 
 export ARM_TOOLS_PATH=/usr
 
 cd "$ROOT_DIR"
-fprime-util generate "$TOOLCHAIN" -f \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_SYSROOT="$SYSROOT_DIR" \
-  -DCMAKE_VERBOSE_MAKEFILE=ON
+if [[ "${CLEAN_BUILD:-false}" == "true" || ! -d "$BUILD_DIR" ]]; then
+  GENERATE_ARGS=("$TOOLCHAIN")
+  if [[ "${CLEAN_BUILD:-false}" == "true" ]]; then
+    GENERATE_ARGS+=("-f")
+  fi
+  GENERATE_ARGS+=(
+    "-DCMAKE_BUILD_TYPE=Release"
+    "-DCMAKE_SYSROOT=$SYSROOT_DIR"
+    "-DCMAKE_VERBOSE_MAKEFILE=ON"
+  )
+  fprime-util generate "${GENERATE_ARGS[@]}"
+else
+  echo "Reusing existing F Prime build cache: $BUILD_DIR"
+fi
 fprime-util build "$TOOLCHAIN"
 
 BIN_PATH="$(find "$ROOT_DIR/build-artifacts" -type f -path "*/${DEPLOYMENT_NAME}/bin/${DEPLOYMENT_NAME}" | grep "/${TOOLCHAIN}/" | head -n 1 || true)"
@@ -189,6 +263,8 @@ EOF
 chmod +x "$CONTAINER_SCRIPT"
 
 docker run --rm \
+  -e CLEAN_BUILD="$CLEAN" \
+  -e CLEAN_VENV="$CLEAN" \
   -v "$REPO_ROOT:/repo" \
   -v "$CONTAINER_SCRIPT:/tmp/run-build.sh:ro" \
   -w /repo/ArtemisRpiTeensy_N2 \

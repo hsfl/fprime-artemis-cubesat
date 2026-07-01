@@ -7,12 +7,17 @@
 RelayUartRf::RelayUartRf(Stream& linkIo,
                          Rf23Driver& rfDriver,
                          LinkCounters& counters,
-                         const RelayConfig& config)
+                         const RelayConfig& config,
+                         Stream* payloadIo,
+                         LocalChannelHandler* localHandler)
     : m_linkIo(linkIo),
+      m_payloadIo(payloadIo),
+      m_localHandler(localHandler),
       m_rf(rfDriver),
       m_counters(counters),
       m_config(config),
       m_state(ParseState::WAIT_MAGIC_0),
+      m_frameChannel(link_protocol::CHANNEL_CCSDS),
       m_frameLength(0),
       m_frameIndex(0),
       m_frameCrc(0),
@@ -20,19 +25,11 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
       m_inCommandMode(false),
       m_commandIndex(0),
       m_lastFrameByteMs(0),
-      m_inHandshake(false),
-      m_linkEstablished(false),
       m_nextMsgId(0),
-      m_seenRxMsgId(false),
-      m_lastRxMsgId(0),
-      m_reassemblyActive(false),
-      m_expectedMsgId(0),
-      m_expectedSegIndex(0),
-      m_expectedSegCount(0),
-      m_reassemblyLen(0),
-      m_lastSegmentMs(0),
       m_rawUartLen(0),
       m_lastRawUartByteMs(0),
+      m_payloadUartLen(0),
+      m_lastPayloadUartByteMs(0),
       m_uplinkHead(0),
       m_uplinkTail(0),
       m_uplinkCount(0),
@@ -41,8 +38,9 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
       m_downlinkCount(0) {
   memset(m_framePayload, 0, sizeof(m_framePayload));
   memset(m_commandBuffer, 0, sizeof(m_commandBuffer));
-  memset(m_reassemblyBuf, 0, sizeof(m_reassemblyBuf));
+  memset(m_reassembly, 0, sizeof(m_reassembly));
   memset(m_rawUartBuf, 0, sizeof(m_rawUartBuf));
+  memset(m_payloadUartBuf, 0, sizeof(m_payloadUartBuf));
   memset(m_uplinkQueue, 0, sizeof(m_uplinkQueue));
   memset(m_downlinkQueue, 0, sizeof(m_downlinkQueue));
 
@@ -52,13 +50,16 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
   if (m_config.downlinkQueueDepth == 0 || m_config.downlinkQueueDepth > MAX_QUEUE_DEPTH) {
     m_config.downlinkQueueDepth = 16;
   }
+  if (!link_protocol::isRfChannel(m_config.defaultUartChannel)) {
+    m_config.defaultUartChannel = link_protocol::CHANNEL_CCSDS;
+  }
 }
 
 void RelayUartRf::begin() {
   resetFrameParser(false);
-  resetReassembly(false, false);
-  m_inHandshake = false;
-  m_linkEstablished = false;
+  for (uint8_t channel = 0; channel < link_protocol::CHANNEL_COUNT; channel++) {
+    resetReassembly(channel, false, false);
+  }
 }
 
 void RelayUartRf::poll() {
@@ -66,15 +67,10 @@ void RelayUartRf::poll() {
     while (m_linkIo.available() > 0) {
       const uint8_t b = static_cast<uint8_t>(m_linkIo.read());
       m_counters.uartRxBytes += 1;
-      // Pre-link, intercept the Pi's '#PING' handshake locally instead of
-      // relaying it; once the link is established this is skipped entirely.
-      if (!m_linkEstablished && handleHandshakeByte(b)) {
-        continue;
-      }
       if (m_config.uartInputFramed) {
         processUartByte(b);
       } else {
-        processRawUartByte(b);
+        processRawUartByte(b, m_config.defaultUartChannel);
       }
     }
 
@@ -83,7 +79,17 @@ void RelayUartRf::poll() {
     }
   }
 
+  if (m_payloadIo != nullptr) {
+    while (m_payloadIo->available() > 0) {
+      const uint8_t b = static_cast<uint8_t>(m_payloadIo->read());
+      m_counters.uartRxBytes += 1;
+      processRawUartByte(b, link_protocol::CHANNEL_PAYLOAD);
+    }
+    flushPayloadUartIfStale();
+  }
+
   flushRfToUart();
+  flushLocalResponseToUart();
   serviceUplinkQueue();
   serviceDownlinkQueue();
 }
@@ -100,56 +106,35 @@ void RelayUartRf::processUartByte(uint8_t b) {
   processFrameByte(b);
 }
 
-bool RelayUartRf::handleHandshakeByte(uint8_t b) {
-  // Returns true if the byte was consumed by the boot handshake (and must not
-  // be relayed). Only called while the link is not yet established, so there is
-  // no concurrent F' traffic to collide with. A '#'-prefixed, newline-
-  // terminated command line is answered locally; '#PING' -> '#PONG' latches the
-  // link established, after which poll() stops inspecting bytes altogether.
-  if (!m_inHandshake) {
-    if (b != static_cast<uint8_t>(link_protocol::COMMAND_PREFIX)) {
-      return false;  // not a handshake; relay as normal link traffic
-    }
-    m_inHandshake = true;
-    m_commandIndex = 0;
-    memset(m_commandBuffer, 0, sizeof(m_commandBuffer));
-    return true;
+void RelayUartRf::processRawUartByte(uint8_t b, uint8_t channel) {
+  if (channel == link_protocol::CHANNEL_PAYLOAD) {
+    m_counters.payloadUartRxBytes += 1;
   }
 
-  if (b == '\n' || b == '\r') {
-    m_commandBuffer[m_commandIndex] = '\0';
-    m_inHandshake = false;
-    if (strcmp(m_commandBuffer, link_protocol::CMD_PING) == 0) {
-      const size_t n = strlen(link_protocol::RESP_PONG);
-      m_linkIo.write(reinterpret_cast<const uint8_t*>(link_protocol::RESP_PONG), n);
-      m_counters.uartTxBytes += static_cast<uint32_t>(n);
-      m_linkEstablished = true;
-    }
-    return true;
+  uint8_t* rawBuf = m_rawUartBuf;
+  uint16_t* rawLen = &m_rawUartLen;
+  uint32_t* lastByteMs = &m_lastRawUartByteMs;
+  if (channel == link_protocol::CHANNEL_PAYLOAD) {
+    rawBuf = m_payloadUartBuf;
+    rawLen = &m_payloadUartLen;
+    lastByteMs = &m_lastPayloadUartByteMs;
   }
 
-  if (m_commandIndex + 1 < sizeof(m_commandBuffer)) {
-    m_commandBuffer[m_commandIndex++] = static_cast<char>(b);
-  }
-  return true;
-}
-
-void RelayUartRf::processRawUartByte(uint8_t b) {
   uint16_t rawChunkLimit = m_config.rawUartChunkBytes;
   if (rawChunkLimit == 0 || rawChunkLimit > link_protocol::FRAME_MAX_PAYLOAD) {
     rawChunkLimit = link_protocol::RF_SEGMENT_MAX_DATA;
   }
-  if (m_rawUartLen >= rawChunkLimit) {
-    enqueueUplinkMessage(m_rawUartBuf, m_rawUartLen);
-    m_rawUartLen = 0;
+  if (*rawLen >= rawChunkLimit) {
+    enqueueUplinkMessage(channel, rawBuf, *rawLen);
+    *rawLen = 0;
   }
 
-  m_rawUartBuf[m_rawUartLen++] = b;
-  m_lastRawUartByteMs = millis();
+  rawBuf[(*rawLen)++] = b;
+  *lastByteMs = millis();
 
-  if (m_rawUartLen >= rawChunkLimit) {
-    enqueueUplinkMessage(m_rawUartBuf, m_rawUartLen);
-    m_rawUartLen = 0;
+  if (*rawLen >= rawChunkLimit) {
+    enqueueUplinkMessage(channel, rawBuf, *rawLen);
+    *rawLen = 0;
   }
 }
 
@@ -165,8 +150,32 @@ void RelayUartRf::flushRawUartIfStale() {
       m_rawUartLen = 0;
       return;
     }
-    enqueueUplinkMessage(m_rawUartBuf, m_rawUartLen);
+    enqueueUplinkMessage(m_config.defaultUartChannel, m_rawUartBuf, m_rawUartLen);
     m_rawUartLen = 0;
+  }
+}
+
+void RelayUartRf::flushPayloadUartIfStale() {
+  if (m_payloadUartLen == 0) {
+    return;
+  }
+
+  const uint32_t now = millis();
+  if ((now - m_lastPayloadUartByteMs) >= m_config.rawUartFlushMs) {
+    enqueueUplinkMessage(link_protocol::CHANNEL_PAYLOAD, m_payloadUartBuf, m_payloadUartLen);
+    m_payloadUartLen = 0;
+  }
+}
+
+void RelayUartRf::flushLocalResponseToUart() {
+  if (m_localHandler == nullptr) {
+    return;
+  }
+
+  uint8_t response[link_protocol::FRAME_MAX_PAYLOAD] = {0};
+  uint16_t responseLen = 0;
+  if (m_localHandler->pollLocalResponse(response, responseLen)) {
+    sendUartFrame(link_protocol::CHANNEL_TEENSY_LOCAL, response, responseLen);
   }
 }
 
@@ -218,8 +227,18 @@ void RelayUartRf::processFrameByte(uint8_t b) {
 
     case ParseState::WAIT_MAGIC_1:
       if (b == link_protocol::FRAME_MAGIC_1) {
+        m_state = ParseState::WAIT_CHANNEL;
+      } else {
+        resetFrameParser(false);
+      }
+      break;
+
+    case ParseState::WAIT_CHANNEL:
+      if (link_protocol::isValidChannel(b)) {
+        m_frameChannel = b;
         m_state = ParseState::WAIT_LEN_LO;
       } else {
+        m_counters.framingDrops += 1;
         resetFrameParser(false);
       }
       break;
@@ -264,8 +283,12 @@ void RelayUartRf::flushRfToUart() {
   uint8_t rfBuffer[link_protocol::RF_PACKET_MAX_LEN] = {0};
   uint8_t rfLen = static_cast<uint8_t>(sizeof(rfBuffer));
 
-  if (m_reassemblyActive && (millis() - m_lastSegmentMs) > link_protocol::RF_REASSEMBLY_TIMEOUT_MS) {
-    resetReassembly(true, true);
+  const uint32_t now = millis();
+  for (uint8_t channel = 0; channel < link_protocol::CHANNEL_COUNT; channel++) {
+    ReassemblyState& state = m_reassembly[channel];
+    if (state.active && (now - state.lastSegmentMs) > link_protocol::RF_REASSEMBLY_TIMEOUT_MS) {
+      resetReassembly(channel, true, true);
+    }
   }
 
   while (m_rf.available()) {
@@ -279,6 +302,7 @@ void RelayUartRf::flushRfToUart() {
 
 void RelayUartRf::resetFrameParser(bool timeoutReset) {
   m_state = ParseState::WAIT_MAGIC_0;
+  m_frameChannel = link_protocol::CHANNEL_CCSDS;
   m_frameLength = 0;
   m_frameIndex = 0;
   m_frameCrc = 0;
@@ -295,11 +319,25 @@ void RelayUartRf::handleCompletedFrame() {
     return;
   }
 
-  enqueueUplinkMessage(m_framePayload, m_frameLength);
+  if (m_frameChannel == link_protocol::CHANNEL_PAYLOAD) {
+    m_counters.payloadUartRxBytes += m_frameLength;
+  }
+  if (m_frameChannel == link_protocol::CHANNEL_TEENSY_LOCAL) {
+    if (m_localHandler == nullptr || !m_localHandler->beginLocalFrame(m_framePayload, m_frameLength)) {
+      m_counters.framingDrops += 1;
+    }
+    return;
+  }
+
+  enqueueUplinkMessage(m_frameChannel, m_framePayload, m_frameLength);
 }
 
-bool RelayUartRf::sendUartFrame(const uint8_t* payload, uint16_t length) {
+bool RelayUartRf::sendUartFrame(uint8_t channel, const uint8_t* payload, uint16_t length) {
   if (length == 0 || length > link_protocol::FRAME_MAX_PAYLOAD) {
+    m_counters.framingDrops += 1;
+    return false;
+  }
+  if (!link_protocol::isValidChannel(channel)) {
     m_counters.framingDrops += 1;
     return false;
   }
@@ -308,13 +346,14 @@ bool RelayUartRf::sendUartFrame(const uint8_t* payload, uint16_t length) {
 
   m_linkIo.write(link_protocol::FRAME_MAGIC_0);
   m_linkIo.write(link_protocol::FRAME_MAGIC_1);
+  m_linkIo.write(channel);
   m_linkIo.write(static_cast<uint8_t>(length & 0xFF));
   m_linkIo.write(static_cast<uint8_t>((length >> 8) & 0xFF));
   m_linkIo.write(payload, length);
   m_linkIo.write(static_cast<uint8_t>(crc & 0xFF));
   m_linkIo.write(static_cast<uint8_t>((crc >> 8) & 0xFF));
 
-  m_counters.uartTxBytes += static_cast<uint32_t>(length + 6);
+  m_counters.uartTxBytes += static_cast<uint32_t>(length + 7);
   return true;
 }
 
@@ -329,9 +368,13 @@ bool RelayUartRf::sendRawToUart(const uint8_t* payload, uint16_t length) {
   return true;
 }
 
-bool RelayUartRf::sendPayloadOverRf(const uint8_t* payload, uint16_t length) {
+bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uint16_t length) {
   if (length == 0 || length > link_protocol::FRAME_MAX_PAYLOAD) {
     m_counters.rfOversizeDrops += 1;
+    return false;
+  }
+  if (!link_protocol::isRfChannel(channel)) {
+    m_counters.framingDrops += 1;
     return false;
   }
 
@@ -355,7 +398,7 @@ bool RelayUartRf::sendPayloadOverRf(const uint8_t* payload, uint16_t length) {
                                  : remaining);
 
     uint8_t rfPacket[link_protocol::RF_PACKET_MAX_LEN] = {0};
-    rfPacket[0] = link_protocol::RF_SEGMENT_MAGIC;
+    rfPacket[0] = link_protocol::magicForChannel(channel);
     rfPacket[1] = msgId;
     rfPacket[2] = segIdx;
     rfPacket[3] = segCount;
@@ -363,7 +406,8 @@ bool RelayUartRf::sendPayloadOverRf(const uint8_t* payload, uint16_t length) {
     memcpy(&rfPacket[link_protocol::RF_SEGMENT_HEADER_LEN], payload + sent, chunkLen);
 
     const uint8_t rfLen = static_cast<uint8_t>(link_protocol::RF_SEGMENT_HEADER_LEN + chunkLen);
-    if (!sendRfPacketWithAck(rfPacket, rfLen, msgId, segIdx)) {
+    const bool sentOk = sendRfPacketWithAck(rfPacket, rfLen, channel, msgId, segIdx);
+    if (!sentOk) {
       m_counters.rfTxDrops += 1;
       return false;
     }
@@ -371,6 +415,9 @@ bool RelayUartRf::sendPayloadOverRf(const uint8_t* payload, uint16_t length) {
     sent = static_cast<uint16_t>(sent + chunkLen);
     m_counters.rfTxPackets += 1;
     m_counters.rfTxSegments += 1;
+    if (channel == link_protocol::CHANNEL_PAYLOAD) {
+      m_counters.payloadRfTxSegments += 1;
+    }
 
     if (segIdx + 1 < segCount) {
       delay(link_protocol::RF_INTER_SEGMENT_GAP_MS);
@@ -378,15 +425,22 @@ bool RelayUartRf::sendPayloadOverRf(const uint8_t* payload, uint16_t length) {
   }
 
   m_counters.rfTxMessages += 1;
+  if (channel == link_protocol::CHANNEL_PAYLOAD) {
+    m_counters.payloadRfTxMessages += 1;
+  }
   return true;
 }
 
-bool RelayUartRf::sendRfPacketWithAck(const uint8_t* packet, uint8_t packetLen, uint8_t msgId, uint8_t segIdx) {
+bool RelayUartRf::sendRfPacketWithAck(const uint8_t* packet,
+                                      uint8_t packetLen,
+                                      uint8_t channel,
+                                      uint8_t msgId,
+                                      uint8_t segIdx) {
   for (uint8_t attempt = 0; attempt <= link_protocol::RF_ACK_RETRIES; attempt++) {
     if (!m_rf.send(packet, packetLen)) {
       return false;
     }
-    if (waitForAck(msgId, segIdx)) {
+    if (waitForAck(channel, msgId, segIdx)) {
       return true;
     }
     m_counters.rfAckTimeouts += 1;
@@ -397,7 +451,7 @@ bool RelayUartRf::sendRfPacketWithAck(const uint8_t* packet, uint8_t packetLen, 
   return false;
 }
 
-bool RelayUartRf::waitForAck(uint8_t msgId, uint8_t segIdx) {
+bool RelayUartRf::waitForAck(uint8_t channel, uint8_t msgId, uint8_t segIdx) {
   const uint32_t startMs = millis();
   uint8_t rfBuffer[link_protocol::RF_PACKET_MAX_LEN] = {0};
 
@@ -405,7 +459,7 @@ bool RelayUartRf::waitForAck(uint8_t msgId, uint8_t segIdx) {
     while (m_rf.available()) {
       uint8_t rfLen = static_cast<uint8_t>(sizeof(rfBuffer));
       if (m_rf.recv(rfBuffer, &rfLen) && rfLen > 0) {
-        if (isAckPacket(rfBuffer, rfLen, msgId, segIdx)) {
+        if (isAckPacket(rfBuffer, rfLen, channel, msgId, segIdx)) {
           m_counters.rfAckRx += 1;
           return true;
         }
@@ -417,18 +471,22 @@ bool RelayUartRf::waitForAck(uint8_t msgId, uint8_t segIdx) {
   return false;
 }
 
-bool RelayUartRf::isAckPacket(const uint8_t* packet, uint8_t packetLen, uint8_t msgId, uint8_t segIdx) const {
+bool RelayUartRf::isAckPacket(const uint8_t* packet,
+                              uint8_t packetLen,
+                              uint8_t channel,
+                              uint8_t msgId,
+                              uint8_t segIdx) const {
   return packetLen == link_protocol::RF_SEGMENT_HEADER_LEN &&
-         packet[0] == link_protocol::RF_SEGMENT_MAGIC &&
+         packet[0] == link_protocol::magicForChannel(channel) &&
          packet[1] == msgId &&
          packet[2] == link_protocol::RF_ACK_SEGMENT_INDEX &&
          packet[3] == segIdx &&
          packet[4] == 0;
 }
 
-bool RelayUartRf::sendAck(uint8_t msgId, uint8_t segIdx) {
+bool RelayUartRf::sendAck(uint8_t channel, uint8_t msgId, uint8_t segIdx) {
   uint8_t ackPacket[link_protocol::RF_SEGMENT_HEADER_LEN] = {
-      link_protocol::RF_SEGMENT_MAGIC,
+      link_protocol::magicForChannel(channel),
       msgId,
       link_protocol::RF_ACK_SEGMENT_INDEX,
       segIdx,
@@ -447,7 +505,8 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
     return;
   }
 
-  if (packet[0] != link_protocol::RF_SEGMENT_MAGIC) {
+  uint8_t channel = link_protocol::CHANNEL_CCSDS;
+  if (!link_protocol::channelForMagic(packet[0], channel)) {
     m_counters.framingDrops += 1;
     return;
   }
@@ -477,74 +536,86 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
   }
 
   const uint32_t now = millis();
-  if (m_reassemblyActive && (now - m_lastSegmentMs) > link_protocol::RF_REASSEMBLY_TIMEOUT_MS) {
-    resetReassembly(true, true);
+  ReassemblyState& state = m_reassembly[channel];
+  if (state.active && (now - state.lastSegmentMs) > link_protocol::RF_REASSEMBLY_TIMEOUT_MS) {
+    resetReassembly(channel, true, true);
   }
 
-  if (!m_reassemblyActive) {
+  if (!state.active) {
     if (segIdx != 0) {
       m_counters.rfReassemblyDrops += 1;
       return;
     }
 
-    if (m_seenRxMsgId && static_cast<uint8_t>(m_lastRxMsgId + 1) != msgId) {
+    if (state.seenRxMsgId && static_cast<uint8_t>(state.lastRxMsgId + 1) != msgId) {
       m_counters.rfMsgIdGaps += 1;
     }
-    m_reassemblyActive = true;
-    m_expectedMsgId = msgId;
-    m_expectedSegIndex = 0;
-    m_expectedSegCount = segCount;
-    m_reassemblyLen = 0;
+    state.active = true;
+    state.expectedMsgId = msgId;
+    state.expectedSegIndex = 0;
+    state.expectedSegCount = segCount;
+    state.length = 0;
   }
 
-  if (msgId == m_expectedMsgId && segCount == m_expectedSegCount && segIdx < m_expectedSegIndex) {
-    sendAck(msgId, segIdx);
+  if (msgId == state.expectedMsgId && segCount == state.expectedSegCount && segIdx < state.expectedSegIndex) {
+    sendAck(channel, msgId, segIdx);
     return;
   }
 
-  if (msgId != m_expectedMsgId || segCount != m_expectedSegCount || segIdx != m_expectedSegIndex) {
-    resetReassembly(false, true);
+  if (msgId != state.expectedMsgId || segCount != state.expectedSegCount || segIdx != state.expectedSegIndex) {
+    resetReassembly(channel, false, true);
 
     if (segIdx == 0) {
-      m_reassemblyActive = true;
-      m_expectedMsgId = msgId;
-      m_expectedSegIndex = 0;
-      m_expectedSegCount = segCount;
-      m_reassemblyLen = 0;
+      state.active = true;
+      state.expectedMsgId = msgId;
+      state.expectedSegIndex = 0;
+      state.expectedSegCount = segCount;
+      state.length = 0;
     } else {
       return;
     }
   }
 
-  if (static_cast<uint16_t>(m_reassemblyLen + chunkLen) > link_protocol::FRAME_MAX_PAYLOAD) {
+  if (static_cast<uint16_t>(state.length + chunkLen) > link_protocol::FRAME_MAX_PAYLOAD) {
     m_counters.rfOversizeDrops += 1;
-    resetReassembly(false, true);
+    resetReassembly(channel, false, true);
     return;
   }
 
-  memcpy(m_reassemblyBuf + m_reassemblyLen, packet + link_protocol::RF_SEGMENT_HEADER_LEN, chunkLen);
-  m_reassemblyLen = static_cast<uint16_t>(m_reassemblyLen + chunkLen);
-  m_expectedSegIndex = static_cast<uint8_t>(m_expectedSegIndex + 1);
-  m_lastSegmentMs = now;
+  memcpy(state.buffer + state.length, packet + link_protocol::RF_SEGMENT_HEADER_LEN, chunkLen);
+  state.length = static_cast<uint16_t>(state.length + chunkLen);
+  state.expectedSegIndex = static_cast<uint8_t>(state.expectedSegIndex + 1);
+  state.lastSegmentMs = now;
   m_counters.rfRxSegments += 1;
-  sendAck(msgId, segIdx);
+  if (channel == link_protocol::CHANNEL_PAYLOAD) {
+    m_counters.payloadRfRxSegments += 1;
+  }
+  sendAck(channel, msgId, segIdx);
 
   if (segIdx + 1 == segCount) {
     m_counters.rfRxMessages += 1;
-    m_seenRxMsgId = true;
-    m_lastRxMsgId = msgId;
-    enqueueDownlinkMessage(m_reassemblyBuf, m_reassemblyLen);
-    resetReassembly(false, false);
+    if (channel == link_protocol::CHANNEL_PAYLOAD) {
+      m_counters.payloadRfRxMessages += 1;
+    }
+    state.seenRxMsgId = true;
+    state.lastRxMsgId = msgId;
+    enqueueDownlinkMessage(channel, state.buffer, state.length);
+    resetReassembly(channel, false, false);
   }
 }
 
-void RelayUartRf::resetReassembly(bool timeoutReset, bool dropReset) {
-  m_reassemblyActive = false;
-  m_expectedMsgId = 0;
-  m_expectedSegIndex = 0;
-  m_expectedSegCount = 0;
-  m_reassemblyLen = 0;
-  m_lastSegmentMs = 0;
+void RelayUartRf::resetReassembly(uint8_t channel, bool timeoutReset, bool dropReset) {
+  if (!link_protocol::isRfChannel(channel)) {
+    return;
+  }
+
+  ReassemblyState& state = m_reassembly[channel];
+  state.active = false;
+  state.expectedMsgId = 0;
+  state.expectedSegIndex = 0;
+  state.expectedSegCount = 0;
+  state.length = 0;
+  state.lastSegmentMs = 0;
 
   if (timeoutReset) {
     m_counters.rfReassemblyTimeouts += 1;
@@ -604,9 +675,13 @@ void RelayUartRf::emitLinkStatus() {
   }
 }
 
-bool RelayUartRf::enqueueUplinkMessage(const uint8_t* payload, uint16_t length) {
+bool RelayUartRf::enqueueUplinkMessage(uint8_t channel, const uint8_t* payload, uint16_t length) {
   if (length == 0 || length > link_protocol::FRAME_MAX_PAYLOAD) {
     m_counters.rfOversizeDrops += 1;
+    return false;
+  }
+  if (!link_protocol::isRfChannel(channel)) {
+    m_counters.framingDrops += 1;
     return false;
   }
 
@@ -616,6 +691,7 @@ bool RelayUartRf::enqueueUplinkMessage(const uint8_t* payload, uint16_t length) 
   }
 
   QueueEntry& entry = m_uplinkQueue[m_uplinkHead];
+  entry.channel = channel;
   entry.length = length;
   memcpy(entry.payload, payload, length);
   m_uplinkHead = static_cast<uint8_t>((m_uplinkHead + 1) % m_config.uplinkQueueDepth);
@@ -623,9 +699,13 @@ bool RelayUartRf::enqueueUplinkMessage(const uint8_t* payload, uint16_t length) 
   return true;
 }
 
-bool RelayUartRf::enqueueDownlinkMessage(const uint8_t* payload, uint16_t length) {
+bool RelayUartRf::enqueueDownlinkMessage(uint8_t channel, const uint8_t* payload, uint16_t length) {
   if (length == 0 || length > link_protocol::FRAME_MAX_PAYLOAD) {
     m_counters.rfOversizeDrops += 1;
+    return false;
+  }
+  if (!link_protocol::isRfChannel(channel) && channel != link_protocol::CHANNEL_TEENSY_LOCAL) {
+    m_counters.framingDrops += 1;
     return false;
   }
 
@@ -635,6 +715,7 @@ bool RelayUartRf::enqueueDownlinkMessage(const uint8_t* payload, uint16_t length
   }
 
   QueueEntry& entry = m_downlinkQueue[m_downlinkHead];
+  entry.channel = channel;
   entry.length = length;
   memcpy(entry.payload, payload, length);
   m_downlinkHead = static_cast<uint8_t>((m_downlinkHead + 1) % m_config.downlinkQueueDepth);
@@ -648,7 +729,11 @@ void RelayUartRf::serviceUplinkQueue() {
   }
 
   QueueEntry& entry = m_uplinkQueue[m_uplinkTail];
-  sendPayloadOverRf(entry.payload, entry.length);
+  if (link_protocol::isRfChannel(entry.channel)) {
+    sendPayloadOverRf(entry.channel, entry.payload, entry.length);
+  } else {
+    m_counters.framingDrops += 1;
+  }
   m_uplinkTail = static_cast<uint8_t>((m_uplinkTail + 1) % m_config.uplinkQueueDepth);
   m_uplinkCount = static_cast<uint8_t>(m_uplinkCount - 1);
 }
@@ -659,8 +744,13 @@ void RelayUartRf::serviceDownlinkQueue() {
   }
 
   QueueEntry& entry = m_downlinkQueue[m_downlinkTail];
-  if (m_config.uartOutputFramed) {
-    sendUartFrame(entry.payload, entry.length);
+  if (entry.channel == link_protocol::CHANNEL_PAYLOAD && m_payloadIo != nullptr) {
+    const size_t written = m_payloadIo->write(entry.payload, entry.length);
+    m_payloadIo->flush();
+    m_counters.uartTxBytes += static_cast<uint32_t>(written);
+    m_counters.payloadUartTxBytes += static_cast<uint32_t>(written);
+  } else if (m_config.uartOutputFramed) {
+    sendUartFrame(entry.channel, entry.payload, entry.length);
   } else {
     sendRawToUart(entry.payload, entry.length);
   }

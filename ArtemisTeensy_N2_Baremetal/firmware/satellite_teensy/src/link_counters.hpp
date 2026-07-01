@@ -13,6 +13,12 @@ struct LinkCounters {
   uint32_t rfTxMessages = 0;
   uint32_t rfRxSegments = 0;
   uint32_t rfTxSegments = 0;
+  uint32_t payloadUartRxBytes = 0;
+  uint32_t payloadUartTxBytes = 0;
+  uint32_t payloadRfRxMessages = 0;
+  uint32_t payloadRfTxMessages = 0;
+  uint32_t payloadRfRxSegments = 0;
+  uint32_t payloadRfTxSegments = 0;
 
   uint32_t crcDrops = 0;
   uint32_t framingDrops = 0;
@@ -40,6 +46,12 @@ struct LinkCounters {
     rfTxMessages = 0;
     rfRxSegments = 0;
     rfTxSegments = 0;
+    payloadUartRxBytes = 0;
+    payloadUartTxBytes = 0;
+    payloadRfRxMessages = 0;
+    payloadRfTxMessages = 0;
+    payloadRfRxSegments = 0;
+    payloadRfTxSegments = 0;
 
     crcDrops = 0;
     framingDrops = 0;

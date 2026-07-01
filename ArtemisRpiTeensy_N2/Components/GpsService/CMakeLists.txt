@@ -3,4 +3,6 @@ register_fprime_library(
         ${CMAKE_CURRENT_LIST_DIR}/GpsService.fpp
     SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/GpsService.cpp
+    DEPENDS
+        Components_Types
 )

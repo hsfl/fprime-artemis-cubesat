@@ -1,0 +1,95 @@
+import pathlib
+import struct
+import sys
+import types
+import unittest
+
+
+TOOLS_DIR = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(TOOLS_DIR))
+sys.modules.setdefault("serial", types.SimpleNamespace(Serial=object))
+
+import payload_receiver  # noqa: E402
+
+
+class DummySerial:
+    def __init__(self) -> None:
+        self.writes: list[bytes] = []
+
+    def write(self, data: bytes) -> int:
+        self.writes.append(data)
+        return len(data)
+
+
+def make_header(product_id: int, transfer_id: int, blob: bytes) -> bytes:
+    total_packets = (len(blob) + payload_receiver.DATA_BYTES - 1) // payload_receiver.DATA_BYTES
+    packet = bytearray()
+    packet += payload_receiver.MAGIC
+    packet += bytes([payload_receiver.TYPE_HEADER, transfer_id])
+    packet += struct.pack("<I", product_id)
+    packet += struct.pack("<I", len(blob))
+    packet += struct.pack("<H", total_packets)
+    packet += bytes([payload_receiver.DATA_BYTES])
+    packet += struct.pack("<H", payload_receiver.crc16_ccitt(blob))
+    return bytes(packet)
+
+
+def make_data(transfer_id: int, packet_index: int, chunk: bytes) -> bytes:
+    packet = bytearray()
+    packet += payload_receiver.MAGIC
+    packet += bytes([payload_receiver.TYPE_DATA, transfer_id])
+    packet += struct.pack("<H", packet_index)
+    packet += bytes([len(chunk)])
+    packet += chunk
+    packet += struct.pack("<H", payload_receiver.crc16_ccitt(packet))
+    return bytes(packet)
+
+
+def make_end(transfer_id: int, total_packets: int, blob: bytes) -> bytes:
+    packet = bytearray()
+    packet += payload_receiver.MAGIC
+    packet += bytes([payload_receiver.TYPE_END, transfer_id])
+    packet += struct.pack("<H", total_packets)
+    packet += struct.pack("<H", payload_receiver.crc16_ccitt(blob))
+    return bytes(packet)
+
+
+class PayloadReceiverTests(unittest.TestCase):
+    def test_extracts_variable_length_packets_and_reconstructs_arbitrary_bytes(self) -> None:
+        blob = b"\x00N2\xffpayload,csv\n1,2,3\n"
+        transfer_id = 9
+        receiver = payload_receiver.PayloadReceiver("unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0)
+        header = make_header(42, transfer_id, blob)
+        data = make_data(transfer_id, 0, blob)
+        end = make_end(transfer_id, 1, blob)
+
+        receiver.rx_buffer += b"noise" + header + data + end
+
+        packets = [receiver.try_extract_packet(), receiver.try_extract_packet(), receiver.try_extract_packet()]
+        self.assertEqual([len(packet) for packet in packets], [17, 7 + len(blob) + 2, 8])
+
+        serial = DummySerial()
+        for packet in packets:
+            receiver.handle_packet(packet, serial)  # type: ignore[arg-type]
+
+        self.assertTrue(receiver.complete)
+        self.assertEqual(receiver.reconstruct(), blob)
+        self.assertEqual(serial.writes, [])
+
+    def test_retry_request_is_not_padded_to_max_packet_length(self) -> None:
+        blob = b"x" * (payload_receiver.DATA_BYTES * 10)
+        receiver = payload_receiver.PayloadReceiver("unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0)
+        receiver.handle_header(make_header(7, 3, blob))
+
+        serial = DummySerial()
+        receiver.request_retries(serial)  # type: ignore[arg-type]
+
+        self.assertEqual(len(serial.writes), 1)
+        request = serial.writes[0]
+        self.assertLess(len(request), payload_receiver.MAX_PACKET)
+        self.assertEqual(request[:4], payload_receiver.MAGIC + bytes([payload_receiver.TYPE_RETRY_REQUEST, 3]))
+        self.assertEqual(request[6], 2)
+
+
+if __name__ == "__main__":
+    unittest.main()
