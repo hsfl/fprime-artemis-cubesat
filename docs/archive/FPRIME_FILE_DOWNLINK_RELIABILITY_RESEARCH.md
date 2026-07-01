@@ -54,6 +54,8 @@ Primary files checked:
 - `ArtemisRpiTeensy_N2/lib/fprime/Svc/FileDownlink/FileDownlink.cpp`
 - `ArtemisRpiTeensy_N2/lib/fprime/Fw/FilePacket/docs/sdd.md`
 - `ArtemisRpiTeensy_N2/fprime-venv/lib/python3.10/site-packages/fprime_gds/common/files/downlinker.py`
+- `ArtemisRpiTeensy_N2/lib/fprime/docs/reference/gds-plugins/*.md`
+- `ArtemisRpiTeensy_N2/lib/fprime/docs/user-manual/gds/*.md`
 - `ArtemisRpiTeensy_N2/Components/PayloadDownlinkManager/PayloadDownlinkManager.fpp`
 - `ArtemisRpiTeensy_N2/Components/PayloadDownlinkManager/PayloadDownlinkManager.cpp`
 - `ArtemisRpiTeensy_N2/tools/payload_receiver.py`
@@ -312,6 +314,149 @@ the radio:
 This is the same family of design as our channel-1 payload path and is better
 matched to the RFM23BP packet budget than stock CCSDS file downlink.
 
+## GDS Extension Surface From Repo-Local Docs
+
+The repo-local GDS plugin and user-manual docs sharpen which "GDS plugin" ideas
+are realistic.
+
+### Data Handler plugin
+
+`docs/reference/gds-plugins/data-handler.md` says data-handler plugins register
+custom consumers for decoded F Prime data and run in a `CustomDataHandler`
+process, separate from the core GDS runtime.
+
+Important detail: descriptor strings include:
+
+```text
+FW_PACKET_TELEM
+FW_PACKET_LOG
+FW_PACKET_FILE
+FW_PACKET_PACKETIZED_TLM
+```
+
+Implication for file downlink repair:
+
+- A data-handler plugin can subscribe to `FW_PACKET_FILE`.
+- It is the right hook to observe stock FileDownlink START/DATA/END packets.
+- It can track sequence/offset gaps without blocking the main communication
+  thread.
+- It can publish derived ground-processed channels through
+  `self.publisher.publish_channel(...)`, useful for dashboard-visible repair
+  state such as holes, retry rounds, and verified/incomplete status.
+
+Limitation:
+
+- The data-handler interface is primarily a decoded-data consumer. By itself,
+  it is not clearly the command-sending control loop.
+
+### GDS App plugin
+
+`docs/reference/gds-plugins/gds-app.md` says `GdsApp` plugins run separate
+processes and `GdsStandardApp` wires up the standard GDS pipeline. The example
+uses `pipeline.send_command(...)`.
+
+Implication:
+
+- A `GdsStandardApp` is the best documented plugin shape for a repair controller
+  that needs to both observe GDS data and issue `SendPartial` or
+  `CalculateCrc` commands.
+- It isolates repair logic from the main GDS communication process.
+- It can be a project-local app first, then potentially an upstreamable plugin.
+
+Likely architecture:
+
+```text
+DataHandler(FW_PACKET_FILE) or StandardPipeline consumer
+-> missing-range tracker
+-> GdsStandardApp repair controller
+-> pipeline.send_command("FileHandling.fileDownlink.SendPartial", ...)
+-> pipeline.send_command("FileHandling.fileManager.CalculateCrc", ...)
+-> publish repair/verified status as ground-processed channels
+```
+
+### Communication plugin
+
+`docs/reference/gds-plugins/communications.md` says communication plugins swap
+the raw byte I/O mechanism and run in the GDS communications process. Only one
+communication plugin is selected.
+
+Implication:
+
+- This is the right hook only if we replace the UART/IP/radio adapter itself.
+- It is not the first place to implement file repair.
+- Blocking or slow I/O here delays the rest of GDS, so repair logic does not
+  belong here.
+
+### Framing plugin
+
+`docs/reference/gds-plugins/framing.md` says framing plugins assemble/extract
+F Prime packets from protocol-specific frames, run inside the GDS communication
+thread, and are selection plugins.
+
+Implication:
+
+- This is useful for custom CCSDS/F Prime framing or a future radio-specific
+  framing stack.
+- It is too invasive for a FileDownlink repair overlay.
+- Poor implementation can delay all communications.
+
+### GDS Function plugin
+
+`docs/reference/gds-plugins/gds-function.md` says function plugins run once at
+startup in the main GDS process.
+
+Implication:
+
+- Useful for startup wiring or launching helper processes.
+- Not appropriate for a long-running repair loop by itself.
+
+### Dashboards
+
+`docs/user-manual/gds/gds-custom-dashboards.md` and
+`gds-dashboard-reference.md` say dashboards support:
+
+- `command-input`
+- `command-history`
+- `event-list`
+- `channel-table`
+- `logging`
+
+The dashboard reference explicitly says file handling components are not
+currently supported in dashboards and are better suited for a full view.
+
+Implication:
+
+- A dashboard can show our existing `PayloadDownlinkManager` telemetry/events.
+- A dashboard can show repair-helper status if it is published as channels or
+  events.
+- A dashboard cannot, by itself, become a custom File Downlink/repair tab.
+
+### CLI and Integration Test API
+
+`docs/user-manual/gds/gds-cli.md` says `fprime-cli` supports:
+
+- `channels`
+- `events`
+- `command-send`
+
+It can send `SendFile`, `SendPartial`, and `CalculateCrc` as normal commands,
+and it can filter events/channels. The developer guide lists CLI file
+uplink/downlink tools as future work, so do not assume a ready-made file-repair
+CLI exists in this F Prime version.
+
+`docs/user-manual/gds/gds-test-api-guide.md` documents command send and
+await/assert patterns for telemetry and events. This is a good fit for
+regression testing a repair helper once the logic exists.
+
+Implication:
+
+- First prototype can be a standalone Python helper around `fprime-cli
+  command-send` plus parsing GDS file logs, but this is crude.
+- Better prototype can use the GDS Integration Test API or `GdsStandardApp`
+  pipeline directly to send commands and observe results.
+- HIL regression should assert command responses, `FileDownlink` telemetry,
+  repair-helper derived channels/events, and final CRC match.
+
 ## Integration Options
 
 ### Option 1: Keep Custom Channel-1 Payload Downlink
@@ -368,8 +513,11 @@ Flow:
 This could be implemented as:
 
 - a standalone Python helper that talks to `fprime-gds`/`fprime-cli`
+- a GDS `DataHandlerPlugin` subscribing to `FW_PACKET_FILE` for hole tracking
+- a `GdsStandardApp` repair controller that sends `SendPartial` and
+  `CalculateCrc`
 - a local patch to `fprime_gds.common.files.downlinker`
-- a GDS plugin/tab
+- a custom GDS full view or app; the XML dashboard alone is not enough
 - an upstream F Prime GDS feature proposal
 
 Pros:
@@ -386,6 +534,7 @@ Cons:
 - repair commands consume the same link budget
 - needs careful state tracking when START/END packets are also dropped
 - requires GDS/plugin customization anyway
+- cannot be implemented as dashboard XML alone
 - likely slower than channel 1 for larger files
 
 Minimum acceptance criteria:
@@ -464,7 +613,7 @@ Most promising F Prime-facing contribution.
 Core idea:
 
 - keep stock `Svc.FileDownlink`
-- observe file packet sequence/offset gaps
+- observe file packet sequence/offset gaps via `FW_PACKET_FILE`
 - maintain missing-range set
 - issue `SendPartial` automatically
 - verify file with CRC before marking success
@@ -476,6 +625,8 @@ Why this is novel enough to matter:
 - The missing piece is the ground-side repair loop.
 - This would benefit any mission using F Prime GDS over a lossy or intermittent
   link, not just Neutron 2.
+- The plugin should start as a `DataHandlerPlugin` plus `GdsStandardApp`, not a
+  communication/framing plugin.
 
 ### 2. Patch GDS Downlinker Hash Handling
 
@@ -565,4 +716,3 @@ question becomes which customization has lower risk:
 
 - for MVP: current channel-1 ARQ path
 - for future F Prime polish: GDS/FileDownlink repair helper
-
