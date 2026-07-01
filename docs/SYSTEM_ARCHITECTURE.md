@@ -146,6 +146,10 @@ The broader subsystem architecture still matters, but several subsystem function
 
 ## Transport Architecture: One UART, Three Channels
 
+![Basic command dataflow from fprime-gds through the ground Teensy, RF link, satellite Teensy, custom UART framing, ComCcsds, and F Prime deployment](GDS_TO_SATELLITE_DATAFLOW.png)
+
+Source diagram: [`GDS_TO_SATELLITE_DATAFLOW.svg`](GDS_TO_SATELLITE_DATAFLOW.svg), generated from [`GDS_TO_SATELLITE_DATAFLOW.mmd`](GDS_TO_SATELLITE_DATAFLOW.mmd). The PNG is checked in for GitHub Markdown rendering.
+
 This section is the corrected, authoritative description of how bytes move between the Raspberry Pi, the satellite Teensy, the RF link, the ground Teensy, and the ground laptop. The single source of truth for the constants below is [`config/transport_constants.json`](../config/transport_constants.json).
 
 ### Why one UART
@@ -367,6 +371,10 @@ Conceptually, D2S2 answers one question for the demo: **"are we approaching our 
 In other words, D2S2 lets us rehearse the *timing* of a real pass — approach, contact, collect, downlink — without being in space. It is a simulator (orange in the [system diagram](#high-level-architecture)), not flight hardware; a real spacecraft would derive the same timing from GPS/ephemeris and ADCS. In the current topology the actual mission-mode transitions are emitted by `scienceManager` and `commsManager` into `missionManager.modeUpdateIn`; D2S2 provides the pass-timing premise those transitions are staged around.
 
 ## Demo Operating Story
+
+![Demo flow from boot through contact setup, SOH display, scheduled collection, data collection, science downlink, and ground review](DEMO_FLOWCHART.png)
+
+Source diagram: [`DEMO_FLOWCHART.svg`](DEMO_FLOWCHART.svg), generated from [`DEMO_FLOWCHART.mmd`](DEMO_FLOWCHART.mmd). The PNG is checked in for GitHub Markdown rendering.
 
 This is the architecture-level story the software must support.
 
