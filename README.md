@@ -93,7 +93,9 @@ Reasons to stay on the current RFM23BP radio for now:
 
 In short: an SDR is a "someday" upgrade, not a near-term need. Until the benefit
 clearly outweighs the added learning and maintenance burden, we keep the
-RFM23BP + RadioHead path on both the ground station and the satellite.
+RFM23BP + RadioHead path on both the ground station and the satellite. See
+[`docs/archive/HACKRF_SDR_GROUND_STATION_INVESTIGATION_2026-06-30.md`](docs/archive/HACKRF_SDR_GROUND_STATION_INVESTIGATION_2026-06-30.md)
+for the HackRF/SDR packet-compatibility investigation.
 
 ## Target demo
 
