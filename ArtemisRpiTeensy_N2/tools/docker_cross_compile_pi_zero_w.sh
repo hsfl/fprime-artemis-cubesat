@@ -138,7 +138,6 @@ fi
 
 if [[ "$LOCAL_ONLY" == "true" && "$SYNC_SYSROOT" == "auto" ]]; then
   echo "Local-only mode selected; reusing existing sysroot"
->>>>>>> d3eff1367fa0a0d2e373685656d402b1d9c6e59b
   SYNC_SYSROOT="false"
 fi
 

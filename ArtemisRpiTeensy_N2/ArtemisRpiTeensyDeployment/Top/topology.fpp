@@ -45,7 +45,7 @@ module ArtemisRpiTeensyDeployment {
     instance thermalService
     instance payloadDownlinkManager
     instance epsAdapterArtemis
-    instance payloadAdapterN1Legacy
+    instance payloadAdapterNeutronSim
     instance payloadAdapterLepton
     instance adcsAdapterD2S2
     instance gpsAdapterArtemis

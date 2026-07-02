@@ -106,12 +106,12 @@ module ArtemisRpiTeensyDeployment {
     stack size Default.STACK_SIZE \
     priority 28
 
-  # instance payloadAdapterNeutronSim: Components.PayloadAdapter_NeutronSim base id 0x10021000 \
-  #   queue size Default.QUEUE_SIZE \
-  #   stack size Default.STACK_SIZE \
-  #   priority 27
+  instance payloadAdapterNeutronSim: Components.PayloadAdapter_NeutronSim base id 0x10021000 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 27
 
-  instance payloadAdapterLepton: Components.PayloadAdapter_Lepton base id 0x1000F000 \
+  instance payloadAdapterLepton: Components.PayloadAdapter_Lepton base id 0x10027000 \
     queue size Default.QUEUE_SIZE \
     stack size 256 * 1024 \
     priority 27
