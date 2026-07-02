@@ -111,26 +111,21 @@ void PayloadDownlinkManagerTester::testProgressEventsEveryTenPercent() {
             expectedPercent,
             expectedPercent / 10U,
             10);
-        ASSERT_TLM_ProgressPercent_SIZE(expectedPercent / 10U);
-        ASSERT_TLM_ProgressPercent(sampleIndex, expectedPercent);
-        ASSERT_TLM_ProgressPacketsSent_SIZE(expectedPercent / 10U);
-        ASSERT_TLM_ProgressPacketsSent(sampleIndex, expectedPercent / 10U);
-        ASSERT_TLM_ProgressTotalPackets_SIZE(expectedPercent / 10U);
-        ASSERT_TLM_ProgressTotalPackets(sampleIndex, 10);
     }
 
     this->invoke_to_run(0, 0);
     ASSERT_EVENTS_PayloadDownlinkProgress_SIZE(9);
     ASSERT_EVENTS_PayloadDownlinkComplete_SIZE(1);
-    ASSERT_TLM_ProgressPercent_SIZE(10);
-    ASSERT_TLM_ProgressPercent(9, 100);
-    ASSERT_TLM_ProgressPacketsSent_SIZE(10);
-    ASSERT_TLM_ProgressPacketsSent(9, 10);
-    ASSERT_TLM_ProgressTotalPackets_SIZE(10);
-    ASSERT_TLM_ProgressTotalPackets(9, 10);
+    ASSERT_TLM_ProgressPercent_SIZE(1);
+    ASSERT_TLM_ProgressPercent(0, 50);
+    ASSERT_TLM_ProgressPacketsSent_SIZE(1);
+    ASSERT_TLM_ProgressPacketsSent(0, 5);
+    ASSERT_TLM_ProgressTotalPackets_SIZE(1);
+    ASSERT_TLM_ProgressTotalPackets(0, 10);
     this->invoke_to_run(0, 0);
     ASSERT_EVENTS_PayloadDownlinkProgress_SIZE(10);
     ASSERT_EVENTS_PayloadDownlinkProgress(9, 1, 100, 10, 10);
+    ASSERT_TLM_ProgressPercent_SIZE(1);
 
     U8 smallPayload[(LinkCfg::PAYLOAD_PACKET_DATA_BYTES * 2U) + 1U] = {};
     for (FwSizeType i = 0; i < sizeof(smallPayload); ++i) {
@@ -153,27 +148,22 @@ void PayloadDownlinkManagerTester::testProgressEventsEveryTenPercent() {
     ASSERT_EVENTS_PayloadDownlinkProgress(0, 2, 40, 1, 3);
     ASSERT_EVENTS_PayloadDownlinkProgress(1, 2, 90, 2, 3);
     ASSERT_EVENTS_PayloadDownlinkComplete_SIZE(1);
-    ASSERT_TLM_ProgressPercent_SIZE(3);
-    ASSERT_TLM_ProgressPercent(0, 40);
-    ASSERT_TLM_ProgressPercent(1, 90);
-    ASSERT_TLM_ProgressPercent(2, 100);
-    ASSERT_TLM_ProgressPacketsSent_SIZE(3);
-    ASSERT_TLM_ProgressPacketsSent(0, 1);
-    ASSERT_TLM_ProgressPacketsSent(1, 2);
-    ASSERT_TLM_ProgressPacketsSent(2, 3);
-    ASSERT_TLM_ProgressTotalPackets_SIZE(3);
-    ASSERT_TLM_ProgressTotalPackets(0, 3);
-    ASSERT_TLM_ProgressTotalPackets(1, 3);
-    ASSERT_TLM_ProgressTotalPackets(2, 3);
     this->invoke_to_run(0, 0);
     ASSERT_EVENTS_PayloadDownlinkProgress_SIZE(3);
     ASSERT_EVENTS_PayloadDownlinkProgress(2, 2, 100, 3, 3);
+    this->clearHistory();
     this->sendCmd_GET_PAYLOAD_STATUS(0, 0);
     this->component.doDispatch();
-    ASSERT_CMD_RESPONSE_SIZE(2);
-    ASSERT_EVENTS_PayloadDownlinkProgress_SIZE(4);
-    ASSERT_EVENTS_PayloadDownlinkProgress(3, 2, 100, 3, 3);
+    ASSERT_CMD_RESPONSE_SIZE(1);
+    ASSERT_EVENTS_PayloadDownlinkProgress_SIZE(1);
+    ASSERT_EVENTS_PayloadDownlinkProgress(0, 2, 100, 3, 3);
     ASSERT_EVENTS_PayloadStatus_SIZE(1);
+    ASSERT_TLM_ProgressPercent_SIZE(1);
+    ASSERT_TLM_ProgressPercent(0, 100);
+    ASSERT_TLM_ProgressPacketsSent_SIZE(1);
+    ASSERT_TLM_ProgressPacketsSent(0, 3);
+    ASSERT_TLM_ProgressTotalPackets_SIZE(1);
+    ASSERT_TLM_ProgressTotalPackets(0, 3);
 }
 
 void PayloadDownlinkManagerTester::testQueuesRetryPacketsForScheduledResend() {

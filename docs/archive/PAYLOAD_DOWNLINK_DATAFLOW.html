@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PayloadDownlinkManager — Channel-1 Downlink Data Flow</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #171c24;
+    --panel2: #1e2530;
+    --line: #2c3646;
+    --text: #d7dee8;
+    --dim: #8a97a8;
+    --accent: #4cc2ff;
+    --flight: #7aa2f7;
+    --link: #e0af68;
+    --ground: #9ece6a;
+    --err: #f7768e;
+    --ok: #73daca;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1.2rem 4rem;
+    background: var(--bg); color: var(--text);
+    font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    line-height: 1.5;
+  }
+  main { max-width: 1060px; margin: 0 auto; }
+  h1 { font-size: 1.45rem; margin: 0 0 .2rem; color: #fff; letter-spacing: .01em; }
+  h2 { font-size: 1.05rem; margin: 2.6rem 0 .8rem; color: var(--accent); border-bottom: 1px solid var(--line); padding-bottom: .35rem; }
+  .sub { color: var(--dim); font-size: .85rem; margin-bottom: 1.6rem; }
+  .sub code { color: var(--text); }
+
+  /* key numbers strip */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem; margin: 1.2rem 0; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: .6rem .8rem; }
+  .stat b { display: block; font-size: 1.15rem; color: #fff; }
+  .stat span { font-size: .72rem; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
+
+  /* pipeline */
+  .pipe { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; margin: 1rem 0; }
+  .node {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: .55rem .7rem; min-width: 118px; flex: 1;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .node b { font-size: .8rem; color: #fff; }
+  .node span { font-size: .68rem; color: var(--dim); }
+  .node.flight { border-top: 3px solid var(--flight); }
+  .node.link   { border-top: 3px solid var(--link); }
+  .node.ground { border-top: 3px solid var(--ground); }
+  .arrow { align-self: center; padding: 0 .35rem; color: var(--dim); font-size: 1rem; }
+  .legend { display: flex; gap: 1.4rem; font-size: .75rem; color: var(--dim); margin-top: .5rem; }
+  .dotf::before, .dotl::before, .dotg::before { content: "●"; margin-right: .35rem; }
+  .dotf::before { color: var(--flight); } .dotl::before { color: var(--link); } .dotg::before { color: var(--ground); }
+
+  /* sequence animation */
+  .seqwrap { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.2rem 1.2rem; }
+  .controls { display: flex; align-items: center; gap: .7rem; margin-bottom: .9rem; flex-wrap: wrap; }
+  button {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: .35rem .9rem; font: inherit; font-size: .8rem; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); color: #06222f; border-color: var(--accent); font-weight: 700; }
+  #phaseLabel { font-size: .82rem; color: var(--accent); min-width: 0; flex: 1; }
+  .seq { position: relative; height: 340px; }
+  .lane { position: absolute; top: 26px; bottom: 6px; width: 2px; background: var(--line); }
+  .lane.flight { left: 18%; } .lane.ground { left: 82%; }
+  .lanehdr { position: absolute; top: 0; transform: translateX(-50%); font-size: .78rem; font-weight: 700; }
+  .lanehdr.flight { left: 18%; color: var(--flight); }
+  .lanehdr.ground { left: 82%; color: var(--ground); }
+  .msg {
+    position: absolute; left: 18%; width: 64%; height: 20px; opacity: 0;
+    transition: opacity .35s;
+    font-size: .7rem; color: var(--dim);
+  }
+  .msg .txt { position: absolute; left: 50%; transform: translateX(-50%); top: -4px; white-space: nowrap; }
+  .msg .shaft { position: absolute; top: 12px; left: 2px; right: 2px; height: 1.5px; background: currentColor; }
+  .msg .head { position: absolute; top: 8.5px; width: 0; height: 0; border-top: 4.5px solid transparent; border-bottom: 4.5px solid transparent; }
+  .msg.r .head { right: 0; border-left: 8px solid currentColor; }
+  .msg.l .head { left: 0; border-right: 8px solid currentColor; }
+  .msg.c-hdr  { color: var(--accent); }
+  .msg.c-data { color: var(--flight); }
+  .msg.c-end  { color: var(--link); }
+  .msg.c-rty  { color: var(--err); }
+  .msg.c-ok   { color: var(--ok); }
+  .msg.on { opacity: 1; }
+  .msg.dim-out { opacity: .28; }
+  .note { position: absolute; font-size: .68rem; color: var(--dim); opacity: 0; transition: opacity .35s; max-width: 15%; }
+  .note.on { opacity: 1; }
+  .note.fl { left: 1%; } .note.gr { right: 1%; text-align: right; }
+
+  /* packet layout tables */
+  .pkt { margin: 1.1rem 0 1.6rem; }
+  .pkt h3 { font-size: .85rem; margin: 0 0 .4rem; color: #fff; }
+  .pkt h3 small { color: var(--dim); font-weight: 400; }
+  .bytes { display: flex; flex-wrap: wrap; gap: 3px; }
+  .byte {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 5px;
+    padding: .3rem .5rem; font-size: .68rem; text-align: center; min-width: 54px;
+  }
+  .byte b { display: block; font-size: .72rem; color: #fff; }
+  .byte i { font-style: normal; color: var(--dim); font-size: .62rem; }
+  .byte.magic { border-color: var(--accent); } .byte.magic b { color: var(--accent); }
+  .byte.crc { border-color: var(--link); } .byte.crc b { color: var(--link); }
+  .byte.data { border-color: var(--flight); } .byte.data b { color: var(--flight); }
+  .byte.grow { flex: 1; }
+
+  /* state machine */
+  .sm { display: flex; flex-wrap: wrap; gap: .9rem; align-items: center; }
+  .state { border: 2px solid var(--line); border-radius: 999px; padding: .45rem 1.1rem; font-size: .8rem; font-weight: 700; background: var(--panel); }
+  .state.idle { border-color: var(--dim); }
+  .state.run  { border-color: var(--flight); color: var(--flight); }
+  .state.done { border-color: var(--ok); color: var(--ok); }
+  .state.err  { border-color: var(--err); color: var(--err); }
+  .sm .via { font-size: .68rem; color: var(--dim); text-align: center; }
+  .smrow { display: flex; align-items: center; gap: .5rem; }
+
+  table { border-collapse: collapse; width: 100%; font-size: .78rem; margin-top: .6rem; }
+  th, td { border: 1px solid var(--line); padding: .4rem .6rem; text-align: left; }
+  th { background: var(--panel2); color: #fff; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
+  td:first-child { white-space: nowrap; }
+  .k { color: var(--accent); }
+  footer { margin-top: 3rem; color: var(--dim); font-size: .72rem; border-top: 1px solid var(--line); padding-top: .8rem; }
+  footer code { color: var(--text); }
+</style>
+</head>
+<body>
+<main>
+  <h1>PayloadDownlinkManager — Channel-1 Downlink Data Flow</h1>
+  <div class="sub">
+    Reliable science-blob downlink over the RFM23BP link. Flight side:
+    <code>Components/PayloadDownlinkManager</code> · Ground side: <code>tools/payload_receiver.py</code> ·
+    Constants: <code>config/transport_constants.json</code>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b>35 B</b><span>data bytes / packet</span></div>
+    <div class="stat"><b>1 pkt / s</b><span>rateGroup1 @ 1 Hz</span></div>
+    <div class="stat"><b>1 MiB</b><span>max blob size</span></div>
+    <div class="stat"><b>CRC16</b><span>per packet + whole file</span></div>
+    <div class="stat"><b>288</b><span>max pkts / retry round</span></div>
+    <div class="stat"><b>All-or-nothing</b><span>file written only on CRC match</span></div>
+  </div>
+
+  <h2>1 · Transport pipeline (satellite → ground)</h2>
+  <div class="pipe">
+    <div class="node flight"><b>PayloadDownlinkManager</b><span>F´ on Pi · chunks file into N2 packets</span></div>
+    <div class="arrow">→</div>
+    <div class="node flight"><b>uartChannelMux</b><span>tag channel 1 · UART frame D4 C3 · ≤220 B</span></div>
+    <div class="arrow">→</div>
+    <div class="node link"><b>Sat Teensy relay</b><span>RF segments · magic A6 · 49 B pkts, 44 B useful</span></div>
+    <div class="arrow">→</div>
+    <div class="node link"><b>RFM23BP ⇢ RFM23BP</b><span>link ACK · 4 retries · 80 ms timeout</span></div>
+    <div class="arrow">→</div>
+    <div class="node link"><b>Ground Teensy</b><span>reassemble · route to SerialUSB2</span></div>
+    <div class="arrow">→</div>
+    <div class="node ground"><b>payload_receiver.py</b><span>index map · CRC check · retry bitmaps</span></div>
+    <div class="arrow">→</div>
+    <div class="node ground"><b>Reconstructed file</b><span>written only after whole-file CRC16 match</span></div>
+  </div>
+  <div class="legend">
+    <span class="dotf">flight (F´ / Raspberry Pi)</span>
+    <span class="dotl">RF link layer (Teensy firmware)</span>
+    <span class="dotg">ground (operator PC)</span>
+  </div>
+  <div class="sub" style="margin-top:.6rem">
+    Retry requests travel the same path in reverse: <code>payload_receiver.py → ground Teensy → RF → sat Teensy → uartChannelMux.payloadRecvOut → PayloadDownlinkManager.packetIn</code>.
+  </div>
+
+  <h2>2 · Transfer sequence (step through it)</h2>
+  <div class="seqwrap">
+    <div class="controls">
+      <button class="primary" id="btnPlay">▶ Play</button>
+      <button id="btnStep">Step</button>
+      <button id="btnReset">Reset</button>
+      <span id="phaseLabel">Press Play — a full transfer with one loss + retry round.</span>
+    </div>
+    <div class="seq" id="seq">
+      <div class="lanehdr flight">FLIGHT · PayloadDownlinkManager</div>
+      <div class="lanehdr ground">GROUND · payload_receiver.py</div>
+      <div class="lane flight"></div>
+      <div class="lane ground"></div>
+    </div>
+  </div>
+
+  <h2>3 · Packet formats <small style="color:var(--dim)">— magic <span class="k">"N2"</span> (0x4E 0x32), multi-byte fields little-endian</small></h2>
+
+  <div class="pkt">
+    <h3>HEADER — 17 B <small>· type 1 · flight → ground · announces the transfer</small></h3>
+    <div class="bytes">
+      <div class="byte magic"><b>N2</b><i>0–1 magic</i></div>
+      <div class="byte"><b>01</b><i>2 type</i></div>
+      <div class="byte"><b>xferId</b><i>3 (U8, wraps, ≠0)</i></div>
+      <div class="byte"><b>productId</b><i>4–7 U32</i></div>
+      <div class="byte"><b>totalBytes</b><i>8–11 U32</i></div>
+      <div class="byte"><b>totalPkts</b><i>12–13 U16</i></div>
+      <div class="byte"><b>35</b><i>14 pktDataBytes</i></div>
+      <div class="byte crc"><b>fileCrc16</b><i>15–16</i></div>
+    </div>
+  </div>
+
+  <div class="pkt">
+    <h3>DATA — ≤44 B <small>· type 2 · flight → ground · one 35-byte chunk</small></h3>
+    <div class="bytes">
+      <div class="byte magic"><b>N2</b><i>0–1 magic</i></div>
+      <div class="byte"><b>02</b><i>2 type</i></div>
+      <div class="byte"><b>xferId</b><i>3</i></div>
+      <div class="byte"><b>pktIndex</b><i>4–5 U16</i></div>
+      <div class="byte"><b>validLen</b><i>6 U8 ≤35</i></div>
+      <div class="byte data grow"><b>file bytes @ index×35</b><i>7 … 7+validLen</i></div>
+      <div class="byte crc"><b>crc16</b><i>over all preceding bytes</i></div>
+    </div>
+  </div>
+
+  <div class="pkt">
+    <h3>END — 8 B <small>· type 3 · flight → ground · triggers ground-side audit</small></h3>
+    <div class="bytes">
+      <div class="byte magic"><b>N2</b><i>0–1 magic</i></div>
+      <div class="byte"><b>03</b><i>2 type</i></div>
+      <div class="byte"><b>xferId</b><i>3</i></div>
+      <div class="byte"><b>totalPkts</b><i>4–5 U16</i></div>
+      <div class="byte crc"><b>fileCrc16</b><i>6–7</i></div>
+    </div>
+  </div>
+
+  <div class="pkt">
+    <h3>RETRY_REQUEST — ≤43 B <small>· type 4 · ground → flight · selective-repeat NAK</small></h3>
+    <div class="bytes">
+      <div class="byte magic"><b>N2</b><i>0–1 magic</i></div>
+      <div class="byte"><b>04</b><i>2 type</i></div>
+      <div class="byte"><b>xferId</b><i>3 must match</i></div>
+      <div class="byte"><b>startIndex</b><i>4–5 U16 first missing</i></div>
+      <div class="byte"><b>bitmapLen</b><i>6 U8 ≤36</i></div>
+      <div class="byte data grow"><b>bitmap</b><i>bit set ⇒ pkt (start + byte×8 + bit) missing · window = 288 pkts</i></div>
+    </div>
+  </div>
+
+  <h2>4 · Flight state machine</h2>
+  <div class="sm">
+    <div class="smrow">
+      <div class="state idle">IDLE</div>
+      <div class="via">START_PAYLOAD_DOWNLINK /<br>downlinkRequestIn →</div>
+      <div class="state run">DOWNLINKING</div>
+      <div class="via">all pkts + END sent →</div>
+      <div class="state done">DONE</div>
+    </div>
+  </div>
+  <div class="sm" style="margin-top:.8rem">
+    <div class="smrow">
+      <div class="via">any failure (source, size,<br>port, retry overflow) →</div>
+      <div class="state err">ERROR</div>
+      <div class="via">ABORT_PAYLOAD_DOWNLINK →</div>
+      <div class="state err">ABORTED</div>
+      <div class="via">DONE still services<br>retry rounds ↻</div>
+    </div>
+  </div>
+  <div class="sub" style="margin-top:.7rem">
+    Per 1 Hz tick: retries first (<code>RETRY_PACKETS_PER_RUN=1</code>, preempts fresh data), then fresh
+    (<code>PACKETS_PER_RUN=1</code>). Events: Started · Progress (every 10%) · RetryRequested · Complete (summary ×3) · Failed.
+    Telemetry every 5 ticks while active, every 30 idle.
+  </div>
+
+  <h2>5 · Ground-side rules &amp; completion gate</h2>
+  <table>
+    <tr><th>Rule</th><th>Value / behavior</th></tr>
+    <tr><td>Retry trigger</td><td>Only after END seen, <em>or</em> 8 s of silence after HEADER</td></tr>
+    <tr><td>Retry cadence</td><td>Every 5 s; window starts at first missing index, spans ≤288 packets</td></tr>
+    <tr><td>Packet accept</td><td>Magic + transferId match, per-packet CRC16-CCITT must verify</td></tr>
+    <tr><td>Completion</td><td>Every index 0…totalPackets−1 present <b>and</b> whole-blob CRC16 == header/END fileCrc</td></tr>
+    <tr><td>Output</td><td>File written only on success · exit 0 ok / 2 incomplete / 3 CRC mismatch</td></tr>
+  </table>
+
+  <h2>6 · Flight source resolution &amp; error codes</h2>
+  <table>
+    <tr><th>Source lookup order</th><th>Path</th></tr>
+    <tr><td>1 · env override</td><td><code>NEUTRON_PAYLOAD_DOWNLINK_FILE</code></td></tr>
+    <tr><td>2 · default blob</td><td><code>/tmp/neutron_payload_captures/latest_payload.bin</code></td></tr>
+    <tr><td>3 · newest capture</td><td><code>/tmp/neutron_payload_captures/neutron_capture_*.csv</code> (lexicographic max)</td></tr>
+  </table>
+  <table>
+    <tr><th>LastError</th><th>Meaning</th><th>LastError</th><th>Meaning</th></tr>
+    <tr><td class="k">1</td><td>invalid inbound buffer</td><td class="k">7</td><td>source missing / unreadable</td></tr>
+    <tr><td class="k">2</td><td>blob &gt; 1 MiB</td><td class="k">8</td><td>zero byte count</td></tr>
+    <tr><td class="k">3</td><td>packetOut not connected</td><td class="k">9</td><td>byteCount ≠ source file size</td></tr>
+    <tr><td class="k">4</td><td>bad retry packet (magic/type/xferId)</td><td class="k">10</td><td>retry queue overflow (&gt;288) — fails transfer</td></tr>
+    <tr><td class="k">5</td><td>retry bitmap truncated</td><td class="k">11</td><td>source CRC precheck mismatch</td></tr>
+    <tr><td class="k">6</td><td>send failure</td><td></td><td></td></tr>
+  </table>
+
+  <footer>
+    Generated from <code>PayloadDownlinkManager.cpp</code>, <code>payload_receiver.py</code>,
+    <code>transport_constants.json</code>, and <code>Top/topology.fpp</code> (rateGroup1 @ 1 Hz).
+    Timing math: 36,481 B demo CSV → 1,043 packets ≈ 17.5 min nominal at 35 B/s.
+  </footer>
+</main>
+
+<script>
+(function () {
+  const seq = document.getElementById("seq");
+  const label = document.getElementById("phaseLabel");
+  const steps = [
+    { y: 40,  dir: "r", cls: "c-hdr",  txt: "CMD: START_PAYLOAD_DOWNLINK(productId, byteCount) — via channel 0", note: null,
+      phase: "Operator commands the downlink. Flight resolves + CRCs the source file, enters DOWNLINKING." },
+    { y: 70,  dir: "r", cls: "c-hdr",  txt: "HEADER · xferId, productId, totalBytes, totalPkts, fileCrc16", note: null,
+      phase: "HEADER announces the transfer. Ground clears its packet map and starts tracking." },
+    { y: 100, dir: "r", cls: "c-data", txt: "DATA idx 0 · 35 B + crc16", note: null,
+      phase: "Data packets flow — one per 1 Hz rate-group tick (35 B/s)." },
+    { y: 124, dir: "r", cls: "c-data", txt: "DATA idx 1", note: null,
+      phase: "Each packet lands at offset idx × 35 in the ground-side map." },
+    { y: 148, dir: "r", cls: "c-data lost", txt: "DATA idx 2 — ✕ lost on RF", note: { side: "gr", y: 144, txt: "gap: idx 2 never arrives" },
+      phase: "A packet dies on the RF link (frame CRC fails, reassembly times out). Flight doesn't know." },
+    { y: 172, dir: "r", cls: "c-data", txt: "DATA idx 3 … idx N−1", note: null,
+      phase: "Flight keeps sending — no per-packet ground ACK. Progress events every 10%." },
+    { y: 200, dir: "r", cls: "c-end",  txt: "END · totalPkts, fileCrc16", note: null,
+      phase: "END sent → flight enters DONE (but still services retries). Ground audits its map." },
+    { y: 232, dir: "l", cls: "c-rty",  txt: "RETRY_REQUEST · start=2, bitmap 00000001", note: { side: "gr", y: 228, txt: "NAK every 5 s until whole" },
+      phase: "Ground finds the hole and sends a selective-repeat bitmap (≤288 pkts/round)." },
+    { y: 262, dir: "r", cls: "c-data", txt: "DATA idx 2 (resend from retry queue)", note: { side: "fl", y: 258, txt: "retries preempt fresh data" },
+      phase: "Flight replays exactly the missing indexes — 1 per tick, before any new packets." },
+    { y: 294, dir: "l", cls: "c-ok",   txt: "✓ all packets present · whole-file CRC16 match → file written", note: null,
+      phase: "Completion gate: every index present AND blob CRC16 == fileCrc. Only then is the file written. Flight logs PayloadDownlinkComplete." },
+  ];
+
+  const els = steps.map((s) => {
+    const m = document.createElement("div");
+    m.className = "msg " + s.dir + " " + s.cls;
+    m.style.top = s.y + "px";
+    m.innerHTML = '<span class="txt">' + s.txt + '</span><span class="shaft"></span><span class="head"></span>';
+    if (s.cls.indexOf("lost") >= 0) {
+      m.querySelector(".shaft").style.background =
+        "repeating-linear-gradient(90deg, currentColor 0 6px, transparent 6px 12px)";
+      m.querySelector(".head").style.opacity = "0.25";
+    }
+    seq.appendChild(m);
+    let n = null;
+    if (s.note) {
+      n = document.createElement("div");
+      n.className = "note " + s.note.side;
+      n.style.top = s.note.y + "px";
+      n.textContent = s.note.txt;
+      seq.appendChild(n);
+    }
+    return { m: m, n: n };
+  });
+
+  let i = -1, timer = null;
+  function show(k) {
+    els.forEach((e, j) => {
+      e.m.classList.toggle("on", j <= k);
+      e.m.classList.toggle("dim-out", j < k);
+      if (e.n) e.n.classList.toggle("on", j <= k);
+    });
+    label.textContent = k >= 0 ? (k + 1) + "/" + steps.length + " — " + steps[k].phase
+                              : "Press Play — a full transfer with one loss + retry round.";
+  }
+  function step() {
+    if (i < steps.length - 1) { i++; show(i); }
+    if (i >= steps.length - 1 && timer) { clearInterval(timer); timer = null; playBtn.textContent = "▶ Play"; }
+  }
+  function reset() {
+    if (timer) { clearInterval(timer); timer = null; }
+    i = -1; show(i); playBtn.textContent = "▶ Play";
+  }
+  const playBtn = document.getElementById("btnPlay");
+  playBtn.onclick = function () {
+    if (timer) { clearInterval(timer); timer = null; playBtn.textContent = "▶ Play"; return; }
+    if (i >= steps.length - 1) reset();
+    playBtn.textContent = "⏸ Pause";
+    step();
+    timer = setInterval(step, 1600);
+  };
+  document.getElementById("btnStep").onclick = function () {
+    if (timer) { clearInterval(timer); timer = null; playBtn.textContent = "▶ Play"; }
+    step();
+  };
+  document.getElementById("btnReset").onclick = reset;
+  show(-1);
+})();
+</script>
+</body>
+</html>

@@ -120,6 +120,78 @@ The current target is a shortened FlatSat FSR end-to-end demo based on the team'
 - Simulated payload data is acceptable until a real payload data source is stable enough for the demo.
 - Ground-station presentation quality matters: live telemetry, command acknowledgement, and visible science-data review are part of the success criteria.
 
+## MVP Demo Release Freeze
+
+Release tag: `v1.0.0-mvp-demo`
+
+Release date: 2026-07-02
+
+Purpose: freeze the known-good Neutron 2 FlatSat MVP demo state so the team has
+one reproducible version for sharing, flashing, rehearsal, and regression
+comparison. This is a demo release, not a flight-readiness claim.
+
+Frozen artifact set:
+
+- Pi Zero W F Prime binary:
+  `ArtemisRpiTeensy_N2/build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/bin/ArtemisRpiTeensyDeployment`
+- Matching F Prime dictionary:
+  `ArtemisRpiTeensy_N2/build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json`
+- Satellite Teensy firmware:
+  `ArtemisTeensy_N2_Baremetal/build/arduino-cli/satellite_teensy.ino.hex`
+- Ground Teensy firmware:
+  `GDS_Teensy/build/arduino-cli/gds_teensy.ino.hex`
+- GitHub Release checksum file:
+  `SHA256SUMS`
+
+Validation gates for this release:
+
+- `tools/validate_local.sh`
+- HIL/default-profile F Prime generate/build
+- Pi Zero W ARMv6 cross-build or existing artifact verification
+- satellite Teensy Arduino CLI build
+- ground Teensy Arduino CLI build
+- release-asset checksum generation
+
+Hardware proof basis:
+
+- The live HIL path has been demonstrated with GDS command/event/telemetry over
+  RF, Raspberry Pi runtime on `/dev/serial0`, operator-scheduled collection,
+  simulated payload capture, channel-1 payload reconstruction, payload viewer
+  parsing, and Pi-vs-ground payload hash matching.
+- The runbook source of truth for reproducing the demo is
+  [`docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`](docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md).
+
+Validated for this MVP:
+
+- laptop GDS to ground Teensy channel 0 path
+- RFM23BP command uplink and telemetry/event downlink
+- Raspberry Pi Zero W deployment runtime through the satellite Teensy UART
+- Base Mode command path and SOH snapshot path
+- compressed scheduled collection flow
+- simulated Neutron 2 payload capture on the Pi
+- storage/downlink handoff events
+- channel 1 payload transfer through the RF bridge
+- ground-side payload reconstruction with CRC
+- payload viewer parsing of reconstructed science bytes
+
+Not validated by this release:
+
+- stock F Prime file downlink for science products
+- high-rate telemetry
+- production SatNOGS radio behavior
+- real Neutron payload board data source
+- full mission-duration timing
+- channel 2 HIL against the real PDU
+- RF/GDS APID sequence-count cleanup and full uplink robustness
+- battery/PDU-powered RF brownout behavior
+- flight readiness
+
+Post-v1 development should branch from this frozen point on
+`neutron2-develop`. The next work should focus on operational hardening rather
+than changing the proven demo baseline: scheduling/cancel edge cases, cheap CI
+gates, watchdog/restart behavior, topology de-forking, stale-doc cleanup, and
+PDU/payload hardware integration.
+
 ## F Prime Version
 
 This branch is pinned to F Prime `v4.2.1`:
