@@ -184,6 +184,9 @@ right port.
 
 Attach the ground Teensy to WSL before starting these commands. Use the first
 ground Teensy triple-serial port for GDS and the third for payload reception.
+Because these commands interact with USB serial hardware exposed into WSL2,
+WSL2 users should run the hardware-facing commands with `sudo` unless the WSL
+user is already configured for serial-device access.
 
 Terminal 1, start `fprime-gds`:
 
@@ -218,7 +221,7 @@ python3 -u tools/payload_receiver.py \
   --port "$GDS_PAYLOAD_PORT" \
   --baud 115200 \
   --output "$RUN_DIR/payload_30s.bin" \
-  --timeout 600
+  --timeout 240
 ```
 
 The full operator flow, expected events, and pass criteria live in

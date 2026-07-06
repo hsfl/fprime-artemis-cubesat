@@ -99,6 +99,9 @@ Windows laptop:
   `http://127.0.0.1:8062`
 - attach the ground Teensy USB device to WSL with `usbipd-win`
 - inside WSL, use `/dev/ttyACM*` or `/dev/ttyUSB*`, not `COM3`
+- WSL2 users should run commands that open USB serial devices with `sudo`, such
+  as `run_gds_uart.sh` and `tools/payload_receiver.py`, unless the WSL user is
+  already configured for serial-device access
 - for the full `usbipd-win` bind/attach/detach procedure, see
   `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md`
 
@@ -220,7 +223,7 @@ python -u tools/payload_receiver.py \
   --port "$GDS_PAYLOAD_PORT" \
   --baud 115200 \
   --output "$RUN_DIR/payload_30s.bin" \
-  --timeout 600
+  --timeout 240
 ```
 
 Windows WSL2:
@@ -237,7 +240,7 @@ python -u tools/payload_receiver.py \
   --port "$GDS_PAYLOAD_PORT" \
   --baud 115200 \
   --output "$RUN_DIR/payload_30s.bin" \
-  --timeout 600
+  --timeout 240
 ```
 
 Expected receiver output:
@@ -569,7 +572,7 @@ If telemetry is blank:
 If payload receiver prints `incomplete`:
 
 - rerun the receiver before sending downlink again
-- use a longer timeout such as `--timeout 600`
+- use a longer timeout such as `--timeout 240`
 - `retry:` lines are normal; failure is only when the receiver exits before `complete:`
 - for a direct retry of the same Pi latest payload, use:
 
