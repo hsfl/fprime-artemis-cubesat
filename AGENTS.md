@@ -46,7 +46,7 @@ Use this project with the `fprime-swe` skill and follow these steps exactly.
   git status --short --branch
   git submodule status --recursive
   ```
-  Treat the active branch and local uncommitted files as the current working context. Do not assume the checkout is on `main`, `neutron_2`, `students/component-starter-base`, or any Codex feature branch without verifying.
+  Treat the active branch and local uncommitted files as the current working context. Do not assume the checkout is on `main`, `neutron_2`, `neutron2-develop`, or any Codex feature branch without verifying.
 - Read `docs/SYSTEM_ARCHITECTURE.md` first.
   - This is the required system-level crosswalk between the Neutron 2 target architecture and the Artemis-based prototype used for the current demo.
   - Do not continue with subsystem or architecture work until this file has been read.
@@ -306,7 +306,7 @@ PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
    - verify remote branch naming is push-compatible (avoid `dev/x` if `dev` branch already exists remotely)
 
 ### Student Branch / Handoff Rules
-- `students/component-starter-base` is the shared student starter branch, created from `neutron_2`; verify the current branch before making student-facing edits.
+- `neutron2-develop` is the shared post-v1 student development branch, created from the frozen MVP demo baseline; verify the current branch before making student-facing edits.
 - Keep student-facing docs KISS: clear, concise, consistent, and explicit about what students should edit.
 - Use service/adapter terminology from `docs/SYSTEM_ARCHITECTURE.md` and `docs/STUDENT_COMPONENT_STARTERS.md`; do not restate the full architecture here.
 - Placeholder or request-state commands must not imply real hardware actuation. Say plainly when a component records intent only.

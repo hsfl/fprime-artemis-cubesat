@@ -22,6 +22,10 @@ There is no fixed device name — the suffix depends on the machine and which US
 
 Tip: unplug everything, plug in **one** Teensy, run the enumerate command, and note which port(s) appear before adding the next device. Label the physical USB cables.
 
+On Windows, the Teensy must be attached into WSL2 before these Linux device names
+appear. See [`STUDENT_WINDOWS_LAPTOP_SETUP.md`](STUDENT_WINDOWS_LAPTOP_SETUP.md)
+for the `usbipd-win` bind/attach/detach workflow.
+
 ## Ground Teensy: three USB serial ports
 
 When the ground Teensy is built with `USB_TRIPLE_SERIAL`, it presents three ports to the laptop. **The port index is its own axis — it is *not* the same as the satellite UART channel numbers.** (See [Transport Architecture](SYSTEM_ARCHITECTURE.md#the-three-ground-usb-serial-ports).)

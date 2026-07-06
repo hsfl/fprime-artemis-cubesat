@@ -122,7 +122,9 @@ The current target is a shortened FlatSat FSR end-to-end demo based on the team'
 
 ## MVP Demo Release Freeze
 
-Release tag: `v1.0.0-mvp-demo`
+GitHub release: `v1.0.0`
+
+Internal demo-freeze label: `v1.0.0-mvp-demo`
 
 Release date: 2026-07-02
 
@@ -186,10 +188,15 @@ Not validated by this release:
 - battery/PDU-powered RF brownout behavior
 - flight readiness
 
-Post-v1 development should branch from this frozen point on
-`neutron2-develop`. The next work should focus on operational hardening rather
-than changing the proven demo baseline: scheduling/cancel edge cases, cheap CI
-gates, watchdog/restart behavior, topology de-forking, stale-doc cleanup, and
+Post-v1 development should happen on `neutron2-develop`. Student work should
+start from that branch, not from the frozen release branch/tag. The
+`neutron2-develop` branch currently starts from the same contents as the MVP
+release baseline, so it is the right place for follow-on work without changing
+the proven demo snapshot.
+
+The next work should focus on operational hardening rather than changing the
+proven demo baseline: scheduling/cancel edge cases, cheap CI gates,
+watchdog/restart behavior, topology de-forking, stale-doc cleanup, and
 PDU/payload hardware integration.
 
 ## F Prime Version
