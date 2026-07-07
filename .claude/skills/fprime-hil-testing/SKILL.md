@@ -33,10 +33,10 @@ sed -n '1,220p' AGENTS.md
 sed -n '1,220p' README.md
 sed -n '1,260p' docs/SYSTEM_ARCHITECTURE.md
 sed -n '400,490p' docs/agents_notes.md
-sed -n '1,140p' docs/RF_MVP_DEMO_RUNBOOK.md
+sed -n '1,140p' docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md
 ```
 
-Use `docs/RF_MVP_DEMO_RUNBOOK.md` as the current HIL proof source. Older
+Use `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md` as the current HIL proof source. Older
 `HIL_TEST_HANDOFF_*` files may be stale or branch-specific.
 
 ## Platform Detection
@@ -88,7 +88,18 @@ If system Python lacks `pyserial`, use the repo venv Python after activating
 `ArtemisRpiTeensy_N2/fprime-venv`.
 
 If WSL2 does not show the Teensy devices, attach them from Windows with
-`usbipd-win`, then re-run the WSL2 checks.
+`usbipd-win` from an **administrator PowerShell** window (`usbipd bind --busid
+<BUSID>` once, then `usbipd attach --wsl --busid <BUSID>` each session), then
+re-run the WSL2 checks. Full procedure: `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md`.
+
+If a serial command fails with `Permission denied` on WSL2 or Linux, the
+durable fix is `sudo usermod -aG dialout "$USER"` plus a WSL restart
+(or re-login). A one-off `sudo` on the specific serial command is acceptable
+in a demo emergency, but keep the repo venv and the same port; never `sudo`
+builds or `fprime-util`.
+
+macOS note: `timeout` used below needs coreutils (`brew install coreutils`,
+command `gtimeout`); otherwise run `cat <port>` and Ctrl-C after a few seconds.
 
 ## Teensy Upload Targeting: Mandatory
 

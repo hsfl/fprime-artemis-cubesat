@@ -25,6 +25,11 @@ Project skills are shared through `.agents/skills/` for Codex-style agents and `
 | `fprime-swe` | [`.agents/skills/fprime-swe/SKILL.md`](.agents/skills/fprime-swe/SKILL.md) | Developing F' components, ports, topologies, running builds, or using fprime-util |
 | `fprime-docs-search` | [`.agents/skills/fprime-docs-search/SKILL.md`](.agents/skills/fprime-docs-search/SKILL.md) | Looking up F' framework docs — check repo-local docs at `ArtemisRpiTeensy_N2/lib/fprime/docs` first |
 | `fprime-cross-compilation` | [`.agents/skills/fprime-cross-compilation/SKILL.md`](.agents/skills/fprime-cross-compilation/SKILL.md) | Cross-compiling for ARM targets; Pi Zero W ARMv6 landmine documented here |
+| `fprime-fpp-authoring` | [`.agents/skills/fprime-fpp-authoring/SKILL.md`](.agents/skills/fprime-fpp-authoring/SKILL.md) | Writing/editing `.fpp` files, wiring a component into the topology, base IDs, or diagnosing FPP autocoder errors |
+| `fprime-testing` | [`.agents/skills/fprime-testing/SKILL.md`](.agents/skills/fprime-testing/SKILL.md) | Writing or running component unit tests, `fprime-util check`, GDS integration tests, or `tools/validate_local.sh` |
+| `fprime-local-emulation` | [`.agents/skills/fprime-local-emulation/SKILL.md`](.agents/skills/fprime-local-emulation/SKILL.md) | Running or debugging the no-hardware laptop demo: local emulation, `local-demo` topology profile, simulated payload, payload viewer |
+| `fprime-hil-testing` | [`.agents/skills/fprime-hil-testing/SKILL.md`](.agents/skills/fprime-hil-testing/SKILL.md) | Guiding live hardware-in-the-loop bring-up: Teensy staging, serial enumeration, Pi service checks, GDS launch, RF smoke tests |
+| `teensy-firmware` | [`.agents/skills/teensy-firmware/SKILL.md`](.agents/skills/teensy-firmware/SKILL.md) | Building/uploading satellite or ground Teensy firmware, upload-ID targeting, link protocol and transport-constants regeneration |
 | `student-git-handoff` | [`.agents/skills/student-git-handoff/SKILL.md`](.agents/skills/student-git-handoff/SKILL.md) | Helping non-technical students use GitHub feature branches, commits, pushes, and pull requests with Software Dev Lead-approved base branches |
 
 ## Student Platform Policy

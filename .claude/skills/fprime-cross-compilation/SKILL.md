@@ -107,8 +107,9 @@ ssh <user>@<device-address>
 ./deployment -a 0.0.0.0 -p 50000
 ```
 
-## Notes for tutorial tracking
+## Notes
 
-- Keep tutorial notes under `docs/tutorial-3-cross-compilation/` when following the repo tutorial workflow.
 - macOS users must run cross-compilation commands inside the Docker container.
+- Windows users run the same Docker flow inside WSL2 (Docker Desktop with the
+  WSL2 backend); native PowerShell/CMD is not a supported F Prime path.
 - For repo-specific context and prior attempts, read `references/context.md`.

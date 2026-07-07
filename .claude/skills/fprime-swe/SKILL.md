@@ -130,19 +130,25 @@ fprime-util generate -f
 ```bash
 fprime-gds  # Opens web UI at http://127.0.0.1:5000
 ```
+
+**This repo / macOS note:** port 5000 is often taken by Control Center/AirPlay Receiver on macOS. Use the repo launcher `./tools/run_gds_uart.sh` (defaults to GUI port 5050) or pass `--gui-port 5050`.
 - **Commanding tab**: Send commands
 - **Events tab**: View logs
 - **Channels tab**: Monitor telemetry
 
 ## Cross-Compilation (Raspberry Pi)
 
+**THIS REPO'S TARGET IS A PI ZERO W (ARMv6).** Do NOT use `aarch64-linux` or standard `arm-hf-linux` for it — both target ARMv7+ and produce binaries that SIGILL on the Pi Zero W. Use the `fprime-cross-compilation` skill, which documents the ARMv6 toolchain and the repo's `tools/docker_cross_compile_pi_zero_w.sh` workflow.
+
+Generic F' cross-compilation (for ARMv7+/ARMv8 targets only):
+
 ```bash
 export ARM_TOOLS_PATH=/opt/toolchains  # Point to ARM GCC
-fprime-util generate aarch64-linux     # 64-bit Pi
+fprime-util generate aarch64-linux     # 64-bit Pi 3/4/5
 fprime-util build aarch64-linux
 ```
 
-Platforms: `aarch64-linux` (64-bit), `arm-hf-linux` (32-bit)
+Platforms: `aarch64-linux` (64-bit), `arm-hf-linux` (32-bit ARMv7)
 
 **macOS users**: Use Docker container for ARM cross-compilation.
 
