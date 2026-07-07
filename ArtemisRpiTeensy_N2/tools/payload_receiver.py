@@ -3,6 +3,11 @@
 
 The stream is intentionally filetype-agnostic. It reconstructs bytes by packet
 index, verifies CRCs, writes the blob, and sends retry bitmaps when needed.
+
+Two modes:
+  * single-file (default): wait for one transfer and write it to --output.
+  * directory (--output-dir DIR): keep listening and save every completed
+    transfer into DIR as a uniquely named .fdp file (background listener).
 """
 
 from __future__ import annotations
@@ -40,10 +45,27 @@ def crc16_ccitt(data: bytes) -> int:
 
 
 class PayloadReceiver:
-    def __init__(self, port: str, baud: int, output: pathlib.Path, timeout_s: float) -> None:
+    def __init__(
+        self,
+        port: str,
+        baud: int,
+        output: pathlib.Path,
+        timeout_s: float,
+        output_dir: pathlib.Path | None = None,
+        ext: str = ".bin",
+        debug: bool = False,
+    ) -> None:
         self.port = port
         self.baud = baud
         self.output = output
+        self.output_dir = output_dir
+        self.ext = ext
+        self.debug = debug
+        self.debug_total_bytes = 0
+        self.debug_last_report_s = 0.0
+        self.debug_seen_magic = False
+        self.debug_type_counts: dict[int, int] = {}
+        self.received_count = 0
         self.timeout_s = timeout_s
         self.transfer_id: int | None = None
         self.product_id = 0
@@ -114,6 +136,7 @@ class PayloadReceiver:
         while time.monotonic() < partial_deadline:
             chunk = ser.read(MAX_PACKET)
             if chunk:
+                self.debug_report(chunk)
                 self.rx_buffer += chunk
                 packet = self.try_extract_packet()
                 if packet:
@@ -121,6 +144,30 @@ class PayloadReceiver:
             elif not self.rx_buffer:
                 return b""
         return b""
+
+    def debug_report(self, chunk: bytes) -> None:
+        """Opt-in raw-stream diagnostic: confirm bytes arrive and whether an N2
+        magic ever shows up, so a silent transfer can be localized to
+        (no bytes) / (bytes but no header) / (header seen but not parsed)."""
+        if not self.debug:
+            return
+        self.debug_total_bytes += len(chunk)
+        if not self.debug_seen_magic and MAGIC in (self.rx_buffer[-1:] + chunk):
+            self.debug_seen_magic = True
+            index = chunk.find(MAGIC)
+            snippet = chunk[index:index + 8] if index >= 0 else chunk[:8]
+            print(f"debug: first N2 magic seen; bytes={snippet.hex(' ')}")
+        now = time.monotonic()
+        if now - self.debug_last_report_s >= 1.0:
+            self.debug_last_report_s = now
+            c = self.debug_type_counts
+            print(
+                f"debug: rx_bytes_total={self.debug_total_bytes} "
+                f"types[header={c.get(TYPE_HEADER, 0)} data={c.get(TYPE_DATA, 0)} "
+                f"end={c.get(TYPE_END, 0)} other={sum(v for k, v in c.items() if k not in (TYPE_HEADER, TYPE_DATA, TYPE_END))}] "
+                f"header_seen={self.transfer_id is not None} "
+                f"packets={len(self.packets)}/{self.total_packets}"
+            )
 
     def try_extract_packet(self) -> bytes:
         while True:
@@ -168,6 +215,9 @@ class PayloadReceiver:
             return
         packet_type = packet[2]
         transfer_id = packet[3]
+
+        if self.debug:
+            self.debug_type_counts[packet_type] = self.debug_type_counts.get(packet_type, 0) + 1
 
         if packet_type == TYPE_HEADER:
             self.handle_header(packet)
@@ -261,15 +311,104 @@ class PayloadReceiver:
         chunks = [self.packets[idx] for idx in range(self.total_packets)]
         return b"".join(chunks)[: self.total_bytes]
 
+    def reset_transfer(self) -> None:
+        """Clear per-transfer state so the next HEADER starts fresh."""
+        self.transfer_id = None
+        self.product_id = 0
+        self.total_bytes = 0
+        self.total_packets = 0
+        self.file_crc = 0
+        self.packets = {}
+        self.end_seen = False
+        self.next_retry_request_s = 0.0
+        self.last_packet_s = 0.0
+        # rx_buffer is intentionally kept: it may hold the next transfer's bytes.
+
+    def finalize_to_dir(self) -> None:
+        """Write the completed transfer into output_dir with a unique name."""
+        assert self.output_dir is not None
+        blob = self.reconstruct()
+        actual_crc = crc16_ccitt(blob)
+        crc_ok = actual_crc == self.file_crc
+        self.received_count += 1
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        # The header does not carry the data product's real id or capture time, so
+        # the original ./DpCat filename cannot be reconstructed here. Fall back to
+        # the ground receive time: Dp_<datetime><ext>. The extension is a
+        # caller-supplied label (--ext), not a format the receiver interprets. A
+        # CRC failure is flagged so a bad blob is never mistaken for a good file.
+        suffix = "" if crc_ok else ".badcrc"
+        base = f"Dp_{time.strftime('%Y%m%d_%H%M%S')}"
+        target = self.output_dir / f"{base}{self.ext}{suffix}"
+        dupe = 1
+        while target.exists():  # two transfers can complete within the same second
+            target = self.output_dir / f"{base}_{dupe:03d}{self.ext}{suffix}"
+            dupe += 1
+        target.write_bytes(blob)
+        status = "ok" if crc_ok else f"CRC MISMATCH actual=0x{actual_crc:04x} expected=0x{self.file_crc:04x}"
+        print(
+            f"saved: {target.name} product={self.product_id} transfer={self.transfer_id} "
+            f"bytes={len(blob)} packets={self.total_packets} [{status}]"
+        )
+
+    def run_directory(self, idle_timeout_s: float = 0.0) -> int:
+        """Continuously listen and save every completed transfer to output_dir.
+
+        Runs until Ctrl-C. If idle_timeout_s > 0, also exits after that many
+        seconds with no activity while not mid-transfer.
+        """
+        assert self.output_dir is not None
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        print(f"listening on {self.port}: saving completed transfers to {self.output_dir}/ (Ctrl-C to stop)")
+        last_activity = time.monotonic()
+        with serial.Serial(self.port, self.baud, timeout=0.2) as ser:
+            try:
+                while True:
+                    packet = self.read_packet(ser)
+                    if packet:
+                        self.handle_packet(packet, ser)
+                        last_activity = time.monotonic()
+                    self.request_retries_if_due(ser)
+                    if self.complete:
+                        self.finalize_to_dir()
+                        self.reset_transfer()
+                        last_activity = time.monotonic()
+                    elif (
+                        idle_timeout_s > 0
+                        and self.transfer_id is None
+                        and (time.monotonic() - last_activity) > idle_timeout_s
+                    ):
+                        print("idle timeout reached; exiting")
+                        break
+            except KeyboardInterrupt:
+                print("\nstopped by user")
+        return 0
+
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True, help="Payload serial port, usually ground Teensy SerialUSB2")
     parser.add_argument("--baud", type=int, default=115200)
-    parser.add_argument("--output", type=pathlib.Path, default=pathlib.Path("payload_blob.bin"))
-    parser.add_argument("--timeout", type=float, default=120.0)
+    parser.add_argument("--output", type=pathlib.Path, default=pathlib.Path("payload_blob.bin"),
+                        help="Single-file output path (used only when --output-dir is not given)")
+    parser.add_argument("--output-dir", type=pathlib.Path, default=None,
+                        help="Directory to save every completed transfer (continuous listen mode)")
+    parser.add_argument("--ext", default=".bin",
+                        help="Filename extension label for --output-dir files (e.g. .fdp for data products). "
+                             "The receiver never interprets content; this is only a label. Default: .bin")
+    parser.add_argument("--timeout", type=float, default=120.0,
+                        help="Single-file mode: max seconds to wait for one transfer")
+    parser.add_argument("--idle-timeout", type=float, default=0.0,
+                        help="--output-dir mode: exit after this many idle seconds (0 = run until Ctrl-C)")
+    parser.add_argument("--debug", action="store_true",
+                        help="Print a raw-stream heartbeat (bytes received, whether an N2 magic/header "
+                             "has been seen) to localize a silent transfer")
     args = parser.parse_args(argv)
-    return PayloadReceiver(args.port, args.baud, args.output, args.timeout).run()
+    receiver = PayloadReceiver(args.port, args.baud, args.output, args.timeout,
+                               output_dir=args.output_dir, ext=args.ext, debug=args.debug)
+    if args.output_dir is not None:
+        return receiver.run_directory(args.idle_timeout)
+    return receiver.run()
 
 
 if __name__ == "__main__":
