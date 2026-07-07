@@ -26,6 +26,21 @@ with `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md`.
   (e.g. `/tmp` capture dir owned by root from an earlier sudo run; fix
   ownership instead).
 
+## Preflight (fresh clone or git worktree)
+
+The build needs two submodules initialized — `EpsDriver_Artemis` includes a
+header from `external/artemis-pdu`, and everything builds against the pinned
+framework:
+
+```bash
+git submodule update --init ArtemisRpiTeensy_N2/lib/fprime external/artemis-pdu
+```
+
+A missing `artemis-pdu` fails late (~95% through the build) with
+`fatal error: '../../../external/artemis-pdu/src/pdu_protocol_v2.h' file not found`.
+The venv must exist at `ArtemisRpiTeensy_N2/fprime-venv/` (in a worktree, a
+symlink to the main checkout's venv works).
+
 ## One-Command Paths (prefer these)
 
 Standard laptop regression before handing changes to mission ops or another
