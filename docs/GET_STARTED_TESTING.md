@@ -48,7 +48,7 @@ For the current team demo, the important proof is:
 4. Local payload hash matches the Pi latest payload file.
 5. `ground-station/neutron2-payload-viewer` parses the reconstructed payload.
 6. Pi journal shows `PayloadDownlinkProgress`, `PayloadDownlinkComplete`, and
-   `CommsManager.DownlinkFinished`.
+   `CommsApp.DownlinkFinished`.
 
 The maintained procedure for this is `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`.
 

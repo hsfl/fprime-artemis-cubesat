@@ -59,7 +59,7 @@ So far the bench has been brought up **USB-powered only** — the OBC/Teensy on 
 
 ### Future: power from the Artemis bus (PDU → battery → solar)
 
-Moving off USB means bringing up the EPS chain: PDU v2.2 + battery board v2, and eventually solar panels (the full [Artemis CubeSat Kit](https://sites.google.com/hawaii.edu/artemiscubesatkit) bus). Drive the PDU only through `EpsService` / `EpsAdapter_Artemis` (PDU v2 protocol), never raw packets. The authoritative wire format is the [PDU Protocol ICD](../external/artemis-pdu/PDU_PROTOCOL_ICD.md).
+Moving off USB means bringing up the EPS chain: PDU v2.2 + battery board v2, and eventually solar panels (the full [Artemis CubeSat Kit](https://sites.google.com/hawaii.edu/artemiscubesatkit) bus). Drive the PDU only through `EpsManager` / `EpsDriver_Artemis` (PDU v2 protocol), never raw packets. The authoritative wire format is the [PDU Protocol ICD](../external/artemis-pdu/PDU_PROTOCOL_ICD.md).
 
 ### PDU rail map (PDU v2 protocol)
 

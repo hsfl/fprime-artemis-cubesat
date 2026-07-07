@@ -32,24 +32,24 @@ module ArtemisRpiTeensyDeployment {
     instance timer
     instance comDriver
     instance cmdSeq
-    instance teensyTransportService
-    instance missionManager
-    instance scienceManager
-    instance sohManager
-    instance commsManager
-    instance epsService
-    instance payloadService
-    instance adcsService
-    instance gpsService
-    instance storageService
-    instance thermalService
-    instance payloadDownlinkManager
-    instance epsAdapterArtemis
-    instance payloadAdapterNeutronSim
-    instance adcsAdapterD2S2
-    instance gpsAdapterArtemis
-    instance commsAdapterTeensyRfm23
-    instance thermalAdapterArtemis
+    instance teensyTransportManager
+    instance missionApp
+    instance scienceApp
+    instance sohApp
+    instance commsApp
+    instance epsManager
+    instance payloadManager
+    instance adcsManager
+    instance gpsManager
+    instance storageManager
+    instance thermalManager
+    instance payloadDownlinkApp
+    instance epsDriverArtemis
+    instance payloadDriverNeutronSim
+    instance adcsDriverD2S2
+    instance gpsDriverArtemis
+    instance commsDriverTeensyRfm23
+    instance thermalDriverArtemis
     instance uartChannelMux
 
   # ----------------------------------------------------------------------
@@ -112,8 +112,8 @@ module ArtemisRpiTeensyDeployment {
       comDriver.ready         -> ComCcsds.comStub.drvConnected
 
       # Channel 1 carries generic payload blob packets outside CCSDS.
-      uartChannelMux.payloadRecvOut -> payloadDownlinkManager.packetIn
-      payloadDownlinkManager.packetOut -> uartChannelMux.payloadSendIn
+      uartChannelMux.payloadRecvOut -> payloadDownlinkApp.packetIn
+      payloadDownlinkApp.packetOut -> uartChannelMux.payloadSendIn
     }
 
     connections FileHandling_DataProducts {
@@ -134,23 +134,23 @@ module ArtemisRpiTeensyDeployment {
       # rateGroup1.RateGroupMemberOut[2] -> systemResources.run
       rateGroup1.RateGroupMemberOut[3] -> ComCcsds.comQueue.run
       rateGroup1.RateGroupMemberOut[4] -> ComCcsds.aggregator.timeout
-      rateGroup1.RateGroupMemberOut[5] -> teensyTransportService.run
-      rateGroup1.RateGroupMemberOut[6] -> missionManager.run
-      rateGroup1.RateGroupMemberOut[7] -> payloadDownlinkManager.run
+      rateGroup1.RateGroupMemberOut[5] -> teensyTransportManager.run
+      rateGroup1.RateGroupMemberOut[6] -> missionApp.run
+      rateGroup1.RateGroupMemberOut[7] -> payloadDownlinkApp.run
       # RF MVP: tick the scheduled science path; keep higher-volume demo status loops off.
-      rateGroup1.RateGroupMemberOut[8] -> scienceManager.run
-      # rateGroup1.RateGroupMemberOut[9] -> sohManager.run
-      # rateGroup1.RateGroupMemberOut[10] -> commsManager.run
+      rateGroup1.RateGroupMemberOut[8] -> scienceApp.run
+      # rateGroup1.RateGroupMemberOut[9] -> sohApp.run
+      # rateGroup1.RateGroupMemberOut[10] -> commsApp.run
 
       # Rate group 2
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup2] -> rateGroup2.CycleIn
       rateGroup2.RateGroupMemberOut[0] -> cmdSeq.schedIn
-      rateGroup2.RateGroupMemberOut[1] -> epsAdapterArtemis.run
-      # rateGroup2.RateGroupMemberOut[2] -> payloadService.run
-      # rateGroup2.RateGroupMemberOut[3] -> adcsService.run
-      # rateGroup2.RateGroupMemberOut[4] -> gpsService.run
-      # rateGroup2.RateGroupMemberOut[5] -> storageService.run
-      # rateGroup2.RateGroupMemberOut[6] -> thermalService.run
+      rateGroup2.RateGroupMemberOut[1] -> epsDriverArtemis.run
+      # rateGroup2.RateGroupMemberOut[2] -> payloadManager.run
+      # rateGroup2.RateGroupMemberOut[3] -> adcsManager.run
+      # rateGroup2.RateGroupMemberOut[4] -> gpsManager.run
+      # rateGroup2.RateGroupMemberOut[5] -> storageManager.run
+      # rateGroup2.RateGroupMemberOut[6] -> thermalManager.run
 
       # Rate group 3
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup3] -> rateGroup3.CycleIn
@@ -169,58 +169,58 @@ module ArtemisRpiTeensyDeployment {
     }
 
     connections MissionFlow {
-      missionManager.collectionRequestOut -> scienceManager.requestIn
-      missionManager.cancelRequestOut -> scienceManager.cancelRequestIn
-      scienceManager.payloadRequestOut -> payloadService.requestIn
-      payloadService.statusOut -> scienceManager.payloadStatusIn
-      scienceManager.scienceProductOut -> storageService.requestIn
-      storageService.downlinkReadyOut -> commsManager.scienceReadyIn
-      commsManager.downlinkRequestOut -> storageService.downlinkRequestIn
-      commsManager.payloadDownlinkRequestOut -> payloadDownlinkManager.downlinkRequestIn
-      payloadDownlinkManager.statusOut -> commsManager.payloadDownlinkStatusIn
-      scienceManager.missionModeOut -> missionManager.modeUpdateIn[0]
-      commsManager.missionModeOut -> missionManager.modeUpdateIn[1]
+      missionApp.collectionRequestOut -> scienceApp.requestIn
+      missionApp.cancelRequestOut -> scienceApp.cancelRequestIn
+      scienceApp.payloadRequestOut -> payloadManager.requestIn
+      payloadManager.statusOut -> scienceApp.payloadStatusIn
+      scienceApp.scienceProductOut -> storageManager.requestIn
+      storageManager.downlinkReadyOut -> commsApp.scienceReadyIn
+      commsApp.downlinkRequestOut -> storageManager.downlinkRequestIn
+      commsApp.payloadDownlinkRequestOut -> payloadDownlinkApp.downlinkRequestIn
+      payloadDownlinkApp.statusOut -> commsApp.payloadDownlinkStatusIn
+      scienceApp.missionModeOut -> missionApp.modeUpdateIn[0]
+      commsApp.missionModeOut -> missionApp.modeUpdateIn[1]
     }
 
-    connections ServiceAdapterBindings {
-      epsService.adapterRequestOut -> epsAdapterArtemis.requestIn
-      epsAdapterArtemis.statusOut -> epsService.adapterStatusIn
-      epsAdapterArtemis.teensyRequestOut -> uartChannelMux.localSendIn
-      uartChannelMux.localRecvOut -> epsAdapterArtemis.teensyResponseIn
+    connections ManagerDriverBindings {
+      epsManager.driverRequestOut -> epsDriverArtemis.requestIn
+      epsDriverArtemis.statusOut -> epsManager.driverStatusIn
+      epsDriverArtemis.teensyRequestOut -> uartChannelMux.localSendIn
+      uartChannelMux.localRecvOut -> epsDriverArtemis.teensyResponseIn
 
-      payloadService.adapterRequestOut -> payloadAdapterNeutronSim.requestIn
-      payloadAdapterNeutronSim.statusOut -> payloadService.adapterStatusIn
+      payloadManager.driverRequestOut -> payloadDriverNeutronSim.requestIn
+      payloadDriverNeutronSim.statusOut -> payloadManager.driverStatusIn
 
-      adcsService.adapterRequestOut -> adcsAdapterD2S2.requestIn
-      adcsAdapterD2S2.statusOut -> adcsService.adapterStatusIn
+      adcsManager.driverRequestOut -> adcsDriverD2S2.requestIn
+      adcsDriverD2S2.statusOut -> adcsManager.driverStatusIn
 
-      gpsService.adapterRequestOut -> gpsAdapterArtemis.requestIn
-      gpsAdapterArtemis.statusOut -> gpsService.adapterStatusIn
+      gpsManager.driverRequestOut -> gpsDriverArtemis.requestIn
+      gpsDriverArtemis.statusOut -> gpsManager.driverStatusIn
 
-      thermalService.adapterRequestOut -> thermalAdapterArtemis.requestIn
-      thermalAdapterArtemis.statusOut -> thermalService.adapterStatusIn
+      thermalManager.driverRequestOut -> thermalDriverArtemis.requestIn
+      thermalDriverArtemis.statusOut -> thermalManager.driverStatusIn
 
-      commsManager.adapterRequestOut -> commsAdapterTeensyRfm23.requestIn
-      commsAdapterTeensyRfm23.teensyRequestOut -> uartChannelMux.rfLocalSendIn
-      uartChannelMux.rfLocalRecvOut -> commsAdapterTeensyRfm23.teensyResponseIn
-      commsAdapterTeensyRfm23.rssiStatusOut -> commsManager.rssiStatusIn
-      commsAdapterTeensyRfm23.statusOut[0] -> commsManager.adapterStatusIn
-      commsAdapterTeensyRfm23.statusOut[1] -> teensyTransportService.adapterStatusIn
+      commsApp.driverRequestOut -> commsDriverTeensyRfm23.requestIn
+      commsDriverTeensyRfm23.teensyRequestOut -> uartChannelMux.rfLocalSendIn
+      uartChannelMux.rfLocalRecvOut -> commsDriverTeensyRfm23.teensyResponseIn
+      commsDriverTeensyRfm23.rssiStatusOut -> commsApp.rssiStatusIn
+      commsDriverTeensyRfm23.statusOut[0] -> commsApp.driverStatusIn
+      commsDriverTeensyRfm23.statusOut[1] -> teensyTransportManager.driverStatusIn
     }
 
     connections TransportFlow {
-      teensyTransportService.linkStatusOut -> commsManager.linkStatusIn
+      teensyTransportManager.linkStatusOut -> commsApp.linkStatusIn
     }
 
     connections SoHInputs {
-      epsService.sohStatusOut -> sohManager.statusIn[0]
-      payloadService.sohStatusOut -> sohManager.statusIn[1]
-      adcsService.sohStatusOut -> sohManager.statusIn[2]
-      gpsService.sohStatusOut -> sohManager.statusIn[3]
-      storageService.sohStatusOut -> sohManager.statusIn[4]
-      thermalService.sohStatusOut -> sohManager.statusIn[5]
-      commsManager.sohStatusOut -> sohManager.statusIn[6]
-      teensyTransportService.sohStatusOut -> sohManager.statusIn[7]
+      epsManager.sohStatusOut -> sohApp.statusIn[0]
+      payloadManager.sohStatusOut -> sohApp.statusIn[1]
+      adcsManager.sohStatusOut -> sohApp.statusIn[2]
+      gpsManager.sohStatusOut -> sohApp.statusIn[3]
+      storageManager.sohStatusOut -> sohApp.statusIn[4]
+      thermalManager.sohStatusOut -> sohApp.statusIn[5]
+      commsApp.sohStatusOut -> sohApp.statusIn[6]
+      teensyTransportManager.sohStatusOut -> sohApp.statusIn[7]
     }
 
     connections ArtemisRpiTeensyDeployment {

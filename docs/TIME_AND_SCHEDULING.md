@@ -8,7 +8,7 @@ See the [Glossary](GLOSSARY.md) for terms and [`SYSTEM_ARCHITECTURE.md`](SYSTEM_
 
 F´ separates **wall-clock time** from **periodic scheduling**, and this project uses both:
 
-1. **Wall-clock time (timestamps).** Every event and telemetry sample is stamped with a real time so GDS shows when things happened. The time source is the `chronoTime` instance, wired in the topology as `time connections instance chronoTime`. Components request the current time through a `time get` port (e.g. MissionManager declares `time get port timeCaller`).
+1. **Wall-clock time (timestamps).** Every event and telemetry sample is stamped with a real time so GDS shows when things happened. The time source is the `chronoTime` instance, wired in the topology as `time connections instance chronoTime`. Components request the current time through a `time get` port (e.g. MissionApp declares `time get port timeCaller`).
 2. **Periodic scheduling (rate groups).** Anything that needs to "run every so often" is ticked by a **rate group**, not by sleeping or reading the clock in a loop.
 
 The countdown for scheduled collection is built on the **rate-group** mechanism, not on wall-clock deltas — see below.
@@ -35,19 +35,19 @@ That 1 Hz cycle drives `timer → rateGroupDriver`, which fans out to three rate
 A component "joins" a rate group by connecting its `run: Svc.Sched` input to a `RateGroupMemberOut` port in `Top/topology.fpp`. For example:
 
 ```
-rateGroup1.RateGroupMemberOut[6] -> missionManager.run
-rateGroup1.RateGroupMemberOut[8] -> scienceManager.run
+rateGroup1.RateGroupMemberOut[6] -> missionApp.run
+rateGroup1.RateGroupMemberOut[8] -> scienceApp.run
 ```
 
-Both `missionManager` and `scienceManager` tick on **rateGroup1 at 1 Hz**. That 1 Hz is the key number that makes the countdown below come out in real seconds.
+Both `missionApp` and `scienceApp` tick on **rateGroup1 at 1 Hz**. That 1 Hz is the key number that makes the countdown below come out in real seconds.
 
 ## How "collect in N seconds" actually works
 
-The demo command is `missionManager.SCHEDULE_COLLECTION(delaySeconds)`. Here is the full chain:
+The demo command is `missionApp.SCHEDULE_COLLECTION(delaySeconds)`. Here is the full chain:
 
-1. **Command arrives.** `MissionManager::SCHEDULE_COLLECTION_cmdHandler` sets mode to `COLLECTION_PENDING`, records `delaySeconds`, emits `ModeChanged` + `CollectionScheduled`, and **forwards the delay** to ScienceManager: `collectionRequestOut_out(0, delaySeconds)`.
-2. **ScienceManager takes ownership of the countdown.** `ScienceManager::requestIn_handler` stores it: `m_pendingDelaySeconds = delaySeconds` and logs `CollectionTriggered`.
-3. **The countdown ticks down once per second.** `ScienceManager::run_handler` runs every rateGroup1 tick (1 Hz) and decrements:
+1. **Command arrives.** `MissionApp::SCHEDULE_COLLECTION_cmdHandler` sets mode to `COLLECTION_PENDING`, records `delaySeconds`, emits `ModeChanged` + `CollectionScheduled`, and **forwards the delay** to ScienceApp: `collectionRequestOut_out(0, delaySeconds)`.
+2. **ScienceApp takes ownership of the countdown.** `ScienceApp::requestIn_handler` stores it: `m_pendingDelaySeconds = delaySeconds` and logs `CollectionTriggered`.
+3. **The countdown ticks down once per second.** `ScienceApp::run_handler` runs every rateGroup1 tick (1 Hz) and decrements:
    ```cpp
    if (m_pendingDelaySeconds > 0) {
        m_pendingDelaySeconds -= 1;          // one tick == one second at 1 Hz
@@ -57,13 +57,13 @@ The demo command is `missionManager.SCHEDULE_COLLECTION(delaySeconds)`. Here is 
        }
    }
    ```
-4. **Collection fires.** When the counter hits 0, ScienceManager requests a payload capture and emits a `COLLECTING` mode update, which flows to `missionManager.modeUpdateIn` and moves the mission state forward.
+4. **Collection fires.** When the counter hits 0, ScienceApp requests a payload capture and emits a `COLLECTING` mode update, which flows to `missionApp.modeUpdateIn` and moves the mission state forward.
 
 So `SCHEDULE_COLLECTION(10)` = 10 rateGroup1 ticks = **~10 real seconds**, because rateGroup1 runs at exactly 1 Hz.
 
 ## Telemetry cadence (same mechanism)
 
-The rate-group tick also paces telemetry so the radio is not flooded (see the [RF link constraint](SYSTEM_ARCHITECTURE.md#the-rf-link-constraint-how-fprime-gds-talks-over-a-walkie-talkie)). For example, `MissionManager::run_handler` increments a heartbeat each tick and only writes telemetry every **30 ticks (~30 s)** unless something changes; `ScienceManager` writes immediately while a countdown is active and otherwise every 30 ticks.
+The rate-group tick also paces telemetry so the radio is not flooded (see the [RF link constraint](SYSTEM_ARCHITECTURE.md#the-rf-link-constraint-how-fprime-gds-talks-over-a-walkie-talkie)). For example, `MissionApp::run_handler` increments a heartbeat each tick and only writes telemetry every **30 ticks (~30 s)** unless something changes; `ScienceApp` writes immediately while a countdown is active and otherwise every 30 ticks.
 
 ## Gotchas
 

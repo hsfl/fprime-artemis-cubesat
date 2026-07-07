@@ -37,14 +37,14 @@ If this passes but HIL fails, the likely issue is one of:
 | Layer | Owns | First proof | Look here |
 |---|---|---|---|
 | repo/build | generated headers, F Prime build, unit tests | `./tools/validate_local.sh` passes | `tools/validate_local.sh`, `config/transport_constants.json` |
-| GDS/session | dictionary, command send, events/channels UI | `missionManager.PING` returns `Pong` | `ArtemisRpiTeensy_N2/tools/run_gds_uart.sh`, GDS Events tab |
-| F Prime mission | mode and scheduled collection | `ModeChanged`, `CollectionScheduled` | `MissionManager`, `ScienceManager` |
-| payload service | capture request and adapter handoff | `PayloadScienceCaptureRequested`, `CaptureComplete` | `PayloadService`, `PayloadAdapter_NeutronSim` |
-| storage | latest science product | `ScienceStored`, `LatestDataset` | `StorageService` |
-| comms/downlink | science downlink request and progress | `DownlinkRequested`, `PayloadDownlinkProgress` | `CommsManager`, `PayloadDownlinkManager` |
+| GDS/session | dictionary, command send, events/channels UI | `missionApp.PING` returns `Pong` | `ArtemisRpiTeensy_N2/tools/run_gds_uart.sh`, GDS Events tab |
+| F Prime mission | mode and scheduled collection | `ModeChanged`, `CollectionScheduled` | `MissionApp`, `ScienceApp` |
+| payload manager | capture request and driver handoff | `PayloadScienceCaptureRequested`, `CaptureComplete` | `PayloadManager`, `PayloadDriver_NeutronSim` |
+| storage | latest science product | `ScienceStored`, `LatestDataset` | `StorageManager` |
+| comms/downlink | science downlink request and progress | `DownlinkRequested`, `PayloadDownlinkProgress` | `CommsApp`, `PayloadDownlinkApp` |
 | UART mux | Pi to satellite Teensy virtual channels | `FramesTx`/`FramesRx` move, `FrameDrops` stays low | `UartChannelMux`, generated `LinkCfg.hpp` |
 | RF bridge | channel 0/1 RF movement | Teensy `#LINK_STATUS` counters move | `relay_uart_rf.*`, RF debug serial |
-| EPS/PDU | satellite-local channel 2 RPC | `PduRequestQueued`, then handled or timed out | `EpsService`, `EpsAdapter_Artemis`, `pdu_proxy.cpp` |
+| EPS/PDU | satellite-local channel 2 RPC | `PduRequestQueued`, then handled or timed out | `EpsManager`, `EpsDriver_Artemis`, `pdu_proxy.cpp` |
 | payload receiver/viewer | channel 1 reconstruction and display | receiver prints `complete:`, viewer summary parses | `tools/payload_receiver.py`, `ground-station/neutron2-payload-viewer/` |
 
 ## Golden Event Ladder
@@ -106,7 +106,7 @@ cd ArtemisRpiTeensy_N2
 . fprime-venv/bin/activate
 DICT="$(find build-artifacts -name '*TopologyDictionary.json' | sort | tail -n 1)"
 
-fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.PING \
+fprime-cli command-send ArtemisRpiTeensyDeployment.missionApp.PING \
   --arguments 4245 \
   --dictionary "$DICT" \
   --log-level-gds ERROR
@@ -165,11 +165,11 @@ rg -n "CollectionScheduled|CollectionTriggered|PayloadScienceCaptureRequested|Ca
 
 Interpretation:
 
-- stops at `CollectionScheduled`: check `MissionManager` to `ScienceManager`
-- stops at `CollectionTriggered`: check `ScienceManager` to `PayloadService`
-- stops at `PayloadScienceCaptureRequested`: check `PayloadAdapter_NeutronSim`
+- stops at `CollectionScheduled`: check `MissionApp` to `ScienceApp`
+- stops at `CollectionTriggered`: check `ScienceApp` to `PayloadManager`
+- stops at `PayloadScienceCaptureRequested`: check `PayloadDriver_NeutronSim`
 - shows `CaptureFailed`: inspect the simulator script and capture directory
-- shows `ScienceProductReady` but not `ScienceStored`: check `StorageService`
+- shows `ScienceProductReady` but not `ScienceStored`: check `StorageManager`
 
 For local simulated payload files:
 
@@ -217,7 +217,7 @@ If receiver is incomplete:
 Manual status command:
 
 ```bash
-fprime-cli command-send ArtemisRpiTeensyDeployment.payloadDownlinkManager.GET_PAYLOAD_STATUS \
+fprime-cli command-send ArtemisRpiTeensyDeployment.payloadDownlinkApp.GET_PAYLOAD_STATUS \
   --dictionary "$DICT" \
   --log-level-gds ERROR
 ```
@@ -270,12 +270,12 @@ Payload proof is separate:
 ### EPS/PDU Commands Fail Or Timeout
 
 EPS/PDU MVP behavior intentionally crosses the EPS service and Artemis PDU
-adapter boundary while the new PDU is being tested through F Prime.
+driver boundary while the new PDU is being tested through F Prime.
 
 Debug in this order:
 
-1. `EpsService` command accepted or rejected
-2. `EpsAdapter_Artemis` queued request
+1. `EpsManager` command accepted or rejected
+2. `EpsDriver_Artemis` queued request
 3. channel 2 local RPC frame sent by `UartChannelMux`
 4. satellite Teensy local router received the channel 2 payload
 5. `pdu_proxy.cpp` wrote a PDU v2 frame to the PDU UART
@@ -289,11 +289,11 @@ Useful GDS events/channels:
 - `PduRequestHandled`
 - `PduRequestFailed`
 - `PduRequestTimedOut`
-- `EpsService.AdapterLinkState`
-- `EpsAdapter_Artemis.TransportFailureCount`
-- `EpsAdapter_Artemis.PendingRequestTicks`
+- `EpsManager.DriverLinkState`
+- `EpsDriver_Artemis.TransportFailureCount`
+- `EpsDriver_Artemis.PendingRequestTicks`
 
-If channel 2 fails, treat it as satellite-local EPS/PDU adapter work first. It
+If channel 2 fails, treat it as satellite-local EPS/PDU driver work first. It
 is not forwarded over RF to the ground Teensy.
 
 ## Teensy RF Debug Counters

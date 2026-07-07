@@ -44,8 +44,8 @@ Not validated:
 
 The HIL demo and laptop rehearsal use the same topology. The scheduled science
 path, payload downlink manager, transport service, command/telemetry framework,
-and EPS adapter ticks are active. The higher-volume periodic `sohManager.run`,
-`payloadService.run`, `storageService.run`, and `commsManager.run` loops remain
+and EPS driver ticks are active. The higher-volume periodic `sohApp.run`,
+`payloadManager.run`, `storageManager.run`, and `commsApp.run` loops remain
 disabled; use command-triggered SOH/storage/link checks for demo visibility.
 
 ## Output Files
@@ -206,32 +206,32 @@ GDS pages to keep ready:
 
 Useful channels:
 
-- `missionManager.CurrentMode`
-- `scienceManager.PendingDelaySeconds`
-- `scienceManager.CollectionCount`
-- `storageService.StoredProducts`
-- `commsManager.PendingScienceBytes`
-- `commsManager.LinkState`
-- `commsManager.RssiDbm`
-- `payloadDownlinkManager.ProgressPercent`
+- `missionApp.CurrentMode`
+- `scienceApp.PendingDelaySeconds`
+- `scienceApp.CollectionCount`
+- `storageManager.StoredProducts`
+- `commsApp.PendingScienceBytes`
+- `commsApp.LinkState`
+- `commsApp.RssiDbm`
+- `payloadDownlinkApp.ProgressPercent`
 
 Command bounds:
 
-- `missionManager.SCHEDULE_COLLECTION delaySeconds` accepts `1..300`.
+- `missionApp.SCHEDULE_COLLECTION delaySeconds` accepts `1..300`.
 - capture duration accepts `1..120`; default is `30`.
 - invalid values return `VALIDATION_ERROR` and emit a rejection warning event.
 - operator command-rejection events are always visible; storm-capable
   link/downlink warnings remain throttled for RF event budget.
-- `scienceManager.SCIENCE_CAPTURE(durationSeconds)` is one-shot; it does not
+- `scienceApp.SCIENCE_CAPTURE(durationSeconds)` is one-shot; it does not
   change the default capture duration for later scheduled collections.
 
 Persistent capture duration:
 
-- Set `scienceManager.CAPTURE_DURATION_SECONDS` with `PRM_SET`, then persist it
+- Set `scienceApp.CAPTURE_DURATION_SECONDS` with `PRM_SET`, then persist it
   with `PRM_SAVE`.
 - The parameter file is `PrmDb.dat` in the deployment runtime working
   directory.
-- `scienceManager.CONFIGURE_CAPTURE_DURATION` is a volatile runtime override;
+- `scienceApp.CONFIGURE_CAPTURE_DURATION` is a volatile runtime override;
   use `PRM_SET` + `PRM_SAVE` when the default should survive restart.
 
 ## Start Payload Receiver
@@ -378,14 +378,14 @@ DICT=build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRp
 ### 1. Base Mode
 
 ```bash
-fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.ENTER_BASE_MODE \
+fprime-cli command-send ArtemisRpiTeensyDeployment.missionApp.ENTER_BASE_MODE \
   --dictionary "$DICT" --log-level-gds ERROR
 ```
 
 Expected event:
 
 ```text
-MissionManager.ModeChanged mode=BASE
+MissionApp.ModeChanged mode=BASE
 ```
 
 `ENTER_BASE_MODE` also cancels any pending scheduled collection.
@@ -393,7 +393,7 @@ MissionManager.ModeChanged mode=BASE
 ### 2. SOH Snapshot
 
 ```bash
-fprime-cli command-send ArtemisRpiTeensyDeployment.sohManager.EMIT_SOH_SNAPSHOT \
+fprime-cli command-send ArtemisRpiTeensyDeployment.sohApp.EMIT_SOH_SNAPSHOT \
   --dictionary "$DICT" --log-level-gds ERROR
 ```
 
@@ -405,14 +405,14 @@ Expected behavior:
 ### 3. Optional RSSI Check
 
 ```bash
-fprime-cli command-send ArtemisRpiTeensyDeployment.commsManager.PING_LINK_RSSI \
+fprime-cli command-send ArtemisRpiTeensyDeployment.commsApp.PING_LINK_RSSI \
   --dictionary "$DICT" --log-level-gds ERROR
 ```
 
 Expected Pi journal event:
 
 ```text
-CommsManager.LinkRssiPing state=<state> rssi=<value>dBm
+CommsApp.LinkRssiPing state=<state> rssi=<value>dBm
 ```
 
 Example from the bench:
@@ -427,7 +427,7 @@ The default capture duration is already `30` seconds. This command is useful
 when you want to make the current runtime setting explicit before a demo.
 
 ```bash
-fprime-cli command-send ArtemisRpiTeensyDeployment.scienceManager.CONFIGURE_CAPTURE_DURATION \
+fprime-cli command-send ArtemisRpiTeensyDeployment.scienceApp.CONFIGURE_CAPTURE_DURATION \
   --arguments 30 \
   --dictionary "$DICT" --log-level-gds ERROR
 ```
@@ -435,13 +435,13 @@ fprime-cli command-send ArtemisRpiTeensyDeployment.scienceManager.CONFIGURE_CAPT
 Expected event:
 
 ```text
-ScienceManager.CaptureDurationConfigured durationSeconds=30
+ScienceApp.CaptureDurationConfigured durationSeconds=30
 ```
 
 ### 5. Schedule Collection
 
 ```bash
-fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.SCHEDULE_COLLECTION \
+fprime-cli command-send ArtemisRpiTeensyDeployment.missionApp.SCHEDULE_COLLECTION \
   --arguments 4 \
   --dictionary "$DICT" --log-level-gds ERROR
 ```
@@ -449,8 +449,8 @@ fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.SCHEDULE_COLLE
 Expected events:
 
 ```text
-MissionManager.CollectionScheduled delaySeconds=4
-ScienceManager.CollectionTriggered delaySeconds=4
+MissionApp.CollectionScheduled delaySeconds=4
+ScienceApp.CollectionTriggered delaySeconds=4
 ```
 
 Wait about 40 seconds for the 4 second delay and 30 second capture window.
@@ -458,8 +458,8 @@ Wait about 40 seconds for the 4 second delay and 30 second capture window.
 Expected events:
 
 ```text
-ScienceManager.ScienceProductReady productSize=<n>
-StorageService.ScienceStored productCount=<n> size=<n>
+ScienceApp.ScienceProductReady productSize=<n>
+StorageManager.ScienceStored productCount=<n> size=<n>
 ```
 
 For a 30 second simulated capture, expect about 30 CSV rows and a few hundred
@@ -468,7 +468,7 @@ bytes.
 Optional cancel before the delay expires:
 
 ```bash
-fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.CANCEL_COLLECTION \
+fprime-cli command-send ArtemisRpiTeensyDeployment.missionApp.CANCEL_COLLECTION \
   --dictionary "$DICT" --log-level-gds ERROR
 ```
 
@@ -481,14 +481,14 @@ Expected behavior:
 ### 6. Report Latest Dataset
 
 ```bash
-fprime-cli command-send ArtemisRpiTeensyDeployment.storageService.REPORT_LATEST_DATASET \
+fprime-cli command-send ArtemisRpiTeensyDeployment.storageManager.REPORT_LATEST_DATASET \
   --dictionary "$DICT" --log-level-gds ERROR
 ```
 
 Expected event:
 
 ```text
-StorageService.LatestDataset productCount=<n> size=<n>
+StorageManager.LatestDataset productCount=<n> size=<n>
 ```
 
 ### 7. Request Science Downlink
@@ -496,18 +496,18 @@ StorageService.LatestDataset productCount=<n> size=<n>
 Make sure the payload receiver is still running, then send:
 
 ```bash
-fprime-cli command-send ArtemisRpiTeensyDeployment.commsManager.REQUEST_SCIENCE_DOWNLINK \
+fprime-cli command-send ArtemisRpiTeensyDeployment.commsApp.REQUEST_SCIENCE_DOWNLINK \
   --dictionary "$DICT" --log-level-gds ERROR
 ```
 
 Expected events:
 
 ```text
-CommsManager.DownlinkRequested bytes=<n>
-StorageService.DownlinkPrepared downlinkBytes=<n>
-PayloadDownlinkManager.PayloadDownlinkStarted product=<n> bytes=<n> packets=<n>
-PayloadDownlinkManager.PayloadDownlinkComplete transfer=<n> packetsSent=<n>
-CommsManager.DownlinkFinished bytes=<n>
+CommsApp.DownlinkRequested bytes=<n>
+StorageManager.DownlinkPrepared downlinkBytes=<n>
+PayloadDownlinkApp.PayloadDownlinkStarted product=<n> bytes=<n> packets=<n>
+PayloadDownlinkApp.PayloadDownlinkComplete transfer=<n> packetsSent=<n>
+CommsApp.DownlinkFinished bytes=<n>
 ```
 
 Expected receiver completion:
@@ -633,7 +633,7 @@ If payload receiver prints `incomplete`:
 
 ```bash
 BYTES="$(ssh artemis-pi 'wc -c < /tmp/neutron_payload_captures/latest_payload.bin')"
-fprime-cli command-send ArtemisRpiTeensyDeployment.payloadDownlinkManager.START_PAYLOAD_DOWNLINK \
+fprime-cli command-send ArtemisRpiTeensyDeployment.payloadDownlinkApp.START_PAYLOAD_DOWNLINK \
   --arguments 99 "$BYTES" \
   --dictionary "$DICT" --log-level-gds ERROR
 ```
@@ -679,6 +679,6 @@ rm -rf /tmp/neutron_hil/rf_demo_*
 On the Pi, old simulator captures can be removed from GDS:
 
 ```text
-ArtemisRpiTeensyDeployment.storageService.REMOVE_OLD_DATASETS
+ArtemisRpiTeensyDeployment.storageManager.REMOVE_OLD_DATASETS
 confirm = 1
 ```

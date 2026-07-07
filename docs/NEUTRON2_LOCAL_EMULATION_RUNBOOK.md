@@ -144,15 +144,15 @@ In `fprime-gds`, keep these pages ready:
 
 Useful channels to watch:
 
-- `ArtemisRpiTeensyDeployment.missionManager.CurrentMode`
-- `ArtemisRpiTeensyDeployment.missionManager.ModeHeartbeat`
-- `ArtemisRpiTeensyDeployment.sohManager.OverallHealth`
-- `ArtemisRpiTeensyDeployment.scienceManager.PendingDelaySeconds`
-- `ArtemisRpiTeensyDeployment.scienceManager.CollectionCount`
-- `ArtemisRpiTeensyDeployment.payloadAdapterNeutronSim.LastRowsCaptured`
-- `ArtemisRpiTeensyDeployment.payloadAdapterNeutronSim.LastTotalCounts`
-- `ArtemisRpiTeensyDeployment.storageService.StoredProducts`
-- `ArtemisRpiTeensyDeployment.commsManager.PendingScienceBytes`
+- `ArtemisRpiTeensyDeployment.missionApp.CurrentMode`
+- `ArtemisRpiTeensyDeployment.missionApp.ModeHeartbeat`
+- `ArtemisRpiTeensyDeployment.sohApp.OverallHealth`
+- `ArtemisRpiTeensyDeployment.scienceApp.PendingDelaySeconds`
+- `ArtemisRpiTeensyDeployment.scienceApp.CollectionCount`
+- `ArtemisRpiTeensyDeployment.payloadDriverNeutronSim.LastRowsCaptured`
+- `ArtemisRpiTeensyDeployment.payloadDriverNeutronSim.LastTotalCounts`
+- `ArtemisRpiTeensyDeployment.storageManager.StoredProducts`
+- `ArtemisRpiTeensyDeployment.commsApp.PendingScienceBytes`
 
 If charts are blank, check that the chart is not paused.
 
@@ -165,19 +165,19 @@ Use these commands in the GDS Commanding page.
 Command:
 
 ```text
-ArtemisRpiTeensyDeployment.missionManager.ENTER_BASE_MODE
+ArtemisRpiTeensyDeployment.missionApp.ENTER_BASE_MODE
 ```
 
 Expected event:
 
 ```text
-MissionManager.ModeChanged mode=0
+MissionApp.ModeChanged mode=0
 ```
 
 Expected channel:
 
 ```text
-missionManager.CurrentMode = 0
+missionApp.CurrentMode = 0
 ```
 
 Lead-facing line:
@@ -191,13 +191,13 @@ The spacecraft is in Base Mode and ready for the mock contact window.
 Command:
 
 ```text
-ArtemisRpiTeensyDeployment.sohManager.EMIT_SOH_SNAPSHOT
+ArtemisRpiTeensyDeployment.sohApp.EMIT_SOH_SNAPSHOT
 ```
 
 Expected event:
 
 ```text
-SoHManager.Snapshot
+SoHApp.Snapshot
 ```
 
 Expected behavior:
@@ -216,7 +216,7 @@ We are downlinking health and state-of-health data during the pass.
 Command:
 
 ```text
-ArtemisRpiTeensyDeployment.scienceManager.CONFIGURE_CAPTURE_DURATION
+ArtemisRpiTeensyDeployment.scienceApp.CONFIGURE_CAPTURE_DURATION
 ```
 
 Argument:
@@ -228,7 +228,7 @@ durationSeconds = 10
 Expected event:
 
 ```text
-ScienceManager.CaptureDurationConfigured durationSeconds=10
+ScienceApp.CaptureDurationConfigured durationSeconds=10
 ```
 
 Lead-facing line:
@@ -242,7 +242,7 @@ For the compressed demo, the payload capture will collect ten seconds of simulat
 Command:
 
 ```text
-ArtemisRpiTeensyDeployment.missionManager.SCHEDULE_COLLECTION
+ArtemisRpiTeensyDeployment.missionApp.SCHEDULE_COLLECTION
 ```
 
 Argument:
@@ -254,15 +254,15 @@ delaySeconds = 10
 Expected immediate events:
 
 ```text
-MissionManager.CollectionScheduled delaySeconds=10
-ScienceManager.CollectionTriggered delaySeconds=10
+MissionApp.CollectionScheduled delaySeconds=10
+ScienceApp.CollectionTriggered delaySeconds=10
 ```
 
 Expected channels:
 
 ```text
-missionManager.CurrentMode = 1
-scienceManager.PendingDelaySeconds counts down toward 0
+missionApp.CurrentMode = 1
+scienceApp.PendingDelaySeconds counts down toward 0
 ```
 
 Lead-facing line:
@@ -278,29 +278,29 @@ Wait about 10 to 15 seconds.
 Expected events:
 
 ```text
-PayloadService.PayloadScienceCaptureRequested
-PayloadService.PayloadCollectionForwarded
-PayloadAdapter_NeutronSim.CaptureComplete
-PayloadService.PayloadStatusUpdated
-ScienceManager.ScienceProductReady
-StorageService.ScienceStored
+PayloadManager.PayloadScienceCaptureRequested
+PayloadManager.PayloadCollectionForwarded
+PayloadDriver_NeutronSim.CaptureComplete
+PayloadManager.PayloadStatusUpdated
+ScienceApp.ScienceProductReady
+StorageManager.ScienceStored
 ```
 
 Expected channels:
 
 ```text
-scienceManager.PendingDelaySeconds = 0
-scienceManager.CollectionCount increments
-payloadAdapterNeutronSim.LastRowsCaptured = 10
-payloadAdapterNeutronSim.LastProductBytes is nonzero
-storageService.StoredProducts increments
-commsManager.PendingScienceBytes is nonzero
+scienceApp.PendingDelaySeconds = 0
+scienceApp.CollectionCount increments
+payloadDriverNeutronSim.LastRowsCaptured = 10
+payloadDriverNeutronSim.LastProductBytes is nonzero
+storageManager.StoredProducts increments
+commsApp.PendingScienceBytes is nonzero
 ```
 
 Lead-facing line:
 
 ```text
-The payload adapter generated a neutron-count science product and handed it into storage.
+The payload driver generated a neutron-count science product and handed it into storage.
 ```
 
 ### 6. Report The Latest Dataset
@@ -308,25 +308,25 @@ The payload adapter generated a neutron-count science product and handed it into
 Command:
 
 ```text
-ArtemisRpiTeensyDeployment.storageService.REPORT_LATEST_DATASET
+ArtemisRpiTeensyDeployment.storageManager.REPORT_LATEST_DATASET
 ```
 
 Expected event:
 
 ```text
-StorageService.LatestDataset
+StorageManager.LatestDataset
 ```
 
 Optional command:
 
 ```text
-ArtemisRpiTeensyDeployment.storageService.REPORT_STORAGE_HISTORY
+ArtemisRpiTeensyDeployment.storageManager.REPORT_STORAGE_HISTORY
 ```
 
 Expected event:
 
 ```text
-StorageService.StorageHistoryEntry
+StorageManager.StorageHistoryEntry
 ```
 
 Lead-facing line:
@@ -340,17 +340,17 @@ Storage has a science product staged for review and downlink handoff.
 Command:
 
 ```text
-ArtemisRpiTeensyDeployment.commsManager.REQUEST_SCIENCE_DOWNLINK
+ArtemisRpiTeensyDeployment.commsApp.REQUEST_SCIENCE_DOWNLINK
 ```
 
 Expected events, in order:
 
 ```text
-CommsManager.DownlinkRequested
-StorageService.DownlinkPrepared
-PayloadDownlinkManager.PayloadDownlinkStarted
-PayloadDownlinkManager.PayloadDownlinkComplete
-CommsManager.DownlinkFinished
+CommsApp.DownlinkRequested
+StorageManager.DownlinkPrepared
+PayloadDownlinkApp.PayloadDownlinkStarted
+PayloadDownlinkApp.PayloadDownlinkComplete
+CommsApp.DownlinkFinished
 ```
 
 Lead-facing line:
@@ -429,7 +429,7 @@ rm /tmp/neutron_payload_captures/neutron_capture_*.csv
 From GDS, simulator cleanup can also be requested with:
 
 ```text
-ArtemisRpiTeensyDeployment.storageService.REMOVE_OLD_DATASETS
+ArtemisRpiTeensyDeployment.storageManager.REMOVE_OLD_DATASETS
 ```
 
 Argument:
@@ -452,7 +452,7 @@ If the payload viewer does not update:
 - refresh the viewer
 - restart the viewer process
 
-If `PayloadAdapter_NeutronSim.CaptureFailed` appears:
+If `PayloadDriver_NeutronSim.CaptureFailed` appears:
 
 - confirm `NEUTRON_PAYLOAD_SIM_ROOT` points to:
   `external/payload-neutron-simulation`

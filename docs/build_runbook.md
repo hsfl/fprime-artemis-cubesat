@@ -124,12 +124,12 @@ Local laptop closed-loop emulation (no hardware) is documented in:
 ## MVP Bring-up Checks
 1. Verify process starts without initialization assertion failures.
 2. Verify Teensy serial log prints relay-ready line.
-3. In GDS, issue `teensyTransportService.LINK_STATUS` and verify event/telemetry updates.
-4. In GDS, issue `missionManager.PING` and verify the pong event/telemetry path.
+3. In GDS, issue `teensyTransportManager.LINK_STATUS` and verify event/telemetry updates.
+4. In GDS, issue `missionApp.PING` and verify the pong event/telemetry path.
 
 ## Fault Handling Checks
 1. Disconnect UART cable while app is running and verify app process remains alive.
-2. Reconnect UART and verify `TeensyTransportService` telemetry continues updating.
+2. Reconnect UART and verify `TeensyTransportManager` telemetry continues updating.
 3. If explicitly testing UART mux fault handling, send malformed wrapper bytes to Teensy UART and verify framing/CRC counters increase.
 
 ## Raspberry Pi Native Build + Run

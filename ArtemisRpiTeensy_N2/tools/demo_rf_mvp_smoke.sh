@@ -23,7 +23,7 @@ usage() {
   cat <<'EOF'
 Usage: demo_rf_mvp_smoke.sh [options]
 
-Checks the RF MVP demo setup and optionally sends missionManager.PING through
+Checks the RF MVP demo setup and optionally sends missionApp.PING through
 the active fprime-gds UART session.
 
 Options:
@@ -39,7 +39,7 @@ Options:
   -h, --help            Show this help text
 
 Expected proof of success:
-  MissionManager pong token=<token>
+  MissionApp pong token=<token>
   Opcode 0x10006001 dispatched
   Opcode 0x10006001 completed
 EOF
@@ -153,10 +153,10 @@ fi
 # shellcheck disable=SC1090
 . "$VENV_ACTIVATE"
 
-log "sending missionManager.PING token=$TOKEN"
+log "sending missionApp.PING token=$TOKEN"
 PING_CMD=(
   fprime-cli command-send
-  "${DEPLOYMENT_NAME}.missionManager.PING"
+  "${DEPLOYMENT_NAME}.missionApp.PING"
   --arguments "$TOKEN"
   --dictionary "$DICT_PATH"
   --log-level-gds ERROR
@@ -168,10 +168,10 @@ else
 fi
 
 log "checking Pi journal for pong"
-JOURNAL_OUTPUT="$(ssh "$PI_HOST" "journalctl -u '$PI_SERVICE' --since '45 seconds ago' --no-pager | egrep 'MissionManager|PING|pong|OpCode|completed|ERROR|WARNING' | tail -100")"
+JOURNAL_OUTPUT="$(ssh "$PI_HOST" "journalctl -u '$PI_SERVICE' --since '45 seconds ago' --no-pager | egrep 'MissionApp|PING|pong|OpCode|completed|ERROR|WARNING' | tail -100")"
 printf '%s\n' "$JOURNAL_OUTPUT"
 
-grep -q "MissionManager pong token=$TOKEN" <<<"$JOURNAL_OUTPUT" || fail "pong token=$TOKEN not found in Pi journal"
+grep -q "MissionApp pong token=$TOKEN" <<<"$JOURNAL_OUTPUT" || fail "pong token=$TOKEN not found in Pi journal"
 grep -Eq "Op[Cc]ode 0x10006001 completed" <<<"$JOURNAL_OUTPUT" || fail "PING completion opcode not found in Pi journal"
 
 log "PASS: command path verified with token=$TOKEN"

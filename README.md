@@ -221,7 +221,7 @@ Where to find things:
 
 - `ArtemisRpiTeensy_N2/`
   - Active F' flight-software project (promoted in place from the starter sample).
-  - Includes the deployment and custom components such as `MissionManager`, `ScienceManager`, `SoHManager`, `ThermalService`, `UartChannelMux`, `PayloadDownlinkManager`, `EpsService`, and `EpsAdapter_Artemis`.
+  - Includes the deployment and custom components such as `MissionApp`, `ScienceApp`, `SoHApp`, `ThermalManager`, `UartChannelMux`, `PayloadDownlinkApp`, `EpsManager`, and `EpsDriver_Artemis`.
   - F Prime framework lives in `ArtemisRpiTeensy_N2/lib/fprime` (pinned submodule).
 - `ArtemisTeensy_N2_Baremetal/`
   - Satellite Teensy relay firmware workspace (Arduino CLI workflow).
@@ -244,7 +244,7 @@ Where to find things:
 
 New here? Read these roughly in order to fully understand the project:
 
-1. `docs/SYSTEM_ARCHITECTURE.md` — current Neutron 2-on-Artemis architecture, the service/adapter component model, the RF/transport design, and an end-to-end command/telemetry trace. **Read this first.**
+1. `docs/SYSTEM_ARCHITECTURE.md` — current Neutron 2-on-Artemis architecture, the application/manager/driver component model, the RF/transport design, and an end-to-end command/telemetry trace. **Read this first.**
 2. `docs/GLOSSARY.md` — every acronym and term used across the repo (SOH, CCSDS, APID, D2S2, OBC, PDU, HAL, ...). Keep it open while reading the rest.
 3. `docs/FPRIME_GROUND_INTERFACES_PRIMER.md` — F´ literacy: commands, events, telemetry, and parameters, and how to add each.
 4. `docs/archive/OPTIMAL_FPRIME_COMPONENT_TOPOLOGY_PLAN.md` — component and topology plan.
@@ -371,9 +371,9 @@ Implemented:
 - Channel 0 CCSDS/GDS path, channel 1 payload/science path, and channel 2 satellite-local EPS/PDU RPC path.
 - Ground Teensy simple uplink path (USB raw byte burst -> RF segmentation for channels that cross RF).
 - Updated UART/RF transport contract documentation.
-- RPi-hosted neutron payload simulator wired through `PayloadService` and `PayloadAdapter_NeutronSim`, including a latest-capture handoff for downlink.
-- File-backed `PayloadDownlinkManager` and payload receiver tooling for arbitrary payload bytes over channel 1.
-- Artemis EPS/PDU command adapter over channel 2 using the PDU v2 protocol from `external/artemis-pdu`, with timeout/recovery handling.
+- RPi-hosted neutron payload simulator wired through `PayloadManager` and `PayloadDriver_NeutronSim`, including a latest-capture handoff for downlink.
+- File-backed `PayloadDownlinkApp` and payload receiver tooling for arbitrary payload bytes over channel 1.
+- Artemis EPS/PDU command driver over channel 2 using the PDU v2 protocol from `external/artemis-pdu`, with timeout/recovery handling.
 - HIL proof of the shortened demo story over the real RPi UART, satellite
   Teensy, RFM23BP pair, ground Teensy, `fprime-gds`, payload receiver, and
   payload viewer path. See `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`.
@@ -381,7 +381,7 @@ Implemented:
 Not implemented yet:
 - HIL validation of channel 2 against the real PDU.
 - RF/GDS cleanup to reduce APID sequence-count warnings on lossy channel 0 traffic.
-- Broader EPS/PDU telemetry beyond the current command/status path, plus thermal, GPS, and IMU telemetry + command adapter behavior.
+- Broader EPS/PDU telemetry beyond the current command/status path, plus thermal, GPS, and IMU telemetry + command driver behavior.
 - Full uplink robustness (deterministic packet-boundary extraction and retry/ack strategy).
 - Target/bench proof for the 2026-07-06 hardening sprint: ARMv6 cross-build
   verification, HIL RF smoke on the unified topology, WDT trip test, Pi service
@@ -394,6 +394,6 @@ Not implemented yet:
 - Use `docs/archive/` for historical implementation plans, sizing memos, and RF debug notes.
 - See [Read next](#read-next) above for the architecture, runbook, emulation, and setup docs.
 - The UART channel mux and RF transport (one Pi↔Teensy UART, three channels, the
-  ground triple-serial mapping, and the Manager → Service → Adapter HAL pattern)
+  ground triple-serial mapping, and the Application -> Manager -> Driver HAL pattern)
   are documented in `docs/SYSTEM_ARCHITECTURE.md` under **Transport Architecture:
   One UART, Three Channels** and **Flight Software Architecture**.

@@ -1,0 +1,36 @@
+#ifndef Components_MissionApp_HPP
+#define Components_MissionApp_HPP
+
+#include "Components/MissionApp/MissionAppComponentAc.hpp"
+
+namespace Components {
+
+class MissionApp final : public MissionAppComponentBase {
+  public:
+    MissionApp(const char* const compName);
+    ~MissionApp();
+
+  private:
+    void pingIn_handler(FwIndexType portNum, U32 key) override;
+    void run_handler(FwIndexType portNum, U32 context) override;
+    void modeUpdateIn_handler(FwIndexType portNum, const Components::MissionMode& mode, U32 detail) override;
+    void ENTER_BASE_MODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+    void PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 token) override;
+    void SCHEDULE_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 delaySeconds) override;
+    void CANCEL_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+
+    bool isAllowedTransition(Components::MissionMode requested) const;
+    bool transitionToMode(Components::MissionMode requested, U32 detail);
+    void cancelCollection();
+    void writeTelemetry();
+
+    Components::MissionMode m_currentMode;
+    U32 m_lastScheduledDelaySeconds;
+    U32 m_pingCount;
+    U32 m_modeHeartbeat;
+    U32 m_lastTelemetryHeartbeat;
+};
+
+}  // namespace Components
+
+#endif

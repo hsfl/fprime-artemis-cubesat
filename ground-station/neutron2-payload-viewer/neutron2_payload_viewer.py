@@ -203,7 +203,7 @@ HTML = """<!doctype html>
           <h3>How To Read It</h3>
           <p>Red chart bands mark SAA rows, where elevated counts are expected. Blue line movement outside red bands is background variation.</p>
           <p>This demo data is synthetic and order-of-magnitude realistic, not a calibrated detector product. The viewer automatically opens a newer CSV or CSV-in-BIN payload when downlink or capture produces one.</p>
-          <p>Capture files are run artifacts in the OS temp folder. Do not rely on automatic cleanup; archive or delete old files as needed, or run StorageService.REMOVE_OLD_DATASETS(confirm=1).</p>
+          <p>Capture files are run artifacts in the OS temp folder. Do not rely on automatic cleanup; archive or delete old files as needed, or run StorageManager.REMOVE_OLD_DATASETS(confirm=1).</p>
         </div>
       </div>
     </section>
@@ -409,7 +409,7 @@ def cleanup_hint(paths: list[Path], capture_dir: Path) -> str:
         return ""
     return (
         f"{len(paths)} payload products found. Cleanup old downlink files when done: "
-        f"StorageService.REMOVE_OLD_DATASETS(confirm=1), or archive/delete files in {capture_dir}."
+        f"StorageManager.REMOVE_OLD_DATASETS(confirm=1), or archive/delete files in {capture_dir}."
     )
 
 
@@ -515,7 +515,7 @@ def main() -> int:
     url = f"http://{args.host}:{args.port}/"
     print(f"Neutron 2 payload viewer: {url}")
     print(f"Capture directory: {args.capture_dir}")
-    print("Cleanup note: archive/delete old downlink CSVs when done, or use StorageService.REMOVE_OLD_DATASETS(confirm=1).")
+    print("Cleanup note: archive/delete old downlink CSVs when done, or use StorageManager.REMOVE_OLD_DATASETS(confirm=1).")
     if args.file:
         print(f"Explicit file: {args.file}")
     if not args.no_open:

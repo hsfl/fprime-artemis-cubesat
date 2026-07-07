@@ -1019,3 +1019,43 @@ Still open (not demo-blocking):
   of the hardened code, HIL RF smoke on the unified topology, deliberate WDT
   trip test, live `ln` to `artemis-fprime.service` migration, and `PRM_SAVE`
   round-trip on the Pi filesystem/release-symlink layout.
+
+## Native App-Man-Drv rename (2026-07-06)
+
+The active repo now uses native F´ Application-Manager-Driver vocabulary. Old
+hardening logs, archive docs, and pre-rename notes may still use the legacy
+Manager/Service/Adapter terms; use this table to decode them.
+
+Application tier, formerly repo "Manager":
+
+| Legacy name | Native name | Legacy instance | Native instance |
+| --- | --- | --- | --- |
+| `MissionManager` | `MissionApp` | `missionManager` | `missionApp` |
+| `ScienceManager` | `ScienceApp` | `scienceManager` | `scienceApp` |
+| `CommsManager` | `CommsApp` | `commsManager` | `commsApp` |
+| `SoHManager` | `SoHApp` | `sohManager` | `sohApp` |
+| `PayloadDownlinkManager` | `PayloadDownlinkApp` | `payloadDownlinkManager` | `payloadDownlinkApp` |
+
+Manager tier, formerly repo "Service":
+
+| Legacy name | Native name | Legacy instance | Native instance |
+| --- | --- | --- | --- |
+| `EpsService` | `EpsManager` | `epsService` | `epsManager` |
+| `PayloadService` | `PayloadManager` | `payloadService` | `payloadManager` |
+| `GpsService` | `GpsManager` | `gpsService` | `gpsManager` |
+| `AdcsService` | `AdcsManager` | `adcsService` | `adcsManager` |
+| `ThermalService` | `ThermalManager` | `thermalService` | `thermalManager` |
+| `StorageService` | `StorageManager` | `storageService` | `storageManager` |
+| `TeensyTransportService` | `TeensyTransportManager` | `teensyTransportService` | `teensyTransportManager` |
+
+Driver tier, formerly repo "Adapter":
+
+| Legacy name | Native name | Legacy instance | Native instance |
+| --- | --- | --- | --- |
+| `EpsAdapter_Artemis` | `EpsDriver_Artemis` | `epsAdapterArtemis` | `epsDriverArtemis` |
+| `PayloadAdapter_NeutronSim` | `PayloadDriver_NeutronSim` | `payloadAdapterNeutronSim` | `payloadDriverNeutronSim` |
+| `PayloadAdapter_N1Legacy` | `PayloadDriver_N1Legacy` | `payloadAdapterN1Legacy` | `payloadDriverN1Legacy` |
+| `CommsAdapter_TeensyRfm23` | `CommsDriver_TeensyRfm23` | `commsAdapterTeensyRfm23` | `commsDriverTeensyRfm23` |
+| `GpsAdapter_Artemis` | `GpsDriver_Artemis` | `gpsAdapterArtemis` | `gpsDriverArtemis` |
+| `ThermalAdapter_Artemis` | `ThermalDriver_Artemis` | `thermalAdapterArtemis` | `thermalDriverArtemis` |
+| `AdcsAdapter_D2S2` | `AdcsDriver_D2S2` | `adcsAdapterD2S2` | `adcsDriverD2S2` |

@@ -1,0 +1,9 @@
+register_fprime_library(
+    AUTOCODER_INPUTS
+        ${CMAKE_CURRENT_LIST_DIR}/CommsDriver_TeensyRfm23.fpp
+    SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/CommsDriver_TeensyRfm23.cpp
+    DEPENDS
+        Components_Types
+        Components_LinkCfg
+)

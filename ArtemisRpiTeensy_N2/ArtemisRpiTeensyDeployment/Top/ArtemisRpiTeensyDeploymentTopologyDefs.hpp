@@ -49,24 +49,24 @@ namespace PingEntries {
     namespace ArtemisRpiTeensyDeployment_rateGroup2 {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_rateGroup3 {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_cmdSeq {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_teensyTransportService {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_missionManager {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_scienceManager {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_sohManager {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_commsManager {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_epsService {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_payloadService {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_adcsService {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_gpsService {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_storageService {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_thermalService {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_payloadDownlinkManager {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_epsAdapterArtemis {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_payloadAdapterNeutronSim {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_adcsAdapterD2S2 {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_gpsAdapterArtemis {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_commsAdapterTeensyRfm23 {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_thermalAdapterArtemis {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_teensyTransportManager {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_missionApp {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_scienceApp {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_sohApp {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_commsApp {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_epsManager {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_payloadManager {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_adcsManager {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_gpsManager {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_storageManager {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_thermalManager {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_payloadDownlinkApp {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_epsDriverArtemis {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_payloadDriverNeutronSim {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_adcsDriverD2S2 {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_gpsDriverArtemis {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_commsDriverTeensyRfm23 {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_thermalDriverArtemis {enum { WARN = 3, FATAL = 5 };}
 }  // namespace PingEntries
 
 // Definitions are placed within the same namespace as the FPP module that contains the topology.

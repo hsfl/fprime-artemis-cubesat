@@ -5,7 +5,7 @@ module Components {
         @ CCSDS bytes from ComStub, wrapped as channel 0.
         guarded input port ccsdsSendIn: Drv.ByteStreamSend
 
-        @ Payload packets from PayloadDownlinkManager, wrapped as channel 1.
+        @ Payload packets from PayloadDownlinkApp, wrapped as channel 1.
         guarded input port payloadSendIn: Fw.BufferSend
 
         @ Local Teensy subsystem RPC packets, wrapped as channel 2.
@@ -26,13 +26,13 @@ module Components {
         @ Unwrapped channel 0 bytes sent to ComStub.
         output port ccsdsRecvOut: Drv.ByteStreamData
 
-        @ Unwrapped channel 1 packets sent to PayloadDownlinkManager.
+        @ Unwrapped channel 1 packets sent to PayloadDownlinkApp.
         output port payloadRecvOut: Fw.BufferSend
 
-        @ Unwrapped channel 2 packets sent to the local Teensy subsystem adapter.
+        @ Unwrapped channel 2 packets sent to the local Teensy subsystem driver.
         output port localRecvOut: Fw.BufferSend
 
-        @ Unwrapped channel 2 RF-status packets sent to the comms adapter.
+        @ Unwrapped channel 2 RF-status packets sent to the comms driver.
         output port rfLocalRecvOut: Fw.BufferSend
 
         @ Original UART receive buffer returned to the UART driver.

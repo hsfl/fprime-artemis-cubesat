@@ -36,7 +36,7 @@ Acronyms and terms used across this repository, for students and new team member
 ## Flight software (F´ / this repo)
 
 - **F´ / F Prime / FPP** — the NASA/JPL flight-software framework used here; FPP is its modeling language (`.fpp` files). See [`FPRIME_GROUND_INTERFACES_PRIMER.md`](FPRIME_GROUND_INTERFACES_PRIMER.md).
-- **Manager → Service → Adapter (HAL)** — the three-tier component pattern: managers decide what happens, services hold the hardware-independent subsystem contract, adapters are the hardware/protocol glue (the **HAL**, Hardware Abstraction Layer). See [`SYSTEM_ARCHITECTURE.md` › Flight Software Architecture](SYSTEM_ARCHITECTURE.md#flight-software-architecture-manager--service--adapter-hal).
+- **Application -> Manager -> Driver (HAL)** — the three-tier F´ component pattern: applications decide what happens, managers hold the hardware-independent subsystem contract, drivers are the hardware/protocol glue (the **HAL**, Hardware Abstraction Layer). See [`SYSTEM_ARCHITECTURE.md` › Flight Software Architecture](SYSTEM_ARCHITECTURE.md#flight-software-architecture-application--manager--driver-hal).
 - **Component** — an F´ module with typed ports; the unit of flight software. *Active* = has its own thread/queue; *passive* = runs in a caller's context.
 - **Port** — a typed connection point between components (the F´ equivalent of a function-call interface).
 - **Topology** — the wiring of component instances and port connections; defined in `Top/topology.fpp`.
@@ -45,7 +45,7 @@ Acronyms and terms used across this repository, for students and new team member
 - **Rate group** — a set of components ticked at a fixed frequency (here 1 / 0.5 / 0.25 Hz). See [`TIME_AND_SCHEDULING.md`](TIME_AND_SCHEDULING.md).
 - **C&DH** — Command & Data Handling; the F´ core that dispatches commands and routes events/telemetry (`CdhCore` in the topology).
 - **UartChannelMux** — the Pi-side component that multiplexes one physical UART into virtual channels 0/1/2.
-- **Adapter** — see Manager → Service → Adapter above; the only tier that changes when hardware is swapped.
+- **Driver** — see Application -> Manager -> Driver above; the only tier that changes when hardware is swapped.
 
 ## Ground / protocol
 
@@ -55,7 +55,7 @@ Acronyms and terms used across this repository, for students and new team member
 - **TM / TC** — Telemetry (downlink) and Telecommand (uplink) frames.
 - **APID** — Application Process Identifier; the CCSDS tag that identifies a packet stream. GDS tracks a per-APID sequence count; gaps show as sequence warnings.
 - **Frame / packet / segment** — a CCSDS *frame* (here 128 bytes) carries *packets*; over RF each frame is split into ~49-byte RF *segments* and reassembled. See [Transport Architecture](SYSTEM_ARCHITECTURE.md#transport-architecture-one-uart-three-channels).
-- **RPC** — Remote Procedure Call; here, channel-2 request/response between a Pi-side adapter and a board on the satellite Teensy's local bus (e.g. PDU). Consumed on the satellite, not forwarded over RF.
+- **RPC** — Remote Procedure Call; here, channel-2 request/response between a Pi-side driver and a board on the satellite Teensy's local bus (e.g. PDU). Consumed on the satellite, not forwarded over RF.
 - **CRC** — Cyclic Redundancy Check; the per-frame integrity check. A failed CRC makes GDS print `Checksum validation failed` and drop the frame.
 - **ICD** — Interface Control Document; the authoritative wire-format spec for a hardware interface (e.g. the PDU ICD).
 

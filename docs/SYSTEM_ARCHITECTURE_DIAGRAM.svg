@@ -61,29 +61,29 @@
 
   <rect x="420" y="426" width="224" height="124" rx="12" fill="#ffffff" stroke="#4a8a4a" stroke-width="1.2"/>
   <text class="caption" x="434" y="444">Mission layer</text>
-  <text class="micro" x="434" y="460">MissionManager</text>
-  <text class="micro" x="434" y="474">ScienceManager</text>
-  <text class="micro" x="434" y="488">SoHManager</text>
-  <text class="micro" x="434" y="502">CommsManager</text>
+  <text class="micro" x="434" y="460">MissionApp</text>
+  <text class="micro" x="434" y="474">ScienceApp</text>
+  <text class="micro" x="434" y="488">SoHApp</text>
+  <text class="micro" x="434" y="502">CommsApp</text>
   <text class="micro" x="434" y="516">Spacecraft mode logic and</text>
   <text class="micro" x="434" y="530">demo flow coordination</text>
 
   <rect x="176" y="562" width="224" height="124" rx="12" fill="#ffffff" stroke="#4a8a4a" stroke-width="1.2"/>
   <text class="caption" x="190" y="576">Subsystem services</text>
-  <text class="micro" x="190" y="592">TeensyTransportService</text>
-  <text class="micro" x="190" y="606">EpsService</text>
-  <text class="micro" x="190" y="620">PayloadService</text>
-  <text class="micro" x="190" y="634">AdcsService</text>
-  <text class="micro" x="190" y="648">GpsService</text>
-  <text class="micro" x="190" y="662">StorageService</text>
+  <text class="micro" x="190" y="592">TeensyTransportManager</text>
+  <text class="micro" x="190" y="606">EpsManager</text>
+  <text class="micro" x="190" y="620">PayloadManager</text>
+  <text class="micro" x="190" y="634">AdcsManager</text>
+  <text class="micro" x="190" y="648">GpsManager</text>
+  <text class="micro" x="190" y="662">StorageManager</text>
 
   <rect x="420" y="562" width="224" height="124" rx="12" fill="#ffffff" stroke="#4a8a4a" stroke-width="1.2"/>
-  <text class="caption" x="434" y="576">Hardware adapters / HAL</text>
-  <text class="micro" x="434" y="592">EpsAdapter_Artemis</text>
-  <text class="micro" x="434" y="606">PayloadAdapter_NeutronSim</text>
-  <text class="micro" x="434" y="620">AdcsAdapter_D2S2</text>
-  <text class="micro" x="434" y="634">GpsAdapter_Artemis</text>
-  <text class="micro" x="434" y="648">CommsAdapter_TeensyRfm23</text>
+  <text class="caption" x="434" y="576">Hardware drivers / HAL</text>
+  <text class="micro" x="434" y="592">EpsDriver_Artemis</text>
+  <text class="micro" x="434" y="606">PayloadDriver_NeutronSim</text>
+  <text class="micro" x="434" y="620">AdcsDriver_D2S2</text>
+  <text class="micro" x="434" y="634">GpsDriver_Artemis</text>
+  <text class="micro" x="434" y="648">CommsDriver_TeensyRfm23</text>
 
   <rect x="132" y="766" width="556" height="64" rx="16" fill="#eaf2ff" stroke="#3c659f" stroke-width="1.5"/>
   <text class="label" x="156" y="793">Teensy 4.1</text>

@@ -136,13 +136,13 @@ Open:
 
 The automated sequence is:
 
-1. `MissionManager.ENTER_BASE_MODE`
-2. `SoHManager.EMIT_SOH_SNAPSHOT`
-3. `ScienceManager.CONFIGURE_CAPTURE_DURATION(<capture seconds>)`
-4. `MissionManager.SCHEDULE_COLLECTION(<delay seconds>)`
-5. `StorageService.REPORT_LATEST_DATASET`
-6. `StorageService.REPORT_STORAGE_HISTORY`
-7. `CommsManager.REQUEST_SCIENCE_DOWNLINK`
+1. `MissionApp.ENTER_BASE_MODE`
+2. `SoHApp.EMIT_SOH_SNAPSHOT`
+3. `ScienceApp.CONFIGURE_CAPTURE_DURATION(<capture seconds>)`
+4. `MissionApp.SCHEDULE_COLLECTION(<delay seconds>)`
+5. `StorageManager.REPORT_LATEST_DATASET`
+6. `StorageManager.REPORT_STORAGE_HISTORY`
+7. `CommsApp.REQUEST_SCIENCE_DOWNLINK`
 
 Default timing is a 10-second schedule delay and a 10-second simulated capture.
 For a quick non-interactive check:
@@ -154,9 +154,9 @@ For a quick non-interactive check:
 The pass condition is intentionally laptop-local:
 
 - GDS accepts the command sequence.
-- `PayloadAdapter_NeutronSim` writes a new CSV under `/tmp/neutron_payload_captures`.
+- `PayloadDriver_NeutronSim` writes a new CSV under `/tmp/neutron_payload_captures`.
 - F Prime publishes that CSV as `/tmp/neutron_payload_captures/latest_payload.bin`.
-- `PayloadDownlinkManager.PayloadDownlinkComplete` and `CommsManager.DownlinkFinished`
+- `PayloadDownlinkApp.PayloadDownlinkComplete` and `CommsApp.DownlinkFinished`
   appear in the run log.
 - `ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py --summary` parses that CSV.
 - The payload viewer is opened/refocused for visual inspection after the verified
@@ -173,69 +173,69 @@ still needs to validate the physical RFM23BP channel 1 receive path with
 1. Start emulation with `./tools/run_local_emulation.sh`.
 2. Open GDS web UI at `http://127.0.0.1:5050`.
 3. In telemetry, watch these channels:
-   - `MissionManager.ModeHeartbeat`
-   - `MissionManager.PingCount`
-   - `TeensyTransportService.LinkHeartbeat`
-   - `GpsAdapter_Artemis.FixState`
-   - `CommsAdapter_TeensyRfm23.LinkState`
-   - `CommsAdapter_TeensyRfm23.RfRxPackets`
+   - `MissionApp.ModeHeartbeat`
+   - `MissionApp.PingCount`
+   - `TeensyTransportManager.LinkHeartbeat`
+   - `GpsDriver_Artemis.FixState`
+   - `CommsDriver_TeensyRfm23.LinkState`
+   - `CommsDriver_TeensyRfm23.RfRxPackets`
 4. Confirm `ModeHeartbeat` and `LinkHeartbeat` increment continuously.
-5. Send command `MissionManager.PING` with a token (example `42`).
+5. Send command `MissionApp.PING` with a token (example `42`).
 6. Confirm:
    - command response is `OK`
-   - event `MissionManager.Pong` appears with your token and an incrementing count
-   - telemetry `MissionManager.PingCount` increments
+   - event `MissionApp.Pong` appears with your token and an incrementing count
+   - telemetry `MissionApp.PingCount` increments
 
 If all three checks pass, the local command/telemetry/event loop is working for basic manual demo validation.
 
-## Adapter Telemetry Expectations (GPS + RFM23)
+## Driver Telemetry Expectations (GPS + RFM23)
 
-When the adapter model path is active, expect:
+When the driver model path is active, expect:
 
-- `ArtemisRpiTeensyDeployment.gpsAdapterArtemis.FixState` to move through:
+- `ArtemisRpiTeensyDeployment.gpsDriverArtemis.FixState` to move through:
   - acquiring (`1`) early in runtime
   - mostly `3` (3D fix) with occasional `2` (2D) and rare `0` (dropout)
-- `ArtemisRpiTeensyDeployment.commsAdapterTeensyRfm23.LinkState` to move through:
+- `ArtemisRpiTeensyDeployment.commsDriverTeensyRfm23.LinkState` to move through:
   - acquiring (`1`) at startup
   - mostly `2` (locked) with occasional `3` (degraded) and rare `0` (down)
-- `ArtemisRpiTeensyDeployment.commsAdapterTeensyRfm23.RfRxPackets` to monotonically increase.
-- `ArtemisRpiTeensyDeployment.teensyTransportService.DownlinkFrames` to follow that receive-packet counter.
+- `ArtemisRpiTeensyDeployment.commsDriverTeensyRfm23.RfRxPackets` to monotonically increase.
+- `ArtemisRpiTeensyDeployment.teensyTransportManager.DownlinkFrames` to follow that receive-packet counter.
 
 ## Demo Walkthrough: `CollectionScheduled` (10s)
 
 Use this when you want to demonstrate the timed collection story in GDS.
 
 1. Start emulation and open `http://127.0.0.1:5050`.
-2. In **Commanding**, send `SCHEDULE_COLLECTION` on `missionManager` (or `ArtemisRpiTeensyDeployment.missionManager`) with argument `10`.
+2. In **Commanding**, send `SCHEDULE_COLLECTION` on `missionApp` (or `ArtemisRpiTeensyDeployment.missionApp`) with argument `10`.
 3. Confirm in **Command History**:
    - command response is `OK`
 4. Confirm immediate updates in **Events**:
-   - `ArtemisRpiTeensyDeployment.missionManager.ModeChanged` (`mode=1`)
-   - `ArtemisRpiTeensyDeployment.missionManager.CollectionScheduled` (`delay=10`)
-   - `ArtemisRpiTeensyDeployment.scienceManager.CollectionTriggered` (`delay=10`)
+   - `ArtemisRpiTeensyDeployment.missionApp.ModeChanged` (`mode=1`)
+   - `ArtemisRpiTeensyDeployment.missionApp.CollectionScheduled` (`delay=10`)
+   - `ArtemisRpiTeensyDeployment.scienceApp.CollectionTriggered` (`delay=10`)
 5. Confirm immediate updates in **Channels/Charts**:
-   - `ArtemisRpiTeensyDeployment.missionManager.CurrentMode` becomes `1`
-   - `ArtemisRpiTeensyDeployment.missionManager.LastScheduledDelaySeconds` becomes `10`
-   - `ArtemisRpiTeensyDeployment.scienceManager.PendingDelaySeconds` starts at `10`
+   - `ArtemisRpiTeensyDeployment.missionApp.CurrentMode` becomes `1`
+   - `ArtemisRpiTeensyDeployment.missionApp.LastScheduledDelaySeconds` becomes `10`
+   - `ArtemisRpiTeensyDeployment.scienceApp.PendingDelaySeconds` starts at `10`
 6. Wait about 10 seconds and confirm collection activity in **Events**:
-   - `ArtemisRpiTeensyDeployment.payloadService.PayloadCollectionForwarded`
-   - `ArtemisRpiTeensyDeployment.payloadService.PayloadStatusUpdated`
-   - `ArtemisRpiTeensyDeployment.scienceManager.ScienceProductReady`
-   - `ArtemisRpiTeensyDeployment.storageService.ScienceStored`
+   - `ArtemisRpiTeensyDeployment.payloadManager.PayloadCollectionForwarded`
+   - `ArtemisRpiTeensyDeployment.payloadManager.PayloadStatusUpdated`
+   - `ArtemisRpiTeensyDeployment.scienceApp.ScienceProductReady`
+   - `ArtemisRpiTeensyDeployment.storageManager.ScienceStored`
 7. Confirm post-collection state in **Channels/Charts**:
-   - `ArtemisRpiTeensyDeployment.scienceManager.PendingDelaySeconds` reaches `0`
-   - `ArtemisRpiTeensyDeployment.scienceManager.CollectionCount` increments
-   - `ArtemisRpiTeensyDeployment.storageService.StoredProducts` increments
-   - `ArtemisRpiTeensyDeployment.commsManager.PendingScienceBytes` becomes nonzero
+   - `ArtemisRpiTeensyDeployment.scienceApp.PendingDelaySeconds` reaches `0`
+   - `ArtemisRpiTeensyDeployment.scienceApp.CollectionCount` increments
+   - `ArtemisRpiTeensyDeployment.storageManager.StoredProducts` increments
+   - `ArtemisRpiTeensyDeployment.commsApp.PendingScienceBytes` becomes nonzero
 
 Optional follow-on command:
 
-- Send `REQUEST_SCIENCE_DOWNLINK` on `commsManager`
-- Expect `ArtemisRpiTeensyDeployment.commsManager.DownlinkRequested`,
-  `ArtemisRpiTeensyDeployment.storageService.DownlinkPrepared`,
-  `ArtemisRpiTeensyDeployment.payloadDownlinkManager.PayloadDownlinkStarted`,
-  `ArtemisRpiTeensyDeployment.payloadDownlinkManager.PayloadDownlinkComplete`, and
-  `ArtemisRpiTeensyDeployment.commsManager.DownlinkFinished`
+- Send `REQUEST_SCIENCE_DOWNLINK` on `commsApp`
+- Expect `ArtemisRpiTeensyDeployment.commsApp.DownlinkRequested`,
+  `ArtemisRpiTeensyDeployment.storageManager.DownlinkPrepared`,
+  `ArtemisRpiTeensyDeployment.payloadDownlinkApp.PayloadDownlinkStarted`,
+  `ArtemisRpiTeensyDeployment.payloadDownlinkApp.PayloadDownlinkComplete`, and
+  `ArtemisRpiTeensyDeployment.commsApp.DownlinkFinished`
 - `DownlinkFinished` is emitted after the payload downlink manager completes, not immediately on request.
 - This is a real channel 1 payload transfer path, but it is not a stock GDS `#Downlink` file transfer.
 - In local laptop emulation, review the generated science CSV in the Neutron 2 payload viewer at `http://127.0.0.1:8062`. In HIL, run `tools/payload_receiver.py` on the ground channel 1 serial endpoint and review the reconstructed file.

@@ -56,8 +56,8 @@ Primary files checked:
 - `ArtemisRpiTeensy_N2/fprime-venv/lib/python3.10/site-packages/fprime_gds/common/files/downlinker.py`
 - `ArtemisRpiTeensy_N2/lib/fprime/docs/reference/gds-plugins/*.md`
 - `ArtemisRpiTeensy_N2/lib/fprime/docs/user-manual/gds/*.md`
-- `ArtemisRpiTeensy_N2/Components/PayloadDownlinkManager/PayloadDownlinkManager.fpp`
-- `ArtemisRpiTeensy_N2/Components/PayloadDownlinkManager/PayloadDownlinkManager.cpp`
+- `ArtemisRpiTeensy_N2/Components/PayloadDownlinkApp/PayloadDownlinkApp.fpp`
+- `ArtemisRpiTeensy_N2/Components/PayloadDownlinkApp/PayloadDownlinkApp.cpp`
 - `ArtemisRpiTeensy_N2/tools/payload_receiver.py`
 - `docs/SYSTEM_ARCHITECTURE.md`
 - `external/epscorc3m/SatellitePayload/satellite_teensy/satellite_teensy.ino`
@@ -123,7 +123,7 @@ The alternative lightweight F Prime protocol subtopology has:
 ```text
 ComFprime.comQueue
 -> ComFprime.framer          # Svc.FprimeFramer
--> ComStub or custom Com adapter
+-> ComStub or custom Com driver
 ```
 
 But that is not the active stack in this deployment.
@@ -253,7 +253,7 @@ CCSDS/channel 0. The risk is sustained byte-perfect bulk file transfer.
 The current custom sidecar path is:
 
 ```text
-PayloadDownlinkManager
+PayloadDownlinkApp
 -> uartChannelMux channel 1
 -> satellite Teensy/RFM23BP
 -> ground Teensy SerialUSB2
@@ -277,7 +277,7 @@ Current channel-1 packet design includes:
 - retry bitmap from ground receiver to flight software
 - selective resend of missing packet indexes
 
-`PayloadDownlinkManager` exposes telemetry/events for operator visibility:
+`PayloadDownlinkApp` exposes telemetry/events for operator visibility:
 
 - `PayloadState`
 - `TransferId`
@@ -382,7 +382,7 @@ communication plugin is selected.
 
 Implication:
 
-- This is the right hook only if we replace the UART/IP/radio adapter itself.
+- This is the right hook only if we replace the UART/IP/radio driver itself.
 - It is not the first place to implement file repair.
 - Blocking or slow I/O here delays the rest of GDS, so repair logic does not
   belong here.
@@ -426,7 +426,7 @@ currently supported in dashboards and are better suited for a full view.
 
 Implication:
 
-- A dashboard can show our existing `PayloadDownlinkManager` telemetry/events.
+- A dashboard can show our existing `PayloadDownlinkApp` telemetry/events.
 - A dashboard can show repair-helper status if it is published as channels or
   events.
 - A dashboard cannot, by itself, become a custom File Downlink/repair tab.
@@ -564,7 +564,7 @@ ReliableFileDownlink
     either channel 1 sidecar or custom ComCcsds APID
 ```
 
-This is close to what `PayloadDownlinkManager` already is. The novel part would
+This is close to what `PayloadDownlinkApp` already is. The novel part would
 be making the component generic over files and documenting it as a reusable
 F Prime pattern rather than Neutron-specific payload plumbing.
 
@@ -638,7 +638,7 @@ Near-term improvement:
 
 This is smaller than full repair but makes stock behavior safer.
 
-### 3. Genericize `PayloadDownlinkManager`
+### 3. Genericize `PayloadDownlinkApp`
 
 Current channel-1 path is payload-oriented, but the protocol is really a
 generic reliable blob downlink:
@@ -696,7 +696,7 @@ For post-MVP / possible contribution work:
   the science file arrive reliably?
 - What file sizes are actually expected for the demo and for the real payload?
 - Are we willing to patch/extend GDS, or do we need to stay stock for judging?
-- Should `PayloadDownlinkManager` be renamed/genericized after MVP so the
+- Should `PayloadDownlinkApp` be renamed/genericized after MVP so the
   architecture reads as a reusable reliable blob service?
 - Is there appetite to upstream a GDS FileDownlink repair plugin once the demo
   pressure is gone?

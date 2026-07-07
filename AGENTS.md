@@ -12,7 +12,7 @@ IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for an
 |framework:{assert:user-manual/framework/assert.md,autocoded:user-manual/framework/autocoded-functions.md,baremetal:user-manual/framework/baremetal-multicore.md,config:user-manual/framework/configuring-fprime.md,data-products:user-manual/framework/data-products.md,dynamic-mem:user-manual/framework/dynamic-memory.md,ground-if:user-manual/framework/ground-interface.md,state-machines:user-manual/framework/state-machines.md,platforms:user-manual/framework/supported-platforms.md}
 |gds:{cli:user-manual/gds/gds-cli.md,dashboards:user-manual/gds/gds-custom-dashboards.md,dash-ref:user-manual/gds/gds-dashboard-reference.md,dev:user-manual/gds/gds-dev-guide.md,test-api:user-manual/gds/gds-test-api-guide.md,seqgen:user-manual/gds/seqgen.md}
 |design:{app-man-drv:user-manual/design-patterns/app-man-drv.md,ports:user-manual/design-patterns/common-port-patterns.md,health:user-manual/design-patterns/health-checking.md,hub:user-manual/design-patterns/hub-pattern.md,manager-worker:user-manual/design-patterns/manager-worker.md,rate-group:user-manual/design-patterns/rate-group.md,subtopo:user-manual/design-patterns/subtopologies.md}
-|reference:{comm-adapter:reference/communication-adapter-interface.md,fpp-json-dict:reference/fpp-json-dict.md,translations:reference/fprime-translations.md,nomenclature:reference/nomenclature.md,numerical-types:reference/numerical-types.md,gds-plugins:reference/gds-plugins}
+|reference:{comm-driver:reference/communication-driver-interface.md,fpp-json-dict:reference/fpp-json-dict.md,translations:reference/fprime-translations.md,nomenclature:reference/nomenclature.md,numerical-types:reference/numerical-types.md,gds-plugins:reference/gds-plugins}
 |component-sdds:{root:./ArtemisRpiTeensy_N2/lib/fprime,locations:Svc/**/docs/*.md plus Fw/**/docs/*.md plus Drv/**/docs/*.md plus Os/**/docs/*.md plus Utils/**/docs/*.md,search:`rg --files ArtemisRpiTeensy_N2/lib/fprime | rg '/docs/.*\\.md$'`}
 </!>
 
@@ -308,7 +308,7 @@ PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
 ### Student Branch / Handoff Rules
 - `neutron2-develop` is the shared post-v1 student development branch, created from the frozen MVP demo baseline; verify the current branch before making student-facing edits.
 - Keep student-facing docs KISS: clear, concise, consistent, and explicit about what students should edit.
-- Use service/adapter terminology from `docs/SYSTEM_ARCHITECTURE.md` and `docs/STUDENT_COMPONENT_STARTERS.md`; do not restate the full architecture here.
+- Use native application/manager/driver terminology from `docs/SYSTEM_ARCHITECTURE.md` and `docs/STUDENT_COMPONENT_STARTERS.md`; do not restate the full architecture here.
 - Placeholder or request-state commands must not imply real hardware actuation. Say plainly when a component records intent only.
 - When helping students with GitHub flow, use the `student-git-handoff` skill and keep their work on feature branches from the approved student base.
 

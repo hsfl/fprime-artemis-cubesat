@@ -38,7 +38,7 @@
 
   <rect x="850" y="190" width="190" height="110" rx="24" fill="#eef6eb" stroke="#4a8a4a" stroke-width="2"/>
   <text class="label" x="874" y="220">5. Pending state</text>
-  <text class="body" x="874" y="244">MissionManager enters</text>
+  <text class="body" x="874" y="244">MissionApp enters</text>
   <text class="body" x="874" y="262">DataCollectionPending</text>
 
   <rect x="1065" y="190" width="190" height="110" rx="24" fill="#eef6eb" stroke="#4a8a4a" stroke-width="2"/>

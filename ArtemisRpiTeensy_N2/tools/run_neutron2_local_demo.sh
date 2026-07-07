@@ -22,7 +22,7 @@ Usage: run_neutron2_local_demo.sh [options]
 
 Runs the Neutron 2 laptop-only MVP demo:
   local F' app <-> PTY link emulator <-> fprime-gds
-  PayloadAdapter_NeutronSim -> /tmp/neutron_payload_captures/*.csv
+  PayloadDriver_NeutronSim -> /tmp/neutron_payload_captures/*.csv
   Neutron 2 payload viewer -> http://127.0.0.1:8062
 
 Options:
@@ -303,18 +303,18 @@ wait_for_port "$VIEWER_PORT" "payload viewer"
 START_EPOCH="$(python3 -c 'import time; print(time.time())')"
 
 log "sending demo command sequence"
-send_command "missionManager.ENTER_BASE_MODE" || fail "Command failed: missionManager.ENTER_BASE_MODE"
-send_command "sohManager.EMIT_SOH_SNAPSHOT" || fail "Command failed: sohManager.EMIT_SOH_SNAPSHOT"
-send_command "scienceManager.CONFIGURE_CAPTURE_DURATION" "$CAPTURE_SECONDS" || fail "Command failed: scienceManager.CONFIGURE_CAPTURE_DURATION"
-send_command "missionManager.SCHEDULE_COLLECTION" "$DELAY_SECONDS" || fail "Command failed: missionManager.SCHEDULE_COLLECTION"
+send_command "missionApp.ENTER_BASE_MODE" || fail "Command failed: missionApp.ENTER_BASE_MODE"
+send_command "sohApp.EMIT_SOH_SNAPSHOT" || fail "Command failed: sohApp.EMIT_SOH_SNAPSHOT"
+send_command "scienceApp.CONFIGURE_CAPTURE_DURATION" "$CAPTURE_SECONDS" || fail "Command failed: scienceApp.CONFIGURE_CAPTURE_DURATION"
+send_command "missionApp.SCHEDULE_COLLECTION" "$DELAY_SECONDS" || fail "Command failed: missionApp.SCHEDULE_COLLECTION"
 
 WAIT_SECONDS=$((DELAY_SECONDS + 4))
 log "waiting ${WAIT_SECONDS}s for scheduled capture"
 sleep "$WAIT_SECONDS"
 
-send_command "storageService.REPORT_LATEST_DATASET" || fail "Command failed: storageService.REPORT_LATEST_DATASET"
-send_command "storageService.REPORT_STORAGE_HISTORY" || fail "Command failed: storageService.REPORT_STORAGE_HISTORY"
-send_command "commsManager.REQUEST_SCIENCE_DOWNLINK" || fail "Command failed: commsManager.REQUEST_SCIENCE_DOWNLINK"
+send_command "storageManager.REPORT_LATEST_DATASET" || fail "Command failed: storageManager.REPORT_LATEST_DATASET"
+send_command "storageManager.REPORT_STORAGE_HISTORY" || fail "Command failed: storageManager.REPORT_STORAGE_HISTORY"
+send_command "commsApp.REQUEST_SCIENCE_DOWNLINK" || fail "Command failed: commsApp.REQUEST_SCIENCE_DOWNLINK"
 wait_for_log_pattern "PayloadDownlinkComplete" "payload downlink completion" || fail "Payload downlink did not complete"
 wait_for_log_pattern "DownlinkFinished" "comms downlink completion" || fail "Comms downlink did not complete"
 

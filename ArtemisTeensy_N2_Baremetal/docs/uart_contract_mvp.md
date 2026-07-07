@@ -47,12 +47,12 @@ Uplink:
 
 The Pi does not open a second PDU serial device. F Prime sends PDU work to the satellite Teensy over channel 2:
 
-1. `EpsService` issues a typed EPS/PDU request.
-2. `EpsAdapter_Artemis` builds a PDU v2 frame using `external/artemis-pdu/src/pdu_protocol_v2.h`.
+1. `EpsManager` issues a typed EPS/PDU request.
+2. `EpsDriver_Artemis` builds a PDU v2 frame using `external/artemis-pdu/src/pdu_protocol_v2.h`.
 3. `UartChannelMux` wraps the local request as channel 2.
 4. Satellite `PduProxy` consumes channel 2, writes the inner PDU frame to `Serial1` at `9600` baud, and waits for the PDU response.
 5. `PduProxy` returns a channel 2 response to the Pi.
-6. `EpsAdapter_Artemis` validates the PDU v2 response and emits EPS status/telemetry.
+6. `EpsDriver_Artemis` validates the PDU v2 response and emits EPS status/telemetry.
 
 Channel 2 request payload:
 

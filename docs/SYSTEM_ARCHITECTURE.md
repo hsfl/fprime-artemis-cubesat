@@ -44,17 +44,17 @@ Keep `external/epscorc3m` as a reference for how the Artemis hardware actually b
 | `OBC` | Artemis OBC board using `Raspberry Pi` plus `Teensy 4.1` | Main flight-computing and interface layer | `Raspberry Pi` runs higher-level flight software. `Teensy` handles bridge/control duties and hardware-facing integration. |
 | `EPS` | Artemis EPS / PDU / battery system | Real power-system baseline for the demo | Treat as the real EPS prototype, not a stub. PDU v2 protocol per the [PDU ICD](#reference-documents). |
 | `ADCS` | `D2S2` simulator | Simulated ADCS behavior for the demo | The current demo does not require full physical flight ADCS implementation inside this repo. |
-| `PLD` | `Neutron 2` payload **simulator** now, `Neutron 2` **development payload board** (loaned to us) later | Payload/science data source | Simulated payload data is acceptable for the demo. The adapter swaps to the loaned Neutron 2 dev board when it arrives, with no change to mission logic. |
+| `PLD` | `Neutron 2` payload **simulator** now, `Neutron 2` **development payload board** (loaned to us) later | Payload/science data source | Simulated payload data is acceptable for the demo. The driver swaps to the loaned Neutron 2 dev board when it arrives, with no change to mission logic. |
 | `COMMS` | `RFM23BP` for MVP, `SatNOGS` board as alternate/future path | Radio/transport subsystem | Default assumption is `RFM23BP` until the in-house `SatNOGS` board is validated. |
 | `GPS` | Artemis kit GPS module | Position/time reference from installed Artemis hardware | Exact module may vary by kit configuration. |
 | `S&M` | Artemis structure and antenna deployment baseline | Mechanical/structural context for the demo | Important for full-system understanding, but not the primary focus of current software work. |
 | `TCS` | Artemis thermal baseline with sensors/heater context | Thermal and battery-heater context | Relevant to system understanding; currently a lower-priority software slice for the MVP demo. |
 
-## Flight Software Architecture: Manager → Service → Adapter (HAL)
+## Flight Software Architecture: Application → Manager → Driver (HAL)
 
 This is the most important pattern in the repository. Read it before touching components.
 
-![F Prime architecture pattern: Mission talks to services, services talk to adapters](FPRIME_ARCHITECTURE_PATTERN.png)
+![F Prime architecture pattern: applications talk to managers, managers talk to drivers](FPRIME_ARCHITECTURE_PATTERN.png)
 
 ### The problem this solves
 
@@ -68,49 +68,49 @@ We still need to build, demonstrate, and iterate now, then **swap in real hardwa
 
 ### The three tiers
 
-1. **Managers** — *decide what happens next.* Mission and mode logic. They own the demo story (Base Mode → scheduled collection → science downlink) and coordinate subsystems. They talk **only to services**, never to hardware.
-   - `MissionManager`, `ScienceManager`, `SoHManager`, `CommsManager`
-2. **Services** — *subsystem logic + telemetry.* The stable, hardware-independent contract for each subsystem ("collect a payload sample," "command an EPS rail," "get GPS fix"). Services expose generic commands/telemetry to the managers and call down to an adapter for the actual hardware action.
-   - `PayloadService`, `EpsService`, `AdcsService`, `GpsService`, `StorageService`, `TeensyTransportService`
-3. **Adapters (the HAL)** — *hardware + protocol glue.* Each adapter implements one service's contract against one specific piece of hardware or simulator. This is the **only** tier that changes when hardware changes.
-   - `PayloadAdapter_NeutronSim` (sim today → `PayloadAdapter_*` for the dev board later)
-   - `EpsAdapter_Artemis` (Artemis PDU v2 protocol)
-   - `AdcsAdapter_D2S2`, `GpsAdapter_Artemis`, `CommsAdapter_TeensyRfm23`
+1. **Applications** — *decide what happens next.* Mission and mode logic. They own the demo story (Base Mode -> scheduled collection -> science downlink) and coordinate subsystems. They talk **only to managers**, never to hardware.
+   - `MissionApp`, `ScienceApp`, `SoHApp`, `CommsApp`
+2. **Managers** — *subsystem logic + telemetry.* The stable, hardware-independent contract for each subsystem ("collect a payload sample," "command an EPS rail," "get GPS fix"). Managers expose generic commands/telemetry to the applications and call down to a driver for the actual hardware action.
+   - `PayloadManager`, `EpsManager`, `AdcsManager`, `GpsManager`, `StorageManager`, `TeensyTransportManager`
+3. **Drivers (the HAL)** — *hardware + protocol glue.* Each driver implements one manager's contract against one specific piece of hardware or simulator. This is the **only** tier that changes when hardware changes.
+   - `PayloadDriver_NeutronSim` (sim today → `PayloadDriver_*` for the dev board later)
+   - `EpsDriver_Artemis` (Artemis PDU v2 protocol)
+   - `AdcsDriver_D2S2`, `GpsDriver_Artemis`, `CommsDriver_TeensyRfm23`
 
-> **Mission talks to services. Services talk to adapters. Adapters talk to hardware.**
+> **Applications talk to managers. Managers talk to drivers. Drivers talk to hardware.**
 
-### This is F´'s Application-Manager-Driver pattern (we didn't invent it)
+### This is F´'s Application-Manager-Driver pattern
 
-Good news for anyone worried this is bespoke over-engineering: **it isn't a custom invention — it's F´'s own built-in hardware-abstraction pattern.** F´ calls it the **Application-Manager-Driver (App-Man-Drv)** pattern, documented in the framework at [`lib/fprime/.../design-patterns/app-man-drv.md`](../ArtemisRpiTeensy_N2/lib/fprime/docs/user-manual/design-patterns/app-man-drv.md) and [`how-to/develop-device-driver.md`](../ArtemisRpiTeensy_N2/lib/fprime/docs/how-to/develop-device-driver.md). Our three tiers map onto it almost 1:1 — we just use demo-friendlier names:
+This is not custom terminology. F´ calls this the **Application-Manager-Driver (App-Man-Drv)** pattern, documented in the framework at [`lib/fprime/.../design-patterns/app-man-drv.md`](../ArtemisRpiTeensy_N2/lib/fprime/docs/user-manual/design-patterns/app-man-drv.md) and [`how-to/develop-device-driver.md`](../ArtemisRpiTeensy_N2/lib/fprime/docs/how-to/develop-device-driver.md). This repo now uses the native F´ vocabulary in component names and topology instances:
 
-| Our term | F´ App-Man-Drv term | Role |
+| F´ tier | Repo suffix convention | Current examples | Role |
 | --- | --- | --- |
-| **Manager** (`MissionManager`, `ScienceManager`, `CommsManager`) | **Application** | Mission/mode logic; cross-cutting; talks only to the tier below |
-| **Service** (`EpsService`, `PayloadService`, `GpsService`) | **Manager** (device manager) | Subsystem-generic command/telemetry contract; hardware-independent |
-| **Adapter** (`EpsAdapter_Artemis`, `PayloadAdapter_NeutronSim`) | **Driver** (device/bus driver) | Hardware + protocol glue; the only tier that changes per hardware |
+| **Application** | `*App` | `MissionApp`, `ScienceApp`, `CommsApp`, `SoHApp`, `PayloadDownlinkApp` | Mission/mode logic; cross-cutting; talks only to managers |
+| **Manager** | `*Manager` | `EpsManager`, `PayloadManager`, `GpsManager`, `StorageManager` | Subsystem-generic command/telemetry contract; hardware-independent |
+| **Driver** | `*Driver_<Hardware>` | `EpsDriver_Artemis`, `PayloadDriver_NeutronSim`, `CommsDriver_TeensyRfm23` | Hardware + protocol glue; the only tier that changes per hardware |
 
-> ⚠️ **Vocabulary warning — read this before you read upstream F´ docs:** the word **"Manager" points at opposite ends of the stack** in the two vocabularies. *Our* "Manager" is F´'s "Application"; F´'s "Manager" is *our* "Service." So when the JPL LedBlinker tutorial, `fprime-sensors`, or the device-driver how-to says "Manager," they mean what this repo calls a **Service**. Don't let it trip you up.
+> **Legacy names before 2026-07-06:** the old repo vocabulary was Manager -> Application, Service -> Manager, Adapter -> Driver. Old logs and archived plans may still use those names, but active source and docs should use the native F´ names above.
 
-What makes this a *real* HAL — and not just decorative indirection — is the same mechanism F´ relies on: the swap boundary uses a **shared port interface**. F´ drivers are swappable because `LinuxI2cDriver` and `ZephyrI2cDriver` both speak the same `Drv.I2c` interface. We do the equivalent: `EpsService` and `EpsAdapter_Artemis` both speak the mirrored `Components.EpsCommand` / `Components.EpsStatus` ports defined in [`Components/Types/Types.fpp`](../ArtemisRpiTeensy_N2/Components/Types/Types.fpp). A new adapter only has to honor those ports, then you re-wire one topology connection — the service is untouched. That shared-port boundary is exactly why the "sim now, real board later" swap works, and the framework docs explicitly call out *simulation and testing* as a reason to layer this way.
+What makes this a *real* HAL — and not just decorative indirection — is the same mechanism F´ relies on: the swap boundary uses a **shared port interface**. F´ drivers are swappable because `LinuxI2cDriver` and `ZephyrI2cDriver` both speak the same `Drv.I2c` interface. We do the equivalent: `EpsManager` and `EpsDriver_Artemis` both speak the mirrored `Components.EpsCommand` / `Components.EpsStatus` ports defined in [`Components/Types/Types.fpp`](../ArtemisRpiTeensy_N2/Components/Types/Types.fpp). A new driver only has to honor those ports, then you re-wire one topology connection — the manager is untouched. That shared-port boundary is exactly why the "sim now, real board later" swap works, and the framework docs explicitly call out *simulation and testing* as a reason to layer this way.
 
 ### Why this is worth it (the tradeoff)
 
-- **Benefit:** when the loaned Neutron 2 payload board, the SatNOGS comms board, or the final EPS arrives, we write a **new adapter** and re-wire one connection in the topology. Managers and services are untouched, so the mission demo keeps working. We can develop against the hardware we have today and drop in flight hardware with no major refactor.
-- **Cost:** more components and one extra indirection (manager → service → adapter) than a baremetal "just call the driver" approach. For a one-off baremetal demo this would be overkill — but for Neutron 2's "evolve hardware independently" requirement it pays for itself. This indirection is exactly the flexibility `external/epscorc3m` lacked.
+- **Benefit:** when the loaned Neutron 2 payload board, the SatNOGS comms board, or the final EPS arrives, we write a **new driver** and re-wire one connection in the topology. Applications and managers are untouched, so the mission demo keeps working. We can develop against the hardware we have today and drop in flight hardware with no major refactor.
+- **Cost:** more components and one extra indirection (application -> manager -> driver) than a baremetal "just call the driver" approach. For a one-off baremetal demo this would be overkill — but for Neutron 2's "evolve hardware independently" requirement it pays for itself. This indirection is exactly the flexibility `external/epscorc3m` lacked.
 
 ### How to extend it (student recipe)
 
-- New mission behavior → edit/add a **Manager**.
-- New subsystem capability or telemetry contract → edit/add a **Service**.
-- New or swapped hardware/sim → add an **Adapter**, keep the service contract identical, and re-wire it in `Top/topology.fpp`.
-- If you find yourself putting hardware/protocol bytes in a manager or service, that logic belongs in an adapter.
+- New mission behavior -> edit/add an **Application** (`*App`).
+- New subsystem capability or telemetry contract -> edit/add a **Manager** (`*Manager`).
+- New or swapped hardware/sim -> add a **Driver** (`*Driver_<Hardware>`), keep the manager contract identical, and re-wire it in `Top/topology.fpp`.
+- If you find yourself putting hardware/protocol bytes in an application or manager, that logic belongs in a driver.
 
 ### Implementation notes (use the framework, don't fight it)
 
-Two notes to keep adapters aligned with stock F´ rather than reinventing it:
+Two notes to keep drivers aligned with stock F´ rather than reinventing it:
 
-1. **For subsystems on the Pi's own bus, use F´'s built-in bus drivers.** If a device is directly reachable from the Pi over I²C/SPI/GPIO (*not* routed behind the satellite Teensy), prefer `Drv.LinuxI2cDriver`, `Drv.LinuxSpiDriver`, or `Drv.LinuxGpioDriver` as the lower half of the adapter, plus a thin device manager — don't hand-roll the bus access. Our current EPS/GPS/thermal adapters are bespoke because they go through the **channel 2 Teensy RPC** (a hardware constraint of the one-UART OBC board), which justifies the custom code *there*. But for anything the Pi can talk to directly, use the framework driver.
-2. **Check `fprime-sensors` before writing a new adapter.** The community library [`fprime-sensors`](https://github.com/fprime-community/fprime-sensors) ships ready-made device managers (IMU, magnetometer, etc.) as Manager+Driver pairs. When the real GPS/IMU/thermal boards arrive, see whether a drop-in already exists before building a `*Adapter_*` from scratch.
+1. **For subsystems on the Pi's own bus, use F´'s built-in bus drivers.** If a device is directly reachable from the Pi over I²C/SPI/GPIO (*not* routed behind the satellite Teensy), prefer `Drv.LinuxI2cDriver`, `Drv.LinuxSpiDriver`, or `Drv.LinuxGpioDriver` as the lower half of the driver, plus a thin device manager — don't hand-roll the bus access. Our current EPS/GPS/thermal drivers are bespoke because they go through the **channel 2 Teensy RPC** (a hardware constraint of the one-UART OBC board), which justifies the custom code *there*. But for anything the Pi can talk to directly, use the framework driver.
+2. **Check `fprime-sensors` before writing a new driver.** The community library [`fprime-sensors`](https://github.com/fprime-community/fprime-sensors) ships ready-made device managers (IMU, magnetometer, etc.) as Manager+Driver pairs. When the real GPS/IMU/thermal boards arrive, see whether a drop-in already exists before building a `*Driver_*` from scratch.
 
 ## OBC Detail
 
@@ -126,7 +126,7 @@ The `OBC` is the most important subsystem for this repository.
 ### OBC software model in this repo
 
 - `ArtemisRpiTeensy_N2`
-  - active `F'` project and flight-software root (managers, services, adapters, topology)
+  - active `F'` project and flight-software root (applications, managers, drivers, topology)
 - `ArtemisTeensy_N2_Baremetal`
   - satellite-side Teensy firmware (UART↔RF relay + local RPC)
 - `GDS_Teensy`
@@ -142,7 +142,7 @@ Today, the codebase is strongest in:
 - `COMMS` bridge behavior
 - ground-link demonstration path
 
-The broader subsystem architecture still matters, but several subsystem functions remain planned, simulated, or partially integrated. The HAL is what lets those slices firm up one adapter at a time.
+The broader subsystem architecture still matters, but several subsystem functions remain planned, simulated, or partially integrated. The HAL is what lets those slices firm up one driver at a time.
 
 ## Transport Architecture: One UART, Three Channels
 
@@ -174,7 +174,7 @@ Every Pi↔Teensy UART frame is wrapped as:
 | `1` | Payload | Payload/science data packet **sidecar**, chunk-sized for the RFM23BP packet budget (`N2` = `0x4E 0x32` magic, 35 data bytes/packet) | **Yes** |
 | `2` | Teensy-local RPC | Satellite-Teensy-local subsystem RPC — PDU/EPS, GPS, etc. | **No** |
 
-**Channel 2 is the one students most often misread.** It is *Remote Procedure Call* traffic between the F´ adapters on the Pi and the subsystem hardware that hangs off the **satellite Teensy's** local bus (e.g. the PDU/EPS over the Teensy's I²C/serial). The Teensy **consumes** channel 2 locally to actuate or read those boards; it is **not** forwarded over RF. The *results* (status, telemetry) can still be surfaced and logged through F´ events/telemetry on the ground — but the RPC bytes themselves never leave the satellite.
+**Channel 2 is the one students most often misread.** It is *Remote Procedure Call* traffic between the F´ drivers on the Pi and the subsystem hardware that hangs off the **satellite Teensy's** local bus (e.g. the PDU/EPS over the Teensy's I²C/serial). The Teensy **consumes** channel 2 locally to actuate or read those boards; it is **not** forwarded over RF. The *results* (status, telemetry) can still be surfaced and logged through F´ events/telemetry on the ground — but the RPC bytes themselves never leave the satellite.
 
 Only channels `0` and `1` cross the RF link (`rf_count = 2`); the satellite UART carries all three (`satellite_count = 3`).
 
@@ -212,7 +212,7 @@ laptop fprime-gds  (ground USB serial port 0)
 -> F Prime ComCcsds  (and back the same way for uplink)
 
 Channel 1: payload/science product bytes
-F Prime PayloadDownlinkManager
+F Prime PayloadDownlinkApp
 -> UartChannelMux
 -> satellite Teensy
 -> RFM23BP RF link
@@ -222,7 +222,7 @@ F Prime PayloadDownlinkManager
 -> ground-station/neutron2-payload-viewer
 
 Channel 2: satellite-local subsystem RPC (stays on the satellite)
-F Prime adapter (e.g. EpsAdapter_Artemis)
+F Prime driver (e.g. EpsDriver_Artemis)
 -> UartChannelMux
 -> satellite Teensy
 -> local board bus (PDU/EPS, GPS, ...)
@@ -279,7 +279,7 @@ To make GDS comms work over this radio at all, we deliberately shrank and thrott
 - ⚠️ Sustained full telemetry drops packets and produces APID sequence-count warnings.
 - ❌ Large, byte-perfect file downlink over the CCSDS path is not realistic on this radio — that is what the channel 1 sidecar (now) and a better modem / SatNOGS board (later) are for.
 
-This is exactly why the architecture treats **RFM23BP as the MVP comms path and a SatNOGS-style board as the real-downlink future path**, and why the Manager → Service → Adapter split matters: moving to a better radio is a new `CommsAdapter_*`, not a mission rewrite.
+This is exactly why the architecture treats **RFM23BP as the MVP comms path and a SatNOGS-style board as the real-downlink future path**, and why the Application -> Manager -> Driver split matters: moving to a better radio is a new `CommsDriver_*`, not a mission rewrite.
 
 ## RF MVP Config Overrides (a landmine to know about)
 
@@ -302,43 +302,43 @@ The values that actually changed from the framework default:
 
 ## End-to-End Example: Tracing a Command and a Telemetry Channel
 
-This section ties the component tiers and the transport together using **real instance and port names** from [`ArtemisRpiTeensyDeployment/Top/topology.fpp`](../ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Top/topology.fpp). Follow `missionManager.PING` down and back.
+This section ties the component tiers and the transport together using **real instance and port names** from [`ArtemisRpiTeensyDeployment/Top/topology.fpp`](../ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Top/topology.fpp). Follow `missionApp.PING` down and back.
 
 ### Uplink: a command from the ground to a handler
 
-1. Operator runs `fprime-cli command-send ...missionManager.PING --arguments 4245` (or clicks it in the GDS GUI). `fprime-gds` serializes it as a CCSDS **TC** byte stream out ground USB serial port 0.
+1. Operator runs `fprime-cli command-send ...missionApp.PING --arguments 4245` (or clicks it in the GDS GUI). `fprime-gds` serializes it as a CCSDS **TC** byte stream out ground USB serial port 0.
 2. Ground Teensy → RF (channel 0) → satellite Teensy → Pi `/dev/serial0`.
 3. On the Pi, `comDriver` (the `LinuxUartDriver`) receives bytes: `comDriver.$recv -> uartChannelMux.drvReceiveIn`.
 4. `uartChannelMux` de-multiplexes channel 0 and passes CCSDS bytes up: `uartChannelMux.ccsdsRecvOut -> ComCcsds.comStub.drvReceiveIn`.
 5. `ComCcsds` deframes the CCSDS frame/packet and routes the command: `ComCcsds.fprimeRouter.commandOut -> CdhCore.cmdDisp.seqCmdBuff`.
-6. `CdhCore.cmdDisp` (the command dispatcher) matches the opcode and invokes the owning component — here `missionManager`'s `PING` command input port.
-7. `MissionManager::PING_cmdHandler` runs: bumps `PingCount`, emits the `Pong` event, and replies `cmdResponse_out(... OK)`.
+6. `CdhCore.cmdDisp` (the command dispatcher) matches the opcode and invokes the owning component — here `missionApp`'s `PING` command input port.
+7. `MissionApp::PING_cmdHandler` runs: bumps `PingCount`, emits the `Pong` event, and replies `cmdResponse_out(... OK)`.
 8. The response returns: `CdhCore.cmdDisp.seqCmdStatus -> ComCcsds.fprimeRouter.cmdResponseIn`, is framed, and goes back down channel 0 to GDS as the command ack.
 
 ### Downlink: a telemetry channel to the ground
 
-1. A component writes a channel — e.g. `MissionManager::writeTelemetry()` calls the autocoded `tlmWrite_PingCount(...)`.
+1. A component writes a channel — e.g. `MissionApp::writeTelemetry()` calls the autocoded `tlmWrite_PingCount(...)`.
 2. The telemetry path aggregates channels and emits CCSDS packets: `CdhCore.tlmSend.PktSend -> ComCcsds.comQueue.comPacketQueueIn[TELEMETRY]`.
 3. `ComCcsds` frames it into a (128-byte) CCSDS **TM** frame: `ComCcsds.comStub.drvSendOut -> uartChannelMux.ccsdsSendIn`.
 4. `uartChannelMux` wraps it on channel 0 and pushes it to the UART: `uartChannelMux.drvSendOut -> comDriver.$send`.
 5. Pi → satellite Teensy → RF (segmented into 3 packets) → ground Teensy → ground USB serial port 0 → `fprime-gds` validates the frame CRC and updates the channel in the GUI.
 
-Events follow the same downlink path via `CdhCore.events`; ground debug serial port 1 can watch the raw link counters while this happens. The **science/payload path is different** — it never touches `ComCcsds`/CCSDS; it uses `PayloadDownlinkManager` → channel 1 (see [Transport Architecture](#transport-architecture-one-uart-three-channels)).
+Events follow the same downlink path via `CdhCore.events`; ground debug serial port 1 can watch the raw link counters while this happens. The **science/payload path is different** — it never touches `ComCcsds`/CCSDS; it uses `PayloadDownlinkApp` → channel 1 (see [Transport Architecture](#transport-architecture-one-uart-three-channels)).
 
 ### Where the HAL fits in this trace
 
-`PING` is a pure C&DH loop, so it never touches an adapter. A *subsystem* command does: e.g. an EPS rail command flows `cmdDisp → epsService` (the stable contract) `→ epsAdapterArtemis` (PDU v2 over channel 2 RPC) `→ uartChannelMux` (channel 2) `→ satellite Teensy → PDU`. Same uplink plumbing; the service and adapter tiers are where subsystem-specific behavior lives. Swapping hardware swaps only the adapter.
+`PING` is a pure C&DH loop, so it never touches an driver. A *subsystem* command does: e.g. an EPS rail command flows `cmdDisp → epsManager` (the stable contract) `→ epsDriverArtemis` (PDU v2 over channel 2 RPC) `→ uartChannelMux` (channel 2) `→ satellite Teensy → PDU`. Same uplink plumbing; the service and driver tiers are where subsystem-specific behavior lives. Swapping hardware swaps only the driver.
 
 ## Key Demo Interfaces
 
 These are the interfaces that matter most for the current demo architecture.
 
 - `OBC <-> EPS`
-  - control and telemetry relationship using the Artemis EPS/PDU baseline (channel 2 RPC → `EpsAdapter_Artemis`)
+  - control and telemetry relationship using the Artemis EPS/PDU baseline (channel 2 RPC → `EpsDriver_Artemis`)
 - `OBC <-> ADCS`
   - simulated through `D2S2`
 - `OBC <-> PLD`
-  - payload data / command path to the Neutron 2 payload simulator now, and the loaned Neutron 2 development payload board later (same `PayloadService` contract, swapped adapter)
+  - payload data / command path to the Neutron 2 payload simulator now, and the loaned Neutron 2 development payload board later (same `PayloadManager` contract, swapped driver)
 - `OBC <-> COMMS`
   - `RFM23BP` now, `SatNOGS` if and when validated
 - `OBC <-> GPS`
@@ -365,10 +365,10 @@ The ground side for this demo should be understood as a separate but essential p
 
 Conceptually, D2S2 answers one question for the demo: **"are we approaching our orbit / contact window?"** That timing signal is what drives the mission story:
 
-- D2S2 pass/timing information → a story service informs `MissionManager` → the spacecraft moves between **Base Mode** and **Science Collection** at the right moments.
+- D2S2 pass/timing information → a story service informs `MissionApp` → the spacecraft moves between **Base Mode** and **Science Collection** at the right moments.
 - On the ground, the same D2S2 pass-planning inputs define the **mock contact window** used to stage the live demo: when the "pass" starts and how long it lasts.
 
-In other words, D2S2 lets us rehearse the *timing* of a real pass — approach, contact, collect, downlink — without being in space. It is a simulator (orange in the [system diagram](#high-level-architecture)), not flight hardware; a real spacecraft would derive the same timing from GPS/ephemeris and ADCS. In the current topology the actual mission-mode transitions are emitted by `scienceManager` and `commsManager` into `missionManager.modeUpdateIn`; D2S2 provides the pass-timing premise those transitions are staged around.
+In other words, D2S2 lets us rehearse the *timing* of a real pass — approach, contact, collect, downlink — without being in space. It is a simulator (orange in the [system diagram](#high-level-architecture)), not flight hardware; a real spacecraft would derive the same timing from GPS/ephemeris and ADCS. In the current topology the actual mission-mode transitions are emitted by `scienceApp` and `commsApp` into `missionApp.modeUpdateIn`; D2S2 provides the pass-timing premise those transitions are staged around.
 
 ## Demo Operating Story
 
@@ -392,14 +392,14 @@ For the MVP path, F Prime does not use stock GDS file downlink for the science p
 
 Runtime ownership is:
 
-- `PayloadAdapter_NeutronSim` (or a future real Neutron 2 payload-board adapter) produces payload bytes.
-- `StorageService` tracks the latest science product.
-- `CommsManager.REQUEST_SCIENCE_DOWNLINK` requests downlink of the latest stored product.
-- `PayloadDownlinkManager` packetizes the product, sends channel 1 packets, and emits progress events.
+- `PayloadDriver_NeutronSim` (or a future real Neutron 2 payload-board driver) produces payload bytes.
+- `StorageManager` tracks the latest science product.
+- `CommsApp.REQUEST_SCIENCE_DOWNLINK` requests downlink of the latest stored product.
+- `PayloadDownlinkApp` packetizes the product, sends channel 1 packets, and emits progress events.
 - `tools/payload_receiver.py` reconstructs bytes, requests retries for missing packets, verifies CRC, and writes the output file.
 - The payload viewer opens the reconstructed file and parses neutron-count CSV content.
 
-`PayloadDownlinkManager.PayloadDownlinkProgress` emits nominal `10%` increments from `10` through `90`. `PayloadDownlinkComplete` and `CommsManager.DownlinkFinished` are the completion signals. For tiny payloads, several progress events may appear at the same timestamp or packet count because one payload packet can represent more than ten percent of the file.
+`PayloadDownlinkApp.PayloadDownlinkProgress` emits nominal `10%` increments from `10` through `90`. `PayloadDownlinkComplete` and `CommsApp.DownlinkFinished` are the completion signals. For tiny payloads, several progress events may appear at the same timestamp or packet count because one payload packet can represent more than ten percent of the file.
 
 ## Development Assumptions
 
@@ -414,15 +414,15 @@ Unless the user says otherwise, agents should assume the following:
 
 ## EPS/PDU Boundary Note
 
-For the MVP, the EPS service and Artemis PDU adapter boundary is intentionally pragmatic. The new PDU is planned for F Prime-driven testing, so some PDU-shaped diagnostics and rail semantics may appear near the EPS service while the ICD settles.
+For the MVP, the EPS service and Artemis PDU driver boundary is intentionally pragmatic. The new PDU is planned for F Prime-driven testing, so some PDU-shaped diagnostics and rail semantics may appear near the EPS service while the ICD settles.
 
 This is acceptable when:
 
 - mission operators see generic EPS/rail commands rather than raw PDU packets
-- `EpsAdapter_Artemis` owns the PDU v2 protocol and channel 2 local RPC details
+- `EpsDriver_Artemis` owns the PDU v2 protocol and channel 2 local RPC details
 - HIL notes clearly say when behavior is real PDU response versus local emulation
 
-If the PDU grows into a fuller subsystem contract, refactor the adapter/service split then. The MVP priority is an understandable, reproducible EPS path that can exercise the real PDU through F Prime. See the [PDU Protocol ICD](#reference-documents) for the wire format.
+If the PDU grows into a fuller subsystem contract, refactor the driver/service split then. The MVP priority is an understandable, reproducible EPS path that can exercise the real PDU through F Prime. See the [PDU Protocol ICD](#reference-documents) for the wire format.
 
 ## Reference Documents
 
@@ -432,7 +432,7 @@ Authoritative hardware/protocol references that back this architecture. Read the
 - **RFM23BP datasheet** — radio packet/FIFO limits that drive the RF segmentation budget. The repo file [`docs/rfm23bp/RFM23BP_datasheet.txt`](rfm23bp/RFM23BP_datasheet.txt) is a **local copy**; the online datasheet is: <https://www.hoperf.com/uploads/RFM23BPdatasheet_1695351296.pdf>
 - **RF chain root-cause analysis** — why the RF link forced the 128-byte frame and telemetry throttling decisions: [`docs/archive/RF_CHAIN_ROOT_CAUSE_ANALYSIS_2026-04-24.md`](archive/RF_CHAIN_ROOT_CAUSE_ANALYSIS_2026-04-24.md)
 - **iOBC 1 MB NOR fit & boot architecture** — why the 1 MB NOR is the bootloader budget (not the F´ app budget), the SD→SDRAM boot chain, and the recommended golden-image/A-B failover memory map: [`docs/archive/IOBC_NOR_FIT_AND_BOOT_ARCHITECTURE.md`](archive/IOBC_NOR_FIT_AND_BOOT_ARCHITECTURE.md)
-- **Artemis PDU Protocol ICD** — PDU v2 command/telemetry wire format used by `EpsAdapter_Artemis` over channel 2: [`external/artemis-pdu/PDU_PROTOCOL_ICD.md`](../external/artemis-pdu/PDU_PROTOCOL_ICD.md) ([PDF](../external/artemis-pdu/docs/PDU_PROTOCOL_ICD.pdf))
+- **Artemis PDU Protocol ICD** — PDU v2 command/telemetry wire format used by `EpsDriver_Artemis` over channel 2: [`external/artemis-pdu/PDU_PROTOCOL_ICD.md`](../external/artemis-pdu/PDU_PROTOCOL_ICD.md) ([PDF](../external/artemis-pdu/docs/PDU_PROTOCOL_ICD.pdf))
 - **Proven baremetal reference** — the prior working Artemis flight software we refactored away from: [`external/epscorc3m`](../external/epscorc3m)
 - **Transport constants (source of truth)** — channel IDs, frame wrapper, RF/payload sizing: [`config/transport_constants.json`](../config/transport_constants.json)
 
@@ -451,11 +451,11 @@ In particular, do not:
 
 - confuse Artemis hardware with the full Neutron 2 production architecture
 - assume every subsystem in the architecture already has matching implementation in the repo
-- put hardware/protocol details into managers or services — that belongs in an adapter
+- put hardware/protocol details into managers or services — that belongs in an driver
 - optimize for generic CubeSat completeness when the actual goal is the Neutron 2 demo story on Artemis prototype hardware
 
 Instead, use this rule:
 
 - preserve the Neutron 2 subsystem architecture in planning and naming
-- keep the Manager → Service → Adapter layering intact so hardware can be swapped later
+- keep the Application -> Manager -> Driver layering intact so hardware can be swapped later
 - use Artemis hardware reality as the implementation constraint for the current demo

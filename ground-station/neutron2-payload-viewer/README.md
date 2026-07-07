@@ -124,7 +124,7 @@ persistent cleanup reminder, and when the folder gets crowded it shows a stronge
 cleanup notice. For simulator products on the RPi, operators can use:
 
 ```text
-StorageService.REMOVE_OLD_DATASETS(confirm=1)
+StorageManager.REMOVE_OLD_DATASETS(confirm=1)
 ```
 
 For ground laptop files, archive or delete old payloads from the capture directory

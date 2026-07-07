@@ -97,6 +97,26 @@ Additional investigation findings (2026-07-06):
 - Verified non-issues: first boot without PrmDb.dat is non-fatal (both demo runs prove it);
   new event strings fit com buffers; no leftover local-demo/profile refs anywhere.
 
+## Post-freeze follow-on: native App-Man-Drv rename (2026-07-06, worker K)
+
+- Sprint work committed (5 atomic commits `76ec9ca..2008b18`) and pushed to
+  `origin/neutron2-develop` BEFORE the rename, so the refactor is separable history.
+- Worker K renamed all 19 HAL components to native F´ nomenclature (old Manager→`*App`,
+  Service→`*Manager`, Adapter→`*Driver_<Hw>`), instances, topology, GDS command strings in
+  tools, and the active docs; `docs/hardening-reports/K-appmandriver-rename.md` has the table.
+- **Incident:** K's blanket Adapter→Driver sed leaked into the two GENERATED Python venvs
+  (`fprime-venv`, `.cross-venv-linux`), corrupting pip's vendored `requests`
+  (`HTTPAdapter`→`HTTPDriver`). Git-tracked code, submodules, and `external/` verified
+  untouched. Orchestrator rebuilt `fprime-venv` from the exact dist-info pin set
+  (fprime-gds==4.2.1, fprime-tools==4.2.1, fprime-fpp==3.2.0, 70 pkgs) and deleted
+  `.cross-venv-linux` for the cross script to regenerate. Lesson for future rename tasks:
+  exclude `*venv*` and all generated trees from sed sweeps EXPLICITLY.
+- Post-rename, clean-venv verification: full `validate_local.sh` PASS (incl. automated demo)
+  AND ARMv6 cross-compile PASS (Tag_CPU_arch v6 attributes verified). One straggler fixed by
+  orchestrator: old names in `ArtemisTeensy_N2_Baremetal/docs/uart_contract_mvp.md`.
+- Rendered diagrams (`docs/*.png`/`.svg` from `.mmd`) still show old instance names —
+  regenerate when convenient (K updated the `.mmd` sources).
+
 ## SPRINT COMPLETE — 2026-07-06
 
 All tasks landed (A–H incl. post-sprint adversarial review + fixes); final `tools/validate_local.sh`

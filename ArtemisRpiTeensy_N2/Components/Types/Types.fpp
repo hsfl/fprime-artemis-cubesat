@@ -17,7 +17,7 @@ module Components {
     FAIL = 3
   }
 
-  @ EPS adapter request opcode. Specific adapters map these logical requests to hardware protocols.
+  @ EPS driver request opcode. Specific drivers map these logical requests to hardware protocols.
   enum EpsRequest : U8 {
     GET_SUMMARY_STATUS = 0
     PING = 1
@@ -29,7 +29,7 @@ module Components {
     SET_CHARGER_STATE = 7
   }
 
-  @ Mission collection request from MissionManager to ScienceManager.
+  @ Mission collection request from MissionApp to ScienceApp.
   port CollectionRequest(delaySeconds: U32)
 
   @ Payload capture request in seconds.
@@ -43,7 +43,7 @@ module Components {
     TEST = 3
   }
 
-  @ Science product descriptor handoff. The source path is an adapter-owned local file path.
+  @ Science product descriptor handoff. The source path is a driver-owned local file path.
   port ScienceProductDescriptor(
     productId: U32,
     productBytes: U32,
@@ -90,10 +90,10 @@ module Components {
     lastError: U32
   )
 
-  @ EPS command from mission-facing EPS service to hardware adapter.
+  @ EPS command from mission-facing EPS manager to hardware driver.
   port EpsCommand(epsRequest: EpsRequest, outputId: U8, commandedState: U8, durationMs: U16)
 
-  @ EPS status from hardware adapter to mission-facing EPS service.
+  @ EPS status from hardware driver to mission-facing EPS manager.
   port EpsStatus(
     healthState: HealthState,
     linkState: U8,

@@ -13,7 +13,7 @@ Background: [`SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHITECTURE.md) (component model 
 | **Telemetry (channel)** | spacecraft → ground | a gauge / measured value | sampled over time |
 | **Parameter** | ground ↔ spacecraft | a persistent setting | until changed |
 
-All four are **declared in FPP** inside a component, and F´ autocodes the boilerplate (serialization, dispatch, dictionary entries) so GDS knows about them automatically. The examples below are from [`Components/MissionManager/MissionManager.fpp`](../ArtemisRpiTeensy_N2/Components/MissionManager/MissionManager.fpp).
+All four are **declared in FPP** inside a component, and F´ autocodes the boilerplate (serialization, dispatch, dictionary entries) so GDS knows about them automatically. The examples below are from [`Components/MissionApp/MissionApp.fpp`](../ArtemisRpiTeensy_N2/Components/MissionApp/MissionApp.fpp).
 
 ## 1. Commands — ground tells the spacecraft to do something
 
@@ -30,7 +30,7 @@ async command SCHEDULE_COLLECTION(delaySeconds: U32)
 You implement a handler (autocoded signature):
 
 ```cpp
-void MissionManager::PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 token) {
+void MissionApp::PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 token) {
     this->m_pingCount += 1;
     this->log_ACTIVITY_LO_Pong(token, this->m_pingCount);   // emit an event
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);  // ALWAYS reply
@@ -43,7 +43,7 @@ void MissionManager::PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 token)
 In GDS: the command appears in the commanding panel; send it with the GUI or:
 
 ```bash
-fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.PING --arguments 4245
+fprime-cli command-send ArtemisRpiTeensyDeployment.missionApp.PING --arguments 4245
 ```
 
 ## 2. Events — the spacecraft's log
@@ -52,7 +52,7 @@ Declare with a severity and a printf-style format:
 
 ```
 @ Ping response event
-event Pong(token: U32, count: U32) severity activity low format "MissionManager pong token={} count={}"
+event Pong(token: U32, count: U32) severity activity low format "MissionApp pong token={} count={}"
 
 @ Invalid service-requested mission mode transition rejected
 event ModeUpdateRejected(requested: Components.MissionMode, current: Components.MissionMode, detail: U32) \
@@ -88,7 +88,7 @@ telemetry ModeHeartbeat: U32
 Write from C++ (autocoded `tlmWrite_<Name>`):
 
 ```cpp
-void MissionManager::writeTelemetry() {
+void MissionApp::writeTelemetry() {
     this->tlmWrite_CurrentMode(this->m_currentMode);
     this->tlmWrite_PingCount(this->m_pingCount);
     this->tlmWrite_ModeHeartbeat(this->m_modeHeartbeat);
@@ -101,7 +101,7 @@ void MissionManager::writeTelemetry() {
 
 ## 4. Parameters — persistent settings
 
-MissionManager has none, so here is the general shape. A parameter is a value the ground can set that the spacecraft remembers:
+MissionApp has none, so here is the general shape. A parameter is a value the ground can set that the spacecraft remembers:
 
 ```
 @ Example: capture duration the science manager uses
@@ -120,7 +120,7 @@ U32 dur = this->paramGet_CaptureDurationSeconds(valid);
 
 ## How this maps to adding a feature
 
-Working within the [Manager → Service → Adapter](SYSTEM_ARCHITECTURE.md#flight-software-architecture-manager--service--adapter-hal) model:
+Working within the [Application -> Manager -> Driver](SYSTEM_ARCHITECTURE.md#flight-software-architecture-application--manager--driver-hal) model:
 
 - Want the operator to trigger something? → add a **command** to a manager/service.
 - Want the operator to *see* something happened? → add an **event**.
@@ -132,5 +132,5 @@ After editing the `.fpp`, rebuild (`fprime-util build`) to regenerate the dictio
 ## Where to go deeper
 
 - F´ local docs (matched to the checked-out submodule version): `ArtemisRpiTeensy_N2/lib/fprime/docs` — see `user-manual/overview/04-cmd-evt-chn-prm.md`.
-- This repo's component examples under `ArtemisRpiTeensy_N2/Components/` (e.g. `MissionManager`, `ScienceManager`, `EpsService`).
+- This repo's component examples under `ArtemisRpiTeensy_N2/Components/` (e.g. `MissionApp`, `ScienceApp`, `EpsManager`).
 - Student starter guidance: [`STUDENT_COMPONENT_STARTERS.md`](STUDENT_COMPONENT_STARTERS.md).
