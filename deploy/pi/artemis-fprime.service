@@ -1,0 +1,36 @@
+# Neutron 2 F Prime Raspberry Pi service.
+# Install on the Pi as /etc/systemd/system/artemis-fprime.service.
+# The binary and dictionary are managed as symlinks under /home/pi/artemis/current
+# so a new release can be installed without changing this unit file.
+
+[Unit]
+Description=Neutron 2 Artemis F Prime deployment
+# Wait for local filesystems so /home/pi/artemis/current exists before launch.
+After=local-fs.target
+# The deployment can run without network, but starting after network-online keeps
+# boot logs and SSH-based bench checks easier to reason about during demos.
+After=network-online.target
+Wants=network-online.target
+# Fail clearly if the release symlink has not been installed yet.
+ConditionPathExists=/home/pi/artemis/current/ArtemisRpiTeensyDeployment
+
+[Service]
+Type=simple
+# Current bench Pi docs use the default Raspberry Pi account.
+User=pi
+Group=pi
+# Keep relative paths, future dictionary references, and generated files anchored
+# next to the current release binary and dictionary symlinks.
+WorkingDirectory=/home/pi/artemis/current
+# /dev/serial0 is the Pi-to-satellite-Teensy UART used by the Artemis OBC bench.
+ExecStart=/home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0
+# Demo hardening: bring the flight app back if it crashes or exits unexpectedly.
+Restart=always
+RestartSec=5
+# Send stdout/stderr to journald so students can use journalctl for triage.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=artemis-fprime
+
+[Install]
+WantedBy=multi-user.target
