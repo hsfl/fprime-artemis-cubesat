@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "link_protocol.hpp"
+#include "wdt_guard.hpp"
 
 RelayUartRf::RelayUartRf(Stream& linkIo,
                          Rf23Driver& rfDriver,
@@ -63,6 +64,7 @@ void RelayUartRf::begin() {
 }
 
 void RelayUartRf::poll() {
+  wdt_guard::feed();
   if (m_config.enableUartToRf) {
     while (m_linkIo.available() > 0) {
       const uint8_t b = static_cast<uint8_t>(m_linkIo.read());
@@ -72,6 +74,7 @@ void RelayUartRf::poll() {
       } else {
         processRawUartByte(b, m_config.defaultUartChannel);
       }
+      wdt_guard::feed();
     }
 
     if (!m_config.uartInputFramed) {
@@ -84,6 +87,7 @@ void RelayUartRf::poll() {
       const uint8_t b = static_cast<uint8_t>(m_payloadIo->read());
       m_counters.uartRxBytes += 1;
       processRawUartByte(b, link_protocol::CHANNEL_PAYLOAD);
+      wdt_guard::feed();
     }
     flushPayloadUartIfStale();
   }
@@ -420,7 +424,9 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
     }
 
     if (segIdx + 1 < segCount) {
+      wdt_guard::feed();
       delay(link_protocol::RF_INTER_SEGMENT_GAP_MS);
+      wdt_guard::feed();
     }
   }
 
@@ -437,6 +443,7 @@ bool RelayUartRf::sendRfPacketWithAck(const uint8_t* packet,
                                       uint8_t msgId,
                                       uint8_t segIdx) {
   for (uint8_t attempt = 0; attempt <= link_protocol::RF_ACK_RETRIES; attempt++) {
+    wdt_guard::feed();
     if (!m_rf.send(packet, packetLen)) {
       return false;
     }
@@ -456,6 +463,7 @@ bool RelayUartRf::waitForAck(uint8_t channel, uint8_t msgId, uint8_t segIdx) {
   uint8_t rfBuffer[link_protocol::RF_PACKET_MAX_LEN] = {0};
 
   while ((millis() - startMs) < link_protocol::RF_ACK_TIMEOUT_MS) {
+    wdt_guard::feed();
     while (m_rf.available()) {
       uint8_t rfLen = static_cast<uint8_t>(sizeof(rfBuffer));
       if (m_rf.recv(rfBuffer, &rfLen) && rfLen > 0) {
@@ -465,6 +473,7 @@ bool RelayUartRf::waitForAck(uint8_t channel, uint8_t msgId, uint8_t segIdx) {
         }
         m_counters.rfRxPackets += 1;
         processRfSegment(rfBuffer, rfLen);
+        wdt_guard::feed();
       }
     }
   }

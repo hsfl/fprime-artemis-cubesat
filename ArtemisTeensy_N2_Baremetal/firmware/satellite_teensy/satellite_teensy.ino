@@ -5,6 +5,7 @@
 #include "src/pdu_proxy.hpp"
 #include "src/relay_uart_rf.hpp"
 #include "src/rf23_driver.hpp"
+#include "src/wdt_guard.hpp"
 
 // Teensy 4.1 + RF23BP pinout from EPSCOR demo baseline.
 static constexpr int RADIO_CS = 38;
@@ -139,12 +140,18 @@ void debugPrintCounters(const char* prefix) {
 
 void setup() {
   Serial.begin(DEBUG_UART_BAUD);
+  const bool watchdogReset = wdt_guard::consumeWatchdogResetFlag();
 
   // Match EPSCOR payload baseline: assert Pi power-enable at boot.
   pinMode(RPI_ENABLE_PIN, OUTPUT);
   digitalWrite(RPI_ENABLE_PIN, HIGH);
   pinMode(TEENSY_LED_PIN, OUTPUT);
   digitalWrite(TEENSY_LED_PIN, HIGH);
+  if (watchdogReset) {
+    Serial.println("[ArtemisTeensy] watchdog reset detected");
+  }
+  wdt_guard::begin();
+  Serial.println("[ArtemisTeensy] hardware watchdog armed (12s)");
   Serial.println("[ArtemisTeensy] RPI power enable asserted (pin 36 HIGH)");
   Serial.println("[ArtemisTeensy] LED asserted (pin 13 HIGH)");
 
@@ -166,6 +173,7 @@ void loop() {
   static uint32_t lastDebugStatusMs = 0;
 
   g_relay.poll();
+  wdt_guard::feed();
 
   const uint32_t now = millis();
   updateRadioTrafficLed(now);

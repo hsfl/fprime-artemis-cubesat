@@ -3,6 +3,7 @@
 #include "src/link_counters.hpp"
 #include "src/relay_uart_rf.hpp"
 #include "src/rf23_driver.hpp"
+#include "src/wdt_guard.hpp"
 
 // Teensy 4.1 + RF23BP pinout from EPSCOR demo baseline.
 static constexpr int RADIO_CS = 38;
@@ -148,6 +149,8 @@ void debugPrintCounters(const char* prefix) {
 }
 
 void setup() {
+  const bool watchdogReset = wdt_guard::consumeWatchdogResetFlag();
+
   // USB serial to laptop GDS.
   Serial.begin(USB_UART_BAUD);
 #if ARTEMIS_HAS_DEBUG_USB
@@ -158,6 +161,7 @@ void setup() {
 #endif
   pinMode(TEENSY_LED_PIN, OUTPUT);
   digitalWrite(TEENSY_LED_PIN, HIGH);
+  wdt_guard::begin();
 
   // Keep USB clean: no banner prints on this stream.
   const bool radioOk = g_rfDriver.begin();
@@ -165,6 +169,10 @@ void setup() {
 
 #if ARTEMIS_HAS_DEBUG_USB
   delay(200);
+  if (watchdogReset) {
+    SerialUSB1.println("[GDS_Teensy] watchdog reset detected");
+  }
+  SerialUSB1.println("[GDS_Teensy] hardware watchdog armed (12s)");
   SerialUSB1.println("[GDS_Teensy] debug port ready; data port is USB Serial");
   if (radioOk) {
     SerialUSB1.println("[GDS_Teensy] RF23 bridge ready (raw GDS channel + payload channel + RF segmentation)");
@@ -183,6 +191,7 @@ void loop() {
 #endif
 
   g_relay.poll();
+  wdt_guard::feed();
   updateRadioTrafficLed(millis());
 
 #if ARTEMIS_HAS_DEBUG_USB
