@@ -166,7 +166,7 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   Regenerate with `python3 tools/generate_transport_constants.py`; do not
   hand-edit `LinkCfg.hpp` or either Teensy `link_protocol.hpp`.
 - `./tools/validate_local.sh` checks generated headers, transport drift, local
-  Python tests, F Prime local-demo build, component UTs, and the automated
+  Python tests, F Prime unified-topology build, component UTs, and the automated
   local demo sequence.
 - `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` is the software triage map for
   GDS/dictionary, mission services, payload capture, storage, channel 1
@@ -501,7 +501,7 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   - pass 1: `83` bytes, SHA-256 `eabd0e9f1ddbff5224617affffc72d187b53bffe5bf83426714f5f5359157165`, viewer rows `6`
   - pass 2: `83` bytes, SHA-256 `b4cd40d47c8b7cef9fc407ab7013fdc8831e2d31651e322921592e7f97fe792c`, viewer rows `6`
   - pass 3: `83` bytes, SHA-256 `00a1f94fa03521938757e4e6f85fde76b81ca82fe04099f74fa0c177ca7ccfa7`, viewer rows `6`
-- HIL pass criteria now live in `docs/RF_MVP_DEMO_RUNBOOK.md`:
+- HIL pass criteria now live in `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`:
   - GDS receives live F Prime events/telemetry
   - payload receiver writes the reconstructed file
   - local payload hash matches Pi `/tmp/neutron_payload_captures/latest_payload.bin`
@@ -901,7 +901,7 @@ section:
   - `ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/RfMvpConfig/FpConstants.fpp`
 - Restored `ArtemisRpiTeensy_N2/lib/fprime/default/config` to upstream defaults so the F Prime submodule is clean.
 - Added runbook:
-  - `docs/RF_MVP_DEMO_RUNBOOK.md`
+  - `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`
 - Added smoke script:
   - `ArtemisRpiTeensy_N2/tools/demo_rf_mvp_smoke.sh`
 - Validation after cleanup:
@@ -953,8 +953,6 @@ Still open (not demo-blocking):
 - Define one standard service-to-adapter port-pair template, modeled on the
   payload path, so the thin subsystems (ADCS, GPS, thermal, comms) get a
   consistent contract when they are built out.
-- Add focused unit tests for `ScienceManager` and `CommsManager` decision logic
-  (`MissionManager` mode validation is already covered).
 - Optional hardening: wire `tools/check_transport_constants.py` into CI or a
   pre-commit hook so generated transport headers cannot drift from the manifest.
 
@@ -975,3 +973,49 @@ Still open (not demo-blocking):
   (our channel-2 Teensy-RPC adapters are bespoke for a hardware reason), and
   check `fprime-sensors` for ready-made device managers before writing a new
   `*Adapter_*`.
+
+## Demo Hardening Sprint (2026-07-06)
+
+- Sprint source of truth: `docs/HARDENING_SPRINT_2026-07-06_SCRATCH.md`;
+  worker evidence lives under `docs/hardening-reports/`.
+- Scheduling hardening landed: `SCHEDULE_COLLECTION` rejects invalid delay
+  bounds, capture duration is bounded/defaulted to 30 s, `SCIENCE_CAPTURE` is
+  one-shot, and `CANCEL_COLLECTION` plus `ENTER_BASE_MODE` clear pending
+  collection state.
+- Command-driven mode changes now go through the same validation path as port
+  mode updates; command rejection responses stay operator-visible.
+- Race fix landed after adversarial review: state-mutating `ScienceManager`,
+  `MissionManager`, and `CommsManager` inputs are async so cancel/mode/status
+  updates are serialized on each active component queue.
+- Throttles are split intentionally: storm-capable warning/event paths remain
+  throttled, but human command rejections are unthrottled in GDS command
+  history/events.
+- Topology de-fork landed: the old demo-only topology fork is removed; local
+  emulation and HIL now build/run the same unified topology with
+  RF-budget-sensitive periodic loops still off.
+- `ScienceManager.CAPTURE_DURATION_SECONDS` is now a `PrmDb`-backed parameter;
+  `CONFIGURE_CAPTURE_DURATION` remains a volatile runtime override, while
+  durable default changes use `PRM_SET` then `PRM_SAVE`.
+- FPP ops pass landed: selected events have throttles, many stable channels use
+  `update on change`, and comms RSSI channels have low warning limits.
+- Both Teensy bridge sketches now arm a 12 s hardware watchdog, feed it through
+  normal relay paths, and print boot lines for normal arming or WDT-caused
+  reset detection.
+- `tools/validate_local.sh` now includes a shared Teensy drift guard before
+  build/cache work, including the shared watchdog helper.
+- Pi provisioning was versioned under `deploy/pi/` with
+  `artemis-fprime.service`, `Restart=always`, release-symlink layout guidance,
+  and `ln.service` migration notes.
+- Operator docs were updated for cancel behavior, command bounds, parameter
+  persistence, `PrmDb.dat` runtime-location caveat, watchdog boot logs, and the
+  moved downlink-reliability research doc.
+- Validation evidence: final orchestrator-run `./tools/validate_local.sh`
+  passed end-to-end on the unified topology, including drift checks, generated
+  transport checks, Python tests, F Prime build, 6/6 component UT executables,
+  and the automated local demo CSV path.
+- Validation evidence: both Arduino CLI builds passed for satellite and ground
+  Teensy firmware after watchdog changes.
+- Still open for the next bench/target session: ARMv6 cross-build verification
+  of the hardened code, HIL RF smoke on the unified topology, deliberate WDT
+  trip test, live `ln` to `artemis-fprime.service` migration, and `PRM_SAVE`
+  round-trip on the Pi filesystem/release-symlink layout.

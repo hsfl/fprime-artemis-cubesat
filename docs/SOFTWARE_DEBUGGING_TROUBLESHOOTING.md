@@ -9,7 +9,7 @@ software triage map for:
 
 - `docs/MISSION_OPS_QUICK_RUN.md`
 - `docs/NEUTRON2_LOCAL_EMULATION_RUNBOOK.md`
-- `docs/RF_MVP_DEMO_RUNBOOK.md`
+- `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`
 
 ## First Split
 
@@ -25,7 +25,7 @@ If this fails, fix software before blaming the bench.
 If this passes but HIL fails, the likely issue is one of:
 
 - selected serial port
-- stale dictionary or wrong topology profile
+- stale dictionary or a binary built before the latest topology change
 - Pi deployment/service state
 - satellite Teensy firmware state
 - RF link or debug counters

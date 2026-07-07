@@ -7,7 +7,7 @@ actual detailed procedures in the focused runbooks under `docs/`.
 
 Use these docs first:
 
-- `docs/RF_MVP_DEMO_RUNBOOK.md`
+- `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`
   - real hardware-in-the-loop demo
   - Raspberry Pi -> satellite Teensy -> RFM23BP -> ground Teensy -> laptop
   - use this for team rehearsal and demo proof
@@ -50,7 +50,7 @@ For the current team demo, the important proof is:
 6. Pi journal shows `PayloadDownlinkProgress`, `PayloadDownlinkComplete`, and
    `CommsManager.DownlinkFinished`.
 
-The maintained procedure for this is `docs/RF_MVP_DEMO_RUNBOOK.md`.
+The maintained procedure for this is `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`.
 
 ## Important architecture note
 

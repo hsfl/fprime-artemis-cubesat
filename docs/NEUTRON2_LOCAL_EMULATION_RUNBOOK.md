@@ -52,7 +52,7 @@ cd ~/Developer/fprime-artemis-cubesat
 ```
 
 That script checks generated transport headers, local Python tests, the F Prime
-native `local-demo` build, component unit tests, and the automated demo
+native unified-topology build, component unit tests, and the automated demo
 sequence. Use the manual steps below when you need to inspect or operate the
 demo interactively.
 
@@ -62,7 +62,7 @@ demo interactively.
 cd ~/Developer/fprime-artemis-cubesat
 . ArtemisRpiTeensy_N2/fprime-venv/bin/activate
 cd ArtemisRpiTeensy_N2
-fprime-util generate -f -DNEUTRON2_TOPOLOGY_PROFILE=local-demo
+fprime-util generate -f
 fprime-util build
 ```
 
@@ -72,7 +72,7 @@ fprime-util build
 cd ~/fprime-artemis-cubesat
 . ArtemisRpiTeensy_N2/fprime-venv/bin/activate
 cd ArtemisRpiTeensy_N2
-fprime-util generate -f -DNEUTRON2_TOPOLOGY_PROFILE=local-demo
+fprime-util generate -f
 fprime-util build
 ```
 
@@ -81,15 +81,13 @@ Expected result:
 - build completes without errors
 - dictionary exists under `build-artifacts/.../ArtemisRpiTeensyDeployment/dict/`
 
-Topology profile note:
+Topology note:
 
-- `hil` is the default merge-safe profile.
-- `local-demo` enables the laptop demo rate-group path.
-- `./tools/run_neutron2_local_demo.sh` builds `local-demo` automatically.
+- `Top/topology.fpp` is the single topology for laptop rehearsal and HIL.
+- `./tools/run_neutron2_local_demo.sh` builds that unified topology automatically.
 - `./tools/validate_local.sh` is the standard no-HIL regression command before
   handing local changes to mission ops or another student.
-- after local demo work, rebuild with `-DNEUTRON2_TOPOLOGY_PROFILE=hil` before
-  treating the binary as the HIL/default image.
+- rehearse locally and demo on hardware with the same connection graph.
 
 ## Start The Manual Demo
 

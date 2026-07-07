@@ -58,51 +58,34 @@ fprime-util generate -f
 fprime-util build
 ```
 
-## Topology Profile Toggle
+## Topology
 
-The deployment has two build-time topology profiles:
+The deployment has one topology:
 
-- `hil` is the default merge-safe profile.
-- `local-demo` enables the laptop demo rate-group path for `ScienceManager`,
-  `SoHManager`, `PayloadService`, and `StorageService`, while keeping noisy
-  subsystem polling off.
+- `Top/topology.fpp` is used for both laptop rehearsal and HIL.
+- Periodic service loops that are too chatty for the RF MVP stay disabled in
+  that one topology; command-triggered demo paths remain active.
 
-Switching profiles requires regenerate + rebuild.
+Regenerate + rebuild after topology changes.
 
-Default/HIL build:
+Build:
 
 macOS:
 ```bash
 cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-fprime-util generate -f -DNEUTRON2_TOPOLOGY_PROFILE=hil
+fprime-util generate -f
 fprime-util build
 ```
 
 Windows WSL2:
 ```bash
 cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-fprime-util generate -f -DNEUTRON2_TOPOLOGY_PROFILE=hil
+fprime-util generate -f
 fprime-util build
 ```
 
-Local-demo build:
-
-macOS:
-```bash
-cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-fprime-util generate -f -DNEUTRON2_TOPOLOGY_PROFILE=local-demo
-fprime-util build
-```
-
-Windows WSL2:
-```bash
-cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-fprime-util generate -f -DNEUTRON2_TOPOLOGY_PROFILE=local-demo
-fprime-util build
-```
-
-The Neutron 2 demo launcher does this local-demo generate/build automatically
-unless `--skip-build` is supplied.
+The Neutron 2 demo launcher does this generate/build automatically unless
+`--skip-build` is supplied.
 
 ## One-command launch
 

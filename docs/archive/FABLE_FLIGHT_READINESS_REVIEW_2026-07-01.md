@@ -243,7 +243,7 @@ Direct hits so we don't build from scratch:
 ## Part 6 — GDS Integration of the Custom Payload Path
 
 The repo's own research
-([`archive/FPRIME_FILE_DOWNLINK_RELIABILITY_RESEARCH.md`](archive/FPRIME_FILE_DOWNLINK_RELIABILITY_RESEARCH.md))
+([`../FPRIME_FILE_DOWNLINK_RELIABILITY_RESEARCH.md`](../FPRIME_FILE_DOWNLINK_RELIABILITY_RESEARCH.md))
 is high quality and its conclusion is **endorsed and independently verified**: keep the channel-1
 ARQ sidecar for FSR; do not move science bytes to stock `FileDownlink` over this radio.
 
@@ -334,4 +334,4 @@ appear in the stock GDS File Downlink tab."
 
 *Session artifacts: findings verified on branch `neutron_2` @ working tree of 2026-07-01, F´
 v4.2.1 (submodule `a750219`), fprime-gds 4.2.1. Companion research doc:
-[`archive/FPRIME_FILE_DOWNLINK_RELIABILITY_RESEARCH.md`](archive/FPRIME_FILE_DOWNLINK_RELIABILITY_RESEARCH.md).*
+[`../FPRIME_FILE_DOWNLINK_RELIABILITY_RESEARCH.md`](../FPRIME_FILE_DOWNLINK_RELIABILITY_RESEARCH.md).*

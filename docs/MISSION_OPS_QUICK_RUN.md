@@ -15,7 +15,7 @@ cd ~/Developer/fprime-artemis-cubesat
 ```
 
 This validates the generated transport headers, local Python tooling, F Prime
-native build, component unit tests, and the automated `local-demo` sequence.
+native build, component unit tests, and the automated local demo sequence.
 
 For a faster smoke run after a known-good build:
 
@@ -51,11 +51,23 @@ HIL validates what laptop rehearsal cannot:
 
 ## Ground Rules
 
-- `hil` is the default hardware profile.
-- `local-demo` is for laptop/RPi rehearsal with simulated payload behavior.
+- `Top/topology.fpp` is the one topology for laptop rehearsal and HIL.
 - Services own mission commands, state, telemetry, and events.
 - Adapters own board protocols, buses, radios, packet formats, and hardware quirks.
-- Missing hardware gets a simulator adapter selected by topology profile, not a runtime command.
+- Missing hardware gets a simulator adapter wired in the topology, not a runtime command.
+- Scheduled collection accepts delays from `1..300` seconds; capture duration
+  accepts `1..120` seconds and defaults to `30`.
+- Invalid operator command values return `VALIDATION_ERROR` and emit a
+  rejection warning event every time; storm-capable link/downlink warnings
+  remain throttled for RF event budget.
+- `missionManager.CANCEL_COLLECTION` cancels a pending collection; so does
+  `missionManager.ENTER_BASE_MODE`.
+- `scienceManager.SCIENCE_CAPTURE(durationSeconds)` is one-shot and does not
+  change the default duration. Persist a new default with
+  `PRM_SET scienceManager.CAPTURE_DURATION_SECONDS`, then `PRM_SAVE`.
+- F Prime writes `PrmDb.dat` in the runtime working directory.
+- Teensy bench serial logs print `watchdog reset detected` after a WDT-caused
+  reset; `hardware watchdog armed (12s)` is the normal boot arming line.
 
 ## Top Failure Checks
 
@@ -64,7 +76,7 @@ HIL validates what laptop rehearsal cannot:
    python3 tools/generate_transport_constants.py --check
    python3 tools/check_transport_constants.py
    ```
-2. If GDS opens but commands do not work, verify the selected profile and dictionary.
+2. If GDS opens but commands do not work, verify the dictionary matches the current build.
 3. If payload progress appears but no file is viewable, check `tools/payload_receiver.py` or the local capture directory.
 4. If HIL channel 2 fails, treat it as EPS/PDU adapter or satellite-Teensy-local RPC work first, not as a ground RF problem.
 5. If PDU behavior changes while the ICD settles, update `EpsAdapter_Artemis` first. Refactor `EpsService` only if the mission-facing EPS command contract becomes misleading.

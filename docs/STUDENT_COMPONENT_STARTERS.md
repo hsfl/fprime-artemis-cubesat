@@ -10,8 +10,8 @@ The service is a hardware-agnostic contract derived from mission needs. Every
 hardware-specific fact lives below it, in exactly one adapter.
 
 If this holds, the team develops on simulated or Artemis prototype hardware now
-and swaps adapters later without rewriting mission logic. Adapter selection is a
-build-time topology choice, not a runtime command.
+and swaps adapters later without rewriting mission logic. Adapter wiring is a
+topology choice, not a runtime command.
 
 Related docs:
 
@@ -22,12 +22,11 @@ Related docs:
 - `docs/archive/SERVICE_ADAPTER_ARCHITECTURE_REVIEW_2026-06-25.md` is the
   historical record of the cleanup that established these rules.
 
-Topology profiles:
+Topology rule:
 
-| Profile | Use when | What it means |
-| --- | --- | --- |
-| `hil` | FlatSat/bench or target hardware path | Merge-safe default; keeps noisy local demo loops off. |
-| `local-demo` | Laptop/RPi local emulation without bench access | Enables the scheduled science path and visible service loops for local testing. |
+- `Top/topology.fpp` is the single topology for laptop rehearsal and HIL.
+- Keep RF-budget-sensitive periodic service loops disabled unless they are
+  needed by the actual demo path.
 
 ## Current Components
 
@@ -61,7 +60,7 @@ Topology profiles:
   `RFM23`, `D2S2`) in service ports or telemetry names.
 - Adapters own board protocols, buses, radios, packet formats, timing quirks, and hardware constants.
 - Mission talks to services, not directly to payload boards, radios, EPS/PDU firmware, or ADCS hardware.
-- One adapter per subsystem, wired at build time. Missing hardware gets a simulator adapter selected by topology profile, not a runtime command.
+- One adapter per subsystem, wired in the topology. Missing hardware gets a simulator adapter in the topology, not a runtime command.
 - New subsystem work copies the payload pattern first: `PayloadService` plus `PayloadAdapter_NeutronSim`.
 - Design the service from mission operations first. The adapter can wait for hardware; the contract should not.
 
@@ -133,7 +132,7 @@ and the viewer parses the result.
 
 This is the no-HIL command to run before handing work to another student or
 mission ops. It checks generated transport headers, local Python tests, the
-`local-demo` native build, component unit tests, and the automated local demo
+native unified-topology build, component unit tests, and the automated local demo
 sequence.
 
 Transport constants are generated from:

@@ -10,6 +10,7 @@ This runbook shows:
 - live F Prime event and telemetry downlink over RF
 - optional RFM23BP RSSI status through F Prime
 - operator-scheduled 30 second payload collection
+- cancel or base-mode recovery for pending collections
 - channel 1 payload reconstruction on the ground laptop
 - payload viewer review of the reconstructed `.bin` file
 - local payload hash matching the Pi latest payload file
@@ -24,6 +25,7 @@ Validated:
 - Base Mode command path
 - SOH snapshot command path
 - 30 second scheduled collection path
+- pending-collection cancel path
 - simulated Neutron 2 payload capture on the Pi
 - storage/downlink handoff events
 - channel 1 payload transfer through the RF bridge
@@ -37,6 +39,14 @@ Not validated:
 - real Neutron payload board data source
 - production SatNOGS radio behavior
 - full mission timing
+
+## RF Budget Note
+
+The HIL demo and laptop rehearsal use the same topology. The scheduled science
+path, payload downlink manager, transport service, command/telemetry framework,
+and EPS adapter ticks are active. The higher-volume periodic `sohManager.run`,
+`payloadService.run`, `storageService.run`, and `commsManager.run` loops remain
+disabled; use command-triggered SOH/storage/link checks for demo visibility.
 
 ## Output Files
 
@@ -205,6 +215,25 @@ Useful channels:
 - `commsManager.RssiDbm`
 - `payloadDownlinkManager.ProgressPercent`
 
+Command bounds:
+
+- `missionManager.SCHEDULE_COLLECTION delaySeconds` accepts `1..300`.
+- capture duration accepts `1..120`; default is `30`.
+- invalid values return `VALIDATION_ERROR` and emit a rejection warning event.
+- operator command-rejection events are always visible; storm-capable
+  link/downlink warnings remain throttled for RF event budget.
+- `scienceManager.SCIENCE_CAPTURE(durationSeconds)` is one-shot; it does not
+  change the default capture duration for later scheduled collections.
+
+Persistent capture duration:
+
+- Set `scienceManager.CAPTURE_DURATION_SECONDS` with `PRM_SET`, then persist it
+  with `PRM_SAVE`.
+- The parameter file is `PrmDb.dat` in the deployment runtime working
+  directory.
+- `scienceManager.CONFIGURE_CAPTURE_DURATION` is a volatile runtime override;
+  use `PRM_SET` + `PRM_SAVE` when the default should survive restart.
+
 ## Start Payload Receiver
 
 Terminal 2: start this before requesting science downlink.
@@ -359,6 +388,8 @@ Expected event:
 MissionManager.ModeChanged mode=BASE
 ```
 
+`ENTER_BASE_MODE` also cancels any pending scheduled collection.
+
 ### 2. SOH Snapshot
 
 ```bash
@@ -391,6 +422,9 @@ Comms link RSSI ping state=2 rssi=-5dBm
 ```
 
 ### 4. Configure 30 Second Capture
+
+The default capture duration is already `30` seconds. This command is useful
+when you want to make the current runtime setting explicit before a demo.
 
 ```bash
 fprime-cli command-send ArtemisRpiTeensyDeployment.scienceManager.CONFIGURE_CAPTURE_DURATION \
@@ -430,6 +464,19 @@ StorageService.ScienceStored productCount=<n> size=<n>
 
 For a 30 second simulated capture, expect about 30 CSV rows and a few hundred
 bytes.
+
+Optional cancel before the delay expires:
+
+```bash
+fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.CANCEL_COLLECTION \
+  --dictionary "$DICT" --log-level-gds ERROR
+```
+
+Expected behavior:
+
+- pending collection is cleared
+- mode returns to `BASE`
+- no science capture starts from the canceled schedule
 
 ### 6. Report Latest Dataset
 
@@ -549,6 +596,14 @@ Unexpected sequence count received. Packets may have been dropped.
 
 That means the RF/GDS stream is lossy, not necessarily dead. Confirm the command
 or event reached the Pi before retrying.
+
+Teensy watchdog boot lines are visible on bench serial logs:
+
+- `[ArtemisTeensy] hardware watchdog armed (12s)` or
+  `[GDS_Teensy] hardware watchdog armed (12s)` is normal boot arming.
+- `[ArtemisTeensy] watchdog reset detected` or
+  `[GDS_Teensy] watchdog reset detected` means the previous reset was caused by
+  the hardware watchdog.
 
 ## Fast Troubleshooting
 

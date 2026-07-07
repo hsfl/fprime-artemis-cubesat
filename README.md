@@ -148,7 +148,7 @@ Frozen artifact set:
 Validation gates for this release:
 
 - `tools/validate_local.sh`
-- HIL/default-profile F Prime generate/build
+- unified-topology F Prime generate/build
 - Pi Zero W ARMv6 cross-build or existing artifact verification
 - satellite Teensy Arduino CLI build
 - ground Teensy Arduino CLI build
@@ -194,9 +194,13 @@ start from that branch, not from the frozen release branch/tag. The
 release baseline, so it is the right place for follow-on work without changing
 the proven demo snapshot.
 
-The next work should focus on operational hardening rather than changing the
-proven demo baseline: scheduling/cancel edge cases, cheap CI gates,
-watchdog/restart behavior, topology de-forking, stale-doc cleanup, and
+The 2026-07-06 hardening sprint addressed the laptop-verifiable operational
+gaps without changing the frozen release baseline: scheduling/cancel edge
+cases, topology de-forking, watchdog/restart prep, drift checks, parameter
+persistence, FPP ops hygiene, Pi provisioning docs, and stale-doc cleanup.
+Remaining follow-up should focus on target/bench proof: ARMv6 cross-build
+verification of the hardened code, HIL RF smoke on the unified topology, WDT
+trip testing, Pi service migration, `PRM_SAVE` round-trip behavior, and
 PDU/payload hardware integration.
 
 ## F Prime Version
@@ -347,6 +351,10 @@ Standard no-HIL local regression before handoff:
 ./tools/validate_local.sh
 ```
 
+This gate now covers shared Teensy drift checks, generated transport checks,
+Python tests, unified-topology F Prime build, component UTs, and the automated
+local demo sequence.
+
 ## Hardware-in-the-loop (HIL) testing
 
 The build-and-run section above is laptop emulation only. For the **full demo on
@@ -375,7 +383,9 @@ Not implemented yet:
 - RF/GDS cleanup to reduce APID sequence-count warnings on lossy channel 0 traffic.
 - Broader EPS/PDU telemetry beyond the current command/status path, plus thermal, GPS, and IMU telemetry + command adapter behavior.
 - Full uplink robustness (deterministic packet-boundary extraction and retry/ack strategy).
-- Full demo-state orchestration polish for `Base Mode` -> scheduled collection -> science downlink.
+- Target/bench proof for the 2026-07-06 hardening sprint: ARMv6 cross-build
+  verification, HIL RF smoke on the unified topology, WDT trip test, Pi service
+  migration, and `PRM_SAVE` round-trip behavior on the Pi filesystem.
 - Longer-term ground-side presentation beyond the current `fprime-gds` plus
   Neutron 2 payload viewer MVP.
 
