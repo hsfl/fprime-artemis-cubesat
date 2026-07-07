@@ -43,7 +43,7 @@ Not validated:
 ## RF Budget Note
 
 The HIL demo and laptop rehearsal use the same topology. The scheduled science
-path, payload downlink manager, transport service, command/telemetry framework,
+path, payload downlink app, transport manager, command/telemetry framework,
 and EPS driver ticks are active. The higher-volume periodic `sohApp.run`,
 `payloadManager.run`, `storageManager.run`, and `commsApp.run` loops remain
 disabled; use command-triggered SOH/storage/link checks for demo visibility.
@@ -607,7 +607,7 @@ Teensy watchdog boot lines are visible on bench serial logs:
 
 ## Fast Troubleshooting
 
-For a broader layer map across GDS, F Prime services, UART mux, RF, payload
+For a broader layer map across GDS, F Prime applications/managers, UART mux, RF, payload
 receiver, viewer, and EPS/PDU channel 2, see
 `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md`.
 

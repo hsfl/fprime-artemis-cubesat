@@ -269,8 +269,8 @@ Payload proof is separate:
 
 ### EPS/PDU Commands Fail Or Timeout
 
-EPS/PDU MVP behavior intentionally crosses the EPS service and Artemis PDU
-driver boundary while the new PDU is being tested through F Prime.
+EPS/PDU MVP behavior intentionally crosses the `EpsManager` and
+`EpsDriver_Artemis` boundary while the new PDU is being tested through F Prime.
 
 Debug in this order:
 

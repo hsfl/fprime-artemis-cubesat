@@ -327,7 +327,7 @@ Events follow the same downlink path via `CdhCore.events`; ground debug serial p
 
 ### Where the HAL fits in this trace
 
-`PING` is a pure C&DH loop, so it never touches an driver. A *subsystem* command does: e.g. an EPS rail command flows `cmdDisp → epsManager` (the stable contract) `→ epsDriverArtemis` (PDU v2 over channel 2 RPC) `→ uartChannelMux` (channel 2) `→ satellite Teensy → PDU`. Same uplink plumbing; the service and driver tiers are where subsystem-specific behavior lives. Swapping hardware swaps only the driver.
+`PING` is a pure C&DH loop, so it never touches a driver. A *subsystem* command does: e.g. an EPS rail command flows `cmdDisp → epsManager` (the stable contract) `→ epsDriverArtemis` (PDU v2 over channel 2 RPC) `→ uartChannelMux` (channel 2) `→ satellite Teensy → PDU`. Same uplink plumbing; the manager and driver tiers are where subsystem-specific behavior lives. Swapping hardware swaps only the driver.
 
 ## Key Demo Interfaces
 
@@ -414,7 +414,7 @@ Unless the user says otherwise, agents should assume the following:
 
 ## EPS/PDU Boundary Note
 
-For the MVP, the EPS service and Artemis PDU driver boundary is intentionally pragmatic. The new PDU is planned for F Prime-driven testing, so some PDU-shaped diagnostics and rail semantics may appear near the EPS service while the ICD settles.
+For the MVP, the `EpsManager` and `EpsDriver_Artemis` boundary is intentionally pragmatic. The new PDU is planned for F Prime-driven testing, so some PDU-shaped diagnostics and rail semantics may appear near the EPS manager while the ICD settles.
 
 This is acceptable when:
 
@@ -422,7 +422,7 @@ This is acceptable when:
 - `EpsDriver_Artemis` owns the PDU v2 protocol and channel 2 local RPC details
 - HIL notes clearly say when behavior is real PDU response versus local emulation
 
-If the PDU grows into a fuller subsystem contract, refactor the driver/service split then. The MVP priority is an understandable, reproducible EPS path that can exercise the real PDU through F Prime. See the [PDU Protocol ICD](#reference-documents) for the wire format.
+If the PDU grows into a fuller subsystem contract, refactor the manager/driver split then. The MVP priority is an understandable, reproducible EPS path that can exercise the real PDU through F Prime. See the [PDU Protocol ICD](#reference-documents) for the wire format.
 
 ## Reference Documents
 
@@ -451,7 +451,7 @@ In particular, do not:
 
 - confuse Artemis hardware with the full Neutron 2 production architecture
 - assume every subsystem in the architecture already has matching implementation in the repo
-- put hardware/protocol details into managers or services — that belongs in an driver
+- put hardware/protocol details into applications or managers — that belongs in a driver
 - optimize for generic CubeSat completeness when the actual goal is the Neutron 2 demo story on Artemis prototype hardware
 
 Instead, use this rule:

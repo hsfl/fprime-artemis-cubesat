@@ -54,7 +54,7 @@ Declare with a severity and a printf-style format:
 @ Ping response event
 event Pong(token: U32, count: U32) severity activity low format "MissionApp pong token={} count={}"
 
-@ Invalid service-requested mission mode transition rejected
+@ Invalid app-requested mission mode transition rejected
 event ModeUpdateRejected(requested: Components.MissionMode, current: Components.MissionMode, detail: U32) \
     severity warning low format "Rejected mode update requested={} current={} detail={}"
 ```
@@ -122,7 +122,7 @@ U32 dur = this->paramGet_CaptureDurationSeconds(valid);
 
 Working within the [Application -> Manager -> Driver](SYSTEM_ARCHITECTURE.md#flight-software-architecture-application--manager--driver-hal) model:
 
-- Want the operator to trigger something? → add a **command** to a manager/service.
+- Want the operator to trigger something? → add a **command** to an application or manager.
 - Want the operator to *see* something happened? → add an **event**.
 - Want the operator to *monitor* a value? → add a **telemetry channel**.
 - Want a remembered, ground-settable knob? → add a **parameter**.

@@ -1,12 +1,12 @@
 # Student Component Starters
 
-BLUF: service components stay mission-facing and hardware-agnostic. Hardware details belong in drivers.
+BLUF: manager components stay mission-facing and hardware-agnostic. Hardware details belong in drivers.
 
 Target handoff: v1.0 June 30, 2026
 
 ## Architecture Invariant
 
-The service is a hardware-agnostic contract derived from mission needs. Every
+The manager is a hardware-agnostic contract derived from mission needs. Every
 hardware-specific fact lives below it, in exactly one driver.
 
 If this holds, the team develops on simulated or Artemis prototype hardware now
@@ -25,12 +25,12 @@ Related docs:
 Topology rule:
 
 - `Top/topology.fpp` is the single topology for laptop rehearsal and HIL.
-- Keep RF-budget-sensitive periodic service loops disabled unless they are
+- Keep RF-budget-sensitive periodic manager loops disabled unless they are
   needed by the actual demo path.
 
 ## Current Components
 
-| Subsystem | Owners | Service | Driver / hardware layer | Status |
+| Subsystem | Owners | Application / Manager | Driver / hardware layer | Status |
 | --- | --- | --- | --- | --- |
 | Payload | Aris, Piper, Kenoi | `PayloadManager` | `PayloadDriver_NeutronSim` now, real payload driver later | Wired |
 | Mission | Aris, Kenoi | `MissionApp` | None | Wired |
@@ -57,7 +57,7 @@ Topology rule:
 
 - Managers own commands, state, telemetry, events, and CONOP-level behavior, in
   hardware-agnostic terms. Avoid vendor/board/bus/radio/protocol words (`PDU`,
-  `RFM23`, `D2S2`) in service ports or telemetry names.
+  `RFM23`, `D2S2`) in manager ports or telemetry names.
 - Drivers own board protocols, buses, radios, packet formats, timing quirks, and hardware constants.
 - Applications talk to managers, not directly to payload boards, radios, EPS/PDU firmware, or ADCS hardware.
 - One driver per subsystem, wired in the topology. Missing hardware gets a simulator driver in the topology, not a runtime command.
@@ -161,6 +161,6 @@ Current rule:
 - `EpsManager` stays mission-facing and speaks generic EPS/rail commands.
 - `EpsDriver_Artemis` owns PDU v2 protocol mapping, channel 2 local RPC, and
   hardware response interpretation.
-- If the PDU contract grows enough that the service boundary becomes confusing,
-  create a fuller driver or refactor/cull the service surface later. Do not
+- If the PDU contract grows enough that the manager boundary becomes confusing,
+  create a fuller driver or refactor/cull the manager surface later. Do not
   block the MVP on making the boundary perfect today.

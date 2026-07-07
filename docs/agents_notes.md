@@ -46,15 +46,18 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - MVP custom components in deployment:
   - `Components/LinkCfg`
   - `Components/UartChannelMux`
-  - `Components/PayloadDownlinkManager`
-  - `Components/TeensyTransportService`
-  - `Components/MissionManager`
-  - `Components/PayloadService`
-  - `Components/PayloadAdapter_NeutronSim`
-  - `Components/ThermalService`
-  - `Components/EpsService`
-  - `Components/EpsAdapter_Artemis`
-  - `Components/CommsAdapter_TeensyRfm23`
+  - `Components/PayloadDownlinkApp`
+  - `Components/TeensyTransportManager`
+  - `Components/MissionApp`
+  - `Components/ScienceApp`
+  - `Components/SoHApp`
+  - `Components/CommsApp`
+  - `Components/PayloadManager`
+  - `Components/PayloadDriver_NeutronSim`
+  - `Components/ThermalManager`
+  - `Components/EpsManager`
+  - `Components/EpsDriver_Artemis`
+  - `Components/CommsDriver_TeensyRfm23`
 - Build status:
   - `fprime-util generate -f` passes
   - `fprime-util build` passes
@@ -128,10 +131,10 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - Confirmed smoke evidence:
   - Pi service runs `/home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0`
   - `fprime-gds` over ground channel 0 can command the Pi through RF
-  - `missionManager.PING` dispatches, logs `MissionManager pong`, and completes
+  - `missionApp.PING` dispatches, logs `MissionApp pong`, and completes
   - retried full-flow commands can reach the Pi over the lossy RF path
   - Pi-side demo flow can produce and store a simulated science payload
-  - Pi-side `PayloadDownlinkManager` can report `PayloadDownlinkComplete` and
+  - Pi-side `PayloadDownlinkApp` can report `PayloadDownlinkComplete` and
     `DownlinkFinished` for the staged payload
   - `payload_receiver.py` reconstructs channel-1 RF payload files on the laptop
 - RF looks significantly healthier than the earlier wedged state, but it is
@@ -333,18 +336,18 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   - `2 queues * 32 entries * (220-byte payload + 2-byte length) ~= 14.2 KB`
 - Teensy 4.1 remains within RAM headroom with this profile (validated by successful builds), but do not increase queue depth blindly without re-checking RAM report.
 
-## Adapter MVP Update (2026-04-15)
+## Driver MVP Update (2026-04-15)
 
 ### What changed
 
-- `GpsAdapter_Artemis` is no longer a static `+400` key offset stub.
+- `GpsDriver_Artemis` is no longer a static `+400` key offset stub.
   - It now models a deterministic GPS fix state machine and emits:
     - `FixState` (`0=no-fix`, `1=acquiring`, `2=2D`, `3=3D`)
     - `SatellitesTracked`
     - `FixQualityScore`
     - `RequestCount`
-  - `statusOut` now reports normalized fix-state keys (`0..3`), so `GpsService.GpsFixState` is chart-friendly.
-- `CommsAdapter_TeensyRfm23` is no longer a static `+500` key offset stub.
+  - `statusOut` now reports normalized fix-state keys (`0..3`), so `GpsManager.GpsFixState` is chart-friendly.
+- `CommsDriver_TeensyRfm23` is no longer a static `+500` key offset stub.
   - It now models deterministic RFM23 link behavior and emits:
     - `LinkState` (`0=down`, `1=acquiring`, `2=locked`, `3=degraded`)
     - `RssiDbm`
@@ -353,8 +356,8 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
     - `RfTxDrops`
     - `RequestCount`
   - Output port behavior is now split intentionally:
-    - `statusOut[0]` -> normalized link state for `CommsManager`
-    - `statusOut[1]` -> `RfRxPackets` snapshot for `TeensyTransportService` downlink counter visibility
+    - `statusOut[0]` -> normalized link state for `CommsApp`
+    - `statusOut[1]` -> `RfRxPackets` snapshot for `TeensyTransportManager` downlink counter visibility
 
 ### Why this was needed
 
@@ -364,24 +367,24 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 ### Demo-visible channels/events to watch
 
 - GPS:
-  - `ArtemisRpiTeensyDeployment.gpsAdapterArtemis.FixState`
-  - `ArtemisRpiTeensyDeployment.gpsAdapterArtemis.SatellitesTracked`
-  - `ArtemisRpiTeensyDeployment.gpsAdapterArtemis.FixQualityScore`
-  - `ArtemisRpiTeensyDeployment.gpsService.GpsFixState`
-  - Event: `ArtemisRpiTeensyDeployment.gpsAdapterArtemis.FixStateChanged`
+  - `ArtemisRpiTeensyDeployment.gpsDriverArtemis.FixState`
+  - `ArtemisRpiTeensyDeployment.gpsDriverArtemis.SatellitesTracked`
+  - `ArtemisRpiTeensyDeployment.gpsDriverArtemis.FixQualityScore`
+  - `ArtemisRpiTeensyDeployment.gpsManager.GpsFixState`
+  - Event: `ArtemisRpiTeensyDeployment.gpsDriverArtemis.FixStateChanged`
 - Comms:
-  - `ArtemisRpiTeensyDeployment.commsAdapterTeensyRfm23.LinkState`
-  - `ArtemisRpiTeensyDeployment.commsAdapterTeensyRfm23.RssiDbm`
-  - `ArtemisRpiTeensyDeployment.commsAdapterTeensyRfm23.RfRxPackets`
-  - `ArtemisRpiTeensyDeployment.commsManager.LinkState`
-  - `ArtemisRpiTeensyDeployment.teensyTransportService.DownlinkFrames`
-  - Event: `ArtemisRpiTeensyDeployment.commsAdapterTeensyRfm23.LinkStateChanged`
+  - `ArtemisRpiTeensyDeployment.commsDriverTeensyRfm23.LinkState`
+  - `ArtemisRpiTeensyDeployment.commsDriverTeensyRfm23.RssiDbm`
+  - `ArtemisRpiTeensyDeployment.commsDriverTeensyRfm23.RfRxPackets`
+  - `ArtemisRpiTeensyDeployment.commsApp.LinkState`
+  - `ArtemisRpiTeensyDeployment.teensyTransportManager.DownlinkFrames`
+  - Event: `ArtemisRpiTeensyDeployment.commsDriverTeensyRfm23.LinkStateChanged`
 
 ### Remaining gap (important)
 
-- These two adapters are now mission-meaningful but still model-driven.
+- These two drivers are now mission-meaningful but still model-driven.
 - They are not yet parsing live hardware status lines (for example Teensy `#LINK_STATUS` response fields or raw GPS sentence/fix data).
-- Full hardware-backed adapter ingestion remains a follow-on item after the MVP demo chain is stable.
+- Full hardware-backed driver ingestion remains a follow-on item after the MVP demo chain is stable.
 
 ## Architecture Decision (2026-02-26)
 
@@ -433,8 +436,8 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - Design rule:
   - Keep channel 2 bounded request/response traffic only.
   - Do not send channel 2 over RF.
-  - Do not let mission components know about UART/RF framing; keep it behind adapters and `UartChannelMux`.
-  - If future hardware adds a real sideband bus, it can replace channel 2 behind the EPS/PDU adapter without changing `EpsService`.
+  - Do not let mission components know about UART/RF framing; keep it behind drivers and `UartChannelMux`.
+  - If future hardware adds a real sideband bus, it can replace channel 2 behind `EpsDriver_Artemis` without changing `EpsManager`.
 
 ## Future Subsystem Submodule Plan (2026-06-15)
 
@@ -470,10 +473,10 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - 2026-06-18: `./tools/run_neutron2_local_demo.sh --gui-port 5070 --viewer-port 8070 --delay 3 --capture-seconds 3 --exit-after-sequence --skip-build`
   passed with the channelized local emulator.
 - Verified runtime events included:
-  - `PayloadAdapter_NeutronSim.CaptureComplete`
-  - `StorageService.ScienceStored`
-  - `PayloadDownlinkManager.PayloadDownlinkComplete`
-  - `CommsManager.DownlinkFinished`
+  - `PayloadDriver_NeutronSim.CaptureComplete`
+  - `StorageManager.ScienceStored`
+  - `PayloadDownlinkApp.PayloadDownlinkComplete`
+  - `CommsApp.DownlinkFinished`
 - The local emulator observed channel 1 payload bytes and kept them off the GDS channel 0 stream.
 - `run_neutron2_local_demo.sh` always starts GDS and the Neutron 2 payload viewer, then opens/refocuses the viewer after verified downlink completion.
 - 2026-06-23 HIL proved the shortened demo story over the real RPi UART,
@@ -519,8 +522,8 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 2. HIL-test channel 2 against a real PDU through satellite Teensy `Serial1`.
 3. Reduce RF/GDS APID sequence-count warnings without regressing the payload retry path.
 4. Keep rehearsing the neutron simulator product path through the selected HIL downlink/review path:
-   - `PayloadAdapter_NeutronSim` stages the latest capture for downlink.
-   - `REQUEST_SCIENCE_DOWNLINK` starts the channel 1 `PayloadDownlinkManager` transfer.
+   - `PayloadDriver_NeutronSim` stages the latest capture for downlink.
+   - `REQUEST_SCIENCE_DOWNLINK` starts the channel 1 `PayloadDownlinkApp` transfer.
    - Use `tools/payload_receiver.py` on the ground channel 1 serial endpoint for HIL payload reconstruction.
 5. Keep `fprime-gds` as the live MVP demo ground interface and treat `Yamcs` as the post-MVP target presentation/analysis stack.
 6. Add minimal segment ACK/retry for RF relay reliability after the channelized CCSDS path is stable.
@@ -911,16 +914,16 @@ section:
   - `ArtemisTeensy_N2_Baremetal/tools/arduino-cli/build.sh` passed
   - live RF smoke passed with token `4320`
 
-## EPS/PDU adapter notes
+## EPS/PDU driver notes
 
-- F Prime now exposes the mission-facing EPS/PDU path through `EpsService` and `EpsAdapter_Artemis`.
+- F Prime now exposes the mission-facing EPS/PDU path through `EpsManager` and `EpsDriver_Artemis`.
 - The EPS/PDU boundary is intentionally pragmatic for MVP because the new PDU
   is planned for F Prime-driven testing. Keep generic mission-facing commands
-  in `EpsService`, keep PDU v2 protocol details in `EpsAdapter_Artemis`, and
-  refactor/cull the service surface later if the proven hardware contract
+  in `EpsManager`, keep PDU v2 protocol details in `EpsDriver_Artemis`, and
+  refactor/cull the manager surface later if the proven hardware contract
   demands a sharper split.
-- The adapter uses the PDU v2 framed UART protocol from `external/artemis-pdu/src/pdu_protocol_v2.h`.
-- The adapter no longer opens a separate Pi serial device for the PDU.
+- The driver uses the PDU v2 framed UART protocol from `external/artemis-pdu/src/pdu_protocol_v2.h`.
+- The driver no longer opens a separate Pi serial device for the PDU.
 - EPS/PDU requests are wrapped as channel 2 local RPC packets over the existing Pi <-> satellite Teensy UART.
 - Satellite `PduProxy` writes the inner PDU v2 frame to `Serial1` at 9600 baud and returns the PDU response over channel 2.
 - Channel 2 local status values are `0=OK`, `1=BAD_REQUEST`, `2=BUSY`, `3=TIMEOUT`, `4=TARGET_ERROR`.
@@ -936,13 +939,13 @@ section:
   - `SET_CHARGER_STATE` with `confirm=1`
 - Missing confirmation or unsafe/out-of-range PDU command arguments return
   `VALIDATION_ERROR` in GDS command history and emit `EpsCommandRejected`.
-- Burn-wire and torque-coil commands are intentionally not exposed through `EpsService` yet; add those only with a dedicated HIL/runbook procedure.
+- Burn-wire and torque-coil commands are intentionally not exposed through `EpsManager` yet; add those only with a dedicated HIL/runbook procedure.
 
-## Service/Adapter Cleanup — Open Follow-ups (2026-06-25)
+## Service/Adapter Cleanup — Open Follow-ups (2026-06-25, historical vocabulary)
 
-The service/adapter architecture cleanup landed: de-leaked `EpsService`,
-`ScienceProductDescriptor` threaded end to end, active/async payload adapter,
-`MissionManager`-validated mode transitions with a unit test, and
+The service/adapter architecture cleanup landed before the App-Man-Drv rename:
+de-leaked `EpsService`, `ScienceProductDescriptor` threaded end to end,
+active/async payload adapter, `MissionManager`-validated mode transitions with a unit test, and
 single-source transport constants (`config/transport_constants.json` +
 `tools/generate_transport_constants.py` + `tools/check_transport_constants.py`).
 Durable rules now live in `docs/STUDENT_COMPONENT_STARTERS.md`; the dated review
@@ -959,20 +962,19 @@ Still open (not demo-blocking):
 ## Architecture ↔ F´ App-Man-Drv Cross-Reference (2026-06-29)
 
 - `docs/SYSTEM_ARCHITECTURE.md` now states explicitly that our
-  Manager → Service → Adapter "HAL" **is** F´'s built-in
+  Application → Manager → Driver HAL **is** F´'s built-in
   Application-Manager-Driver (App-Man-Drv) pattern, not a bespoke invention.
   See the new "This is F´'s Application-Manager-Driver pattern" subsection
   (mapping table + vocabulary warning) and the "Implementation notes"
-  subsection under the Manager → Service → Adapter section.
-- Term mapping: our **Manager** = F´ **Application**, our **Service** = F´
-  **Manager** (device manager), our **Adapter** = F´ **Driver**. The word
-  "Manager" points at opposite ends of the stack in the two vocabularies —
-  watch for this when reading upstream F´ tutorials / `fprime-sensors`.
+  subsection under the Application → Manager → Driver section.
+- Current active naming uses F´ vocabulary directly: `*App` for applications,
+  `*Manager` for subsystem contracts, and `*Driver_<Hardware>` for hardware or
+  simulator glue.
 - Implementation guidance added: use stock `Drv.LinuxI2cDriver` /
   `LinuxSpiDriver` / `LinuxGpioDriver` for subsystems on the Pi's own bus
-  (our channel-2 Teensy-RPC adapters are bespoke for a hardware reason), and
+  (our channel-2 Teensy-RPC drivers are bespoke for a hardware reason), and
   check `fprime-sensors` for ready-made device managers before writing a new
-  `*Adapter_*`.
+  `*Driver_*`.
 
 ## Demo Hardening Sprint (2026-07-06)
 
@@ -984,8 +986,8 @@ Still open (not demo-blocking):
   collection state.
 - Command-driven mode changes now go through the same validation path as port
   mode updates; command rejection responses stay operator-visible.
-- Race fix landed after adversarial review: state-mutating `ScienceManager`,
-  `MissionManager`, and `CommsManager` inputs are async so cancel/mode/status
+- Race fix landed after adversarial review: state-mutating `ScienceApp`,
+  `MissionApp`, and `CommsApp` inputs are async so cancel/mode/status
   updates are serialized on each active component queue.
 - Throttles are split intentionally: storm-capable warning/event paths remain
   throttled, but human command rejections are unthrottled in GDS command
@@ -993,7 +995,7 @@ Still open (not demo-blocking):
 - Topology de-fork landed: the old demo-only topology fork is removed; local
   emulation and HIL now build/run the same unified topology with
   RF-budget-sensitive periodic loops still off.
-- `ScienceManager.CAPTURE_DURATION_SECONDS` is now a `PrmDb`-backed parameter;
+- `ScienceApp.CAPTURE_DURATION_SECONDS` is now a `PrmDb`-backed parameter;
   `CONFIGURE_CAPTURE_DURATION` remains a volatile runtime override, while
   durable default changes use `PRM_SET` then `PRM_SAVE`.
 - FPP ops pass landed: selected events have throttles, many stable channels use
