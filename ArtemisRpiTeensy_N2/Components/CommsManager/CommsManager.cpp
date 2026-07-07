@@ -133,7 +133,7 @@ void CommsManager::payloadDownlinkStatusIn_handler(FwIndexType portNum,
 
 void CommsManager::REQUEST_SCIENCE_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     if (this->m_pendingScienceBytes == 0U) {
-        this->log_WARNING_LO_DownlinkFailed(0U, 1U);
+        this->log_WARNING_LO_CommsCommandRejected(1U, 0U);
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
         return;
     }

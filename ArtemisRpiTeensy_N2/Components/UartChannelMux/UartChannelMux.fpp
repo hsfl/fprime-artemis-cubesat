@@ -45,10 +45,10 @@ module Components {
         telemetry FramesRx: U32
 
         @ Dropped malformed channel frames
-        telemetry FrameDrops: U32
+        telemetry FrameDrops: U32 update on change
 
-        @ Channel frame dropped
-        event FrameDropped(reason: U32) severity warning low format "UART channel frame dropped reason={}"
+        @ Channel frame dropped; keep throttled because byte-stream parse paths can storm.
+        event FrameDropped(reason: U32) severity warning low format "UART channel frame dropped reason={}" throttle 10
 
         @ Port for requesting the current time
         time get port timeCaller

@@ -9,22 +9,22 @@ module Components {
         output port pingOut: Svc.Ping
 
         @ Rate group scheduling input
-        sync input port run: Svc.Sched
+        async input port run: Svc.Sched
 
         @ Link status input from transport
-        sync input port linkStatusIn: Svc.Ping
+        async input port linkStatusIn: Svc.Ping
 
         @ Science ready input from storage
-        sync input port scienceReadyIn: Components.ScienceDownlinkReady
+        async input port scienceReadyIn: Components.ScienceDownlinkReady
 
         @ Adapter status input
-        sync input port adapterStatusIn: Svc.Ping
+        async input port adapterStatusIn: Svc.Ping
 
         @ Adapter RSSI input
-        sync input port rssiStatusIn: Components.RssiStatus
+        async input port rssiStatusIn: Components.RssiStatus
 
         @ Payload downlink transfer status input
-        sync input port payloadDownlinkStatusIn: Components.PayloadDownlinkStatus
+        async input port payloadDownlinkStatusIn: Components.PayloadDownlinkStatus
 
         @ Downlink request output to storage
         output port downlinkRequestOut: Components.ScienceDownlinkRequest
@@ -51,16 +51,17 @@ module Components {
         async command PING_LINK_RSSI
 
         @ Current link state
-        telemetry LinkState: U32
+        telemetry LinkState: U32 update on change
 
         @ Pending science bytes
-        telemetry PendingScienceBytes: U32
+        telemetry PendingScienceBytes: U32 update on change
 
         @ Number of explicit link polls
         telemetry LinkPollCount: U32
 
         @ Latest RF link RSSI in dBm
-        telemetry RssiDbm: I32
+        telemetry RssiDbm: I32 update on change \
+            low { yellow -100, orange -110, red -120 }
 
         @ Downlink request event
         event DownlinkRequested(bytes: U32) severity activity high format "Downlink requested for {} bytes"
@@ -68,11 +69,14 @@ module Components {
         @ Downlink completion event for the current synchronous/demo downlink path
         event DownlinkFinished(bytes: U32) severity activity high format "Downlink finished for {} bytes"
 
-        @ Downlink failure or rejected request event
-        event DownlinkFailed(stateValue: U32, lastError: U32) severity warning low format "Downlink failed state={} error={}"
+        @ Operator command rejected by validation guard
+        event CommsCommandRejected(reason: U32, value: U32) severity warning low format "Comms command rejected reason={} value={}"
 
-        @ Link state event
-        event LinkStateUpdated(linkState: U32, rssiDbm: I32) severity activity low format "Comms link state updated {} rssi={}dBm"
+        @ Downlink failure from payload transfer/status paths; keep throttled because RF/status paths can storm.
+        event DownlinkFailed(stateValue: U32, lastError: U32) severity warning low format "Downlink failed state={} error={}" throttle 5
+
+        @ Link state event from polling/status paths; keep throttled because RF/status paths can storm.
+        event LinkStateUpdated(linkState: U32, rssiDbm: I32) severity activity low format "Comms link state updated {} rssi={}dBm" throttle 10
 
         @ RSSI ping event
         event LinkRssiPing(linkState: U32, rssiDbm: I32, pollCount: U32) severity activity high format "Comms link RSSI ping state={} rssi={}dBm polls={}"

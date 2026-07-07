@@ -137,8 +137,7 @@ module ArtemisRpiTeensyDeployment {
       rateGroup1.RateGroupMemberOut[5] -> teensyTransportService.run
       rateGroup1.RateGroupMemberOut[6] -> missionManager.run
       rateGroup1.RateGroupMemberOut[7] -> payloadDownlinkManager.run
-      # HIL/default profile: tick the scheduled science path; keep higher-volume
-      # demo status loops off unless building with NEUTRON2_TOPOLOGY_PROFILE=local-demo.
+      # RF MVP: tick the scheduled science path; keep higher-volume demo status loops off.
       rateGroup1.RateGroupMemberOut[8] -> scienceManager.run
       # rateGroup1.RateGroupMemberOut[9] -> sohManager.run
       # rateGroup1.RateGroupMemberOut[10] -> commsManager.run
@@ -171,6 +170,7 @@ module ArtemisRpiTeensyDeployment {
 
     connections MissionFlow {
       missionManager.collectionRequestOut -> scienceManager.requestIn
+      missionManager.cancelRequestOut -> scienceManager.cancelRequestIn
       scienceManager.payloadRequestOut -> payloadService.requestIn
       payloadService.statusOut -> scienceManager.payloadStatusIn
       scienceManager.scienceProductOut -> storageService.requestIn

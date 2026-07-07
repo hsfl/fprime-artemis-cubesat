@@ -2,6 +2,12 @@
 
 namespace Components {
 
+namespace {
+constexpr U32 MAX_SCHEDULE_DELAY_SECONDS = 300U;
+constexpr U32 REJECT_INVALID_SCHEDULE_DELAY_SECONDS = 1U;
+constexpr U32 REJECT_INVALID_MODE_TRANSITION = 2U;
+}  // namespace
+
 MissionManager::MissionManager(const char* const compName)
     : MissionManagerComponentBase(compName),
       m_currentMode(Components::MissionMode::BASE),
@@ -40,9 +46,12 @@ void MissionManager::modeUpdateIn_handler(FwIndexType portNum, const Components:
 }
 
 void MissionManager::ENTER_BASE_MODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    this->m_currentMode = Components::MissionMode::BASE;
-    this->writeTelemetry();
-    this->log_ACTIVITY_HI_ModeChanged(this->m_currentMode);
+    if (!this->transitionToMode(Components::MissionMode::BASE, 0U)) {
+        this->log_WARNING_LO_MissionCommandRejected(REJECT_INVALID_MODE_TRANSITION, 0U);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+        return;
+    }
+    this->cancelCollection();
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
@@ -54,6 +63,20 @@ void MissionManager::PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 token)
 }
 
 void MissionManager::SCHEDULE_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 delaySeconds) {
+    if ((delaySeconds == 0U) || (delaySeconds > MAX_SCHEDULE_DELAY_SECONDS)) {
+        this->log_WARNING_LO_MissionCommandRejected(REJECT_INVALID_SCHEDULE_DELAY_SECONDS, delaySeconds);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+        return;
+    }
+    if (!this->isAllowedTransition(Components::MissionMode::COLLECTION_PENDING)) {
+        this->log_WARNING_LO_ModeUpdateRejected(
+            Components::MissionMode::COLLECTION_PENDING,
+            this->m_currentMode,
+            delaySeconds);
+        this->log_WARNING_LO_MissionCommandRejected(REJECT_INVALID_MODE_TRANSITION, delaySeconds);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+        return;
+    }
     this->m_currentMode = Components::MissionMode::COLLECTION_PENDING;
     this->m_lastScheduledDelaySeconds = delaySeconds;
     this->writeTelemetry();
@@ -62,6 +85,16 @@ void MissionManager::SCHEDULE_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmd
     if (this->isConnected_collectionRequestOut_OutputPort(0)) {
         this->collectionRequestOut_out(0, delaySeconds);
     }
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void MissionManager::CANCEL_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    if (!this->transitionToMode(Components::MissionMode::BASE, 0U)) {
+        this->log_WARNING_LO_MissionCommandRejected(REJECT_INVALID_MODE_TRANSITION, 0U);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+        return;
+    }
+    this->cancelCollection();
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
@@ -88,6 +121,25 @@ bool MissionManager::isAllowedTransition(Components::MissionMode requested) cons
             return requested == Components::MissionMode::BASE;
         default:
             return false;
+    }
+}
+
+bool MissionManager::transitionToMode(Components::MissionMode requested, U32 detail) {
+    if (!this->isAllowedTransition(requested)) {
+        this->log_WARNING_LO_ModeUpdateRejected(requested, this->m_currentMode, detail);
+        return false;
+    }
+    this->m_currentMode = requested;
+    this->writeTelemetry();
+    this->log_ACTIVITY_HI_ModeChanged(this->m_currentMode);
+    return true;
+}
+
+void MissionManager::cancelCollection() {
+    this->m_lastScheduledDelaySeconds = 0U;
+    this->writeTelemetry();
+    if (this->isConnected_cancelRequestOut_OutputPort(0)) {
+        this->cancelRequestOut_out(0, 0U);
     }
 }
 

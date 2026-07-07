@@ -56,11 +56,11 @@ module Components {
         @ PDU request handling event
         event PduRequestHandled(epsRequest: Components.EpsRequest, status: U32) severity activity low format "Artemis PDU request={} status={}"
 
-        @ PDU request failure event
-        event PduRequestFailed(epsRequest: Components.EpsRequest, status: U32) severity warning low format "Artemis PDU request={} failed status={}"
+        @ PDU request failure event; keep throttled because adapter/transport paths can storm.
+        event PduRequestFailed(epsRequest: Components.EpsRequest, status: U32) severity warning low format "Artemis PDU request={} failed status={}" throttle 5
 
-        @ PDU request timeout event
-        event PduRequestTimedOut(epsRequest: Components.EpsRequest, requestId: U32) severity warning low format "Artemis PDU request={} timed out local request={}"
+        @ PDU request timeout event; keep throttled because adapter/transport paths can storm.
+        event PduRequestTimedOut(epsRequest: Components.EpsRequest, requestId: U32) severity warning low format "Artemis PDU request={} timed out local request={}" throttle 5
 
         @ Port for requesting the current time
         time get port timeCaller

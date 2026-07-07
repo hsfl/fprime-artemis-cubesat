@@ -9,13 +9,16 @@ module Components {
         output port pingOut: Svc.Ping
 
         @ Rate group scheduling input
-        sync input port run: Svc.Sched
+        async input port run: Svc.Sched
 
         @ Collection request input from MissionManager
-        sync input port requestIn: Components.CollectionRequest
+        async input port requestIn: Components.CollectionRequest
+
+        @ Cancel a pending collection request from MissionManager
+        async input port cancelRequestIn: Svc.Ping
 
         @ Payload status input from PayloadService
-        sync input port payloadStatusIn: Components.ScienceProductDescriptor
+        async input port payloadStatusIn: Components.ScienceProductDescriptor
 
         @ Forwarded collection request to PayloadService
         output port payloadRequestOut: Components.PayloadCaptureRequest
@@ -32,17 +35,20 @@ module Components {
         @ Set the capture duration used by scheduled collections
         async command CONFIGURE_CAPTURE_DURATION(durationSeconds: U32)
 
-        @ Trigger immediate collection for the requested duration
+        @ Trigger one immediate collection for the requested duration. Does not change the configured default duration.
         async command SCIENCE_CAPTURE(durationSeconds: U32)
+
+        @ Boot-default capture duration. Runtime CONFIGURE_CAPTURE_DURATION remains volatile.
+        param CAPTURE_DURATION_SECONDS: U32 default 30
 
         @ Pending delay before collection
         telemetry PendingDelaySeconds: U32
 
         @ Capture duration in seconds used for scheduled collection
-        telemetry CaptureDurationSeconds: U32
+        telemetry CaptureDurationSeconds: U32 update on change
 
         @ Number of completed collections
-        telemetry CollectionCount: U32
+        telemetry CollectionCount: U32 update on change
 
         @ Collection trigger event
         event CollectionTriggered(delaySeconds: U32) severity activity high format "Science collection triggered delay={}s"
@@ -52,6 +58,12 @@ module Components {
 
         @ Capture duration configuration event
         event CaptureDurationConfigured(durationSeconds: U32) severity activity high format "Science capture duration configured {}s"
+
+        @ Collection cancel event
+        event CollectionCancelled(remainingSeconds: U32) severity activity high format "Science collection cancelled with {}s remaining"
+
+        @ Science command or request rejected by duration/delay guard
+        event ScienceCommandRejected(reason: U32, value: U32) severity warning low format "Science command rejected reason={} value={}"
 
         @ Port for requesting the current time
         time get port timeCaller
@@ -64,5 +76,11 @@ module Components {
 
         @ Enables telemetry channels handling
         import Fw.Channel
+
+        @ Parameter get port
+        param get port prmGetOut
+
+        @ Parameter set port
+        param set port prmSetOut
     }
 }

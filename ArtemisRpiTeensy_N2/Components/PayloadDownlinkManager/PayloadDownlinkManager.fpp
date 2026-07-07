@@ -33,19 +33,19 @@ module Components {
         async command GET_PAYLOAD_STATUS
 
         @ Payload transfer state: 0=idle, 1=downlinking, 2=done, 3=aborted, 4=error.
-        telemetry PayloadState: U32
+        telemetry PayloadState: U32 update on change
 
         @ Transfer identifier for the latest payload downlink.
-        telemetry TransferId: U32
+        telemetry TransferId: U32 update on change
 
         @ Generic product identifier selected by command.
-        telemetry ProductId: U32
+        telemetry ProductId: U32 update on change
 
         @ Blob size in bytes.
-        telemetry TotalBytes: U32
+        telemetry TotalBytes: U32 update on change
 
         @ Total payload data packets expected.
-        telemetry TotalPackets: U32
+        telemetry TotalPackets: U32 update on change
 
         @ Number of data packets sent, including retry packets.
         telemetry PacketsSent: U32
@@ -66,7 +66,7 @@ module Components {
         telemetry PacketsMissing: U32
 
         @ Last error code.
-        telemetry LastError: U32
+        telemetry LastError: U32 update on change
 
         @ Payload downlink started.
         event PayloadDownlinkStarted(productId: U32, byteCount: U32, totalPackets: U32) \
@@ -80,17 +80,17 @@ module Components {
         event PayloadDownlinkProgress(transferId: U32, percentComplete: U32, packetsSent: U32, totalPackets: U32) \
             severity activity high format "Payload downlink progress transfer={} percent={} packets={}/{}"
 
-        @ Payload downlink failed.
+        @ Payload downlink failed; keep throttled because retry/status paths can storm.
         event PayloadDownlinkFailed(reason: U32, detail: U32) \
-            severity warning low format "Payload downlink failed reason={} detail={}"
+            severity warning low format "Payload downlink failed reason={} detail={}" throttle 5
 
-        @ Payload retry request received.
+        @ Payload retry request received; keep throttled because retry paths can storm.
         event PayloadRetryRequested(startIndex: U32, missingCount: U32) \
-            severity activity low format "Payload retry requested start={} missing={}"
+            severity activity low format "Payload retry requested start={} missing={}" throttle 10
 
-        @ Payload status.
+        @ Payload status; keep throttled because progress/status paths can storm.
         event PayloadStatus(stateValue: U32, sent: U32, total: U32, lastError: U32) \
-            severity activity low format "Payload status state={} sent={} total={} error={}"
+            severity activity low format "Payload status state={} sent={} total={} error={}" throttle 10
 
         @ Port for requesting the current time
         time get port timeCaller

@@ -16,8 +16,12 @@ class MissionManagerTester final : public MissionManagerGTestBase {
     ~MissionManagerTester();
 
     void testRejectsInvalidServiceTransition();
+    void testRejectsInvalidScheduleCommandInputs();
+    void testRejectsInvalidCommandTransition();
     void testAcceptsNominalDemoStoryTransitions();
     void testAcceptsManualDownlinkRetryFromBase();
+    void testEnterBaseModeCancelsPendingCollection();
+    void testCancelCollectionReturnsBaseAndCancels();
 
   private:
     void connectPorts();

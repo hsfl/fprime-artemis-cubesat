@@ -9,13 +9,16 @@ module Components {
         output port pingOut: Svc.Ping
 
         @ Rate group scheduling input
-        sync input port run: Svc.Sched
+        async input port run: Svc.Sched
 
         @ Collection scheduling output to ScienceManager
         output port collectionRequestOut: Components.CollectionRequest
 
+        @ Collection cancellation output to ScienceManager
+        output port cancelRequestOut: Svc.Ping
+
         @ Mission mode update input from story services
-        sync input port modeUpdateIn: [2] Components.MissionModeUpdate
+        async input port modeUpdateIn: [2] Components.MissionModeUpdate
 
         @ Enter base mode
         async command ENTER_BASE_MODE
@@ -26,14 +29,17 @@ module Components {
         @ Schedule data collection delay in seconds
         async command SCHEDULE_COLLECTION(delaySeconds: U32)
 
+        @ Cancel pending collection and return to base mode
+        async command CANCEL_COLLECTION
+
         @ Current mission mode
-        telemetry CurrentMode: Components.MissionMode
+        telemetry CurrentMode: Components.MissionMode update on change
 
         @ Last requested schedule delay
-        telemetry LastScheduledDelaySeconds: U32
+        telemetry LastScheduledDelaySeconds: U32 update on change
 
         @ Number of pings handled
-        telemetry PingCount: U32
+        telemetry PingCount: U32 update on change
 
         @ Mission manager heartbeat
         telemetry ModeHeartbeat: U32
@@ -41,8 +47,11 @@ module Components {
         @ Mission mode transition
         event ModeChanged(mode: Components.MissionMode) severity activity high format "Mission mode changed to {}"
 
-        @ Invalid service-requested mission mode transition rejected
-        event ModeUpdateRejected(requested: Components.MissionMode, current: Components.MissionMode, detail: U32) severity warning low format "Rejected mode update requested={} current={} detail={}"
+        @ Invalid service-requested mission mode transition rejected; keep throttled because port paths can storm.
+        event ModeUpdateRejected(requested: Components.MissionMode, current: Components.MissionMode, detail: U32) severity warning low format "Rejected mode update requested={} current={} detail={}" throttle 5
+
+        @ Mission command rejected by validation guard
+        event MissionCommandRejected(reason: U32, value: U32) severity warning low format "Mission command rejected reason={} value={}"
 
         @ Ping response event
         event Pong(token: U32, count: U32) severity activity low format "MissionManager pong token={} count={}"

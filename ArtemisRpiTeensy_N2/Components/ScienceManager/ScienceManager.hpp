@@ -9,11 +9,13 @@ class ScienceManager final : public ScienceManagerComponentBase {
   public:
     ScienceManager(const char* const compName);
     ~ScienceManager();
+    void preamble() override;
 
   private:
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void run_handler(FwIndexType portNum, U32 context) override;
     void requestIn_handler(FwIndexType portNum, U32 delaySeconds) override;
+    void cancelRequestIn_handler(FwIndexType portNum, U32 key) override;
     void payloadStatusIn_handler(FwIndexType portNum,
                                  U32 productId,
                                  U32 productBytes,
@@ -23,6 +25,10 @@ class ScienceManager final : public ScienceManagerComponentBase {
     void START_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void CONFIGURE_CAPTURE_DURATION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
     void SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
+    void parameterUpdated(FwPrmIdType id) override;
+    void seedCaptureDurationFromParam();
+    bool isValidCaptureDuration(U32 durationSeconds) const;
+    void cancelPendingCollection();
     void writeTelemetry();
 
     U32 m_pendingDelaySeconds;

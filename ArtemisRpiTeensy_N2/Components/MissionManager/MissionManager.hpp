@@ -17,8 +17,11 @@ class MissionManager final : public MissionManagerComponentBase {
     void ENTER_BASE_MODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 token) override;
     void SCHEDULE_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 delaySeconds) override;
+    void CANCEL_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
 
     bool isAllowedTransition(Components::MissionMode requested) const;
+    bool transitionToMode(Components::MissionMode requested, U32 detail);
+    void cancelCollection();
     void writeTelemetry();
 
     Components::MissionMode m_currentMode;

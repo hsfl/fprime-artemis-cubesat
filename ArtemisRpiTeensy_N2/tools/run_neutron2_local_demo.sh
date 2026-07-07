@@ -13,8 +13,7 @@ DELAY_SECONDS="${DELAY_SECONDS:-10}"
 CAPTURE_SECONDS="${CAPTURE_SECONDS:-10}"
 HOLD_AFTER_SEQUENCE="true"
 DICT_PATH="${DICT_PATH:-}"
-TOPOLOGY_PROFILE="${NEUTRON2_TOPOLOGY_PROFILE:-local-demo}"
-BUILD_CACHE="${BUILD_CACHE:-$ROOT_DIR/build-neutron2-local-demo}"
+BUILD_CACHE="${BUILD_CACHE:-$ROOT_DIR/build-neutron2-local}"
 SKIP_BUILD="false"
 
 usage() {
@@ -32,8 +31,8 @@ Options:
   --delay <seconds>          scheduled collection delay (default: 10)
   --capture-seconds <secs>   simulator capture duration (default: 10)
   --dictionary <path>        topology dictionary path (default: latest generated dict)
-  --build-cache <path>       local-demo build cache (default: ArtemisRpiTeensy_N2/build-neutron2-local-demo)
-  --skip-build               use existing binary/dictionary without regenerating the local-demo profile
+  --build-cache <path>       local build cache (default: ArtemisRpiTeensy_N2/build-neutron2-local)
+  --skip-build               use existing binary/dictionary without regenerating the unified topology
   --exit-after-sequence      stop emulator/viewer after automated checks pass
   -h, --help                 show this help text
 
@@ -47,11 +46,11 @@ EOF
 }
 
 log() {
-  printf '[neutron2-local-demo] %s\n' "$*"
+  printf '[neutron2-demo] %s\n' "$*"
 }
 
 fail() {
-  printf '[neutron2-local-demo] ERROR: %s\n' "$*" >&2
+  printf '[neutron2-demo] ERROR: %s\n' "$*" >&2
   exit 1
 }
 
@@ -108,10 +107,10 @@ done
 . "$VENV_ACTIVATE"
 
 if [[ "$SKIP_BUILD" != "true" ]]; then
-  log "building topology profile: $TOPOLOGY_PROFILE"
+  log "building unified topology"
   (
     cd "$ROOT_DIR"
-    fprime-util generate -f --build-cache "$BUILD_CACHE" "-DNEUTRON2_TOPOLOGY_PROFILE=$TOPOLOGY_PROFILE"
+    fprime-util generate -f --build-cache "$BUILD_CACHE"
     fprime-util build --build-cache "$BUILD_CACHE"
   )
 fi
@@ -201,7 +200,7 @@ wait_for_log_pattern() {
     fi
     sleep 0.5
   done
-  printf '[neutron2-local-demo] timed out waiting for %s\n' "$label" >&2
+  printf '[neutron2-demo] timed out waiting for %s\n' "$label" >&2
   return 1
 }
 
