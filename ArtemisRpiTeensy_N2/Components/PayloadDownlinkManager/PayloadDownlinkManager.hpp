@@ -79,6 +79,7 @@ class PayloadDownlinkManager final : public PayloadDownlinkManagerComponentBase 
     U32 m_completionSummaryEventsRemaining;
     U16 m_blobCrc;
     bool m_sentHeader;
+    U32 m_headerSends;  // number of header (re)transmits issued for the current transfer
     bool m_sentEnd;
     bool m_sourceReady;
     U32 m_sourceBytes;

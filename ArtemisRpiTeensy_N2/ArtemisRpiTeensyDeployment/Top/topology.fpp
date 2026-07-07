@@ -189,8 +189,13 @@ module ArtemisRpiTeensyDeployment {
       epsAdapterArtemis.teensyRequestOut -> uartChannelMux.localSendIn
       uartChannelMux.localRecvOut -> epsAdapterArtemis.teensyResponseIn
 
-      payloadService.adapterRequestOut -> payloadAdapterNeutronSim.requestIn
-      payloadAdapterNeutronSim.statusOut -> payloadService.adapterStatusIn
+      # Payload capture is served by the Lepton thermal camera adapter. Its captures
+      # land as ./DpCat/Dp_*.fdp data products; the descriptor it returns (bytes only,
+      # empty path) lets StorageService/CommsManager stage the latest .fdp for downlink
+      # via REQUEST_SCIENCE_DOWNLINK. The NeutronSim instance stays defined but unwired
+      # for easy revert. Operator must ENABLE the camera before a scheduled collection.
+      payloadService.adapterRequestOut -> payloadAdapterLepton.requestIn
+      payloadAdapterLepton.statusOut -> payloadService.adapterStatusIn
 
       adcsService.adapterRequestOut -> adcsAdapterD2S2.requestIn
       adcsAdapterD2S2.statusOut -> adcsService.adapterStatusIn

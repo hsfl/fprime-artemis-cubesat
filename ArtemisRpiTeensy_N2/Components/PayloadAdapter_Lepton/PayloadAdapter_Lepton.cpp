@@ -13,7 +13,7 @@ namespace Components {
 // ----------------------------------------------------------------------
 
 PayloadAdapter_Lepton ::PayloadAdapter_Lepton(const char* const compName)
-    : PayloadAdapter_LeptonComponentBase(compName) {}
+    : PayloadAdapter_LeptonComponentBase(compName), m_captureCount(0) {}
 
 PayloadAdapter_Lepton ::~PayloadAdapter_Lepton() {}
 
@@ -43,10 +43,51 @@ void PayloadAdapter_Lepton ::DISABLE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq)
 
 // Implementation of CAPTURE_IMAGE command handler: grabs the latest streamed frame and stores it as a data product.
 void PayloadAdapter_Lepton ::CAPTURE_IMAGE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    const bool captured = this->captureThermalImage();
+    this->cmdResponse_out(opCode, cmdSeq,
+                          captured ? Fw::CmdResponse::OK : Fw::CmdResponse::EXECUTION_ERROR);
+}
+
+// ----------------------------------------------------------------------
+// Handler implementations for typed input ports
+// ----------------------------------------------------------------------
+
+// Scheduled-collection capture request from the science chain (via PayloadService).
+// durationSeconds is accepted for interface compatibility but ignored: one frame per request.
+void PayloadAdapter_Lepton ::requestIn_handler(FwIndexType portNum, U32 durationSeconds) {
+    static_cast<void>(portNum);
+    static_cast<void>(durationSeconds);
+
+    const bool captured = this->captureThermalImage();
+
+    if (!this->isConnected_statusOut_OutputPort(0)) {
+        return;
+    }
+
+    // Empty source path: PayloadDownlinkManager resolves the newest ./DpCat/*.fdp at
+    // downlink time. sourceCrc 0: the downlink manager skips the descriptor CRC compare
+    // and computes its own from the actual file. On failure, report 0 bytes so the
+    // storage/comms chain treats it as a failed collection (CommsManager guards on bytes!=0).
+    const Fw::String emptyPath("");
+    if (captured) {
+        this->m_captureCount += 1U;
+        this->statusOut_out(0, this->m_captureCount, THERMAL_PRODUCT_BYTES,
+                            Components::ScienceProductSource::REAL_PAYLOAD, emptyPath, 0U);
+    } else {
+        this->statusOut_out(0, 0U, 0U, Components::ScienceProductSource::UNKNOWN, emptyPath, 0U);
+    }
+}
+
+// ----------------------------------------------------------------------
+// Helpers
+// ----------------------------------------------------------------------
+
+// Grabs the latest streamed frame and stores it as a data product. Returns true on success.
+// Shared by CAPTURE_IMAGE (command path) and requestIn (scheduled-collection path).
+bool PayloadAdapter_Lepton ::captureThermalImage() {
     // The data-product get port must be connected or there is nowhere to store the image.
     if (!this->isConnected_productGetOut_OutputPort(0)) {
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
-        return;
+        return false;
     }
 
     this->log_ACTIVITY_LO_ImageCaptureStart();
@@ -66,8 +107,7 @@ void PayloadAdapter_Lepton ::CAPTURE_IMAGE_cmdHandler(FwOpcodeType opCode, U32 c
     if (LeptonCamera::OK != camStatus) {
         Fw::LogStringArg reasonArg(reason);
         this->log_WARNING_HI_ImageCaptureFailed(reasonArg);
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
-        return;
+        return false;
     }
 
     // Allocate a data-product container large enough for one image record.
@@ -85,8 +125,7 @@ void PayloadAdapter_Lepton ::CAPTURE_IMAGE_cmdHandler(FwOpcodeType opCode, U32 c
     // If the container allocation fails, log a warning and return an execution error.
     if (Fw::Success::FAILURE == status) {
         this->log_WARNING_HI_DpMemoryFailure(dpSize);
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
-        return;
+        return false;
     }
 
     // Serialize the image into the container and hand it to the DP writer (stores to disk).
@@ -94,7 +133,7 @@ void PayloadAdapter_Lepton ::CAPTURE_IMAGE_cmdHandler(FwOpcodeType opCode, U32 c
     this->dpSend(container);
 
     this->log_ACTIVITY_HI_ImageCaptureSuccess(dpSize);
-    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+    return true;
 }
 
 }  // namespace Components

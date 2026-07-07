@@ -19,6 +19,16 @@ module Components {
         @ Capture a thermal image from the Lepton camera and store it as a data product on the RPi
         async command CAPTURE_IMAGE opcode 0
 
+        @ Scheduled-collection capture request from the science chain (via PayloadService).
+        @ The duration argument is accepted for interface compatibility but ignored:
+        @ each request captures exactly one thermal frame. Requires a prior ENABLE.
+        async input port requestIn: Components.PayloadCaptureRequest
+
+        @ Captured product descriptor/status output back to PayloadService. Carries the
+        @ on-disk data-product size so the storage/comms/downlink chain can stage the
+        @ latest ./DpCat/*.fdp for downlink. bytes=0 signals a failed capture.
+        output port statusOut: Components.ScienceProductDescriptor
+
         @ Data product record holding one thermal image (timestamp + per-pixel values)
         product record ThermalImageRecord: ThermalImageRecordType id 0
 

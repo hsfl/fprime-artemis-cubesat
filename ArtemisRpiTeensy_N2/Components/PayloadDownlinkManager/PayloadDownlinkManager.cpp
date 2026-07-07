@@ -12,12 +12,16 @@ namespace {
 constexpr U32 MAX_BLOB_BYTES = 1024U * 1024U;
 constexpr U32 PACKETS_PER_RUN = 1;
 constexpr U32 RETRY_PACKETS_PER_RUN = 1;
+constexpr U32 HEADER_RETRANSMIT_COUNT = 3;
 constexpr U32 COMPLETION_SUMMARY_EVENT_REPEATS = 3;
 constexpr const char* PAYLOAD_SOURCE_ENV = "NEUTRON_PAYLOAD_DOWNLINK_FILE";
-constexpr const char* DEFAULT_PAYLOAD_SOURCE = "/tmp/neutron_payload_captures/latest_payload.bin";
-constexpr const char* CAPTURE_DIR = "/tmp/neutron_payload_captures";
-constexpr const char* CAPTURE_PREFIX = "neutron_capture_";
-constexpr const char* CAPTURE_SUFFIX = ".csv";
+// Data-product directory written by the DataProducts subtopology (dpWriter/dpCat).
+// Matches DataProductsConfig::Paths::dpDir ("./DpCat"), CWD-relative to the deployment.
+constexpr const char* CAPTURE_DIR = "./DpCat";
+// DpWriter names files "Dp_<id08>_<sec08>_<usec08>.fdp"; Lepton images all share
+// container id 0, so lexical-max over these names selects the most recent capture.
+constexpr const char* CAPTURE_PREFIX = "Dp_";
+constexpr const char* CAPTURE_SUFFIX = ".fdp";
 
 bool hasPrefix(const char* value, const char* prefix) {
     return std::strncmp(value, prefix, std::strlen(prefix)) == 0;
@@ -75,11 +79,6 @@ std::string resolvePayloadSource(U32& sourceBytes) {
         return std::string();
     }
 
-    const std::string defaultPath(DEFAULT_PAYLOAD_SOURCE);
-    if (fileSizeBytes(defaultPath, sourceBytes)) {
-        return defaultPath;
-    }
-
     const std::string latest = latestCapturePath();
     if (!latest.empty() && fileSizeBytes(latest, sourceBytes)) {
         return latest;
@@ -105,6 +104,7 @@ PayloadDownlinkManager::PayloadDownlinkManager(const char* const compName)
       m_completionSummaryEventsRemaining(0),
       m_blobCrc(0),
       m_sentHeader(false),
+      m_headerSends(0),
       m_sentEnd(false),
       m_sourceReady(false),
       m_sourceBytes(0),
@@ -151,13 +151,16 @@ void PayloadDownlinkManager::run_handler(FwIndexType portNum, U32 context) {
     }
 
     if (this->m_state == STATE_DOWNLINKING) {
-        if (!this->m_sentHeader) {
+        // Resend the header on the first few ticks so one first-packet drop isn't fatal.
+        // Bounded/front-loaded: the receiver clears its buffer on each header it accepts.
+        if (!this->m_sentHeader || this->m_headerSends < HEADER_RETRANSMIT_COUNT) {
             if (!this->sendHeaderPacket()) {
                 this->failTransfer(3U, this->m_lastError);
                 this->emitTelemetry();
                 return;
             }
             this->m_sentHeader = true;
+            this->m_headerSends++;
         }
 
         U32 sentThisRun = 0;
@@ -228,9 +231,17 @@ void PayloadDownlinkManager::START_PAYLOAD_DOWNLINK_cmdHandler(FwOpcodeType opCo
                                                                U32 byteCount) {
     U32 normalizedBytes = byteCount;
     if (normalizedBytes == 0) {
-        this->failTransfer(8U, 0U);
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
-        return;
+        // MVP convenience: byteCount == 0 means "downlink the latest data product",
+        // auto-detecting the size of the newest ./DpCat/*.fdp file so the operator
+        // does not need to know the exact product size.
+        U32 detectedBytes = 0;
+        const std::string detectedPath = resolvePayloadSource(detectedBytes);
+        if (detectedPath.empty() || detectedBytes == 0) {
+            this->failTransfer(7U, 0U);
+            this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+            return;
+        }
+        normalizedBytes = detectedBytes;
     }
     if (normalizedBytes > MAX_BLOB_BYTES) {
         this->failTransfer(2U, normalizedBytes);
@@ -300,6 +311,7 @@ bool PayloadDownlinkManager::resetTransfer(U32 productId,
     this->m_completionSummaryEventsRemaining = 0;
     this->m_blobCrc = sourceCrc;
     this->m_sentHeader = false;
+    this->m_headerSends = 0;
     this->m_sentEnd = false;
     this->m_retryCount = 0;
     this->m_retryCursor = 0;
