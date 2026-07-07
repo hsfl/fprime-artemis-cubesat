@@ -314,7 +314,7 @@ Send the smallest command-path smoke first:
 
 ```bash
 . fprime-venv/bin/activate
-fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.PING \
+fprime-cli command-send ArtemisRpiTeensyDeployment.missionApp.PING \
   --arguments 4245 \
   --dictionary "$DICT" \
   --log-level-gds ERROR
@@ -323,7 +323,7 @@ fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.PING \
 Check the Pi journal for command receipt:
 
 ```bash
-ssh artemis-pi 'journalctl -u artemis-fprime.service --since "45 seconds ago" --no-pager | egrep "MissionManager|PING|pong|Op[Cc]ode|completed|ERROR|WARNING" | tail -100'
+ssh artemis-pi 'journalctl -u artemis-fprime.service --since "45 seconds ago" --no-pager | egrep "MissionApp|PING|pong|Op[Cc]ode|completed|ERROR|WARNING" | tail -100'
 ```
 
 If command bytes reach ground debug counters but the Pi never sees the command,
@@ -419,14 +419,14 @@ cd ArtemisRpiTeensy_N2
 . fprime-venv/bin/activate
 DICT=build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json
 
-fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.ENTER_BASE_MODE --dictionary "$DICT"
-fprime-cli command-send ArtemisRpiTeensyDeployment.sohManager.EMIT_SOH_SNAPSHOT --dictionary "$DICT"
-fprime-cli command-send ArtemisRpiTeensyDeployment.scienceManager.CONFIGURE_CAPTURE_DURATION --arguments 30 --dictionary "$DICT"
-fprime-cli command-send ArtemisRpiTeensyDeployment.missionManager.SCHEDULE_COLLECTION --arguments 4 --dictionary "$DICT"
+fprime-cli command-send ArtemisRpiTeensyDeployment.missionApp.ENTER_BASE_MODE --dictionary "$DICT"
+fprime-cli command-send ArtemisRpiTeensyDeployment.sohApp.EMIT_SOH_SNAPSHOT --dictionary "$DICT"
+fprime-cli command-send ArtemisRpiTeensyDeployment.scienceApp.CONFIGURE_CAPTURE_DURATION --arguments 30 --dictionary "$DICT"
+fprime-cli command-send ArtemisRpiTeensyDeployment.missionApp.SCHEDULE_COLLECTION --arguments 4 --dictionary "$DICT"
 sleep 40
-fprime-cli command-send ArtemisRpiTeensyDeployment.storageService.REPORT_LATEST_DATASET --dictionary "$DICT"
-fprime-cli command-send ArtemisRpiTeensyDeployment.commsManager.REQUEST_SCIENCE_DOWNLINK --dictionary "$DICT"
-fprime-cli command-send ArtemisRpiTeensyDeployment.payloadDownlinkManager.GET_PAYLOAD_STATUS --dictionary "$DICT"
+fprime-cli command-send ArtemisRpiTeensyDeployment.storageManager.REPORT_LATEST_DATASET --dictionary "$DICT"
+fprime-cli command-send ArtemisRpiTeensyDeployment.commsApp.REQUEST_SCIENCE_DOWNLINK --dictionary "$DICT"
+fprime-cli command-send ArtemisRpiTeensyDeployment.payloadDownlinkApp.GET_PAYLOAD_STATUS --dictionary "$DICT"
 ```
 
 `GET_PAYLOAD_STATUS` is useful because it can force the latest

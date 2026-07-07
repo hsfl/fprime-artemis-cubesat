@@ -27,7 +27,7 @@ fprime-util check --all
 ```
 
 Single component: run `fprime-util check` from inside that component's
-directory (e.g. `Components/MissionManager/`).
+directory (e.g. `Components/MissionApp/`).
 
 Note: `settings.ini` sets `FPRIME_ENABLE_FRAMEWORK_UTS=OFF` — framework
 (lib/fprime) UTs are intentionally excluded; only project component UTs build.
@@ -35,9 +35,10 @@ Do not "fix" a missing framework test target by flipping that flag.
 
 ## Exemplar Components (copy these)
 
-`MissionManager`, `UartChannelMux`, `PayloadDownlinkManager`, and
-`EpsAdapter_Artemis` already have working UTs under `Components/<Name>/test/ut/`.
-Copy the closest one rather than writing from scratch.
+`MissionApp`, `ScienceApp`, `CommsApp`, `PayloadDownlinkApp`, `UartChannelMux`,
+and `EpsDriver_Artemis` already have working UTs under
+`Components/<Name>/test/ut/`. Copy the closest one rather than writing from
+scratch.
 
 ## Adding a UT to a Component
 
@@ -100,7 +101,7 @@ Copy the closest one rather than writing from scratch.
 Rate-driven logic: tick it explicitly in a loop —
 `for (U32 t = 0; t < 30; ++t) this->invoke_to_run(0, 0);`
 
-See `Components/MissionManager/test/ut/MissionManagerTester.cpp` for a full
+See `Components/MissionApp/test/ut/MissionAppTester.cpp` for a full
 worked example (command → dispatch → event/telemetry/port assertions).
 
 ## Common UT Pitfalls

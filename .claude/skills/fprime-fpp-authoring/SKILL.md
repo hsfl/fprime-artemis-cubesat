@@ -11,7 +11,7 @@ description: "Use when writing or editing FPP (F Prime Prime) files: component d
   (from `ArtemisRpiTeensy_N2`, venv active). The autocoder only runs at generate time.
 - FPP language reference is NOT on the main F' docs site. Use
   `https://nasa.github.io/fpp/fpp-users-guide.html` (via the `fprime-docs-search` skill).
-- Copy an existing repo component as your template — `Components/SoHManager/SoHManager.fpp`
+- Copy an existing repo component as your template — `Components/SoHApp/SoHApp.fpp`
   is a clean example. `docs/STUDENT_COMPONENT_STARTERS.md` has student-facing starters.
 
 ## Component Definition Anatomy
@@ -89,9 +89,8 @@ All files under `ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Top/` unless not
 4. **`ArtemisRpiTeensyDeploymentTopologyDefs.hpp`** — add a ping entry for the
    new instance in the `PingEntries` namespace (copy an existing entry).
 5. **Rate-driven components** — connect `run` to a rate group in `topology.fpp`
-   (`rateGroupN.RateGroupMemberOut[i] -> myThing.run`). Mind the
-   `local-demo` vs `hil` profile split: `topology.local-demo.fpp` carries the
-   laptop-demo rate path.
+   (`rateGroupN.RateGroupMemberOut[i] -> myThing.run`). The topology is
+   unified — one `topology.fpp` serves both laptop emulation and HIL.
 6. `fprime-util generate -f && fprime-util build`, fix errors, repeat.
 
 ## Common FPP/Codegen Errors → Fixes
@@ -124,8 +123,14 @@ Forgetting `cmdResponse_out` leaves the command hanging in GDS.
 
 ## Repo Conventions
 
-- Service/adapter split per `docs/SYSTEM_ARCHITECTURE.md`: `<X>Service` owns
-  the F' interface; `<X>Adapter_<Impl>` owns the hardware/sim specifics.
+- HAL tiers follow F´'s native Application-Manager-Driver (App-Man-Drv)
+  pattern per `docs/SYSTEM_ARCHITECTURE.md`: `<X>App` owns mission logic,
+  `<X>Manager` owns the stable subsystem contract, `<X>Driver_<Impl>` owns
+  hardware/sim specifics. Applications talk to managers; managers talk to
+  drivers; drivers talk to hardware. Managers and drivers swap via shared
+  port interfaces defined in `Components/Types/Types.fpp`.
+  (Pre-2026-07-06 names — Manager→App, Service→Manager, Adapter→Driver — may
+  linger in old logs and archived plans; active code uses the new names.)
 - Placeholder commands must not imply real hardware actuation — record intent
   only, and say so in the `@` doc comment.
 - Shared types live in `Components/Types` (dep name `Components_Types`).
