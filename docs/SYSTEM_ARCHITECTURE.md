@@ -105,6 +105,22 @@ What makes this a *real* HAL — and not just decorative indirection — is the 
 - New or swapped hardware/sim -> add a **Driver** (`*Driver_<Hardware>`), keep the manager contract identical, and re-wire it in `Top/topology.fpp`.
 - If you find yourself putting hardware/protocol bytes in an application or manager, that logic belongs in a driver.
 
+### Mission payload variants
+
+The bus architecture is shared across mission variants. Neutron 2 and EPSCoR
+C3M use the same mission apps, managers, storage/downlink handoff, UART channel
+map, and RF bridge. The payload driver and ground decoder are the mission-owned
+pieces:
+
+- Neutron 2 demo: `PayloadDriver_NeutronSim` produces neutron payload bytes,
+  and `ground-station/neutron2-payload-viewer` parses the reconstructed file.
+- EPSCoR C3M demo: `PayloadDriver_Lepton` produces Lepton `.fdp` Data Products,
+  and `ground-station/lepton-dp-viewer` parses the reconstructed `.fdp`.
+
+Do not fork the application/manager stack for payload identity. Swap the driver
+wiring and keep `PayloadManager`, `StorageManager`, `CommsApp`, and
+`PayloadDownlinkApp` generic.
+
 ### Implementation notes (use the framework, don't fight it)
 
 Two notes to keep drivers aligned with stock F´ rather than reinventing it:
@@ -183,7 +199,14 @@ Only channels `0` and `1` cross the RF link (`rf_count = 2`); the satellite UART
 The RFM23BP has a small packet budget, so each cross-RF channel is segmented:
 
 - RF packet max `49` bytes, `5`-byte segment header, per-segment magic (`165` CCSDS / `166` payload).
-- ACK/retry with `4` retries and `80 ms` ACK timeout; `500 ms` reassembly timeout; `8 ms` inter-segment gap.
+- ACK policy is generated from `config/transport_constants.json`.
+- Channel `0` / CCSDS keeps per-segment ACK/retry with `4` retries and
+  `80 ms` ACK timeout because GDS command/telemetry traffic has no
+  payload-specific repair loop.
+- Channel `1` / payload is currently ACK-free for the C3M RF MVP candidate;
+  `PayloadDownlinkApp` and `tools/payload_receiver.py` own packet indexes,
+  retry requests, and final CRC repair at the application layer.
+- Reassembly timeout is `500 ms`; inter-segment gap is `8 ms`.
 
 See the [RFM23BP datasheet](#reference-documents) for the radio's packet/FIFO limits that drive these numbers.
 
@@ -218,8 +241,8 @@ F Prime PayloadDownlinkApp
 -> RFM23BP RF link
 -> ground Teensy  (ground USB serial port 2)
 -> tools/payload_receiver.py
--> reconstructed .bin or .csv file
--> ground-station/neutron2-payload-viewer
+-> reconstructed .bin/.csv or .fdp file
+-> ground-station/neutron2-payload-viewer or ground-station/lepton-dp-viewer
 
 Channel 2: satellite-local subsystem RPC (stays on the satellite)
 F Prime driver (e.g. EpsDriver_Artemis)
@@ -235,6 +258,9 @@ Important student-facing rule:
 - ground serial port 1 is a **read-only debug** view of link health.
 - `tools/payload_receiver.py` is the file reconstruction tool for channel 1 (ground serial port 2).
 - `ground-station/neutron2-payload-viewer` is the science review tool after a payload file exists. It can parse `.bin` payload products when the bytes inside are the Neutron 2 CSV format.
+- `ground-station/lepton-dp-viewer` is the C3M review tool after a Lepton
+  `.fdp` exists. It decodes the thermal product produced by
+  `PayloadDriver_Lepton`.
 
 ## The RF Link Constraint: How fprime-gds Talks Over a Walkie-Talkie
 
@@ -392,12 +418,14 @@ For the MVP path, F Prime does not use stock GDS file downlink for the science p
 
 Runtime ownership is:
 
-- `PayloadDriver_NeutronSim` (or a future real Neutron 2 payload-board driver) produces payload bytes.
+- `PayloadDriver_NeutronSim`, `PayloadDriver_Lepton`, or a future real payload
+  board driver produces mission-specific payload bytes.
 - `StorageManager` tracks the latest science product.
 - `CommsApp.REQUEST_SCIENCE_DOWNLINK` requests downlink of the latest stored product.
 - `PayloadDownlinkApp` packetizes the product, sends channel 1 packets, and emits progress events.
 - `tools/payload_receiver.py` reconstructs bytes, requests retries for missing packets, verifies CRC, and writes the output file.
-- The payload viewer opens the reconstructed file and parses neutron-count CSV content.
+- The mission payload viewer opens the reconstructed file: Neutron 2 uses the
+  neutron CSV viewer, while C3M uses the Lepton `.fdp` viewer.
 
 `PayloadDownlinkApp.PayloadDownlinkProgress` emits nominal `10%` increments from `10` through `90`. `PayloadDownlinkComplete` and `CommsApp.DownlinkFinished` are the completion signals. For tiny payloads, several progress events may appear at the same timestamp or packet count because one payload packet can represent more than ten percent of the file.
 

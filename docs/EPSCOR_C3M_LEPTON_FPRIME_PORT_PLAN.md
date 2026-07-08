@@ -30,6 +30,62 @@ payload downlink path for `.fdp` bytes. Do not switch to plain file staging just
 to improve speed, and do not use stock `Svc.FileDownlink` over the RFM23BP RF
 path for this MVP.
 
+## Status Update - 2026-07-08
+
+Core local MVP status: implemented and locally validated on `epscorc3m/demo`.
+The remaining proof gates are HIL bench validation and measured downlink
+optimization.
+
+Completed commits:
+
+- `ade1d85 add c3m lepton payload driver and data products path`
+  - Added `PayloadDriver_Lepton`.
+  - Added project-owned `ArtemisDataProducts` config/subtopology.
+  - Added `DpWrittenRouter` so the DpWriter notification reaches both the
+    catalog path and the Lepton driver.
+  - Wired the C3M mission topology through the existing
+    `PayloadManager -> PayloadDriver_*` seam.
+- `b606203 add c3m local demo and lepton decoder`
+  - Added `tools/run_c3m_local_demo.sh`.
+  - Added the Lepton `.fdp` decoder/viewer under `ground-station/lepton-dp-viewer/`.
+  - Added payload receiver directory/continuous mode.
+  - Added local-emulation tests and `validate_local.sh --demo c3m`.
+- Current local/non-HIL update set
+  - Added the dedicated C3M runbook:
+    [`docs/EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md`](EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md).
+  - Documented the Neutron/C3M payload-driver swap in
+    [`docs/SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHITECTURE.md).
+  - Added generated per-channel RF ACK policy constants.
+  - Kept channel 0 / CCSDS ACKed and made channel 1 / payload ACK-free for the
+    RF MVP bench candidate.
+  - Added the Pi cross-compile helper's `--copy-only` workflow for deploying a
+    previously verified binary without rebuilding.
+
+Validated locally:
+
+- `fprime-util generate -f`
+- `fprime-util build`
+- Python local-emulation tests
+- Direct C3M local demo
+- `./tools/validate_local.sh --demo c3m`
+
+Measured local full-res downlink:
+
+- Product: full-res Lepton `.fdp`
+- Size: 38,480 bytes
+- Payload packets: 1,100
+- Local emulator timing from `PayloadDownlinkStarted` to
+  `PayloadDownlinkComplete`: 34.72 seconds
+- Effective local app rate: about 31.7 payload packets/s, about 1.1 KB/s
+
+Important boundary:
+
+- This proves the laptop-local F Prime command, event, Data Product, channel-1
+  packetization, receiver, and viewer path.
+- It does not prove real Lepton/libuvc behavior, Raspberry Pi deployment, Teensy
+  UART/RF timing, channel-1 RF ACK behavior, queue-drop behavior, or bench CRC
+  repeatability.
+
 ## Current Understanding
 
 ### Architecture Direction
@@ -69,20 +125,24 @@ byte-perfect CCSDS file transfers.
 
 ### Current Bottleneck
 
-The strongest current diagnosis is that the first-order bottleneck is the
-application pacing in `PayloadDownlinkApp`, not `.fdp`.
+The original first-order bottleneck was application pacing in
+`PayloadDownlinkApp`, not `.fdp`. That local bottleneck has now been addressed
+with generated payload pacing constants and a 32-packet-per-run burst.
 
-Current shape:
+Current post-MVP shape:
 
 - Lepton full-res `.fdp`: about 38.5 KB.
 - Channel-1 payload packet data: 35 bytes per data packet.
 - Full-res transfer: about 1,100 data packets before retry overhead.
-- Current effective send pacing: roughly 1 payload packet per second.
-- Result: about 18 minutes for full-res, which is unusable for the demo.
+- Current app pacing: 32 payload packets per 1 Hz run tick.
+- Local emulator result: about 35 seconds for full-res, which is inside the
+  original expected 35-60 second range.
 
-This means Phase 2 pacing is the key first implementation gate. RF ACK policy
-still matters, but it should be treated as a measured transport optimization
-after pacing is no longer the obvious limiter.
+The remaining unknown is the real RF bench behavior. Current generated RF
+policy keeps per-segment ACK/retry on channel 0 and disables RF segment ACKs on
+channel 1. Downlink optimization now needs HIL measurements to distinguish true
+radio airtime limits, queue drops, and app-level retry behavior under the
+ACK-free payload path.
 
 ## Non-Goals
 
@@ -101,6 +161,12 @@ after pacing is no longer the obvious limiter.
 
 Objective: establish the actual current performance before changing anything.
 
+Status:
+
+- Local baseline completed after the C3M port: full-res `.fdp` downlink is about
+  34.72 seconds in laptop emulation.
+- HIL baseline is still pending and is now the next proof gate.
+
 Record the baseline in a new doc such as
 `docs/TRANSPORT_CHARACTERIZATION_2026-07.md`.
 
@@ -115,7 +181,11 @@ Measure:
 
 Expected result:
 
-- Full-res is likely about 18 minutes because of the current app pacing.
+- Pre-pacing full-res was likely about 18 minutes because of the old 1-packet/s
+  app pacing.
+- Current local full-res is about 35 seconds with 32 packets/run.
+- HIL timing is expected to be slower or more variable depending on RF ACK
+  behavior, queue drain, and retry rounds.
 
 Verification:
 
@@ -127,6 +197,16 @@ Verification:
 
 Objective: bring over C3M branch fixes that are bus-level improvements, not
 Lepton-specific architecture.
+
+Status:
+
+- Completed or superseded in the current tree.
+- Satellite Teensy boot/radio sequencing, bounded RF23BP chip-ready probing,
+  RF23 log-sink cleanup, and Pi service `WorkingDirectory` are already present.
+- The remaining branch helper gap, `docker_cross_compile_pi_zero_w.sh
+  --copy-only`, is now ported.
+- Radio-absent/degraded-radio behavior still requires HIL or bench-like hardware
+  proof.
 
 Candidates:
 
@@ -150,6 +230,16 @@ Verification:
 
 Objective: remove the obvious 1-packet-per-second limiter without changing the
 RF protocol.
+
+Status:
+
+- Implemented in the current tree.
+- `config/transport_constants.json` now carries
+  `payload.packets_per_run = 32` and `payload.retry_packets_per_run = 32`.
+- `PayloadDownlinkApp` sends burst packets per run tick and repeats the header
+  generically.
+- Local full-res timing is about 35 seconds.
+- HIL A/B timing remains pending.
 
 Design:
 
@@ -195,6 +285,15 @@ Verification:
 Objective: make channel 1 faster by removing redundant stop-and-wait RF ACKs
 only if Phase 2 is not enough or the team wants the transport optimization.
 
+Status:
+
+- Implemented as the current RF MVP bench candidate.
+- Channel 0 / CCSDS remains per-segment ACKed.
+- Channel 1 / payload is RF-segment ACK-free and relies on app-level packet
+  indexes, retry requests, and final CRC repair.
+- HIL still needs to prove whether the ACK-free payload policy is stable on the
+  real RFM23BP link.
+
 Design:
 
 - Add a generated per-channel ACK policy in `config/transport_constants.json`,
@@ -234,6 +333,14 @@ Objective: support large Lepton `.fdp` products without editing the F Prime
 submodule and without leaking Data Product file discovery into
 `PayloadDownlinkApp`.
 
+Status:
+
+- Implemented for the local MVP.
+- Added project-owned `ArtemisDataProducts` config/subtopology.
+- Added `DpWrittenRouter`.
+- Full-res Lepton `.fdp` products are written locally and reported through an
+  honest `ScienceProductDescriptor`.
+
 Design:
 
 - Keep `.fdp` as the payload science product format.
@@ -261,6 +368,14 @@ Verification:
 
 Objective: port the working C3M Lepton capture code into the current N2 driver
 seam.
+
+Status:
+
+- MVP implemented locally as `PayloadDriver_Lepton`.
+- Local/native path uses a deterministic simulated Lepton frame source.
+- The driver produces a full-res Lepton Data Product and emits a descriptor with
+  the written path and byte count.
+- Real libuvc/Lepton hardware behavior remains a HIL/Pi validation item.
 
 New component:
 
@@ -312,6 +427,14 @@ Verification:
 Objective: provide judge-visible pacing without sacrificing full-res science
 proof.
 
+Status:
+
+- Optional and still pending.
+- Not required for the current core MVP because full-res local downlink is about
+  35 seconds.
+- Still useful if HIL full-res timing is too slow for the live judge flow or if
+  the team wants a sub-15-second visible product.
+
 Design:
 
 - Add a capture mode enum or parameter:
@@ -336,6 +459,14 @@ Targets:
 Objective: wire C3M as a payload mission on the same bus without deleting the
 NeutronSim path.
 
+Status:
+
+- Implemented for `epscorc3m/demo`.
+- `payloadDriverLepton` is wired as the C3M payload driver.
+- `payloadDriverNeutronSim` remains defined for cheap revert/swap.
+- Documentation of the C3M/Neutron payload swap recipe is now in
+  `docs/SYSTEM_ARCHITECTURE.md`.
+
 Design:
 
 - Add `payloadDriverLepton` instance with a free base ID.
@@ -359,6 +490,14 @@ Document:
 
 Objective: make the ground flow usable by students and demo operators.
 
+Status:
+
+- Receiver directory/continuous mode is implemented.
+- Lepton `.fdp` viewer is implemented for full-res products.
+- C3M local demo runner is implemented and wired into `validate_local.sh`.
+- Dedicated C3M local/RF MVP runbook is now in
+  `docs/EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md`.
+
 Receiver:
 
 - Port directory/continuous mode into `tools/payload_receiver.py`.
@@ -380,6 +519,11 @@ Runbook:
 ### Phase 9 - HIL Acceptance Gate
 
 Objective: prove the port on the real bench before merge-back.
+
+Status:
+
+- Pending.
+- This is the next major gate now that the local MVP is green.
 
 Acceptance targets:
 
@@ -404,6 +548,10 @@ Suggested timing gates:
 Objective: bring bus-level improvements back without accidentally turning
 Neutron 2 into the C3M mission.
 
+Status:
+
+- Pending until HIL proves the port and the chosen downlink optimization.
+
 Before merge-back:
 
 - Confirm the FSR/demo release candidate tag exists.
@@ -421,20 +569,96 @@ Do not merge the C3M topology wiring swap into `neutron2-develop` unless the
 team explicitly wants Neutron 2's default payload changed. Mission identity
 should remain an intentional wiring choice.
 
-## Recommendations Before Starting Tomorrow
+## Next Local / Non-HIL Steps
+
+These were completed before HIL prep:
+
+1. Updated `docs/SYSTEM_ARCHITECTURE.md` with the C3M/Neutron payload swap recipe.
+2. Added a dedicated C3M local/RF MVP runbook that covers:
+   - `./tools/validate_local.sh --demo c3m`
+   - `ArtemisRpiTeensy_N2/tools/run_c3m_local_demo.sh`
+   - Lepton viewer command and expected JSON/CSV outputs
+3. Implemented the per-channel ACK policy behind generated constants.
+4. Added generator/check coverage for ACK policy constants so F Prime, satellite
+   Teensy, and ground Teensy cannot drift.
+5. Added `--copy-only` to the Pi cross-compile helper so a previously verified
+   binary can be deployed/smoked without a rebuild.
+
+Completed local/non-HIL gates after the transport edit:
+
+1. `./tools/validate_local.sh --demo c3m`
+2. Satellite Teensy Arduino build
+3. Ground Teensy Arduino build
+4. `ArtemisRpiTeensy_N2/tools/docker_cross_compile_pi_zero_w.sh --local-only`
+
+Remaining local/non-HIL work before HIL:
+
+1. Keep preview mode optional. Implement it only if HIL full-res timing is too
+   slow for the live demo story.
+
+## Downlink Optimization Summary
+
+Current RF policy:
+
+- Channel 0 / CCSDS: RF segment ACK/retry enabled.
+- Channel 1 / payload: RF segment ACK/retry disabled by generated policy.
+- Per-channel ACK policy is generated from `config/transport_constants.json` and
+  checked across F Prime, satellite Teensy, and ground Teensy headers.
+- Current constants:
+  - `RF_ACK_RETRIES = 4`
+  - `RF_ACK_TIMEOUT_MS = 80`
+  - `RF_INTER_SEGMENT_GAP_MS = 8`
+  - `PAYLOAD_PACKETS_PER_RUN = 32`
+  - `PAYLOAD_RETRY_PACKETS_PER_RUN = 32`
+  - `PAYLOAD_PACKET_DATA_BYTES = 35`
+
+Recommended optimization order:
+
+1. HIL baseline the current 32-packet/run, channel-1 ACK-free behavior.
+   - Capture wall-clock time, retry rounds, CRC result, queue drops, RF retries,
+     RF ACK timeouts, and channel-0 command responsiveness.
+2. If HIL is unstable, roll channel 1 back to ACKed in
+   `config/transport_constants.json`, regenerate, rebuild both Teensies, and
+   rerun the same HIL sequence.
+3. Sweep app pacing only after observing HIL counters.
+   - Try 32, 64, 96, then 128 packets/run if queue drops stay zero and channel 0
+     remains responsive.
+4. Treat larger payload app packets as a later experiment, not the primary fix.
+   - Today each `PayloadDownlinkApp` packet carries 35 data bytes and fits in one
+     RF segment.
+   - Larger app packets would reduce app-layer packet count and header overhead,
+     but the Teensy would still split the bytes into RF-sized segments.
+   - If the true limiter is RF segment rate, larger app packets will not solve it.
+5. Treat RF inter-segment gap tuning as conditional.
+   - The 8 ms gap matters mainly for multi-segment RF messages.
+   - With the current one-app-packet-to-one-RF-segment shape, it is not the first
+     downlink lever.
+
+Decision rule:
+
+- If current HIL full-res is <= 60 seconds with clean counters, keep the current
+  ACK-free payload policy and do not add preview mode.
+- If current HIL full-res is 60-120 seconds but clean, consider tuning app
+  pacing next.
+- If CRC failures or retry rounds dominate, A/B channel-1 ACK-on rollback before
+  changing the app layer.
+- If queue drops appear, reduce packets/run rather than hiding the problem with
+  retries.
+
+## Recommendations Before HIL
 
 1. Freeze or tag the current FSR-safe `neutron2-develop` state before invasive
    transport work.
-2. Start with Phase 0 measurement, even if the current timing is obviously bad.
-   The before/after table will be useful for the FSR writeup.
-3. Do Phase 2 pacing before Phase 3 ACK policy. Pacing is lower risk and likely
-   gets most of the win.
-4. Treat Phase 3 as conditional. If Phase 2 plus preview meets demo needs,
-   defer UNACK until after the near-term demo risk is lower.
-5. Keep `.fdp`, but make path/CRC honest. The Lepton driver must not rely on
+2. Start HIL with the current 32-packet/run, channel-1 ACK-free candidate and
+   record the before/after table for the FSR writeup.
+3. Optimize only from measured counters: channel-1 ACK-on rollback and
+   packet-rate sweeps should be A/B tests, not assumptions.
+4. Keep `.fdp`, but make path/CRC honest. The Lepton driver must not rely on
    `PayloadDownlinkApp` guessing the newest file in `./DpCat`.
-6. Preserve the N2 architecture names and seams. The port should produce
+5. Preserve the N2 architecture names and seams. The port should produce
    `PayloadDriver_Lepton`, not resurrect `PayloadAdapter_Lepton` as-is.
+6. Treat preview mode as optional. Full-res is the science proof; preview is only
+   needed if HIL full-res timing is too slow for the live demo.
 
 ## Working Definition of Done
 
