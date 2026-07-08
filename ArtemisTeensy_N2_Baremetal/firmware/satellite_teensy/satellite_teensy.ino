@@ -142,9 +142,8 @@ void setup() {
   Serial.begin(DEBUG_UART_BAUD);
   const bool watchdogReset = wdt_guard::consumeWatchdogResetFlag();
 
-  // Match EPSCOR payload baseline: assert Pi power-enable at boot.
   pinMode(RPI_ENABLE_PIN, OUTPUT);
-  digitalWrite(RPI_ENABLE_PIN, HIGH);
+  digitalWrite(RPI_ENABLE_PIN, LOW);
   pinMode(TEENSY_LED_PIN, OUTPUT);
   digitalWrite(TEENSY_LED_PIN, HIGH);
   if (watchdogReset) {
@@ -152,13 +151,14 @@ void setup() {
   }
   wdt_guard::begin();
   Serial.println("[ArtemisTeensy] hardware watchdog armed (12s)");
-  Serial.println("[ArtemisTeensy] RPI power enable asserted (pin 36 HIGH)");
   Serial.println("[ArtemisTeensy] LED asserted (pin 13 HIGH)");
 
   Serial2.addMemoryForRead(g_rpiUartRxBuffer, sizeof(g_rpiUartRxBuffer));
   Serial2.begin(UART_BAUD);
   g_pduProxy.begin(PDU_UART_BAUD);
   const bool radioOk = g_rfDriver.begin();
+  digitalWrite(RPI_ENABLE_PIN, HIGH);
+  Serial.println("[ArtemisTeensy] RPI power enable asserted (pin 36 HIGH)");
   g_relay.begin();
 
   if (radioOk) {

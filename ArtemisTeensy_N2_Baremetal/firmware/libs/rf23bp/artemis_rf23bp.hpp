@@ -99,6 +99,12 @@ inline void setupSpi1(const Spi1Pins& pins) {
   SPI1.begin();
 }
 
+// Hold chip select high before the radio is probed or initialized.
+inline void setupChipSelect(const RadioPins& pins) {
+  pinMode(pins.cs_pin, OUTPUT);
+  digitalWrite(pins.cs_pin, HIGH);
+}
+
 // Put RF front-end control lines into low-power idle.
 inline void setAmpIdle(const RadioPins& pins) {
   digitalWrite(pins.rx_on_pin, LOW);
@@ -130,17 +136,52 @@ inline void setupAmpPins(const RadioPins& pins, const RadioProfile& profile) {
   }
 }
 
+// Probe the radio with a bounded ready wait so boot can degrade cleanly when
+// the RFM23BP is absent or never reaches chip-ready.
+inline bool probeChipReady(RH_RF22& radio, const RadioPins& pins, Print* log = nullptr,
+                           unsigned long timeout_ms = 100) {
+  setupChipSelect(pins);
+
+  const uint8_t deviceType = radio.spiRead(RH_RF22_REG_00_DEVICE_TYPE);
+  if (deviceType != RH_RF22_DEVICE_TYPE_RX_TRX && deviceType != RH_RF22_DEVICE_TYPE_TX) {
+    if (log != nullptr) {
+      log->println(F("RF23BP device probe failed"));
+    }
+    return false;
+  }
+
+  radio.spiWrite(RH_RF22_REG_07_OPERATING_MODE1, RH_RF22_SWRES);
+
+  const unsigned long deadline = millis() + timeout_ms;
+  while (static_cast<int32_t>(millis() - deadline) < 0) {
+    if ((radio.spiRead(RH_RF22_REG_04_INTERRUPT_STATUS2) & RH_RF22_ICHIPRDY) != 0) {
+      return true;
+    }
+    delay(1);
+  }
+
+  if (log != nullptr) {
+    log->println(F("RF23BP chip-ready timeout"));
+  }
+  return false;
+}
+
 // One-call radio init:
 // 1) amp pin setup
 // 2) SPI1 setup
-// 3) RH_RF22 init + frequency/modem/tx power
-// 4) enter RX or IDLE based on profile
+// 3) bounded radio probe
+// 4) RH_RF22 init + frequency/modem/tx power
+// 5) enter RX or IDLE based on profile
 inline bool initRadio(RH_RF22& radio, const RadioPins& pins = RadioPins(),
                       const RadioProfile& profile = RadioProfile(),
                       Print* log = nullptr) {
   setupAmpPins(pins, profile);
   setupSpi1(pins.spi1);
   delay(10);
+
+  if (!probeChipReady(radio, pins, log)) {
+    return false;
+  }
 
   if (!radio.init()) {
     if (log != nullptr) {
