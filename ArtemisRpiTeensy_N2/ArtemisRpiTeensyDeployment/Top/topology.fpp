@@ -17,7 +17,7 @@ module ArtemisRpiTeensyDeployment {
   # ----------------------------------------------------------------------
     import CdhCore.Subtopology
     import ComCcsds.Subtopology
-    import DataProducts.Subtopology
+    import ArtemisDataProducts.Subtopology
     import FileHandling.Subtopology
     
   # ----------------------------------------------------------------------
@@ -45,12 +45,14 @@ module ArtemisRpiTeensyDeployment {
     instance thermalManager
     instance payloadDownlinkApp
     instance epsDriverArtemis
+    instance payloadDriverLepton
     instance payloadDriverNeutronSim
     instance adcsDriverD2S2
     instance gpsDriverArtemis
     instance commsDriverTeensyRfm23
     instance thermalDriverArtemis
     instance uartChannelMux
+    instance dpWrittenRouter
 
   # ----------------------------------------------------------------------
   # Pattern graph specifiers
@@ -118,8 +120,14 @@ module ArtemisRpiTeensyDeployment {
 
     connections FileHandling_DataProducts {
       # Data Products to File Downlink
-      DataProducts.dpCat.fileOut -> FileHandling.fileDownlink.SendFile
-      FileHandling.fileDownlink.FileComplete -> DataProducts.dpCat.fileDone
+      ArtemisDataProducts.dpCat.fileOut -> FileHandling.fileDownlink.SendFile
+      FileHandling.fileDownlink.FileComplete -> ArtemisDataProducts.dpCat.fileDone
+    }
+
+    connections DataProducts_DpWritten {
+      ArtemisDataProducts.dpWriter.dpWrittenOut -> dpWrittenRouter.dpWrittenIn
+      dpWrittenRouter.catalogOut -> ArtemisDataProducts.dpCat.addToCat
+      dpWrittenRouter.notifyOut -> payloadDriverLepton.dpWrittenIn
     }
 
     connections RateGroups {
@@ -156,9 +164,9 @@ module ArtemisRpiTeensyDeployment {
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup3] -> rateGroup3.CycleIn
       rateGroup3.RateGroupMemberOut[0] -> CdhCore.$health.Run
       rateGroup3.RateGroupMemberOut[1] -> ComCcsds.commsBufferManager.schedIn
-      rateGroup3.RateGroupMemberOut[2] -> DataProducts.dpBufferManager.schedIn
-      rateGroup3.RateGroupMemberOut[3] -> DataProducts.dpWriter.schedIn
-      rateGroup3.RateGroupMemberOut[4] -> DataProducts.dpMgr.schedIn
+      rateGroup3.RateGroupMemberOut[2] -> ArtemisDataProducts.dpBufferManager.schedIn
+      rateGroup3.RateGroupMemberOut[3] -> ArtemisDataProducts.dpWriter.schedIn
+      rateGroup3.RateGroupMemberOut[4] -> ArtemisDataProducts.dpMgr.schedIn
       rateGroup3.RateGroupMemberOut[5] -> comDriver.run
     }
 
@@ -188,8 +196,11 @@ module ArtemisRpiTeensyDeployment {
       epsDriverArtemis.teensyRequestOut -> uartChannelMux.localSendIn
       uartChannelMux.localRecvOut -> epsDriverArtemis.teensyResponseIn
 
-      payloadManager.driverRequestOut -> payloadDriverNeutronSim.requestIn
-      payloadDriverNeutronSim.statusOut -> payloadManager.driverStatusIn
+      payloadManager.driverRequestOut -> payloadDriverLepton.requestIn
+      payloadDriverLepton.statusOut -> payloadManager.driverStatusIn
+
+      payloadDriverLepton.productGetOut -> ArtemisDataProducts.dpMgr.productGetIn
+      payloadDriverLepton.productSendOut -> ArtemisDataProducts.dpMgr.productSendIn
 
       adcsManager.driverRequestOut -> adcsDriverD2S2.requestIn
       adcsDriverD2S2.statusOut -> adcsManager.driverStatusIn

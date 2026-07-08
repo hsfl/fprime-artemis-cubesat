@@ -106,10 +106,15 @@ module ArtemisRpiTeensyDeployment {
     stack size Default.STACK_SIZE \
     priority 28
 
+  instance payloadDriverLepton: Components.PayloadDriver_Lepton base id 0x10027000 \
+    queue size Default.QUEUE_SIZE \
+    stack size 256 * 1024 \
+    priority 27
+
   instance payloadDriverNeutronSim: Components.PayloadDriver_NeutronSim base id 0x10021000 \
     queue size Default.QUEUE_SIZE \
     stack size Default.STACK_SIZE \
-    priority 27
+    priority 26
 
   # ----------------------------------------------------------------------
   # Queued component instances
@@ -141,5 +146,7 @@ module ArtemisRpiTeensyDeployment {
   instance thermalDriverArtemis: Components.ThermalDriver_Artemis base id 0x10025000
 
   instance uartChannelMux: Components.UartChannelMux base id 0x10026000
+
+  instance dpWrittenRouter: Components.DpWrittenRouter base id 0x10028000
 
 }

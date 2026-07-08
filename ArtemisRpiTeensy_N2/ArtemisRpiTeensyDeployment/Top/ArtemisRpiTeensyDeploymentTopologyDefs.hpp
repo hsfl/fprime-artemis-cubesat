@@ -9,14 +9,14 @@
 // Subtopology PingEntries includes
 #include "Svc/Subtopologies/CdhCore/PingEntries.hpp"
 #include "Svc/Subtopologies/ComCcsds/PingEntries.hpp"
-#include "Svc/Subtopologies/DataProducts/PingEntries.hpp"
 #include "Svc/Subtopologies/FileHandling/PingEntries.hpp"
+#include "Subtopologies/ArtemisDataProducts/PingEntries.hpp"
 
 // SubtopologyTopologyDefs includes
 #include "Svc/Subtopologies/CdhCore/SubtopologyTopologyDefs.hpp"
 #include "Svc/Subtopologies/ComCcsds/SubtopologyTopologyDefs.hpp"
-#include "Svc/Subtopologies/DataProducts/SubtopologyTopologyDefs.hpp"
 #include "Svc/Subtopologies/FileHandling/SubtopologyTopologyDefs.hpp"
+#include "Subtopologies/ArtemisDataProducts/SubtopologyTopologyDefs.hpp"
 
 //ComCcsds Enum Includes
 #include "Svc/Subtopologies/ComCcsds/Ports_ComPacketQueueEnumAc.hpp"
@@ -62,6 +62,7 @@ namespace PingEntries {
     namespace ArtemisRpiTeensyDeployment_thermalManager {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_payloadDownlinkApp {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_epsDriverArtemis {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_payloadDriverLepton {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_payloadDriverNeutronSim {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_adcsDriverD2S2 {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_gpsDriverArtemis {enum { WARN = 3, FATAL = 5 };}
@@ -83,7 +84,7 @@ struct TopologyState {
     const char* uartDevice; //!< Linux UART device path (e.g. /dev/serial0)
     CdhCore::SubtopologyState cdhCore;           //!< Subtopology state for CdhCore
     ComCcsds::SubtopologyState comCcsds;         //!< Subtopology state for ComCcsds 
-    DataProducts::SubtopologyState dataProducts; //!< Subtopology state for DataProducts
+    ArtemisDataProducts::SubtopologyState dataProducts; //!< Subtopology state for ArtemisDataProducts
     FileHandling::SubtopologyState fileHandling; //!< Subtopology state for FileHandling
 };
 

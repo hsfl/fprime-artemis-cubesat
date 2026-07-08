@@ -1,0 +1,10 @@
+register_fprime_library(
+    AUTOCODER_INPUTS
+        "${CMAKE_CURRENT_LIST_DIR}/PayloadDriver_Lepton.fpp"
+    SOURCES
+        "${CMAKE_CURRENT_LIST_DIR}/PayloadDriver_Lepton.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/LeptonCamera.cpp"
+    DEPENDS
+        Components_Types
+        Subtopologies_ArtemisDataProducts_ArtemisDataProductsConfig
+)
