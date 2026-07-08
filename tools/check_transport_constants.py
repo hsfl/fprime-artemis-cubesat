@@ -81,6 +81,8 @@ def main() -> int:
         ("channel payload", ("fprime", fp["CHANNEL_PAYLOAD"]), ("satellite", sat["CHANNEL_PAYLOAD"]), ("ground", gnd["CHANNEL_PAYLOAD"])),
         ("UART max payload", ("fprime", fp["UART_FRAME_MAX_PAYLOAD"]), ("satellite", sat["FRAME_MAX_PAYLOAD"]), ("ground", gnd["FRAME_MAX_PAYLOAD"])),
         ("RF payload segment data", ("fprime", fp["RF_SEGMENT_MAX_DATA_BYTES"]), ("satellite", sat["RF_SEGMENT_MAX_DATA"]), ("ground", gnd["RF_SEGMENT_MAX_DATA"])),
+        ("RF ACK required CCSDS", ("fprime", fp["RF_ACK_REQUIRED_CCSDS"]), ("satellite", sat["RF_ACK_REQUIRED_CCSDS"]), ("ground", gnd["RF_ACK_REQUIRED_CCSDS"])),
+        ("RF ACK required payload", ("fprime", fp["RF_ACK_REQUIRED_PAYLOAD"]), ("satellite", sat["RF_ACK_REQUIRED_PAYLOAD"]), ("ground", gnd["RF_ACK_REQUIRED_PAYLOAD"])),
         ("payload packets per run", ("fprime", fp["PAYLOAD_PACKETS_PER_RUN"]), ("satellite", sat["PAYLOAD_PACKETS_PER_RUN"]), ("ground", gnd["PAYLOAD_PACKETS_PER_RUN"])),
         (
             "payload retry packets per run",
@@ -104,6 +106,10 @@ def main() -> int:
         errors.append("F Prime and satellite Teensy must keep channel 2 for local subsystem RPC")
     if gnd["CHANNEL_COUNT"] != 2:
         errors.append("Ground Teensy should expose only the RF-forwarded channels 0 and 1")
+    if fp["RF_ACK_REQUIRED_CCSDS"] != 1:
+        errors.append("Channel 0 / CCSDS must stay ACKed for command and telemetry reliability")
+    if fp["RF_ACK_REQUIRED_PAYLOAD"] not in (0, 1):
+        errors.append("Channel 1 / payload ACK policy must be a generated boolean flag")
 
     if errors:
         for error in errors:

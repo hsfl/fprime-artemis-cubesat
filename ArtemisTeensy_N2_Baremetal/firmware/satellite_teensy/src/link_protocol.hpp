@@ -40,6 +40,8 @@ static constexpr uint32_t RF_REASSEMBLY_TIMEOUT_MS = 500;
 static constexpr uint8_t RF_INTER_SEGMENT_GAP_MS = 8;
 static constexpr uint8_t RF_ACK_RETRIES = 4;
 static constexpr uint16_t RF_ACK_TIMEOUT_MS = 80;
+static constexpr uint8_t RF_ACK_REQUIRED_CCSDS = 1;
+static constexpr uint8_t RF_ACK_REQUIRED_PAYLOAD = 0;
 
 static constexpr uint32_t PAYLOAD_PACKETS_PER_RUN = 32;
 static constexpr uint32_t PAYLOAD_RETRY_PACKETS_PER_RUN = 32;
@@ -60,6 +62,12 @@ inline bool isValidChannel(uint8_t channel) {
 
 inline bool isRfChannel(uint8_t channel) {
   return channel < CHANNEL_RF_COUNT;
+}
+
+inline bool ackRequiredForChannel(uint8_t channel) {
+  return channel == CHANNEL_PAYLOAD
+             ? RF_ACK_REQUIRED_PAYLOAD != 0
+             : RF_ACK_REQUIRED_CCSDS != 0;
 }
 
 inline uint8_t magicForChannel(uint8_t channel) {

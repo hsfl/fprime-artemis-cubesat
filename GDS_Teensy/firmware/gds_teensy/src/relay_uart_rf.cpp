@@ -388,7 +388,11 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
     memcpy(&rfPacket[link_protocol::RF_SEGMENT_HEADER_LEN], payload + sent, chunkLen);
 
     const uint8_t rfLen = static_cast<uint8_t>(link_protocol::RF_SEGMENT_HEADER_LEN + chunkLen);
-    const bool sentOk = sendRfPacketWithAck(rfPacket, rfLen, channel, msgId, segIdx);
+    wdt_guard::feed();
+    const bool sentOk = link_protocol::ackRequiredForChannel(channel)
+                            ? sendRfPacketWithAck(rfPacket, rfLen, channel, msgId, segIdx)
+                            : m_rf.send(rfPacket, rfLen);
+    wdt_guard::feed();
     if (!sentOk) {
       m_counters.rfTxDrops += 1;
       return false;
@@ -545,7 +549,9 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
   }
 
   if (msgId == state.expectedMsgId && segCount == state.expectedSegCount && segIdx < state.expectedSegIndex) {
-    sendAck(channel, msgId, segIdx);
+    if (link_protocol::ackRequiredForChannel(channel)) {
+      sendAck(channel, msgId, segIdx);
+    }
     return;
   }
 
@@ -577,7 +583,9 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
   if (channel == link_protocol::CHANNEL_PAYLOAD) {
     m_counters.payloadRfRxSegments += 1;
   }
-  sendAck(channel, msgId, segIdx);
+  if (link_protocol::ackRequiredForChannel(channel)) {
+    sendAck(channel, msgId, segIdx);
+  }
 
   if (segIdx + 1 == segCount) {
     m_counters.rfRxMessages += 1;

@@ -32,7 +32,11 @@
     "reassembly_timeout_ms": 500,
     "inter_segment_gap_ms": 8,
     "ack_retries": 4,
-    "ack_timeout_ms": 80
+    "ack_timeout_ms": 80,
+    "ack_channels": {
+      "ccsds": true,
+      "payload": false
+    }
   },
   "payload": {
     "magic_0": 78,
