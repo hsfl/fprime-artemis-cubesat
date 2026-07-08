@@ -19,6 +19,51 @@ you are in a bench session and intend to change the Pi.
   ArtemisRpiTeensyDeploymentTopologyDictionary.json -> matching dictionary
 ```
 
+## Team Access And Wi-Fi Priority
+
+Current bench policy:
+
+- Keep the runtime service on user `pi`; do not change
+  `artemis-fprime.service` to a separate team account unless the runtime layout
+  is intentionally migrated too.
+- Team SSH login can use username `pi` plus the shared password distributed
+  out-of-band. Dennis's SSH key path should remain enabled as the recovery path.
+- SSH should allow both password and public-key login. On a live Pi this can be
+  made explicit with a small drop-in at
+  `/etc/ssh/sshd_config.d/90-neutron2-team-login.conf`:
+
+```text
+PasswordAuthentication yes
+PubkeyAuthentication yes
+```
+
+Wi-Fi profiles should be ranked with NetworkManager priorities:
+
+| Priority | Network | Purpose |
+| --- | --- | --- |
+| `200` | `TP-Link_9080` | Primary HIL/team network |
+| `100` | `TP-Link_A168` | Secondary bench fallback |
+| `1` | phone hotspot profile | Last-resort fallback, if configured |
+
+Do not commit Wi-Fi or SSH passwords into this repo. Share them out-of-band.
+
+## Boot And Service Startup Policy
+
+Current bench policy:
+
+- Disable `cloud-init` after the Pi is provisioned. It is useful for first-boot
+  image setup, but it adds avoidable boot time on a fixed HIL bench Pi.
+- Keep `artemis-fprime.service` independent of Wi-Fi. The deployment talks to
+  the satellite Teensy over `/dev/serial0`, so it should not wait for
+  `network-online.target`.
+- Keep SSH/network setup available for operators, but do not make the flight
+  deployment depend on it.
+
+The live bench Pi has `/etc/cloud/cloud-init.disabled` present and the cloud-init
+boot units disabled. If a new SD card is flashed with cloud-init-based first-boot
+customization, apply the disable step only after the first boot and SSH access
+are confirmed.
+
 The Pi Zero W is ARMv6. Do not use generic ARMv7 Raspberry Pi artifacts. For
 the cross-compile landmine and verification flow, use the existing docs:
 
@@ -87,7 +132,23 @@ sudo usermod -aG dialout pi
 sudo reboot
 ```
 
-### 3. Create the runtime directories
+### 3. Disable cloud-init after first boot
+
+Run this only after SSH, Wi-Fi, hostname, and the `pi` account are confirmed.
+
+```bash
+sudo touch /etc/cloud/cloud-init.disabled
+sudo systemctl disable --now \
+  cloud-init-main.service \
+  cloud-init-local.service \
+  cloud-init-network.service \
+  cloud-config.service \
+  cloud-final.service \
+  cloud-init.target \
+  cloud-init-hotplugd.socket
+```
+
+### 4. Create the runtime directories
 
 Run on the Pi:
 
@@ -95,7 +156,7 @@ Run on the Pi:
 mkdir -p /home/pi/artemis/releases /home/pi/artemis/current /home/pi/artemis/logs
 ```
 
-### 4. Copy the frozen release artifacts
+### 5. Copy the frozen release artifacts
 
 On macOS, download the release zip from GitHub:
 
@@ -133,7 +194,7 @@ ln -sfn "$DICT" /home/pi/artemis/current/ArtemisRpiTeensyDeploymentTopologyDicti
 Windows/WSL2 note: run the same `gh`, `scp`, and `ssh` commands from WSL2 with
 the repo at `~/fprime-artemis-cubesat`.
 
-### 5. Install and enable the systemd unit
+### 6. Install and enable the systemd unit
 
 From macOS:
 
@@ -194,6 +255,7 @@ kit. It should have:
 - Raspberry Pi OS Lite 32-bit for Pi Zero W.
 - SSH and Wi-Fi configured for the bench network.
 - User `pi` or a documented replacement with the service file updated.
+- Cloud-init disabled after first boot and confirmed SSH access.
 - UART enabled on `/dev/serial0`, serial console disabled, and `pi` in `dialout`.
 - `/home/pi/artemis/current` linked to the `v1.0.0-mvp-demo` binary and matching
   dictionary.

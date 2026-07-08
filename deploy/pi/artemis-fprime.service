@@ -7,10 +7,8 @@
 Description=Neutron 2 Artemis F Prime deployment
 # Wait for local filesystems so /home/pi/artemis/current exists before launch.
 After=local-fs.target
-# The deployment can run without network, but starting after network-online keeps
-# boot logs and SSH-based bench checks easier to reason about during demos.
-After=network-online.target
-Wants=network-online.target
+# The deployment talks to the satellite Teensy over /dev/serial0, so do not
+# block flight-software startup on Wi-Fi or network-online timing.
 # Fail clearly if the release symlink has not been installed yet.
 ConditionPathExists=/home/pi/artemis/current/ArtemisRpiTeensyDeployment
 
