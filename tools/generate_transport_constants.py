@@ -86,6 +86,8 @@ static constexpr FwSizeType RF_SEGMENT_MAX_DATA_BYTES =
     RF_PACKET_MAX_LEN - RF_SEGMENT_HEADER_LEN;
 static constexpr FwSizeType PAYLOAD_PACKET_MAX_BYTES = RF_SEGMENT_MAX_DATA_BYTES;
 static constexpr FwSizeType PAYLOAD_PACKET_DATA_BYTES = {payload["packet_data_bytes"]};
+static constexpr U32 PAYLOAD_PACKETS_PER_RUN = {payload["packets_per_run"]};
+static constexpr U32 PAYLOAD_RETRY_PACKETS_PER_RUN = {payload["retry_packets_per_run"]};
 static constexpr U8 PAYLOAD_MAGIC_0 = {hex_byte(payload["magic_0"])};  // 'N'
 static constexpr U8 PAYLOAD_MAGIC_1 = {hex_byte(payload["magic_1"])};  // '2'
 
@@ -105,6 +107,7 @@ def render_teensy(cfg: dict, *, satellite: bool) -> str:
     channels = cfg["channels"]
     rpc = cfg["teensy_rpc"]
     rf = cfg["rf"]
+    payload = cfg["payload"]
     command = cfg["command"]
     count = channels["satellite_count"] if satellite else channels["ground_count"]
     local_channel = ""
@@ -151,6 +154,9 @@ static constexpr uint32_t RF_REASSEMBLY_TIMEOUT_MS = {rf["reassembly_timeout_ms"
 static constexpr uint8_t RF_INTER_SEGMENT_GAP_MS = {rf["inter_segment_gap_ms"]};
 static constexpr uint8_t RF_ACK_RETRIES = {rf["ack_retries"]};
 static constexpr uint16_t RF_ACK_TIMEOUT_MS = {rf["ack_timeout_ms"]};
+
+static constexpr uint32_t PAYLOAD_PACKETS_PER_RUN = {payload["packets_per_run"]};
+static constexpr uint32_t PAYLOAD_RETRY_PACKETS_PER_RUN = {payload["retry_packets_per_run"]};
 
 static constexpr char COMMAND_PREFIX = {cpp_char(command["prefix"])};
 static constexpr size_t COMMAND_MAX_LEN = {command["max_len"]};

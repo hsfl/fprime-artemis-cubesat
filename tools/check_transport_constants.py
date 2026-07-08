@@ -81,6 +81,13 @@ def main() -> int:
         ("channel payload", ("fprime", fp["CHANNEL_PAYLOAD"]), ("satellite", sat["CHANNEL_PAYLOAD"]), ("ground", gnd["CHANNEL_PAYLOAD"])),
         ("UART max payload", ("fprime", fp["UART_FRAME_MAX_PAYLOAD"]), ("satellite", sat["FRAME_MAX_PAYLOAD"]), ("ground", gnd["FRAME_MAX_PAYLOAD"])),
         ("RF payload segment data", ("fprime", fp["RF_SEGMENT_MAX_DATA_BYTES"]), ("satellite", sat["RF_SEGMENT_MAX_DATA"]), ("ground", gnd["RF_SEGMENT_MAX_DATA"])),
+        ("payload packets per run", ("fprime", fp["PAYLOAD_PACKETS_PER_RUN"]), ("satellite", sat["PAYLOAD_PACKETS_PER_RUN"]), ("ground", gnd["PAYLOAD_PACKETS_PER_RUN"])),
+        (
+            "payload retry packets per run",
+            ("fprime", fp["PAYLOAD_RETRY_PACKETS_PER_RUN"]),
+            ("satellite", sat["PAYLOAD_RETRY_PACKETS_PER_RUN"]),
+            ("ground", gnd["PAYLOAD_RETRY_PACKETS_PER_RUN"]),
+        ),
     ]
     for label, *pairs in common_pairs:
         expect_equal(errors, label, *pairs)

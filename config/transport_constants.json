@@ -37,7 +37,9 @@
   "payload": {
     "magic_0": 78,
     "magic_1": 50,
-    "packet_data_bytes": 35
+    "packet_data_bytes": 35,
+    "packets_per_run": 32,
+    "retry_packets_per_run": 32
   },
   "command": {
     "prefix": "#",

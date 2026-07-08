@@ -41,6 +41,9 @@ static constexpr uint8_t RF_INTER_SEGMENT_GAP_MS = 8;
 static constexpr uint8_t RF_ACK_RETRIES = 4;
 static constexpr uint16_t RF_ACK_TIMEOUT_MS = 80;
 
+static constexpr uint32_t PAYLOAD_PACKETS_PER_RUN = 32;
+static constexpr uint32_t PAYLOAD_RETRY_PACKETS_PER_RUN = 32;
+
 static constexpr char COMMAND_PREFIX = '#';
 static constexpr size_t COMMAND_MAX_LEN = 64;
 

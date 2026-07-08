@@ -36,6 +36,8 @@ static constexpr FwSizeType RF_SEGMENT_MAX_DATA_BYTES =
     RF_PACKET_MAX_LEN - RF_SEGMENT_HEADER_LEN;
 static constexpr FwSizeType PAYLOAD_PACKET_MAX_BYTES = RF_SEGMENT_MAX_DATA_BYTES;
 static constexpr FwSizeType PAYLOAD_PACKET_DATA_BYTES = 35;
+static constexpr U32 PAYLOAD_PACKETS_PER_RUN = 32;
+static constexpr U32 PAYLOAD_RETRY_PACKETS_PER_RUN = 32;
 static constexpr U8 PAYLOAD_MAGIC_0 = 0x4E;  // 'N'
 static constexpr U8 PAYLOAD_MAGIC_1 = 0x32;  // '2'
 
