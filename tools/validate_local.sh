@@ -130,6 +130,7 @@ if [[ "$RUN_DEMO" == "true" ]]; then
       --exit-after-sequence \
       --gui-port 5061 \
       --viewer-port 8063 \
+      --no-open \
       --delay 2 \
       --capture-seconds 2
   )

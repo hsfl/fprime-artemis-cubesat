@@ -12,7 +12,9 @@ VIEWER_PORT="${VIEWER_PORT:-8062}"
 DELAY_SECONDS="${DELAY_SECONDS:-10}"
 CAPTURE_SECONDS="${CAPTURE_SECONDS:-10}"
 HOLD_AFTER_SEQUENCE="true"
+OPEN_VIEWER="true"
 DICT_PATH="${DICT_PATH:-}"
+APP_BINARY_PATH="${APP_BINARY_PATH:-}"
 BUILD_CACHE="${BUILD_CACHE:-$ROOT_DIR/build-neutron2-local}"
 SKIP_BUILD="false"
 
@@ -30,10 +32,12 @@ Options:
   --viewer-port <port>       payload viewer port (default: 8062)
   --delay <seconds>          scheduled collection delay (default: 10)
   --capture-seconds <secs>   simulator capture duration (default: 10)
+  --app-binary <path>        deployment binary path (default: host-platform artifact)
   --dictionary <path>        topology dictionary path (default: latest generated dict)
   --build-cache <path>       local build cache (default: ArtemisRpiTeensy_N2/build-neutron2-local)
   --skip-build               use existing binary/dictionary without regenerating the unified topology
   --exit-after-sequence      stop emulator/viewer after automated checks pass
+  --no-open                  do not open/refocus the payload viewer in a browser
   -h, --help                 show this help text
 
 Pass criteria:
@@ -72,6 +76,10 @@ while [[ $# -gt 0 ]]; do
       CAPTURE_SECONDS="${2:-}"
       shift 2
       ;;
+    --app-binary)
+      APP_BINARY_PATH="${2:-}"
+      shift 2
+      ;;
     --dictionary)
       DICT_PATH="${2:-}"
       shift 2
@@ -86,6 +94,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --exit-after-sequence)
       HOLD_AFTER_SEQUENCE="false"
+      shift
+      ;;
+    --no-open)
+      OPEN_VIEWER="false"
       shift
       ;;
     -h|--help)
@@ -115,21 +127,47 @@ if [[ "$SKIP_BUILD" != "true" ]]; then
   )
 fi
 
-if [[ -z "$DICT_PATH" ]]; then
-  DICT_PATH="$(
-    python3 - "$ROOT_DIR/build-artifacts" "$DICT_BASENAME" <<'PY'
+resolve_artifact() {
+  local kind="$1"
+  local name="$2"
+  python3 - "$ROOT_DIR/build-artifacts" "$DEPLOYMENT_NAME" "$kind" "$name" <<'PY'
 from pathlib import Path
+import platform
 import sys
 
 root = Path(sys.argv[1])
-name = sys.argv[2]
-matches = list(root.glob(f"*/ArtemisRpiTeensyDeployment/dict/{name}"))
+deployment = sys.argv[2]
+kind = sys.argv[3]
+name = sys.argv[4]
+
+host = platform.system()
+if host == "Darwin":
+    platform_dir = "Darwin"
+elif host == "Linux":
+    platform_dir = "Linux"
+else:
+    platform_dir = host
+
+host_path = root / platform_dir / deployment / kind / name
+if host_path.exists():
+    print(host_path)
+    raise SystemExit(0)
+
+matches = list(root.glob(f"*/{deployment}/{kind}/{name}"))
 if not matches:
     raise SystemExit(1)
 matches.sort(key=lambda path: path.stat().st_mtime, reverse=True)
 print(matches[0])
 PY
-  )" || fail "No topology dictionary found. Build first: fprime-util generate -f && fprime-util build"
+}
+
+if [[ -z "$APP_BINARY_PATH" ]]; then
+  APP_BINARY_PATH="$(resolve_artifact bin "$DEPLOYMENT_NAME")" || fail "No deployment binary found. Build first: fprime-util generate -f && fprime-util build"
+fi
+[[ -x "$APP_BINARY_PATH" ]] || fail "Missing or non-executable deployment binary: $APP_BINARY_PATH"
+
+if [[ -z "$DICT_PATH" ]]; then
+  DICT_PATH="$(resolve_artifact dict "$DICT_BASENAME")" || fail "No topology dictionary found. Build first: fprime-util generate -f && fprime-util build"
 fi
 [[ -f "$DICT_PATH" ]] || fail "Missing dictionary: $DICT_PATH"
 
@@ -275,6 +313,7 @@ send_command() {
   return 1
 }
 
+log "app binary: $APP_BINARY_PATH"
 log "dictionary: $DICT_PATH"
 log "capture dir: $CAPTURE_DIR"
 log "logs: $LOG_DIR"
@@ -282,7 +321,11 @@ log "logs: $LOG_DIR"
 (
   cd "$ROOT_DIR"
   export NEUTRON_PAYLOAD_SIM_ROOT="$REPO_ROOT/external/payload-neutron-simulation"
-  exec ./tools/run_local_emulation.sh --gui-port "$GUI_PORT" --link-mode channelized
+  exec ./tools/run_local_emulation.sh \
+    --app-binary "$APP_BINARY_PATH" \
+    --dictionary "$DICT_PATH" \
+    --gui-port "$GUI_PORT" \
+    --link-mode channelized
 ) >"$LOG_DIR/emulation.log" 2>&1 &
 EMU_PID="$!"
 log "started local emulator pid=$EMU_PID; GDS: http://127.0.0.1:$GUI_PORT"
@@ -328,8 +371,12 @@ SUMMARY="$(
 )"
 printf '%s\n' "$SUMMARY" > "$LOG_DIR/latest_capture_summary.json"
 log "viewer summary written: $LOG_DIR/latest_capture_summary.json"
-open_url "http://127.0.0.1:$VIEWER_PORT"
-log "opened/refocused payload viewer after verified downlink: http://127.0.0.1:$VIEWER_PORT"
+if [[ "$OPEN_VIEWER" == "true" ]]; then
+  open_url "http://127.0.0.1:$VIEWER_PORT"
+  log "opened/refocused payload viewer after verified downlink: http://127.0.0.1:$VIEWER_PORT"
+else
+  log "payload viewer verified at http://127.0.0.1:$VIEWER_PORT"
+fi
 log "PASS: local Neutron 2 MVP demo sequence produced and parsed a science CSV"
 
 if [[ "$HOLD_AFTER_SEQUENCE" == "true" ]]; then

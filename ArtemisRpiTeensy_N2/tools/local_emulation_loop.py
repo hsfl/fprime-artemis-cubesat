@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import errno
 import os
+import platform
 import pty
 import re
 import selectors
@@ -727,12 +728,28 @@ def _find_latest_file(root: Path, pattern: str) -> Optional[Path]:
     return matches[0]
 
 
+def _host_artifact_platform() -> str:
+    system = platform.system()
+    if system == "Darwin":
+        return "Darwin"
+    if system == "Linux":
+        return "Linux"
+    return system
+
+
+def _find_host_file_or_latest(root: Path, pattern: str) -> Optional[Path]:
+    host_path = root / _host_artifact_platform() / pattern
+    if host_path.exists():
+        return host_path
+    return _find_latest_file(root, f"*/{pattern}")
+
+
 def _resolve_default_app_binary(project_root: Path) -> Optional[Path]:
     build_root = project_root / "build-artifacts"
     if not build_root.exists():
         return None
-    return _find_latest_file(
-        build_root, f"*/{DEPLOYMENT_NAME}/bin/{DEPLOYMENT_NAME}"
+    return _find_host_file_or_latest(
+        build_root, f"{DEPLOYMENT_NAME}/bin/{DEPLOYMENT_NAME}"
     )
 
 
@@ -740,8 +757,8 @@ def _resolve_default_dictionary(project_root: Path) -> Optional[Path]:
     build_root = project_root / "build-artifacts"
     if not build_root.exists():
         return None
-    return _find_latest_file(
-        build_root, f"*/{DEPLOYMENT_NAME}/dict/{DICT_BASENAME}"
+    return _find_host_file_or_latest(
+        build_root, f"{DEPLOYMENT_NAME}/dict/{DICT_BASENAME}"
     )
 
 
