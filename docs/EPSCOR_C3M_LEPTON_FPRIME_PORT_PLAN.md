@@ -7,6 +7,10 @@ preserved unchanged at
 [`docs/EPSCOR_C3M_LEPTON_FPRIME_PORT_FABLE_PLAN.md`](EPSCOR_C3M_LEPTON_FPRIME_PORT_FABLE_PLAN.md)
 for traceability.
 
+The focused follow-on plan for restoring real Lepton camera capture inside the
+current driver seam is
+[`docs/C3M_LEPTON_CAMERA_BACKEND_HIL_PLAN.md`](C3M_LEPTON_CAMERA_BACKEND_HIL_PLAN.md).
+
 ## Intent
 
 Dennis's intent is to converge two mission efforts onto one reusable Artemis
@@ -376,6 +380,9 @@ Status:
 - The driver produces a full-res Lepton Data Product and emits a descriptor with
   the written path and byte count.
 - Real libuvc/Lepton hardware behavior remains a HIL/Pi validation item.
+- Follow-on plan for backend selection, conservative `libuvc` build support, and
+  real descriptor CRC:
+  [`docs/C3M_LEPTON_CAMERA_BACKEND_HIL_PLAN.md`](C3M_LEPTON_CAMERA_BACKEND_HIL_PLAN.md).
 
 New component:
 
