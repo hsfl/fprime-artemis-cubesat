@@ -136,6 +136,7 @@ if [[ "$RUN_DEMO" == "true" ]]; then
         ./tools/run_c3m_local_demo.sh \
           --skip-build \
           --exit-after-sequence \
+          --no-open \
           --gui-port 5061 \
           --delay 2 \
           --capture-seconds 2

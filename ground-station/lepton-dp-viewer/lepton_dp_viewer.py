@@ -8,9 +8,12 @@ import datetime as dt
 import glob
 import json
 import os
+import shutil
 import statistics
+import struct
 import subprocess
 import sys
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -157,11 +160,71 @@ def write_csv(path: Path, values_c: list[float], captured_at: str | None) -> Non
             handle.write("\n")
 
 
+def hot_color(value: float) -> tuple[int, int, int]:
+    value = max(0.0, min(1.0, value))
+    red = min(1.0, value * 3.0)
+    green = min(1.0, max(0.0, value * 3.0 - 1.0))
+    blue = min(1.0, max(0.0, value * 3.0 - 2.0))
+    return round(red * 255), round(green * 255), round(blue * 255)
+
+
+def write_png_chunk(tag: bytes, data: bytes) -> bytes:
+    return (
+        struct.pack(">I", len(data))
+        + tag
+        + data
+        + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+    )
+
+
+def write_fallback_png(path: Path, values_c: list[float], scale: int = 4) -> None:
+    min_c = min(values_c)
+    max_c = max(values_c)
+    span = max(max_c - min_c, 1.0)
+    rows: list[bytes] = []
+    for row in range(HEIGHT):
+        out = bytearray()
+        offset = row * WIDTH
+        for value in values_c[offset : offset + WIDTH]:
+            color = bytes(hot_color((value - min_c) / span))
+            out.extend(color * scale)
+        row_bytes = bytes(out)
+        for _ in range(scale):
+            rows.append(row_bytes)
+
+    png_width = WIDTH * scale
+    png_height = HEIGHT * scale
+    scanlines = b"".join(b"\x00" + row for row in rows)
+    ihdr = struct.pack(">IIBBBBB", png_width, png_height, 8, 2, 0, 0, 0)
+    png = (
+        b"\x89PNG\r\n\x1a\n"
+        + write_png_chunk(b"IHDR", ihdr)
+        + write_png_chunk(b"IDAT", zlib.compress(scanlines, level=9))
+        + write_png_chunk(b"IEND", b"")
+    )
+    path.write_bytes(png)
+
+
+def open_image(path: Path) -> None:
+    if sys.platform == "darwin":
+        subprocess.Popen(["open", str(path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return
+    if os.name == "nt":
+        os.startfile(path)  # type: ignore[attr-defined]
+        return
+    opener = shutil.which("xdg-open") or shutil.which("wslview")
+    if opener:
+        subprocess.Popen([opener, str(path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
 def write_png(path: Path, values_c: list[float], title: str, no_show: bool) -> bool:
     try:
         import matplotlib.pyplot as plt  # type: ignore
     except ImportError:
-        return False
+        write_fallback_png(path, values_c)
+        if not no_show:
+            open_image(path)
+        return True
 
     grid = [values_c[row * WIDTH : (row + 1) * WIDTH] for row in range(HEIGHT)]
     fig, ax = plt.subplots(figsize=(8, 6))

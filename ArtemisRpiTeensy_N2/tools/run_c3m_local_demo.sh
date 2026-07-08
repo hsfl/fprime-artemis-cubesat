@@ -14,7 +14,8 @@ DICT_PATH="${DICT_PATH:-}"
 APP_BINARY_PATH="${APP_BINARY_PATH:-}"
 BUILD_CACHE="${BUILD_CACHE:-$ROOT_DIR/build-c3m-local}"
 SKIP_BUILD="false"
-GENERATE_PNG="false"
+GENERATE_PNG="true"
+OPEN_PNG="true"
 
 usage() {
   cat <<'EOF'
@@ -23,7 +24,7 @@ Usage: run_c3m_local_demo.sh [options]
 Runs the EPSCoR C3M laptop-only demo:
   local F' app <-> PTY link emulator <-> fprime-gds
   PayloadDriver_Lepton -> ArtemisDataProducts ./DpCat/*.fdp
-  Lepton data-product decoder -> CSV/summary under tools/logs
+  Lepton data-product decoder -> JSON/CSV/PNG under tools/logs
 
 Options:
   --gui-port <port>          fprime-gds GUI port (default: 5050)
@@ -34,7 +35,9 @@ Options:
   --build-cache <path>       local build cache (default: ArtemisRpiTeensy_N2/build-c3m-local)
   --skip-build               use existing binary/dictionary without regenerating the unified topology
   --exit-after-sequence      stop emulator after automated checks pass
-  --png                      also render a PNG if matplotlib is installed
+  --png                      render PNG output (default; kept for compatibility)
+  --no-png                   skip PNG generation
+  --no-open, --no-show       do not open the decoded PNG viewer
   -h, --help                 show this help text
 
 Pass criteria:
@@ -42,6 +45,7 @@ Pass criteria:
   - scheduled collection writes a new ./DpCat/Dp_*.fdp
   - F Prime payload downlink completes over channel 1
   - Lepton viewer decodes the .fdp and verifies a 160x120 thermal frame
+  - interactive runs open the decoded PNG image
 EOF
 }
 
@@ -90,6 +94,15 @@ while [[ $# -gt 0 ]]; do
       ;;
     --png)
       GENERATE_PNG="true"
+      shift
+      ;;
+    --no-png)
+      GENERATE_PNG="false"
+      OPEN_PNG="false"
+      shift
+      ;;
+    --no-open|--no-show)
+      OPEN_PNG="false"
       shift
       ;;
     -h|--help)
@@ -278,6 +291,32 @@ send_command() {
   return 1
 }
 
+open_png_viewer() {
+  local png_path="$1"
+  [[ -f "$png_path" ]] || fail "PNG not found: $png_path"
+
+  case "$(uname -s)" in
+    Darwin)
+      open "$png_path" >/dev/null 2>&1 || fail "Failed to open PNG viewer for $png_path"
+      ;;
+    Linux)
+      if command -v xdg-open >/dev/null 2>&1; then
+        xdg-open "$png_path" >/dev/null 2>&1 || fail "Failed to open PNG viewer for $png_path"
+      elif command -v wslview >/dev/null 2>&1; then
+        wslview "$png_path" >/dev/null 2>&1 || fail "Failed to open PNG viewer for $png_path"
+      else
+        log "PNG written but no image opener was found: $png_path"
+      fi
+      ;;
+    MINGW*|MSYS*|CYGWIN*)
+      cmd.exe /C start "" "$png_path" >/dev/null 2>&1 || fail "Failed to open PNG viewer for $png_path"
+      ;;
+    *)
+      log "PNG written: $png_path"
+      ;;
+  esac
+}
+
 log "app binary: $APP_BINARY_PATH"
 log "dictionary: $DICT_PATH"
 log "data products: $ROOT_DIR/DpCat"
@@ -325,18 +364,32 @@ fi
 python3 "$REPO_ROOT/ground-station/lepton-dp-viewer/lepton_dp_viewer.py" "$FDP_FILE" "${VIEWER_ARGS[@]}" \
   > "$LOG_DIR/lepton_summary.json"
 
-python3 - "$LOG_DIR/lepton_summary.json" <<'PY'
+PNG_FILE="$(python3 - "$LOG_DIR/lepton_summary.json" "$GENERATE_PNG" <<'PY'
 import json
 import sys
 
 summary = json.load(open(sys.argv[1]))
+expect_png = sys.argv[2] == "true"
 if summary.get("width") != 160 or summary.get("height") != 120 or summary.get("pixels") != 19200:
     raise SystemExit("decoded Lepton dimensions did not match 160x120")
 if summary.get("max_c", 0) <= summary.get("min_c", 0):
     raise SystemExit("decoded Lepton thermal range is invalid")
+png = summary.get("png")
+if expect_png and not png:
+    raise SystemExit("decoded Lepton PNG was not generated")
+if png:
+    print(png)
 PY
+)"
 
 log "viewer summary written: $LOG_DIR/lepton_summary.json"
+if [[ -n "$PNG_FILE" ]]; then
+  log "viewer PNG written: $PNG_FILE"
+  if [[ "$OPEN_PNG" == "true" ]]; then
+    log "opening decoded Lepton PNG"
+    open_png_viewer "$PNG_FILE"
+  fi
+fi
 log "PASS: local EPSCoR C3M demo produced, downlinked, and decoded a Lepton .fdp"
 
 if [[ "$HOLD_AFTER_SEQUENCE" == "true" ]]; then

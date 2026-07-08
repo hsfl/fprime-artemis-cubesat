@@ -59,6 +59,7 @@ Pass criteria:
 - a new `ArtemisRpiTeensy_N2/DpCat/Dp_*.fdp` is produced.
 - the demo log includes `PayloadDownlinkComplete` and `DownlinkFinished`.
 - the viewer summary reports `width=160`, `height=120`, and `pixels=19200`.
+- a decoded Lepton PNG is written under the run log directory.
 - the script prints:
   `PASS: local EPSCoR C3M demo produced, downlinked, and decoded a Lepton .fdp`.
 
@@ -72,6 +73,10 @@ cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 ./tools/run_c3m_local_demo.sh --delay 10 --capture-seconds 10 --exit-after-sequence
 ```
 
+The manual demo writes JSON, CSV, and PNG outputs under the run log directory
+and opens the decoded Lepton PNG after the downlink and decode checks pass. Use
+`--no-open` when running headless or inside automated validation.
+
 The script writes logs under:
 
 ```text
@@ -84,7 +89,7 @@ Manual decode check:
 cd ~/Developer/fprime-artemis-cubesat
 python3 ground-station/lepton-dp-viewer/lepton_dp_viewer.py \
   ArtemisRpiTeensy_N2/DpCat/Dp_*.fdp \
-  --summary --no-show
+  --summary
 ```
 
 Use the newest `.fdp` file from `DpCat` if the shell expands multiple products.
