@@ -77,7 +77,7 @@ New `Components/PayloadDriver_Lepton/` ported from C3M `PayloadAdapter_Lepton/` 
 ### Phase 7 — Ground tooling (Windows-friendly)
 - Port receiver directory/continuous mode into `tools/payload_receiver.py` (applies cleanly; stays pyserial-only ⇒ native Windows) + directory-mode unit tests.
 - Port viewer to `ground-station/lepton-dp-viewer/dp_lepton_viewer.py`, extended to accept 19,200-px **and** 4,800-px arrays; README runbook with N2 command names + Windows section (`pip install fprime-gds numpy matplotlib`).
-- Port July 7 sample `.fdp`/`.png`/`.csv` + README into `TEST-DATA-DOWNLINK/`; drop the 77k-line decoded `.json` (regenerable).
+- Port July 7 sample `.fdp` plus decoded `.csv`/`.json`/`.png` + README into `ground-station/c3m-lepton-test-data/` so the local C3M demo can validate against the real Lepton reference data.
 
 ### Phase 8 — HIL acceptance gate
 ≥5 full-res + ≥5 preview transfers, counters before/after. Targets: **full-res ≤ 60 s** (expect 35–45 s), **preview ≤ 15 s**, 5/5 CRC-complete + plausible thermal decode, zero queue drops, ch0 responsive mid-transfer, retry rounds ≤ 2, `validate_local.sh` PASS on both mission stories, radio-absent cold boot degrades gracefully.

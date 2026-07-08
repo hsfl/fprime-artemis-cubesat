@@ -79,9 +79,9 @@ bool LeptonCamera::loadSampleFrame(char* reason, U32 reasonSize) {
     }
 
     const char* candidates[] = {
-        "../TEST-DATA-DOWNLINK/data/Dp_20260707_120740.csv",
-        "TEST-DATA-DOWNLINK/data/Dp_20260707_120740.csv",
-        "../../TEST-DATA-DOWNLINK/data/Dp_20260707_120740.csv",
+        "../ground-station/c3m-lepton-test-data/data/Dp_20260707_120740.csv",
+        "ground-station/c3m-lepton-test-data/data/Dp_20260707_120740.csv",
+        "../../ground-station/c3m-lepton-test-data/data/Dp_20260707_120740.csv",
     };
     for (const char* candidate : candidates) {
         if (this->loadSampleCsv(candidate)) {

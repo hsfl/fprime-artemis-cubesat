@@ -16,7 +16,7 @@ BUILD_CACHE="${BUILD_CACHE:-$ROOT_DIR/build-c3m-local}"
 SKIP_BUILD="false"
 GENERATE_PNG="true"
 OPEN_PNG="true"
-LEPTON_SAMPLE_CSV="${C3M_LEPTON_SAMPLE_CSV:-$REPO_ROOT/TEST-DATA-DOWNLINK/data/Dp_20260707_120740.csv}"
+LEPTON_SAMPLE_CSV="${C3M_LEPTON_SAMPLE_CSV:-$REPO_ROOT/ground-station/c3m-lepton-test-data/data/Dp_20260707_120740.csv}"
 
 usage() {
   cat <<'EOF'
