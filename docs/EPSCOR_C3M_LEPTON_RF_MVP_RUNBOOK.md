@@ -9,7 +9,8 @@ RFM23BP ACK/retry timing, queue drops, and CRC repeatability.
 
 Validated locally:
 
-- `PayloadDriver_Lepton` simulated full-res Lepton product generation.
+- `PayloadDriver_Lepton` simulated full-res Lepton product generation using
+  the real Lepton sample grid from `TEST-DATA-DOWNLINK`.
 - F Prime Data Product write to `DpCat/Dp_*.fdp`.
 - `PayloadDownlinkApp` channel-1 packetization and retry flow.
 - Ground receiver reconstruction.
@@ -37,6 +38,8 @@ Pass criteria:
 - expected branch/worktree is active.
 - F Prime virtual environment activates.
 - submodules are present.
+- `TEST-DATA-DOWNLINK/Dp_20260707_120740.fdp` and
+  `TEST-DATA-DOWNLINK/data/Dp_20260707_120740.csv` are present.
 
 ## One-Command Local Gate
 
@@ -60,6 +63,9 @@ Pass criteria:
 - the demo log includes `PayloadDownlinkComplete` and `DownlinkFinished`.
 - the viewer summary reports `width=160`, `height=120`, and `pixels=19200`.
 - a decoded Lepton PNG is written under the run log directory.
+- the decoded local-demo CSV matches
+  `TEST-DATA-DOWNLINK/data/Dp_20260707_120740.csv`, ignoring only capture-time
+  metadata.
 - the script prints:
   `PASS: local EPSCoR C3M demo produced, downlinked, and decoded a Lepton .fdp`.
 
@@ -76,6 +82,17 @@ cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 The manual demo writes JSON, CSV, and PNG outputs under the run log directory
 and opens the decoded Lepton PNG after the downlink and decode checks pass. Use
 `--no-open` when running headless or inside automated validation.
+
+By default, `run_c3m_local_demo.sh` exports `C3M_LEPTON_SAMPLE_CSV` to the
+checked-in real Lepton sample:
+
+```text
+TEST-DATA-DOWNLINK/data/Dp_20260707_120740.csv
+```
+
+The resulting local `.fdp` must decode back to that same 120x160 grid. Override
+with `--sample-csv <path>` only when intentionally testing a different Lepton
+sample.
 
 The script writes logs under:
 

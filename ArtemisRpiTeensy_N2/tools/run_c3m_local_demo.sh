@@ -16,6 +16,7 @@ BUILD_CACHE="${BUILD_CACHE:-$ROOT_DIR/build-c3m-local}"
 SKIP_BUILD="false"
 GENERATE_PNG="true"
 OPEN_PNG="true"
+LEPTON_SAMPLE_CSV="${C3M_LEPTON_SAMPLE_CSV:-$REPO_ROOT/TEST-DATA-DOWNLINK/data/Dp_20260707_120740.csv}"
 
 usage() {
   cat <<'EOF'
@@ -33,6 +34,7 @@ Options:
   --app-binary <path>        deployment binary path (default: host-platform artifact)
   --dictionary <path>        topology dictionary path (default: latest generated dict)
   --build-cache <path>       local build cache (default: ArtemisRpiTeensy_N2/build-c3m-local)
+  --sample-csv <path>        real Lepton sample CSV to feed the local camera stub
   --skip-build               use existing binary/dictionary without regenerating the unified topology
   --exit-after-sequence      stop emulator after automated checks pass
   --png                      render PNG output (default; kept for compatibility)
@@ -84,6 +86,10 @@ while [[ $# -gt 0 ]]; do
       BUILD_CACHE="${2:-}"
       shift 2
       ;;
+    --sample-csv)
+      LEPTON_SAMPLE_CSV="${2:-}"
+      shift 2
+      ;;
     --skip-build)
       SKIP_BUILD="true"
       shift
@@ -118,9 +124,11 @@ done
 [[ -f "$VENV_ACTIVATE" ]] || fail "Missing venv: $VENV_ACTIVATE"
 [[ -x "$ROOT_DIR/tools/run_local_emulation.sh" ]] || fail "Missing local emulator launcher"
 [[ -x "$REPO_ROOT/ground-station/lepton-dp-viewer/lepton_dp_viewer.py" ]] || fail "Missing Lepton DP viewer"
+[[ -f "$LEPTON_SAMPLE_CSV" ]] || fail "Missing real Lepton sample CSV: $LEPTON_SAMPLE_CSV"
 
 # shellcheck disable=SC1090
 . "$VENV_ACTIVATE"
+export C3M_LEPTON_SAMPLE_CSV="$LEPTON_SAMPLE_CSV"
 
 if [[ "$SKIP_BUILD" != "true" ]]; then
   log "building unified C3M topology"
@@ -320,6 +328,7 @@ open_png_viewer() {
 log "app binary: $APP_BINARY_PATH"
 log "dictionary: $DICT_PATH"
 log "data products: $ROOT_DIR/DpCat"
+log "real Lepton sample CSV: $LEPTON_SAMPLE_CSV"
 log "logs: $LOG_DIR"
 
 (
@@ -364,12 +373,13 @@ fi
 python3 "$REPO_ROOT/ground-station/lepton-dp-viewer/lepton_dp_viewer.py" "$FDP_FILE" "${VIEWER_ARGS[@]}" \
   > "$LOG_DIR/lepton_summary.json"
 
-PNG_FILE="$(python3 - "$LOG_DIR/lepton_summary.json" "$GENERATE_PNG" <<'PY'
+PNG_FILE="$(python3 - "$LOG_DIR/lepton_summary.json" "$GENERATE_PNG" "$LEPTON_SAMPLE_CSV" <<'PY'
 import json
 import sys
 
 summary = json.load(open(sys.argv[1]))
 expect_png = sys.argv[2] == "true"
+expected_csv = sys.argv[3]
 if summary.get("width") != 160 or summary.get("height") != 120 or summary.get("pixels") != 19200:
     raise SystemExit("decoded Lepton dimensions did not match 160x120")
 if summary.get("max_c", 0) <= summary.get("min_c", 0):
@@ -377,12 +387,38 @@ if summary.get("max_c", 0) <= summary.get("min_c", 0):
 png = summary.get("png")
 if expect_png and not png:
     raise SystemExit("decoded Lepton PNG was not generated")
+decoded_csv = summary.get("csv")
+if not decoded_csv:
+    raise SystemExit("decoded Lepton CSV was not generated")
+
+def read_grid(path):
+    rows = []
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            rows.append([float(value) for value in line.split(",")])
+    if len(rows) != 120 or any(len(row) != 160 for row in rows):
+        raise SystemExit(f"{path} is not a 120x160 Lepton CSV grid")
+    return rows
+
+actual = read_grid(decoded_csv)
+expected = read_grid(expected_csv)
+for row_idx, (actual_row, expected_row) in enumerate(zip(actual, expected)):
+    for col_idx, (actual_value, expected_value) in enumerate(zip(actual_row, expected_row)):
+        if abs(actual_value - expected_value) > 0.005:
+            raise SystemExit(
+                f"decoded Lepton sample mismatch at row={row_idx} col={col_idx}: "
+                f"{actual_value:.2f} != {expected_value:.2f}"
+            )
 if png:
     print(png)
 PY
 )"
 
 log "viewer summary written: $LOG_DIR/lepton_summary.json"
+log "decoded Lepton CSV matches real sample data"
 if [[ -n "$PNG_FILE" ]]; then
   log "viewer PNG written: $PNG_FILE"
   if [[ "$OPEN_PNG" == "true" ]]; then

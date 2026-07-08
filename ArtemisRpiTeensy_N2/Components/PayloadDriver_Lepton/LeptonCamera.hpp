@@ -32,9 +32,12 @@ class LeptonCamera final {
 
   private:
     static void writeReason(char* reason, U32 reasonSize, const char* message);
+    bool loadSampleFrame(char* reason, U32 reasonSize);
+    bool loadSampleCsv(const char* path);
     void fillSyntheticFrame();
 
     bool m_streaming;
+    bool m_usingSampleFrame;
     U32 m_frameCounter;
     U16 m_latestFrame[NUM_PIXELS];
 };
