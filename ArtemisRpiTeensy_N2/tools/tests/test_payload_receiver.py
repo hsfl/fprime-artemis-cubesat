@@ -1,6 +1,7 @@
 import pathlib
 import struct
 import sys
+import tempfile
 import types
 import unittest
 
@@ -89,6 +90,36 @@ class PayloadReceiverTests(unittest.TestCase):
         self.assertLess(len(request), payload_receiver.MAX_PACKET)
         self.assertEqual(request[:4], payload_receiver.MAGIC + bytes([payload_receiver.TYPE_RETRY_REQUEST, 3]))
         self.assertEqual(request[6], 2)
+
+    def test_directory_mode_writes_completed_transfer_with_requested_extension(self) -> None:
+        blob = b"fake-fdp-bytes"
+        transfer_id = 4
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = pathlib.Path(tmp)
+            receiver = payload_receiver.PayloadReceiver(
+                "unused",
+                115200,
+                pathlib.Path("/tmp/out.bin"),
+                1.0,
+                output_dir=output_dir,
+                ext=".fdp",
+            )
+
+            packets = [
+                make_header(88, transfer_id, blob),
+                make_data(transfer_id, 0, blob),
+                make_end(transfer_id, 1, blob),
+            ]
+            serial = DummySerial()
+            for packet in packets:
+                receiver.handle_packet(packet, serial)  # type: ignore[arg-type]
+
+            self.assertTrue(receiver.complete)
+            receiver.finalize_to_dir()
+
+            outputs = list(output_dir.glob("Dp_*.fdp"))
+            self.assertEqual(len(outputs), 1)
+            self.assertEqual(outputs[0].read_bytes(), blob)
 
 
 if __name__ == "__main__":

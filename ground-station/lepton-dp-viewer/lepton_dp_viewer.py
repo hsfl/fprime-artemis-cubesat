@@ -1,0 +1,257 @@
+#!/usr/bin/env python3
+"""Decode EPSCoR C3M Lepton F Prime data products."""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import glob
+import json
+import os
+import statistics
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+
+WIDTH = 160
+HEIGHT = 120
+NUM_PIXELS = WIDTH * HEIGHT
+
+
+def find_repo_root(start: Path) -> Path:
+    for candidate in [start, *start.parents]:
+        if (candidate / "ArtemisRpiTeensy_N2").is_dir() and (candidate / "ground-station").is_dir():
+            return candidate
+    return start
+
+
+def find_dictionary(script_path: Path) -> Path | None:
+    repo_root = find_repo_root(script_path.parent)
+    patterns = [
+        repo_root
+        / "ArtemisRpiTeensy_N2"
+        / "build-artifacts"
+        / "*"
+        / "ArtemisRpiTeensyDeployment"
+        / "dict"
+        / "ArtemisRpiTeensyDeploymentTopologyDictionary.json",
+        repo_root / "ArtemisRpiTeensy_N2" / "build-artifacts" / "*" / "*" / "dict" / "*Dictionary.json",
+    ]
+    for pattern in patterns:
+        hits = glob.glob(str(pattern))
+        if hits:
+            hits.sort(key=lambda value: Path(value).stat().st_mtime, reverse=True)
+            return Path(hits[0])
+    return None
+
+
+def run_fprime_dp_decode(bin_file: Path, dictionary: Path, out_json: Path) -> None:
+    cmd = [
+        "fprime-dp",
+        "decode",
+        "--bin-file",
+        str(bin_file),
+        "--dictionary",
+        str(dictionary),
+        "--output",
+        str(out_json),
+    ]
+    try:
+        completed = subprocess.run(cmd, check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except FileNotFoundError:
+        raise SystemExit("fprime-dp not found on PATH; activate ArtemisRpiTeensy_N2/fprime-venv first")
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(f"fprime-dp decode failed with exit code {exc.returncode}")
+    if completed.stdout:
+        print(completed.stdout, file=sys.stderr, end="")
+    if completed.stderr:
+        print(completed.stderr, file=sys.stderr, end="")
+    if not out_json.exists():
+        raise SystemExit(f"decode reported success but did not write {out_json}")
+
+
+def unwrap_number(value: Any) -> int | float | None:
+    if isinstance(value, dict):
+        value = value.get("value")
+    if isinstance(value, (int, float)):
+        return value
+    return None
+
+
+def extract_pixels(decoded: Any) -> list[int]:
+    def walk(node: Any) -> list[int] | None:
+        if isinstance(node, list):
+            if len(node) == NUM_PIXELS:
+                numbers = [unwrap_number(item) for item in node]
+                if all(isinstance(item, (int, float)) for item in numbers):
+                    return [int(item) for item in numbers]
+            for item in node:
+                found = walk(item)
+                if found is not None:
+                    return found
+        elif isinstance(node, dict):
+            for value in node.values():
+                found = walk(value)
+                if found is not None:
+                    return found
+        return None
+
+    pixels = walk(decoded)
+    if pixels is None:
+        raise SystemExit(f"no {NUM_PIXELS}-element Lepton pixel array found in decoded data product")
+    return pixels
+
+
+def find_captured_at(decoded: Any) -> str | None:
+    def unwrap_time(node: Any) -> tuple[int, int] | None:
+        if not isinstance(node, dict):
+            return None
+        seconds = node.get("seconds")
+        micros = node.get("microseconds", node.get("useconds", 0))
+        if isinstance(seconds, dict):
+            seconds = seconds.get("value")
+        if isinstance(micros, dict):
+            micros = micros.get("value")
+        if isinstance(seconds, int) and isinstance(micros, int):
+            return seconds, micros
+        return None
+
+    def walk(node: Any) -> tuple[int, int] | None:
+        found = unwrap_time(node)
+        if found is not None:
+            return found
+        if isinstance(node, dict):
+            for value in node.values():
+                found = walk(value)
+                if found is not None:
+                    return found
+        elif isinstance(node, list):
+            for item in node:
+                found = walk(item)
+                if found is not None:
+                    return found
+        return None
+
+    found = walk(decoded)
+    if found is None:
+        return None
+    seconds, micros = found
+    timestamp = dt.datetime.fromtimestamp(seconds + micros / 1_000_000, dt.timezone.utc)
+    return timestamp.isoformat()
+
+
+def centikelvin_to_celsius(pixels: list[int]) -> list[float]:
+    return [(pixel / 100.0) - 273.15 for pixel in pixels]
+
+
+def write_csv(path: Path, values_c: list[float], captured_at: str | None) -> None:
+    with path.open("w", encoding="utf-8") as handle:
+        if captured_at:
+            handle.write(f"# CAPTURED_AT,{captured_at}\n")
+        for row in range(HEIGHT):
+            offset = row * WIDTH
+            line = ",".join(f"{value:.2f}" for value in values_c[offset : offset + WIDTH])
+            handle.write(line)
+            handle.write("\n")
+
+
+def write_png(path: Path, values_c: list[float], title: str, no_show: bool) -> bool:
+    try:
+        import matplotlib.pyplot as plt  # type: ignore
+    except ImportError:
+        return False
+
+    grid = [values_c[row * WIDTH : (row + 1) * WIDTH] for row in range(HEIGHT)]
+    fig, ax = plt.subplots(figsize=(8, 6))
+    image = ax.imshow(grid, cmap="hot", aspect="equal", interpolation="nearest")
+    fig.colorbar(image, ax=ax, label="Temperature (C)")
+    ax.set_title(title)
+    ax.set_xlabel("Column")
+    ax.set_ylabel("Row")
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    if not no_show:
+        plt.show()
+    plt.close(fig)
+    return True
+
+
+def decode_product(args: argparse.Namespace) -> dict[str, Any]:
+    bin_file = args.bin_file.resolve()
+    if not bin_file.exists():
+        raise SystemExit(f"file not found: {bin_file}")
+
+    dictionary = args.dictionary or find_dictionary(Path(__file__).resolve())
+    if dictionary is None or not dictionary.exists():
+        raise SystemExit("dictionary not found; pass --dictionary <path>")
+
+    outdir = args.outdir.resolve()
+    outdir.mkdir(parents=True, exist_ok=True)
+    stem = bin_file.stem
+    out_json = outdir / f"{stem}.json"
+    out_csv = outdir / f"{stem}.csv"
+    out_png = outdir / f"{stem}.png"
+
+    run_fprime_dp_decode(bin_file, dictionary, out_json)
+    decoded = json.loads(out_json.read_text(encoding="utf-8"))
+    raw_pixels = extract_pixels(decoded)
+    values_c = centikelvin_to_celsius(raw_pixels)
+    captured_at = find_captured_at(decoded)
+
+    write_csv(out_csv, values_c, captured_at)
+    png_written = False
+    if not args.no_png:
+        title = (
+            f"{stem}\n"
+            f"min {min(values_c):.1f}C  max {max(values_c):.1f}C  mean {statistics.fmean(values_c):.1f}C"
+        )
+        png_written = write_png(out_png, values_c, title, args.no_show)
+
+    return {
+        "input": str(bin_file),
+        "dictionary": str(dictionary.resolve()),
+        "json": str(out_json),
+        "csv": str(out_csv),
+        "png": str(out_png) if png_written else None,
+        "width": WIDTH,
+        "height": HEIGHT,
+        "pixels": len(raw_pixels),
+        "captured_at": captured_at,
+        "min_c": round(min(values_c), 2),
+        "max_c": round(max(values_c), 2),
+        "mean_c": round(statistics.fmean(values_c), 2),
+    }
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("bin_file", type=Path, help="Path to a Lepton .fdp data product")
+    parser.add_argument("--dictionary", type=Path, help="Deployment topology dictionary JSON")
+    parser.add_argument("--outdir", type=Path, default=Path("./data"), help="Output directory")
+    parser.add_argument("--summary", action="store_true", help="Print compact JSON summary to stdout")
+    parser.add_argument("--no-png", action="store_true", help="Skip PNG generation")
+    parser.add_argument("--no-show", action="store_true", help="Save PNG without opening a window")
+    args = parser.parse_args(argv)
+
+    summary = decode_product(args)
+    if args.summary:
+        print(json.dumps(summary, indent=2, sort_keys=True))
+    else:
+        print(f"Wrote JSON: {summary['json']}")
+        print(f"Wrote CSV : {summary['csv']}")
+        if summary["png"]:
+            print(f"Wrote PNG : {summary['png']}")
+        else:
+            print("PNG skipped: matplotlib unavailable or --no-png was set")
+        print(
+            f"Frame: {summary['width']}x{summary['height']} "
+            f"{summary['min_c']:.1f}..{summary['max_c']:.1f} C "
+            f"mean {summary['mean_c']:.1f} C"
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

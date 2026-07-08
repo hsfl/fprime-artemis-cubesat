@@ -8,6 +8,7 @@ VENV_ACTIVATE="$FPRIME_ROOT/fprime-venv/bin/activate"
 RUN_DEMO="true"
 RUN_BUILD="true"
 RUN_UT="true"
+DEMO_PROFILE="${DEMO_PROFILE:-c3m}"
 
 usage() {
   cat <<'EOF'
@@ -22,12 +23,13 @@ Default checks:
   - Python local-emulation and payload-receiver unit tests pass
   - unified topology generates and builds
   - F Prime component unit tests pass
-  - automated local Neutron 2 demo sequence produces and parses a science CSV
+  - automated local EPSCoR C3M demo sequence produces and decodes a Lepton .fdp
 
 Options:
   --skip-build     skip F Prime generate/build
   --skip-ut        skip F Prime component unit tests
   --skip-demo      skip automated local demo run
+  --demo <profile> run local demo profile: c3m or neutron2 (default: c3m)
   -h, --help       show this help text
 EOF
 }
@@ -72,6 +74,10 @@ while [[ $# -gt 0 ]]; do
     --skip-demo)
       RUN_DEMO="false"
       shift
+      ;;
+    --demo)
+      DEMO_PROFILE="${2:-}"
+      shift 2
       ;;
     -h|--help)
       usage
@@ -122,18 +128,37 @@ if [[ "$RUN_UT" == "true" ]]; then
 fi
 
 if [[ "$RUN_DEMO" == "true" ]]; then
-  log "running automated local demo sequence"
-  (
-    cd "$FPRIME_ROOT"
-    ./tools/run_neutron2_local_demo.sh \
-      --skip-build \
-      --exit-after-sequence \
-      --gui-port 5061 \
-      --viewer-port 8063 \
-      --no-open \
-      --delay 2 \
-      --capture-seconds 2
-  )
+  case "$DEMO_PROFILE" in
+    c3m)
+      log "running automated local EPSCoR C3M demo sequence"
+      (
+        cd "$FPRIME_ROOT"
+        ./tools/run_c3m_local_demo.sh \
+          --skip-build \
+          --exit-after-sequence \
+          --gui-port 5061 \
+          --delay 2 \
+          --capture-seconds 2
+      )
+      ;;
+    neutron2)
+      log "running automated local Neutron 2 demo sequence"
+      (
+        cd "$FPRIME_ROOT"
+        ./tools/run_neutron2_local_demo.sh \
+          --skip-build \
+          --exit-after-sequence \
+          --gui-port 5061 \
+          --viewer-port 8063 \
+          --no-open \
+          --delay 2 \
+          --capture-seconds 2
+      )
+      ;;
+    *)
+      fail "Unknown demo profile: $DEMO_PROFILE"
+      ;;
+  esac
 fi
 
 log "PASS"
