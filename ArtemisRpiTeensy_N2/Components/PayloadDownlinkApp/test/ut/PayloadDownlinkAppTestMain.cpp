@@ -1,8 +1,13 @@
 #include "PayloadDownlinkAppTester.hpp"
 
-TEST(Nominal, FileBackedVariableLengthPackets) {
+TEST(Nominal, HeaderRetransmitBehavior) {
     Components::PayloadDownlinkAppTester tester;
-    tester.testFileBackedVariableLengthPackets();
+    tester.testHeaderRetransmitBehavior();
+}
+
+TEST(Nominal, BurstCountSendsGeneratedPayloadPacketsPerRun) {
+    Components::PayloadDownlinkAppTester tester;
+    tester.testBurstCountSendsGeneratedPayloadPacketsPerRun();
 }
 
 TEST(Nominal, ProgressEventsEveryTenPercent) {
@@ -10,9 +15,9 @@ TEST(Nominal, ProgressEventsEveryTenPercent) {
     tester.testProgressEventsEveryTenPercent();
 }
 
-TEST(Nominal, QueuesRetryPacketsForScheduledResend) {
+TEST(Nominal, RetryBurstCountSendsGeneratedRetryPacketsPerRun) {
     Components::PayloadDownlinkAppTester tester;
-    tester.testQueuesRetryPacketsForScheduledResend();
+    tester.testRetryBurstCountSendsGeneratedRetryPacketsPerRun();
 }
 
 int main(int argc, char** argv) {

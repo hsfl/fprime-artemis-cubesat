@@ -10,8 +10,7 @@ namespace Components {
 
 namespace {
 constexpr U32 MAX_BLOB_BYTES = 1024U * 1024U;
-constexpr U32 PACKETS_PER_RUN = 1;
-constexpr U32 RETRY_PACKETS_PER_RUN = 1;
+constexpr U32 HEADER_RETRANSMIT_COUNT = 3U;
 constexpr U32 COMPLETION_SUMMARY_EVENT_REPEATS = 3;
 constexpr const char* PAYLOAD_SOURCE_ENV = "NEUTRON_PAYLOAD_DOWNLINK_FILE";
 constexpr const char* DEFAULT_PAYLOAD_SOURCE = "/tmp/neutron_payload_captures/latest_payload.bin";
@@ -129,8 +128,14 @@ void PayloadDownlinkApp::run_handler(FwIndexType portNum, U32 context) {
     static_cast<void>(context);
     this->m_runTicks += 1;
 
+    const U32 packetsPerRun = LinkCfg::PAYLOAD_PACKETS_PER_RUN;
+    const U32 retryPacketsPerRun = LinkCfg::PAYLOAD_RETRY_PACKETS_PER_RUN;
+    const U32 totalPacketsPerRun = (packetsPerRun > retryPacketsPerRun) ? packetsPerRun : retryPacketsPerRun;
+    U32 packetsSentThisRun = 0;
     U32 retrySentThisRun = 0;
-    while (retrySentThisRun < RETRY_PACKETS_PER_RUN && this->m_retryCursor < this->m_retryCount) {
+    while (packetsSentThisRun < totalPacketsPerRun &&
+           retrySentThisRun < retryPacketsPerRun &&
+           this->m_retryCursor < this->m_retryCount) {
         if (!this->sendDataPacket(this->m_retryPackets[this->m_retryCursor])) {
             this->failTransfer(6U, this->m_lastError);
             this->emitTelemetry();
@@ -138,6 +143,7 @@ void PayloadDownlinkApp::run_handler(FwIndexType portNum, U32 context) {
         }
         this->m_retryCursor++;
         retrySentThisRun++;
+        packetsSentThisRun++;
     }
     if (this->m_retryCursor >= this->m_retryCount) {
         this->m_retryCount = 0;
@@ -152,27 +158,35 @@ void PayloadDownlinkApp::run_handler(FwIndexType portNum, U32 context) {
 
     if (this->m_state == STATE_DOWNLINKING) {
         if (!this->m_sentHeader) {
-            if (!this->sendHeaderPacket()) {
-                this->failTransfer(3U, this->m_lastError);
-                this->emitTelemetry();
-                return;
+            const U32 headerPacketsToSend =
+                (HEADER_RETRANSMIT_COUNT < totalPacketsPerRun) ? HEADER_RETRANSMIT_COUNT : totalPacketsPerRun;
+            for (U32 headerCount = 0; headerCount < headerPacketsToSend; ++headerCount) {
+                if (!this->sendHeaderPacket()) {
+                    this->failTransfer(3U, this->m_lastError);
+                    this->emitTelemetry();
+                    return;
+                }
+                packetsSentThisRun++;
             }
             this->m_sentHeader = true;
         }
 
-        U32 sentThisRun = 0;
-        while (sentThisRun < PACKETS_PER_RUN && this->m_nextPacketIndex < this->m_totalPackets) {
+        U32 dataSentThisRun = 0;
+        while (packetsSentThisRun < totalPacketsPerRun &&
+               dataSentThisRun < packetsPerRun &&
+               this->m_nextPacketIndex < this->m_totalPackets) {
             if (!this->sendDataPacket(this->m_nextPacketIndex)) {
                 this->failTransfer(6U, this->m_lastError);
                 break;
             }
             this->m_nextPacketIndex++;
             this->emitProgressIfDue();
-            sentThisRun++;
+            dataSentThisRun++;
+            packetsSentThisRun++;
         }
 
         if ((this->m_state == STATE_DOWNLINKING) && this->m_nextPacketIndex >= this->m_totalPackets &&
-            !this->m_sentEnd) {
+            !this->m_sentEnd && packetsSentThisRun < totalPacketsPerRun) {
             if (!this->sendEndPacket()) {
                 this->failTransfer(3U, this->m_lastError);
                 this->emitTelemetry();

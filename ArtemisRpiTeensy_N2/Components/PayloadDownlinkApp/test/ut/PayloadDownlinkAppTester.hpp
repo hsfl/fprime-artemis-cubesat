@@ -10,16 +10,17 @@ namespace Components {
 
 class PayloadDownlinkAppTester final : public PayloadDownlinkAppGTestBase {
   public:
-    static const FwSizeType MAX_HISTORY_SIZE = 32;
+    static const FwSizeType MAX_HISTORY_SIZE = 128;
     static const FwEnumStoreType TEST_INSTANCE_ID = 0;
     static const FwSizeType TEST_INSTANCE_QUEUE_DEPTH = 10;
 
     PayloadDownlinkAppTester();
     ~PayloadDownlinkAppTester();
 
-    void testFileBackedVariableLengthPackets();
+    void testHeaderRetransmitBehavior();
+    void testBurstCountSendsGeneratedPayloadPacketsPerRun();
     void testProgressEventsEveryTenPercent();
-    void testQueuesRetryPacketsForScheduledResend();
+    void testRetryBurstCountSendsGeneratedRetryPacketsPerRun();
 
   private:
     void connectPorts();
