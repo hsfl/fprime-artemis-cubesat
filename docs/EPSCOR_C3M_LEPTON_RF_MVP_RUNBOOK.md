@@ -238,6 +238,11 @@ python3 -u tools/payload_receiver.py \
   --continuous
 ```
 
+Future HIL quality-of-life plan: wrap this receiver in a local web UI so the
+operator can see ground-side packet progress, retry state, final CRC, and the
+decoded Lepton PNG next to GDS. See
+[`C3M_PAYLOAD_RECEIVER_WEB_UI_PLAN.md`](C3M_PAYLOAD_RECEIVER_WEB_UI_PLAN.md).
+
 After the receiver writes a `.fdp`, decode it:
 
 ```bash

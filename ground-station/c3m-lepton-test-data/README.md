@@ -116,3 +116,9 @@ python3 ground-station/lepton-dp-viewer/lepton_dp_viewer.py \
 
 Commit new HIL captures here only when they are intentionally promoted as
 reference samples.
+
+Future receiver UI intent is captured in
+[`docs/C3M_PAYLOAD_RECEIVER_WEB_UI_PLAN.md`](../../docs/C3M_PAYLOAD_RECEIVER_WEB_UI_PLAN.md).
+The reason is simple: GDS shows flight-side downlink progress, while the
+payload receiver proves the ground node actually reconstructed and decoded the
+`.fdp`.
