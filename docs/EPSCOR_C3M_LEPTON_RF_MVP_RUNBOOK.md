@@ -1,9 +1,9 @@
 # EPSCoR C3M Lepton Local And RF MVP Runbook
 
-BLUF: use this for the C3M Lepton laptop proof first, then the RF MVP bench
-prep. Local emulation proves the F Prime command/event/Data Product/channel-1
-flow and Lepton `.fdp` decode. HIL is still required for real Pi, Teensy UART,
-RFM23BP ACK/retry timing, queue drops, and CRC repeatability.
+BLUF: use this for the C3M Lepton laptop proof and the validated RF MVP bench
+flow. Local emulation proves the F Prime command/event/Data Product/channel-1
+path; the 2026-07-09 HIL run additionally proved real UVC capture and a
+byte-identical full-resolution RF downlink in `58.557 s`.
 
 ## Scope
 
@@ -19,7 +19,7 @@ Validated locally:
 - Ground receiver reconstruction.
 - Lepton viewer decode of `160x120` thermal pixels.
 
-Not validated locally:
+Requires HIL rather than local emulation:
 
 - real Lepton/libuvc capture.
 - Raspberry Pi runtime on `/dev/serial0`.
@@ -135,16 +135,19 @@ as bench-candidate work until HIL counters prove it.
 
 Current optimized RF policy:
 
-- Channel 0 / CCSDS: ACK required.
-- Channel 1 / payload: ACK not required.
+- Ground-to-satellite channel 0 / CCSDS commands: ACK required.
+- Satellite-to-ground channel 0 telemetry: ACK not required.
+- Channel 1 / payload: ACK not required in either direction.
 - App-level repair remains owned by `PayloadDownlinkApp` and
   `payload_receiver.py` through packet indexes, retry requests, and final CRC.
 
 Rollback rule:
 
 - If HIL shows payload CRC failures, queue drops, or unacceptable retry rounds,
-  set payload ACK back on in `config/transport_constants.json`, regenerate
-  transport constants, rebuild both Teensy sketches, and rerun this local gate.
+  stop optimizing, inspect the directional counters, and increase the relevant
+  manifest-driven UART/RF pacing before considering per-packet payload ACK.
+  Regenerate transport constants, rebuild both Teensy sketches, and rerun both
+  the local gate and HIL acceptance flow after any change.
 
 ## Firmware Build Gates
 
@@ -262,13 +265,20 @@ cd ~/Developer/fprime-artemis-cubesat
 RUN_DIR=/tmp/neutron_hil/c3m_rf_demo_$(date +%Y%m%d_%H%M%S)
 mkdir -p "$RUN_DIR"
 echo "$RUN_DIR" | tee /tmp/neutron_hil/latest_c3m_rf_demo_dir
-python3 -u tools/payload_receiver.py \
+python3 -u ArtemisRpiTeensy_N2/tools/payload_receiver.py \
   --port "$GDS_PAYLOAD_PORT" \
   --baud 115200 \
   --output-dir "$RUN_DIR" \
-  --timeout 240 \
-  --continuous
+  --ext .fdp \
+  --idle-timeout 240 \
+  --debug
 ```
+
+`--output-dir` is the receiver's continuous-listen mode; there is no separate
+`--continuous` flag. `--ext .fdp` is required so the Lepton viewer command
+below finds the reconstructed products. `--idle-timeout 240` exits only after
+four minutes with no serial activity; set it to `0` for an operator-stopped
+session.
 
 Future HIL quality-of-life plan: wrap this receiver in a local web UI so the
 operator can see ground-side packet progress, retry state, final CRC, and the
@@ -318,6 +328,40 @@ Record these before changing pacing or ACK policy again:
 - channel-0 commands remain responsive during channel-1 payload downlink.
 - any retry round count is acceptable only if the final file is byte-correct and
   the demo timing remains acceptable.
+
+## Validated Final Bench Configuration (2026-07-09)
+
+The live C3M Lepton/RFM23BP bench passes both gates with the following generated
+transport constants:
+
+- Pi-to-satellite UART: `115200 8N1` on `/dev/serial0`.
+- payload/base Pi inter-frame margin: `37 ms`.
+- additional channel-0 inter-frame margin: `40 ms`.
+- payload/retry messages per 1 Hz run: `22`.
+- payload RF inter-packet gap: `15 ms`.
+- ground-to-satellite CCSDS commands: ACKed.
+- satellite-to-ground CCSDS telemetry and channel-1 payload: unACKed.
+- RFM23BP 125 kbps register `0x58=0xC0` on both radios.
+
+Do not replace the channel-aware Pi pacing with a baud-rate change. Both the
+current branch and `EPSCOR_C3M_REFACTOR` use `/dev/serial0` at 115200; the
+temporary 57600 diagnostic did not remove bulk CRC errors. The failure was a
+flow-control regression: Pi UART frames overlapped the satellite's RF service.
+Channel-0 frames need the extra allowance because one 128-byte telemetry frame
+uses three RF segments.
+
+Final acceptance evidence:
+
+- Pi release: `/home/pi/artemis/releases/c3m-hil-uartflow37-channel`.
+- real UVC `.fdp`: `38480` bytes.
+- receiver: `1100/1100`, no retry request.
+- application status: `sent=1100 total=1100 error=0`.
+- command-to-file time: `58.557 s`.
+- source/ground SHA-256:
+  `87b61b387647a4e732918b93a071fe51bf64b9b1a55ede6ff30e99289465ac26`.
+- viewer: `160x120`, `19200` pixels; PNG opened successfully.
+- mid-transfer ping returned in the same second.
+- satellite counters: zero CRC, framing, timeout, RF TX, and queue drops.
 
 ## Stop Rules
 

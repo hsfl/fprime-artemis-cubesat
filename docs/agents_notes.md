@@ -1061,3 +1061,25 @@ Driver tier, formerly repo "Adapter":
 | `GpsAdapter_Artemis` | `GpsDriver_Artemis` | `gpsAdapterArtemis` | `gpsDriverArtemis` |
 | `ThermalAdapter_Artemis` | `ThermalDriver_Artemis` | `thermalAdapterArtemis` | `thermalDriverArtemis` |
 | `AdcsAdapter_D2S2` | `AdcsDriver_D2S2` | `adcsAdapterD2S2` | `adcsDriverD2S2` |
+
+## C3M Lepton RF HIL Acceptance (2026-07-09)
+
+- Both live acceptance gates pass with a real UVC Lepton product over the full
+  Pi -> satellite Teensy -> RFM23BP -> ground Teensy -> laptop path.
+- Final product: 38,480-byte `.fdp`, 1,100 data packets, full `160x120` image.
+- Command-to-file time: `58.557 s`; receiver required no retry request.
+- Pi source and ground file SHA-256 matched:
+  `87b61b387647a4e732918b93a071fe51bf64b9b1a55ede6ff30e99289465ac26`.
+- A channel-0 ping returned in the same second during channel-1 downlink; final
+  satellite CRC, framing, parser-timeout, RF-TX, and queue-drop counters were
+  all zero.
+- Root cause was producer/consumer flow control at the shared Pi UART/RF
+  boundary, not a new UART device or baud selection. `/dev/serial0` remains
+  `115200 8N1` and resolves to `/dev/ttyS0` on this Pi.
+- Validated generated transport settings: 37 ms base UART drain margin, 40 ms
+  additional channel-0 margin, 22 payload/retry packets per 1 Hz run, 15 ms
+  payload RF gap, ACKed ground-to-satellite CCSDS, and unACKed satellite
+  telemetry/payload.
+- Repeat procedure and evidence live in
+  `docs/EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md`; the investigation log is
+  `docs/C3M_LEPTON_RF_HIL_SCRATCHPAD_2026-07-09.md`.

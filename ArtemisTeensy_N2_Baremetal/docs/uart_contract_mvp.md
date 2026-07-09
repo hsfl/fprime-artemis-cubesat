@@ -18,6 +18,25 @@ Every Pi <-> satellite Teensy frame uses:
 5. `payload` (`length` bytes)
 6. `crc16` (2 bytes LE): CRC-16/CCITT over payload bytes only
 
+## Pi UART Flow-Control Contract
+
+`LinuxUartDriver` returning success means the encoded frame entered the Linux
+UART queue; it does not mean the satellite Teensy has parsed it or finished RF
+service. `UartChannelMux` therefore paces every successful write using the
+encoded 8N1 wire time plus manifest-generated drain margins:
+
+- base margin for all channels: **37 ms**
+- additional channel 0 margin: **40 ms**
+
+The extra channel 0 allowance prevents a multi-segment CCSDS telemetry frame
+from overlapping a following payload frame at the satellite parser. Keep the
+UART at **115200 8N1**. A 57600 diagnostic did not fix the bench failure and is
+not the validated configuration.
+
+The source of truth is `config/transport_constants.json`; regenerate both F
+Prime and Teensy constants with `tools/generate_transport_constants.py` after
+changing it.
+
 ## Channel Map
 
 | Channel | Name | RF forwarded? | Purpose |
@@ -82,6 +101,18 @@ Only channels 0 and 1 are RF forwarded. Each RF packet has:
 6. `chunk` (`chunk_len` bytes)
 
 Project RF packet max length is `49` bytes, so RF chunk max is `44` bytes.
+
+Directional reliability policy for the validated bulk path:
+
+- ground-to-satellite channel 0 commands require RF ACK/retry
+- satellite-to-ground channel 0 telemetry is unacknowledged
+- channel 1 payload is unacknowledged in both directions and relies on indexed
+  payload packets, end-to-end CRC, and selective bitmap retry
+- channel 1 RF messages use a **15 ms** inter-packet gap
+
+Both RFM23BP radios must use register `0x58=0xC0` with the 125 kbps PHY. The
+setting is required by the device datasheet above 100 kbps and is applied after
+the RadioHead modem preset.
 
 ## Timeout Behavior
 - UART frame parser inter-byte timeout: **250 ms**.
