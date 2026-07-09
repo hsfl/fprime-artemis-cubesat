@@ -20,6 +20,9 @@ Group=pi
 # Keep relative paths, future dictionary references, and generated files anchored
 # next to the current release binary and dictionary symlinks.
 WorkingDirectory=/home/pi/artemis/current
+# C3M Lepton HIL policy. Ignored by non-Lepton payload drivers; required for
+# PayloadDriver_Lepton so the bench cannot silently pass with sample data.
+Environment=LEPTON_CAMERA_BACKEND=uvc
 # /dev/serial0 is the Pi-to-satellite-Teensy UART used by the Artemis OBC bench.
 ExecStart=/home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0
 # Demo hardening: bring the flight app back if it crashes or exits unexpectedly.

@@ -17,6 +17,7 @@ SKIP_BUILD="false"
 GENERATE_PNG="true"
 OPEN_PNG="true"
 LEPTON_SAMPLE_CSV="${C3M_LEPTON_SAMPLE_CSV:-$REPO_ROOT/ground-station/c3m-lepton-test-data/data/Dp_20260707_120740.csv}"
+LEPTON_CAMERA_BACKEND="${LEPTON_CAMERA_BACKEND:-sample}"
 
 usage() {
   cat <<'EOF'
@@ -129,6 +130,7 @@ done
 # shellcheck disable=SC1090
 . "$VENV_ACTIVATE"
 export C3M_LEPTON_SAMPLE_CSV="$LEPTON_SAMPLE_CSV"
+export LEPTON_CAMERA_BACKEND
 
 if [[ "$SKIP_BUILD" != "true" ]]; then
   log "building unified C3M topology"
@@ -329,6 +331,7 @@ log "app binary: $APP_BINARY_PATH"
 log "dictionary: $DICT_PATH"
 log "data products: $ROOT_DIR/DpCat"
 log "real Lepton sample CSV: $LEPTON_SAMPLE_CSV"
+log "Lepton camera backend: $LEPTON_CAMERA_BACKEND"
 log "logs: $LOG_DIR"
 
 (

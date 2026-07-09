@@ -22,6 +22,7 @@ class PayloadDriver_Lepton final : public PayloadDriver_LeptonComponentBase {
         CAPTURE_DP_NO_MEMORY = 4,
         CAPTURE_SERIALIZE_ERROR = 5,
         CAPTURE_WRITE_MISMATCH = 6,
+        CAPTURE_CRC_ERROR = 7,
     };
 
     void pingIn_handler(FwIndexType portNum, U32 key) override;
@@ -39,6 +40,7 @@ class PayloadDriver_Lepton final : public PayloadDriver_LeptonComponentBase {
     void publishFailure(CaptureStatus status, const char* reason);
     void writeTelemetry();
     static U32 clampSize(FwSizeType size);
+    static bool computeFileCrc16(const std::string& outputPath, U32& crcOut);
 
     LeptonCamera m_camera;
     U32 m_lastDurationSeconds;

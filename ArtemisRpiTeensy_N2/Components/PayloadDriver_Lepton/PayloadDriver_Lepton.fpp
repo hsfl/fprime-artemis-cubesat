@@ -60,6 +60,11 @@ module Components {
         @ Lepton camera is ready
         event LeptonReady() severity activity low format "Lepton camera ready"
 
+        @ Selected Lepton frame source backend
+        event LeptonBackendSelected(backend: string size 16) \
+            severity activity low \
+            format "Lepton camera backend selected: {}"
+
         @ Image capture started
         event ImageCaptureStart() severity activity low format "Starting Lepton image capture"
 

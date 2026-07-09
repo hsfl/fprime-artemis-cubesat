@@ -61,6 +61,16 @@ void PayloadDriver_Lepton::dpWrittenIn_handler(FwIndexType portNum,
 
     this->m_pendingWrites -= 1U;
     this->m_lastFileBytes = clampSize(size);
+
+    U32 sourceCrc = 0U;
+    if (!computeFileCrc16(fileName.toChar(), sourceCrc)) {
+        this->m_pendingPath.clear();
+        this->m_pendingProductId = 0U;
+        this->publishFailure(CAPTURE_CRC_ERROR, "failed to compute Lepton data-product CRC");
+        this->writeTelemetry();
+        return;
+    }
+
     this->m_lastCaptureStatus = CAPTURE_OK;
     this->log_ACTIVITY_HI_ImageCaptureSuccess(size);
     if (this->isConnected_statusOut_OutputPort(0)) {
@@ -70,7 +80,7 @@ void PayloadDriver_Lepton::dpWrittenIn_handler(FwIndexType portNum,
                              this->m_lastFileBytes,
                              Components::ScienceProductSource::REAL_PAYLOAD,
                              sourcePath,
-                             0U);
+                             sourceCrc);
     }
     this->m_pendingPath.clear();
     this->m_pendingProductId = 0U;
@@ -84,6 +94,7 @@ void PayloadDriver_Lepton::ENABLE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
         return;
     }
+    this->log_ACTIVITY_LO_LeptonBackendSelected(Fw::LogStringArg(this->m_camera.backendName()));
     this->log_ACTIVITY_LO_LeptonReady();
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
@@ -196,6 +207,29 @@ U32 PayloadDriver_Lepton::clampSize(FwSizeType size) {
         return std::numeric_limits<U32>::max();
     }
     return static_cast<U32>(size);
+}
+
+bool PayloadDriver_Lepton::computeFileCrc16(const std::string& outputPath, U32& crcOut) {
+    FILE* file = std::fopen(outputPath.c_str(), "rb");
+    if (file == nullptr) {
+        return false;
+    }
+
+    U16 crc = 0xFFFFU;
+    int value = 0;
+    while ((value = std::fgetc(file)) != EOF) {
+        crc ^= static_cast<U16>(static_cast<U8>(value)) << 8U;
+        for (U8 bit = 0; bit < 8; bit++) {
+            if ((crc & 0x8000U) != 0) {
+                crc = static_cast<U16>((crc << 1U) ^ 0x1021U);
+            } else {
+                crc = static_cast<U16>(crc << 1U);
+            }
+        }
+    }
+    (void)std::fclose(file);
+    crcOut = static_cast<U32>(crc);
+    return true;
 }
 
 }  // namespace Components
