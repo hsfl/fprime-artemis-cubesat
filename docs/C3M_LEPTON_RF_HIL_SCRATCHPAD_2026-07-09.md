@@ -224,6 +224,8 @@ with a responsive mid-transfer command and no retry packets or transport drops.
 
 ### 2026-07-09 — final UART/RF flow-control root cause and Gate 2 PASS
 
+- RF geometry for this result: ground-station and satellite antennas were about
+  30 inches apart on the tabletop, line-of-sight.
 - The Pi did not change UART devices during this work. Both this branch and
   `EPSCOR_C3M_REFACTOR` use `/dev/serial0` at `115200 8N1`; on this Pi the
   stable logical device resolves to `/dev/ttyS0`. A ten-second clock sample

@@ -21,6 +21,9 @@ This result supersedes the earlier staging blockers recorded in this handoff.
 Both Teensy 4.1 boards are connected.  Always use the physical `usb:*` IDs for
 uploads while both are attached.
 
+The validated RF result used the ground-station and satellite antennas about
+30 inches apart on the tabletop, with line-of-sight between them.
+
 | Board | Upload ID | macOS serial ports | Role |
 | --- | --- | --- | --- |
 | Ground/GDS Teensy | `usb:100000` | `/dev/cu.usbmodem115553301`, `...303`, `...305` | Triple serial: GDS data, debug, payload receiver |

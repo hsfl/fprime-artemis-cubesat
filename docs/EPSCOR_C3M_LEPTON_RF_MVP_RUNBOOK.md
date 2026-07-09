@@ -334,6 +334,8 @@ Record these before changing pacing or ACK policy again:
 The live C3M Lepton/RFM23BP bench passes both gates with the following generated
 transport constants:
 
+- Ground and satellite RF antennas were approximately 30 inches apart on the
+  tabletop, line-of-sight.
 - Pi-to-satellite UART: `115200 8N1` on `/dev/serial0`.
 - payload/base Pi inter-frame margin: `37 ms`.
 - additional channel-0 inter-frame margin: `40 ms`.
