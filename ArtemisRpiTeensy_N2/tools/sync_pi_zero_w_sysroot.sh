@@ -83,6 +83,17 @@ rsync -aH --delete --delete-excluded \
   --filter="- *" \
   "$HOST":/ "$DEST"/
 
+# The Pi GCC directory supplies ARMv6-safe runtime/startup objects, but its
+# compiler helper programs and LTO plugin are ARM executables. If they remain
+# under a `-B<sysroot-gcc-dir>` search path, the x86_64 Docker cross-compiler
+# may try to execute/load them and fail under qemu. Keep only link/runtime
+# inputs here; the container provides its own host-side compiler helpers.
+find "$DEST/usr/lib/gcc/arm-linux-gnueabihf" -type f \
+  \( -name cc1 -o -name cc1plus -o -name collect2 -o -name lto1 \
+     -o -name lto-wrapper -o -name g++-mapper-server \
+     -o -name 'liblto_plugin.so*' \) \
+  -delete
+
 mkdir -p "$DEST/lib"
 ln -sfn arm-linux-gnueabihf/ld-linux-armhf.so.3 "$DEST/lib/ld-linux-armhf.so.3"
 

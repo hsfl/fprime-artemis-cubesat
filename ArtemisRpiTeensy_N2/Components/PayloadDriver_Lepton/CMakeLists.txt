@@ -11,9 +11,26 @@ register_fprime_library(
 
 set(LEPTON_UVC_ENABLED OFF)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    find_library(LEPTON_UVC_LIB NAMES uvc)
-    find_path(LEPTON_UVC_INCLUDE_DIR NAMES libuvc/libuvc.h)
-    find_library(LEPTON_USB1_LIB NAMES usb-1.0)
+    # CMake's default multiarch search does not always descend into an ARM
+    # sysroot's arm-linux-gnueabihf directory. Keep native Linux discovery,
+    # but explicitly include the Pi sysroot locations used by our ARMv6 build.
+    set(LEPTON_INCLUDE_HINTS)
+    set(LEPTON_LIBRARY_HINTS)
+    if(CMAKE_SYSROOT)
+        list(APPEND LEPTON_INCLUDE_HINTS
+            "${CMAKE_SYSROOT}/usr/local/include"
+            "${CMAKE_SYSROOT}/usr/include"
+        )
+        list(APPEND LEPTON_LIBRARY_HINTS
+            "${CMAKE_SYSROOT}/usr/local/lib"
+            "${CMAKE_SYSROOT}/usr/lib/arm-linux-gnueabihf"
+            "${CMAKE_SYSROOT}/lib/arm-linux-gnueabihf"
+        )
+    endif()
+
+    find_library(LEPTON_UVC_LIB NAMES uvc HINTS ${LEPTON_LIBRARY_HINTS})
+    find_path(LEPTON_UVC_INCLUDE_DIR NAMES libuvc/libuvc.h HINTS ${LEPTON_INCLUDE_HINTS})
+    find_library(LEPTON_USB1_LIB NAMES usb-1.0 HINTS ${LEPTON_LIBRARY_HINTS})
 
     if(LEPTON_UVC_LIB AND LEPTON_UVC_INCLUDE_DIR AND LEPTON_USB1_LIB)
         set(LEPTON_UVC_ENABLED ON)
