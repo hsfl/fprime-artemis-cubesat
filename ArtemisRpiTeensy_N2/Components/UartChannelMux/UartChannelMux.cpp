@@ -1,8 +1,19 @@
 #include "Components/UartChannelMux/UartChannelMux.hpp"
 
+#include <Fw/Time/TimeInterval.hpp>
+#include <Os/Task.hpp>
+
 #include <cstring>
 
 namespace Components {
+
+namespace {
+constexpr U32 FRAME_COUNTER_TLM_PERIOD = 64U;
+
+bool shouldPublishFrameCounter(U32 count) {
+    return count == 1U || (count % FRAME_COUNTER_TLM_PERIOD) == 0U;
+}
+}  // namespace
 
 UartChannelMux::UartChannelMux(const char* const compName)
     : UartChannelMuxComponentBase(compName),
@@ -102,9 +113,36 @@ Drv::ByteStreamStatus UartChannelMux::sendWrapped(U8 channel, const U8* data, Fw
     const Drv::ByteStreamStatus status = this->drvSendOut_out(0, wrapped);
     if (status == Drv::ByteStreamStatus::OP_OK) {
         this->m_framesTx++;
-        this->tlmWrite_FramesTx(this->m_framesTx);
+        // Publishing this channel for every frame creates self-generated
+        // CCSDS traffic: the counter update itself is another transmitted
+        // frame. Sample the counter so observability cannot starve payload.
+        if (shouldPublishFrameCounter(this->m_framesTx)) {
+            this->tlmWrite_FramesTx(this->m_framesTx);
+        }
+        // Linux accepts a complete UART write before the bytes have left the
+        // wire. Pace at the shared physical boundary by the actual 8N1 wire
+        // time, plus a small scheduling margin, so long channel-0 frames
+        // cannot backlog and overrun later channel-1 frames (or vice versa).
+        if (LinkCfg::UART_BAUD > 0U) {
+            const U64 delayUs = interFrameDelayUs(channel, size);
+            (void)Os::Task::delay(
+                Fw::TimeInterval(static_cast<U32>(delayUs / 1000000ULL),
+                                 static_cast<U32>(delayUs % 1000000ULL)));
+        }
     }
     return status;
+}
+
+U64 UartChannelMux::interFrameDelayUs(U8 channel, FwSizeType size) {
+    if (LinkCfg::UART_BAUD == 0U) {
+        return 0U;
+    }
+    const U64 encodedBytes = static_cast<U64>(size + LinkCfg::UART_FRAME_OVERHEAD);
+    const U64 wireTimeUs =
+        ((encodedBytes * 10ULL * 1000000ULL) + LinkCfg::UART_BAUD - 1ULL) / LinkCfg::UART_BAUD;
+    const U64 channelDrainUs =
+        (channel == LinkCfg::CHANNEL_CCSDS) ? LinkCfg::UART_CCSDS_EXTRA_MARGIN_US : 0U;
+    return wireTimeUs + LinkCfg::UART_INTER_FRAME_MARGIN_US + channelDrainUs;
 }
 
 void UartChannelMux::parseByte(U8 byte) {
@@ -203,7 +241,9 @@ void UartChannelMux::handleFrame() {
     }
 
     this->m_framesRx++;
-    this->tlmWrite_FramesRx(this->m_framesRx);
+    if (shouldPublishFrameCounter(this->m_framesRx)) {
+        this->tlmWrite_FramesRx(this->m_framesRx);
+    }
 }
 
 U16 UartChannelMux::crc16Ccitt(const U8* data, FwSizeType size) const {

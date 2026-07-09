@@ -49,11 +49,13 @@ class EpsDriver_Artemis final : public EpsDriver_ArtemisComponentBase {
     static constexpr U8 LOCAL_HEADER_LEN = 4;
     static constexpr U32 LOCAL_MAX_PACKET_LEN = LOCAL_HEADER_LEN + PDU_V2_MAX_FRAME_LEN;
     static constexpr U32 PDU_REQUEST_TIMEOUT_TICKS = 2;
+    static constexpr U32 PERIODIC_TELEMETRY_TICKS = 15;
 
     U8 m_sequence;
     U8 m_pendingRequestId;
     U8 m_pendingOpcode;
     U32 m_pendingRequestTicks;
+    U32 m_periodicTelemetryTicks;
     bool m_requestPending;
     Components::EpsRequest m_lastRequest;
     U8 m_protocolVersion;

@@ -78,7 +78,7 @@ void EpsDriver_ArtemisTester::testTimeoutClearsPendingRequest() {
         LinkCfg::TEENSY_STATUS_TIMEOUT,
         PDU_V2_OP_PING);
     ASSERT_TLM_PendingRequestTicks(2, 0);
-    ASSERT_TLM_TransportFailureCount(2, 1);
+    ASSERT_TLM_TransportFailureCount(1, 1);
 
     this->invoke_to_requestIn(0, Components::EpsRequest::GET_PROTOCOL_INFO, 0, 0, 0);
     ASSERT_EVENTS_PduRequestQueued_SIZE(2);

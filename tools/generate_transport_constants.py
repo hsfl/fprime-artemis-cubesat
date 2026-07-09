@@ -54,7 +54,8 @@ def render_fprime(cfg: dict) -> str:
     channels = cfg["channels"]
     rpc = cfg["teensy_rpc"]
     rf = cfg["rf"]
-    ack = rf["ack_channels"]
+    ground_ack = rf["ack_directions"]["ground_to_satellite"]
+    satellite_ack = rf["ack_directions"]["satellite_to_ground"]
     payload = cfg["payload"]
     return f"""#ifndef Components_LinkCfg_HPP
 #define Components_LinkCfg_HPP
@@ -81,6 +82,9 @@ static constexpr U8 TEENSY_RF_OP_LINK_STATS = {rpc["rf_op_link_stats"]};
 static constexpr U8 UART_FRAME_MAGIC_0 = {hex_byte(frame["magic_0"])};
 static constexpr U8 UART_FRAME_MAGIC_1 = {hex_byte(frame["magic_1"])};
 static constexpr FwSizeType UART_FRAME_MAX_PAYLOAD = {frame["max_payload"]};
+static constexpr U32 UART_BAUD = {frame["uart_baud"]};
+static constexpr U32 UART_INTER_FRAME_MARGIN_US = {frame["inter_frame_margin_us"]};
+static constexpr U32 UART_CCSDS_EXTRA_MARGIN_US = {frame["ccsds_extra_margin_us"]};
 static constexpr FwSizeType UART_FRAME_OVERHEAD = 7;
 static constexpr FwSizeType UART_FRAME_MAX_ENCODED =
     UART_FRAME_MAX_PAYLOAD + UART_FRAME_OVERHEAD;
@@ -89,8 +93,12 @@ static constexpr FwSizeType RF_PACKET_MAX_LEN = {rf["packet_max_len"]};
 static constexpr FwSizeType RF_SEGMENT_HEADER_LEN = {rf["segment_header_len"]};
 static constexpr FwSizeType RF_SEGMENT_MAX_DATA_BYTES =
     RF_PACKET_MAX_LEN - RF_SEGMENT_HEADER_LEN;
-static constexpr U8 RF_ACK_REQUIRED_CCSDS = {cpp_flag(ack["ccsds"])};
-static constexpr U8 RF_ACK_REQUIRED_PAYLOAD = {cpp_flag(ack["payload"])};
+static constexpr U8 RF_INTER_SEGMENT_GAP_MS = {rf["inter_segment_gap_ms"]};
+static constexpr U8 RF_PAYLOAD_INTER_PACKET_GAP_MS = {rf["payload_inter_packet_gap_ms"]};
+static constexpr U8 RF_GROUND_TX_ACK_REQUIRED_CCSDS = {cpp_flag(ground_ack["ccsds"])};
+static constexpr U8 RF_GROUND_TX_ACK_REQUIRED_PAYLOAD = {cpp_flag(ground_ack["payload"])};
+static constexpr U8 RF_SATELLITE_TX_ACK_REQUIRED_CCSDS = {cpp_flag(satellite_ack["ccsds"])};
+static constexpr U8 RF_SATELLITE_TX_ACK_REQUIRED_PAYLOAD = {cpp_flag(satellite_ack["payload"])};
 static constexpr FwSizeType PAYLOAD_PACKET_MAX_BYTES = RF_SEGMENT_MAX_DATA_BYTES;
 static constexpr FwSizeType PAYLOAD_PACKET_DATA_BYTES = {payload["packet_data_bytes"]};
 static constexpr U32 PAYLOAD_PACKETS_PER_RUN = {payload["packets_per_run"]};
@@ -102,10 +110,16 @@ inline bool isValidChannel(const U8 channel) {{
     return channel < CHANNEL_COUNT;
 }}
 
-inline bool rfAckRequiredForChannel(const U8 channel) {{
+inline bool rfGroundTxAckRequiredForChannel(const U8 channel) {{
     return channel == CHANNEL_PAYLOAD
-               ? RF_ACK_REQUIRED_PAYLOAD != 0
-               : RF_ACK_REQUIRED_CCSDS != 0;
+               ? RF_GROUND_TX_ACK_REQUIRED_PAYLOAD != 0
+               : RF_GROUND_TX_ACK_REQUIRED_CCSDS != 0;
+}}
+
+inline bool rfSatelliteTxAckRequiredForChannel(const U8 channel) {{
+    return channel == CHANNEL_PAYLOAD
+               ? RF_SATELLITE_TX_ACK_REQUIRED_PAYLOAD != 0
+               : RF_SATELLITE_TX_ACK_REQUIRED_CCSDS != 0;
 }}
 
 }}  // namespace LinkCfg
@@ -120,7 +134,10 @@ def render_teensy(cfg: dict, *, satellite: bool) -> str:
     channels = cfg["channels"]
     rpc = cfg["teensy_rpc"]
     rf = cfg["rf"]
-    ack = rf["ack_channels"]
+    ground_ack = rf["ack_directions"]["ground_to_satellite"]
+    satellite_ack = rf["ack_directions"]["satellite_to_ground"]
+    tx_ack = satellite_ack if satellite else ground_ack
+    rx_ack = ground_ack if satellite else satellite_ack
     payload = cfg["payload"]
     command = cfg["command"]
     count = channels["satellite_count"] if satellite else channels["ground_count"]
@@ -156,6 +173,9 @@ static constexpr uint8_t CHANNEL_COUNT = {count};
 // UART wrapper payload carries opaque bytes tagged by virtual channel.
 static constexpr uint16_t FRAME_MAX_PAYLOAD = {frame["max_payload"]};
 static constexpr uint32_t FRAME_TIMEOUT_MS = {frame["timeout_ms"]};
+static constexpr uint32_t UART_BAUD = {frame["uart_baud"]};
+static constexpr uint32_t UART_INTER_FRAME_MARGIN_US = {frame["inter_frame_margin_us"]};
+static constexpr uint32_t UART_CCSDS_EXTRA_MARGIN_US = {frame["ccsds_extra_margin_us"]};
 
 // RF segmentation parameters.
 static constexpr uint8_t RF_SEGMENT_MAGIC_CCSDS = {hex_byte(rf["segment_magic_ccsds"])};
@@ -166,10 +186,13 @@ static constexpr uint8_t RF_SEGMENT_HEADER_LEN = {rf["segment_header_len"]};
 static constexpr uint8_t RF_SEGMENT_MAX_DATA = RF_PACKET_MAX_LEN - RF_SEGMENT_HEADER_LEN;
 static constexpr uint32_t RF_REASSEMBLY_TIMEOUT_MS = {rf["reassembly_timeout_ms"]};
 static constexpr uint8_t RF_INTER_SEGMENT_GAP_MS = {rf["inter_segment_gap_ms"]};
+static constexpr uint8_t RF_PAYLOAD_INTER_PACKET_GAP_MS = {rf["payload_inter_packet_gap_ms"]};
 static constexpr uint8_t RF_ACK_RETRIES = {rf["ack_retries"]};
 static constexpr uint16_t RF_ACK_TIMEOUT_MS = {rf["ack_timeout_ms"]};
-static constexpr uint8_t RF_ACK_REQUIRED_CCSDS = {cpp_flag(ack["ccsds"])};
-static constexpr uint8_t RF_ACK_REQUIRED_PAYLOAD = {cpp_flag(ack["payload"])};
+static constexpr uint8_t RF_TX_ACK_REQUIRED_CCSDS = {cpp_flag(tx_ack["ccsds"])};
+static constexpr uint8_t RF_TX_ACK_REQUIRED_PAYLOAD = {cpp_flag(tx_ack["payload"])};
+static constexpr uint8_t RF_RX_ACK_REQUIRED_CCSDS = {cpp_flag(rx_ack["ccsds"])};
+static constexpr uint8_t RF_RX_ACK_REQUIRED_PAYLOAD = {cpp_flag(rx_ack["payload"])};
 
 static constexpr uint32_t PAYLOAD_PACKETS_PER_RUN = {payload["packets_per_run"]};
 static constexpr uint32_t PAYLOAD_RETRY_PACKETS_PER_RUN = {payload["retry_packets_per_run"]};
@@ -192,10 +215,16 @@ inline bool isRfChannel(uint8_t channel) {{
   return channel < CHANNEL_RF_COUNT;
 }}
 
-inline bool ackRequiredForChannel(uint8_t channel) {{
+inline bool txAckRequiredForChannel(uint8_t channel) {{
   return channel == CHANNEL_PAYLOAD
-             ? RF_ACK_REQUIRED_PAYLOAD != 0
-             : RF_ACK_REQUIRED_CCSDS != 0;
+             ? RF_TX_ACK_REQUIRED_PAYLOAD != 0
+             : RF_TX_ACK_REQUIRED_CCSDS != 0;
+}}
+
+inline bool rxAckRequiredForChannel(uint8_t channel) {{
+  return channel == CHANNEL_PAYLOAD
+             ? RF_RX_ACK_REQUIRED_PAYLOAD != 0
+             : RF_RX_ACK_REQUIRED_CCSDS != 0;
 }}
 
 inline uint8_t magicForChannel(uint8_t channel) {{

@@ -3,7 +3,10 @@
     "magic_0": 212,
     "magic_1": 195,
     "max_payload": 220,
-    "timeout_ms": 250
+    "timeout_ms": 250,
+    "uart_baud": 115200,
+    "inter_frame_margin_us": 37000,
+    "ccsds_extra_margin_us": 40000
   },
   "channels": {
     "ccsds": 0,
@@ -31,19 +34,26 @@
     "segment_header_len": 5,
     "reassembly_timeout_ms": 500,
     "inter_segment_gap_ms": 8,
+    "payload_inter_packet_gap_ms": 15,
     "ack_retries": 4,
     "ack_timeout_ms": 80,
-    "ack_channels": {
-      "ccsds": true,
-      "payload": false
+    "ack_directions": {
+      "ground_to_satellite": {
+        "ccsds": true,
+        "payload": false
+      },
+      "satellite_to_ground": {
+        "ccsds": false,
+        "payload": false
+      }
     }
   },
   "payload": {
     "magic_0": 78,
     "magic_1": 50,
     "packet_data_bytes": 35,
-    "packets_per_run": 32,
-    "retry_packets_per_run": 32
+    "packets_per_run": 22,
+    "retry_packets_per_run": 22
   },
   "command": {
     "prefix": "#",

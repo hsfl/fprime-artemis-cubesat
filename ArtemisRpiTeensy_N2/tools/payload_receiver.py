@@ -250,12 +250,30 @@ class PayloadReceiver:
     def handle_header(self, packet: bytes) -> None:
         if len(packet) < 17:
             return
-        self.transfer_id = packet[3]
-        self.product_id = struct.unpack_from("<I", packet, 4)[0]
-        self.total_bytes = struct.unpack_from("<I", packet, 8)[0]
-        self.total_packets = struct.unpack_from("<H", packet, 12)[0]
-        self.packet_data_bytes = packet[14]
-        self.file_crc = struct.unpack_from("<H", packet, 15)[0]
+        transfer_id = packet[3]
+        product_id = struct.unpack_from("<I", packet, 4)[0]
+        total_bytes = struct.unpack_from("<I", packet, 8)[0]
+        total_packets = struct.unpack_from("<H", packet, 12)[0]
+        packet_data_bytes = packet[14]
+        file_crc = struct.unpack_from("<H", packet, 15)[0]
+        same_transfer = (
+            self.transfer_id == transfer_id
+            and self.product_id == product_id
+            and self.total_bytes == total_bytes
+            and self.total_packets == total_packets
+            and self.packet_data_bytes == packet_data_bytes
+            and self.file_crc == file_crc
+        )
+        if same_transfer:
+            self.last_packet_s = time.monotonic()
+            return
+
+        self.transfer_id = transfer_id
+        self.product_id = product_id
+        self.total_bytes = total_bytes
+        self.total_packets = total_packets
+        self.packet_data_bytes = packet_data_bytes
+        self.file_crc = file_crc
         self.packets.clear()
         self.end_seen = False
         self.last_packet_s = time.monotonic()

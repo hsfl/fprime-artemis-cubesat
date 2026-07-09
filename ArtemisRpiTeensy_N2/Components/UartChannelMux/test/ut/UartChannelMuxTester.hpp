@@ -10,7 +10,7 @@ namespace Components {
 
 class UartChannelMuxTester final : public UartChannelMuxGTestBase {
   public:
-    static const FwSizeType MAX_HISTORY_SIZE = 32;
+    static const FwSizeType MAX_HISTORY_SIZE = 128;
     static const FwEnumStoreType TEST_INSTANCE_ID = 0;
 
     UartChannelMuxTester();

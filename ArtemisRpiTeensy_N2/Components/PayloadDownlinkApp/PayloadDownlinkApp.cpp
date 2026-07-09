@@ -11,6 +11,7 @@ namespace Components {
 namespace {
 constexpr U32 MAX_BLOB_BYTES = 1024U * 1024U;
 constexpr U32 HEADER_RETRANSMIT_COUNT = 3U;
+constexpr U32 HEADER_REFRESH_COUNT = 1U;
 constexpr U32 COMPLETION_SUMMARY_EVENT_REPEATS = 3;
 constexpr const char* PAYLOAD_SOURCE_ENV = "NEUTRON_PAYLOAD_DOWNLINK_FILE";
 constexpr const char* DEFAULT_PAYLOAD_SOURCE = "/tmp/neutron_payload_captures/latest_payload.bin";
@@ -157,9 +158,11 @@ void PayloadDownlinkApp::run_handler(FwIndexType portNum, U32 context) {
     }
 
     if (this->m_state == STATE_DOWNLINKING) {
-        if (!this->m_sentHeader) {
+        {
+            const U32 requestedHeaders = this->m_sentHeader ? HEADER_REFRESH_COUNT : HEADER_RETRANSMIT_COUNT;
+            const U32 availableSlots = totalPacketsPerRun - packetsSentThisRun;
             const U32 headerPacketsToSend =
-                (HEADER_RETRANSMIT_COUNT < totalPacketsPerRun) ? HEADER_RETRANSMIT_COUNT : totalPacketsPerRun;
+                (requestedHeaders < availableSlots) ? requestedHeaders : availableSlots;
             for (U32 headerCount = 0; headerCount < headerPacketsToSend; ++headerCount) {
                 if (!this->sendHeaderPacket()) {
                     this->failTransfer(3U, this->m_lastError);
@@ -168,7 +171,9 @@ void PayloadDownlinkApp::run_handler(FwIndexType portNum, U32 context) {
                 }
                 packetsSentThisRun++;
             }
-            this->m_sentHeader = true;
+            if (headerPacketsToSend > 0U) {
+                this->m_sentHeader = true;
+            }
         }
 
         U32 dataSentThisRun = 0;

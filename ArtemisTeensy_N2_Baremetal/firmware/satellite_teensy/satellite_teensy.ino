@@ -15,7 +15,7 @@ static constexpr uint8_t RADIO_TX_ON_PIN = 31;
 static constexpr uint8_t RPI_ENABLE_PIN = 36;
 static constexpr uint8_t TEENSY_LED_PIN = 13;
 
-static constexpr uint32_t UART_BAUD = 115200;
+static constexpr uint32_t UART_BAUD = link_protocol::UART_BAUD;
 static constexpr uint32_t PDU_UART_BAUD = 9600;
 static constexpr uint32_t DEBUG_UART_BAUD = 115200;
 static constexpr uint16_t RAW_UART_FLUSH_MS = 12;
@@ -120,6 +120,12 @@ void debugPrintCounters(const char* prefix) {
   Serial.print(g_linkCounters.payloadRfTxSegments);
   Serial.print(" rf_tx_drops=");
   Serial.print(g_linkCounters.rfTxDrops);
+  Serial.print(" crc_drops=");
+  Serial.print(g_linkCounters.crcDrops);
+  Serial.print(" framing_drops=");
+  Serial.print(g_linkCounters.framingDrops);
+  Serial.print(" uart_timeouts=");
+  Serial.print(g_linkCounters.timeoutEvents);
   Serial.print(" rf_msg_id_gaps=");
   Serial.print(g_linkCounters.rfMsgIdGaps);
   Serial.print(" rf_ack_rx=");

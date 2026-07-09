@@ -12,6 +12,8 @@ class UartChannelMux final : public UartChannelMuxComponentBase {
     ~UartChannelMux();
 
   private:
+    friend class UartChannelMuxTester;
+
     enum class ParseState {
         WAIT_MAGIC_0,
         WAIT_MAGIC_1,
@@ -33,6 +35,7 @@ class UartChannelMux final : public UartChannelMuxComponentBase {
     void ccsdsRecvReturnIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
 
     Drv::ByteStreamStatus sendWrapped(U8 channel, const U8* data, FwSizeType size);
+    static U64 interFrameDelayUs(U8 channel, FwSizeType size);
     void parseByte(U8 byte);
     void resetParser();
     void handleFrame();

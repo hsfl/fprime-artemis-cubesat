@@ -107,11 +107,12 @@ void PayloadDownlinkAppTester::testBurstCountSendsGeneratedPayloadPacketsPerRun(
 
     this->invoke_to_run(0, 0);
     ASSERT_EVENTS_PayloadDownlinkComplete_SIZE(1);
-    ASSERT_from_packetOut_SIZE(headerPackets + LinkCfg::PAYLOAD_PACKETS_PER_RUN + 2U);
-    ASSERT_EQ(this->m_packets.size(), headerPackets + LinkCfg::PAYLOAD_PACKETS_PER_RUN + 2U);
-    EXPECT_EQ(this->m_packets[LinkCfg::PAYLOAD_PACKETS_PER_RUN][2], 2U);
-    EXPECT_EQ(this->m_packets[LinkCfg::PAYLOAD_PACKETS_PER_RUN][4], firstRunDataPackets);
-    EXPECT_EQ(this->m_packets[headerPackets + LinkCfg::PAYLOAD_PACKETS_PER_RUN + 1U][2], 3U);
+    ASSERT_from_packetOut_SIZE(headerPackets + LinkCfg::PAYLOAD_PACKETS_PER_RUN + 3U);
+    ASSERT_EQ(this->m_packets.size(), headerPackets + LinkCfg::PAYLOAD_PACKETS_PER_RUN + 3U);
+    EXPECT_EQ(this->m_packets[LinkCfg::PAYLOAD_PACKETS_PER_RUN][2], 1U);
+    EXPECT_EQ(this->m_packets[LinkCfg::PAYLOAD_PACKETS_PER_RUN + 1U][2], 2U);
+    EXPECT_EQ(this->m_packets[LinkCfg::PAYLOAD_PACKETS_PER_RUN + 1U][4], firstRunDataPackets);
+    EXPECT_EQ(this->m_packets[headerPackets + LinkCfg::PAYLOAD_PACKETS_PER_RUN + 2U][2], 3U);
 }
 
 void PayloadDownlinkAppTester::testProgressEventsEveryTenPercent() {
@@ -171,7 +172,7 @@ void PayloadDownlinkAppTester::testRetryBurstCountSendsGeneratedRetryPacketsPerR
     this->invoke_to_run(0, 0);
     ASSERT_EVENTS_PayloadDownlinkComplete_SIZE(1);
     const U32 headerPackets = 3U;
-    const U32 initialPacketCount = headerPackets + LinkCfg::PAYLOAD_PACKETS_PER_RUN + 2U;
+    const U32 initialPacketCount = headerPackets + LinkCfg::PAYLOAD_PACKETS_PER_RUN + 3U;
     ASSERT_from_packetOut_SIZE(initialPacketCount);
     ASSERT_EQ(this->m_packets.size(), initialPacketCount);
 

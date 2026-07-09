@@ -10,6 +10,7 @@ EpsDriver_Artemis::EpsDriver_Artemis(const char* const compName)
       m_pendingRequestId(0),
       m_pendingOpcode(0),
       m_pendingRequestTicks(0),
+      m_periodicTelemetryTicks(0),
       m_requestPending(false),
       m_lastRequest(Components::EpsRequest::GET_SUMMARY_STATUS),
       m_protocolVersion(0),
@@ -34,13 +35,23 @@ void EpsDriver_Artemis::pingIn_handler(FwIndexType portNum, U32 key) {
 void EpsDriver_Artemis::run_handler(FwIndexType portNum, U32 context) {
     static_cast<void>(portNum);
     static_cast<void>(context);
+    this->m_periodicTelemetryTicks += 1U;
     if (this->m_requestPending) {
         this->m_pendingRequestTicks += 1U;
         if (this->m_pendingRequestTicks >= PDU_REQUEST_TIMEOUT_TICKS) {
             this->timeoutPendingRequest();
+            this->writeTelemetry();
+            this->m_periodicTelemetryTicks = 0U;
+            return;
         }
+        // Preserve the live timeout counter without republishing the other
+        // eight unchanged EPS channels on every rate-group tick.
+        this->tlmWrite_PendingRequestTicks(this->m_pendingRequestTicks);
     }
-    this->writeTelemetry();
+    if (this->m_periodicTelemetryTicks >= PERIODIC_TELEMETRY_TICKS) {
+        this->writeTelemetry();
+        this->m_periodicTelemetryTicks = 0U;
+    }
 }
 
 void EpsDriver_Artemis::requestIn_handler(

@@ -62,6 +62,14 @@ void UartChannelMuxTester::testWrapsAndRoutesChannelFrames() {
     this->m_payloadFrames.clear();
     this->m_localFrames.clear();
 
+    const U64 encodedBytes = sizeof(payloadBytes) + LinkCfg::UART_FRAME_OVERHEAD;
+    const U64 wireTimeUs =
+        ((encodedBytes * 10ULL * 1000000ULL) + LinkCfg::UART_BAUD - 1ULL) / LinkCfg::UART_BAUD;
+    EXPECT_EQ(UartChannelMux::interFrameDelayUs(LinkCfg::CHANNEL_PAYLOAD, sizeof(payloadBytes)),
+              wireTimeUs + LinkCfg::UART_INTER_FRAME_MARGIN_US);
+    EXPECT_EQ(UartChannelMux::interFrameDelayUs(LinkCfg::CHANNEL_CCSDS, sizeof(payloadBytes)),
+              wireTimeUs + LinkCfg::UART_INTER_FRAME_MARGIN_US + LinkCfg::UART_CCSDS_EXTRA_MARGIN_US);
+
     Fw::Buffer payloadBuffer(const_cast<U8*>(payloadBytes), sizeof(payloadBytes));
     this->invoke_to_payloadSendIn(0, payloadBuffer);
     ASSERT_from_drvSendOut_SIZE(1);
@@ -81,8 +89,17 @@ void UartChannelMuxTester::testWrapsAndRoutesChannelFrames() {
     ASSERT_from_drvSendOut_SIZE(2);
     ASSERT_EQ(this->m_txFrames.size(), 2U);
     EXPECT_EQ(this->m_txFrames[1][2], LinkCfg::CHANNEL_TEENSY_LOCAL);
+    ASSERT_TLM_FramesTx_SIZE(1);
     ASSERT_TLM_FramesTx(0, 1);
-    ASSERT_TLM_FramesTx(1, 2);
+
+    // Frame-counter telemetry is sampled to avoid creating one CCSDS packet
+    // for every payload packet (and recursively counting that packet too).
+    for (U32 count = 2U; count < 64U; ++count) {
+        this->invoke_to_payloadSendIn(0, payloadBuffer);
+    }
+    ASSERT_from_drvSendOut_SIZE(64);
+    ASSERT_TLM_FramesTx_SIZE(2);
+    ASSERT_TLM_FramesTx(1, 64);
 
     const std::vector<U8> localFrame = makeFrame(LinkCfg::CHANNEL_TEENSY_LOCAL, localBytes, sizeof(localBytes));
     const FwSizeType split = 3;

@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import operator
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -67,6 +68,19 @@ def expect_equal(errors: list[str], label: str, *pairs: tuple[str, int]) -> None
 
 
 def main() -> int:
+    generated_check = subprocess.run(
+        [sys.executable, str(ROOT / "tools/generate_transport_constants.py"), "--check"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if generated_check.returncode != 0:
+        output = (generated_check.stdout + generated_check.stderr).strip()
+        if output:
+            print(output)
+        print("ERROR: generated transport headers do not match config/transport_constants.json")
+        return 1
+
     constants = {name: read_constants(path) for name, path in SOURCES.items()}
     errors: list[str] = []
 
@@ -80,9 +94,16 @@ def main() -> int:
         ("channel CCSDS", ("fprime", fp["CHANNEL_CCSDS"]), ("satellite", sat["CHANNEL_CCSDS"]), ("ground", gnd["CHANNEL_CCSDS"])),
         ("channel payload", ("fprime", fp["CHANNEL_PAYLOAD"]), ("satellite", sat["CHANNEL_PAYLOAD"]), ("ground", gnd["CHANNEL_PAYLOAD"])),
         ("UART max payload", ("fprime", fp["UART_FRAME_MAX_PAYLOAD"]), ("satellite", sat["FRAME_MAX_PAYLOAD"]), ("ground", gnd["FRAME_MAX_PAYLOAD"])),
+        ("UART baud", ("fprime", fp["UART_BAUD"]), ("satellite", sat["UART_BAUD"]), ("ground", gnd["UART_BAUD"])),
+        ("UART inter-frame margin", ("fprime", fp["UART_INTER_FRAME_MARGIN_US"]), ("satellite", sat["UART_INTER_FRAME_MARGIN_US"]), ("ground", gnd["UART_INTER_FRAME_MARGIN_US"])),
+        ("UART CCSDS extra margin", ("fprime", fp["UART_CCSDS_EXTRA_MARGIN_US"]), ("satellite", sat["UART_CCSDS_EXTRA_MARGIN_US"]), ("ground", gnd["UART_CCSDS_EXTRA_MARGIN_US"])),
         ("RF payload segment data", ("fprime", fp["RF_SEGMENT_MAX_DATA_BYTES"]), ("satellite", sat["RF_SEGMENT_MAX_DATA"]), ("ground", gnd["RF_SEGMENT_MAX_DATA"])),
-        ("RF ACK required CCSDS", ("fprime", fp["RF_ACK_REQUIRED_CCSDS"]), ("satellite", sat["RF_ACK_REQUIRED_CCSDS"]), ("ground", gnd["RF_ACK_REQUIRED_CCSDS"])),
-        ("RF ACK required payload", ("fprime", fp["RF_ACK_REQUIRED_PAYLOAD"]), ("satellite", sat["RF_ACK_REQUIRED_PAYLOAD"]), ("ground", gnd["RF_ACK_REQUIRED_PAYLOAD"])),
+        ("RF inter-segment gap", ("fprime", fp["RF_INTER_SEGMENT_GAP_MS"]), ("satellite", sat["RF_INTER_SEGMENT_GAP_MS"]), ("ground", gnd["RF_INTER_SEGMENT_GAP_MS"])),
+        ("RF payload inter-packet gap", ("fprime", fp["RF_PAYLOAD_INTER_PACKET_GAP_MS"]), ("satellite", sat["RF_PAYLOAD_INTER_PACKET_GAP_MS"]), ("ground", gnd["RF_PAYLOAD_INTER_PACKET_GAP_MS"])),
+        ("ground TX CCSDS ACK", ("fprime", fp["RF_GROUND_TX_ACK_REQUIRED_CCSDS"]), ("ground TX", gnd["RF_TX_ACK_REQUIRED_CCSDS"]), ("satellite RX", sat["RF_RX_ACK_REQUIRED_CCSDS"])),
+        ("ground TX payload ACK", ("fprime", fp["RF_GROUND_TX_ACK_REQUIRED_PAYLOAD"]), ("ground TX", gnd["RF_TX_ACK_REQUIRED_PAYLOAD"]), ("satellite RX", sat["RF_RX_ACK_REQUIRED_PAYLOAD"])),
+        ("satellite TX CCSDS ACK", ("fprime", fp["RF_SATELLITE_TX_ACK_REQUIRED_CCSDS"]), ("satellite TX", sat["RF_TX_ACK_REQUIRED_CCSDS"]), ("ground RX", gnd["RF_RX_ACK_REQUIRED_CCSDS"])),
+        ("satellite TX payload ACK", ("fprime", fp["RF_SATELLITE_TX_ACK_REQUIRED_PAYLOAD"]), ("satellite TX", sat["RF_TX_ACK_REQUIRED_PAYLOAD"]), ("ground RX", gnd["RF_RX_ACK_REQUIRED_PAYLOAD"])),
         ("payload packets per run", ("fprime", fp["PAYLOAD_PACKETS_PER_RUN"]), ("satellite", sat["PAYLOAD_PACKETS_PER_RUN"]), ("ground", gnd["PAYLOAD_PACKETS_PER_RUN"])),
         (
             "payload retry packets per run",
@@ -106,10 +127,12 @@ def main() -> int:
         errors.append("F Prime and satellite Teensy must keep channel 2 for local subsystem RPC")
     if gnd["CHANNEL_COUNT"] != 2:
         errors.append("Ground Teensy should expose only the RF-forwarded channels 0 and 1")
-    if fp["RF_ACK_REQUIRED_CCSDS"] != 1:
-        errors.append("Channel 0 / CCSDS must stay ACKed for command and telemetry reliability")
-    if fp["RF_ACK_REQUIRED_PAYLOAD"] not in (0, 1):
-        errors.append("Channel 1 / payload ACK policy must be a generated boolean flag")
+    if fp["RF_GROUND_TX_ACK_REQUIRED_CCSDS"] != 1:
+        errors.append("Ground-to-satellite CCSDS commands must stay ACKed")
+    if fp["RF_SATELLITE_TX_ACK_REQUIRED_CCSDS"] != 0:
+        errors.append("Satellite-to-ground CCSDS telemetry must remain unacknowledged for downlink throughput")
+    if fp["RF_GROUND_TX_ACK_REQUIRED_PAYLOAD"] != 0 or fp["RF_SATELLITE_TX_ACK_REQUIRED_PAYLOAD"] != 0:
+        errors.append("Channel 1 / payload must remain unacknowledged in both directions")
 
     if errors:
         for error in errors:

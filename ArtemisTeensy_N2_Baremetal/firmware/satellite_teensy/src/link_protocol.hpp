@@ -28,6 +28,9 @@ static constexpr uint8_t TEENSY_RF_OP_LINK_STATS = 1;
 // UART wrapper payload carries opaque bytes tagged by virtual channel.
 static constexpr uint16_t FRAME_MAX_PAYLOAD = 220;
 static constexpr uint32_t FRAME_TIMEOUT_MS = 250;
+static constexpr uint32_t UART_BAUD = 115200;
+static constexpr uint32_t UART_INTER_FRAME_MARGIN_US = 37000;
+static constexpr uint32_t UART_CCSDS_EXTRA_MARGIN_US = 40000;
 
 // RF segmentation parameters.
 static constexpr uint8_t RF_SEGMENT_MAGIC_CCSDS = 0xA5;
@@ -38,13 +41,16 @@ static constexpr uint8_t RF_SEGMENT_HEADER_LEN = 5;
 static constexpr uint8_t RF_SEGMENT_MAX_DATA = RF_PACKET_MAX_LEN - RF_SEGMENT_HEADER_LEN;
 static constexpr uint32_t RF_REASSEMBLY_TIMEOUT_MS = 500;
 static constexpr uint8_t RF_INTER_SEGMENT_GAP_MS = 8;
+static constexpr uint8_t RF_PAYLOAD_INTER_PACKET_GAP_MS = 15;
 static constexpr uint8_t RF_ACK_RETRIES = 4;
 static constexpr uint16_t RF_ACK_TIMEOUT_MS = 80;
-static constexpr uint8_t RF_ACK_REQUIRED_CCSDS = 1;
-static constexpr uint8_t RF_ACK_REQUIRED_PAYLOAD = 0;
+static constexpr uint8_t RF_TX_ACK_REQUIRED_CCSDS = 0;
+static constexpr uint8_t RF_TX_ACK_REQUIRED_PAYLOAD = 0;
+static constexpr uint8_t RF_RX_ACK_REQUIRED_CCSDS = 1;
+static constexpr uint8_t RF_RX_ACK_REQUIRED_PAYLOAD = 0;
 
-static constexpr uint32_t PAYLOAD_PACKETS_PER_RUN = 32;
-static constexpr uint32_t PAYLOAD_RETRY_PACKETS_PER_RUN = 32;
+static constexpr uint32_t PAYLOAD_PACKETS_PER_RUN = 22;
+static constexpr uint32_t PAYLOAD_RETRY_PACKETS_PER_RUN = 22;
 
 static constexpr char COMMAND_PREFIX = '#';
 static constexpr size_t COMMAND_MAX_LEN = 64;
@@ -64,10 +70,16 @@ inline bool isRfChannel(uint8_t channel) {
   return channel < CHANNEL_RF_COUNT;
 }
 
-inline bool ackRequiredForChannel(uint8_t channel) {
+inline bool txAckRequiredForChannel(uint8_t channel) {
   return channel == CHANNEL_PAYLOAD
-             ? RF_ACK_REQUIRED_PAYLOAD != 0
-             : RF_ACK_REQUIRED_CCSDS != 0;
+             ? RF_TX_ACK_REQUIRED_PAYLOAD != 0
+             : RF_TX_ACK_REQUIRED_CCSDS != 0;
+}
+
+inline bool rxAckRequiredForChannel(uint8_t channel) {
+  return channel == CHANNEL_PAYLOAD
+             ? RF_RX_ACK_REQUIRED_PAYLOAD != 0
+             : RF_RX_ACK_REQUIRED_CCSDS != 0;
 }
 
 inline uint8_t magicForChannel(uint8_t channel) {

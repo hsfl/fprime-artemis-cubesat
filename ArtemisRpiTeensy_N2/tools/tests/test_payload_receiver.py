@@ -91,6 +91,35 @@ class PayloadReceiverTests(unittest.TestCase):
         self.assertEqual(request[:4], payload_receiver.MAGIC + bytes([payload_receiver.TYPE_RETRY_REQUEST, 3]))
         self.assertEqual(request[6], 2)
 
+    def test_repeated_header_preserves_packets_for_same_transfer(self) -> None:
+        blob = b"a" * payload_receiver.DATA_BYTES + b"tail"
+        transfer_id = 11
+        receiver = payload_receiver.PayloadReceiver("unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0)
+        header = make_header(73, transfer_id, blob)
+        first_data = make_data(transfer_id, 0, blob[: payload_receiver.DATA_BYTES])
+
+        receiver.handle_header(header)
+        receiver.handle_data(first_data)
+        receiver.end_seen = True
+        receiver.handle_header(header)
+
+        self.assertEqual(receiver.packets, {0: blob[: payload_receiver.DATA_BYTES]})
+        self.assertTrue(receiver.end_seen)
+
+    def test_new_header_resets_previous_transfer_state(self) -> None:
+        first_blob = b"first"
+        second_blob = b"second"
+        receiver = payload_receiver.PayloadReceiver("unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0)
+        receiver.handle_header(make_header(1, 1, first_blob))
+        receiver.handle_data(make_data(1, 0, first_blob))
+        receiver.end_seen = True
+
+        receiver.handle_header(make_header(2, 2, second_blob))
+
+        self.assertEqual(receiver.transfer_id, 2)
+        self.assertEqual(receiver.packets, {})
+        self.assertFalse(receiver.end_seen)
+
     def test_directory_mode_writes_completed_transfer_with_requested_extension(self) -> None:
         blob = b"fake-fdp-bytes"
         transfer_id = 4

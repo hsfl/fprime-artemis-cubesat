@@ -198,6 +198,12 @@ inline bool initRadio(RH_RF22& radio, const RadioPins& pins = RadioPins(),
   }
 
   radio.setModemConfig(profile.modem);
+  // RFM23BP datasheet section 3.5.7: rates above 100 kbps require
+  // register 0x58 = 0xC0. RadioHead's 125 kbps preset leaves the POR/default
+  // 0x80 value, which increases eye closure and packet loss.
+  if (profile.modem == RH_RF22::GFSK_Rb125Fd125) {
+    radio.spiWrite(RH_RF22_REG_58_CHARGE_PUMP_CURRENT_TRIMMING, 0xC0);
+  }
   radio.setTxPower(profile.tx_power);
 
   if (profile.start_in_receive) {

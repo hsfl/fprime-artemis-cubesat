@@ -127,6 +127,12 @@ void debugPrintCounters(const char* prefix) {
   SerialUSB1.print(g_linkCounters.payloadRfTxSegments);
   SerialUSB1.print(" rf_tx_drops=");
   SerialUSB1.print(g_linkCounters.rfTxDrops);
+  SerialUSB1.print(" crc_drops=");
+  SerialUSB1.print(g_linkCounters.crcDrops);
+  SerialUSB1.print(" framing_drops=");
+  SerialUSB1.print(g_linkCounters.framingDrops);
+  SerialUSB1.print(" uart_timeouts=");
+  SerialUSB1.print(g_linkCounters.timeoutEvents);
   SerialUSB1.print(" rf_msg_id_gaps=");
   SerialUSB1.print(g_linkCounters.rfMsgIdGaps);
   SerialUSB1.print(" rf_ack_rx=");

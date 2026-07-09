@@ -389,7 +389,7 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
 
     const uint8_t rfLen = static_cast<uint8_t>(link_protocol::RF_SEGMENT_HEADER_LEN + chunkLen);
     wdt_guard::feed();
-    const bool sentOk = link_protocol::ackRequiredForChannel(channel)
+    const bool sentOk = link_protocol::txAckRequiredForChannel(channel)
                             ? sendRfPacketWithAck(rfPacket, rfLen, channel, msgId, segIdx)
                             : m_rf.send(rfPacket, rfLen);
     wdt_guard::feed();
@@ -405,7 +405,15 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
       m_counters.payloadRfTxSegments += 1;
     }
 
-    if (segIdx + 1 < segCount) {
+    if (channel == link_protocol::CHANNEL_PAYLOAD) {
+      // Payload messages fit in one segment and do not use RF ACKs. Give the
+      // peer time to drain each packet before the next preamble.
+      wdt_guard::feed();
+      delay(link_protocol::RF_PAYLOAD_INTER_PACKET_GAP_MS);
+      wdt_guard::feed();
+    } else if (segIdx + 1 < segCount) {
+      // ACK turnaround already paces CCSDS packets; retain only the original
+      // between-segment guard for multi-segment CCSDS messages.
       wdt_guard::feed();
       delay(link_protocol::RF_INTER_SEGMENT_GAP_MS);
       wdt_guard::feed();
@@ -549,7 +557,7 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
   }
 
   if (msgId == state.expectedMsgId && segCount == state.expectedSegCount && segIdx < state.expectedSegIndex) {
-    if (link_protocol::ackRequiredForChannel(channel)) {
+    if (link_protocol::rxAckRequiredForChannel(channel)) {
       sendAck(channel, msgId, segIdx);
     }
     return;
@@ -583,7 +591,7 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
   if (channel == link_protocol::CHANNEL_PAYLOAD) {
     m_counters.payloadRfRxSegments += 1;
   }
-  if (link_protocol::ackRequiredForChannel(channel)) {
+  if (link_protocol::rxAckRequiredForChannel(channel)) {
     sendAck(channel, msgId, segIdx);
   }
 
