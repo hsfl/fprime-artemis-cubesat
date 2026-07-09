@@ -15,6 +15,7 @@ venv/
 # Root docs/build scratch
 logs/
 PrmDb.dat
+data/
 
 # F' project generated artifacts
 ArtemisRpiTeensy_N2/build-artifacts/
