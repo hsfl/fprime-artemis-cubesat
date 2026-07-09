@@ -42,6 +42,13 @@ The script defaults to:
 It exports that path as `C3M_LEPTON_SAMPLE_CSV`, then runs the normal C3M
 mission sequence:
 
+```text
+LEPTON_CAMERA_BACKEND=sample
+```
+
+That backend is for laptop local emulation only. HIL camera proof must use
+`LEPTON_CAMERA_BACKEND=uvc`.
+
 1. `missionApp.ENTER_BASE_MODE`
 2. `sohApp.EMIT_SOH_SNAPSHOT`
 3. `payloadDriverLepton.ENABLE`

@@ -40,6 +40,13 @@ Core local MVP status: implemented and locally validated on `epscorc3m/demo`.
 The remaining proof gates are HIL bench validation and measured downlink
 optimization.
 
+C3M HIL camera prep status: implemented locally on 2026-07-08. The current
+`PayloadDriver_Lepton` now carries the real old-branch `libuvc` Lepton backend,
+explicit backend selection, a Pi-only `testLeptonCamera` harness, and real
+`.fdp` source CRC emission. Laptop validation still uses the checked-in sample
+CSV through `LEPTON_CAMERA_BACKEND=sample`; HIL must run with
+`LEPTON_CAMERA_BACKEND=uvc`.
+
 Completed commits:
 
 - `ade1d85 add c3m lepton payload driver and data products path`
@@ -376,12 +383,18 @@ seam.
 Status:
 
 - MVP implemented locally as `PayloadDriver_Lepton`.
-- Local/native path uses a deterministic simulated Lepton frame source.
+- Local/native path uses explicit `LEPTON_CAMERA_BACKEND=sample` sample data for
+  deterministic emulation, with `synthetic` still available only as an explicit
+  fallback/test backend.
 - The driver produces a full-res Lepton Data Product and emits a descriptor with
-  the written path and byte count.
-- Real libuvc/Lepton hardware behavior remains a HIL/Pi validation item.
-- Follow-on plan for backend selection, conservative `libuvc` build support, and
-  real descriptor CRC:
+  the written path, byte count, and real source CRC.
+- The real old-branch `libuvc` Lepton backend is restored inside
+  `PayloadDriver_Lepton/LeptonCamera.*`, gated to Linux builds that find both
+  `libuvc` and `libusb-1.0`.
+- Real camera behavior remains a Pi/HIL validation item:
+  `LEPTON_CAMERA_BACKEND=uvc ./testLeptonCamera`, then F Prime capture/downlink.
+- Follow-on plan/status for backend selection, conservative `libuvc` build
+  support, and real descriptor CRC:
   [`docs/C3M_LEPTON_CAMERA_BACKEND_HIL_PLAN.md`](C3M_LEPTON_CAMERA_BACKEND_HIL_PLAN.md).
 
 New component:
@@ -598,9 +611,22 @@ Completed local/non-HIL gates after the transport edit:
 3. Ground Teensy Arduino build
 4. `ArtemisRpiTeensy_N2/tools/docker_cross_compile_pi_zero_w.sh --local-only`
 
+Completed local/non-HIL gates after real Lepton backend restore:
+
+1. `fprime-util generate -f`
+2. `fprime-util build`
+3. `./tools/validate_local.sh --demo c3m`
+4. `./tools/docker_cross_compile_pi_zero_w.sh --local-only`
+
 Remaining local/non-HIL work before HIL:
 
-1. Keep preview mode optional. Implement it only if HIL full-res timing is too
+1. Install/sync `libuvc`, `libuvc/libuvc.h`, and `libusb-1.0` into the Pi build
+   environment, or build natively on the Pi, until CMake reports
+   `PayloadDriver_Lepton: libuvc enabled`.
+2. Re-run the Pi Zero W build gate after the camera libraries are visible. The
+   current cross-built ARMv6 binary is architecture-valid, but it compiled the
+   fail-hard non-`libuvc` path because those libraries were not in the sysroot.
+3. Keep preview mode optional. Implement it only if HIL full-res timing is too
    slow for the live demo story.
 
 ## Downlink Optimization Summary

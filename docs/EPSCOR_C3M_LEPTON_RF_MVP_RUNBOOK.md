@@ -9,9 +9,12 @@ RFM23BP ACK/retry timing, queue drops, and CRC repeatability.
 
 Validated locally:
 
-- `PayloadDriver_Lepton` simulated full-res Lepton product generation using
-  the real Lepton sample grid from `ground-station/c3m-lepton-test-data`.
+- `PayloadDriver_Lepton` full-res Lepton product generation using the explicit
+  `LEPTON_CAMERA_BACKEND=sample` path and the real Lepton sample grid from
+  `ground-station/c3m-lepton-test-data`.
 - F Prime Data Product write to `DpCat/Dp_*.fdp`.
+- Nonzero source CRC emitted in the science product descriptor before channel-1
+  downlink.
 - `PayloadDownlinkApp` channel-1 packetization and retry flow.
 - Ground receiver reconstruction.
 - Lepton viewer decode of `160x120` thermal pixels.
@@ -90,9 +93,15 @@ checked-in real Lepton sample:
 ground-station/c3m-lepton-test-data/data/Dp_20260707_120740.csv
 ```
 
+It also exports:
+
+```text
+LEPTON_CAMERA_BACKEND=sample
+```
+
 The resulting local `.fdp` must decode back to that same 120x160 grid. Override
 with `--sample-csv <path>` only when intentionally testing a different Lepton
-sample.
+sample. Do not use `sample`, `synthetic`, or `auto` as HIL camera proof.
 
 The script writes logs under:
 
@@ -167,7 +176,13 @@ Pass criteria:
 
 - ARMv6 artifact is produced.
 - script `file` / `readelf` checks pass.
+- CMake reports `PayloadDriver_Lepton: libuvc enabled` for real-camera HIL.
 - no SSH deploy is attempted from this local-only gate.
+
+If the build reports `PayloadDriver_Lepton: libuvc disabled`, the binary is
+still useful for ARM/runtime smoke, but it is not real-camera HIL-ready. Install
+or sync `libuvc`, `libuvc/libuvc.h`, and `libusb-1.0` into the Pi build
+environment, then rebuild until the `libuvc enabled` line appears.
 
 ## RF MVP Bench Prep
 
@@ -201,13 +216,30 @@ Pi service preflight:
 
 ```bash
 ssh artemis-pi 'systemctl is-active artemis-fprime.service; pgrep -af ArtemisRpiTeensyDeployment'
+ssh artemis-pi 'systemctl show artemis-fprime.service -p Environment'
 ```
 
 Expected:
 
 - service is `active`.
 - deployment is running with `-d /dev/serial0`.
+- service environment includes `LEPTON_CAMERA_BACKEND=uvc`.
 - no stale local process owns the GDS data or payload ports.
+
+Before involving F Prime, prove the Lepton camera backend directly on the Pi:
+
+```bash
+cd /home/pi/artemis/current
+LEPTON_CAMERA_BACKEND=uvc ./testLeptonCamera
+```
+
+Minimum pass:
+
+- `open OK, streaming`
+- `frame OK` with non-identical min/max values
+- exit code `0`
+
+If this fails, stop and fix camera/libuvc access before running the RF demo.
 
 ## Start RF MVP Tools
 
@@ -274,6 +306,9 @@ fprime-cli command-send ArtemisRpiTeensyDeployment.payloadDownlinkApp.GET_PAYLOA
 
 Record these before changing pacing or ACK policy again:
 
+- GDS event `LeptonBackendSelected backend=uvc`.
+- `ScienceProductDescriptor` handoff has nonzero source path, byte count, and
+  source CRC.
 - wall-clock time from `PayloadDownlinkStarted` to `PayloadDownlinkComplete`.
 - receiver reports `complete` and exits cleanly when not in continuous mode.
 - Lepton viewer parses `width=160`, `height=120`, `pixels=19200`.

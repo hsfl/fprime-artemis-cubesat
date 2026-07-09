@@ -81,6 +81,19 @@ the new directory has no old `PrmDb.dat`.
 After installing a new release, either re-run the needed `PRM_SET`/`PRM_SAVE`
 commands or copy `PrmDb.dat` forward intentionally.
 
+## C3M Lepton Backend Note
+
+The service sets:
+
+```text
+LEPTON_CAMERA_BACKEND=uvc
+```
+
+This is required for EPSCoR C3M HIL. If `PayloadDriver_Lepton` is wired in, the
+Pi deployment must use the real libuvc Lepton backend and fail if the camera or
+Y16 stream is unavailable. Local laptop emulation still uses
+`LEPTON_CAMERA_BACKEND=sample` through `run_c3m_local_demo.sh`.
+
 ## Blank SD To Demo-Ready Pi
 
 ### 1. Flash the OS

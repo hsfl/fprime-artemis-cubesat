@@ -23,11 +23,49 @@ Pi harness.
   `EPSCOR_C3M_REFACTOR:ArtemisRpiTeensy_N2/Components/PayloadAdapter_Lepton/`.
 - Local C3M demo is green using the real checked-in Lepton sample CSV from
   `ground-station/c3m-lepton-test-data/`.
-- Current `LeptonCamera.cpp` only supports sample CSV and synthetic data.
-- Current `PayloadDriver_Lepton/CMakeLists.txt` does not detect or link
-  `libuvc` / `libusb-1.0`.
-- Current `PayloadDriver_Lepton` reports real `.fdp` path and size after
-  `dpWrittenIn`, but still emits `sourceCrc = 0`.
+
+## Implementation Status - 2026-07-08
+
+Implemented on `epscorc3m/demo`:
+
+- Ported the full old branch `libuvc` Lepton backend into current
+  `PayloadDriver_Lepton/LeptonCamera.*`.
+- Restored the clean compile-time split:
+  - Linux with `libuvc` + `libusb-1.0`: `LEPTON_USE_LIBUVC` real camera path.
+  - macOS/non-Linux/missing libs: sample/synthetic paths compile with no camera
+    dependencies.
+- Added explicit runtime backend selection:
+  `LEPTON_CAMERA_BACKEND=uvc|sample|synthetic|auto`.
+- Updated the C3M local demo to export `LEPTON_CAMERA_BACKEND=sample`.
+- Added the F Prime-free `testLeptonCamera` harness under
+  `PayloadDriver_Lepton/testLeptonCamera/`.
+- Added `LeptonBackendSelected` event so GDS can prove whether the run used
+  `uvc`, `sample`, or `synthetic`.
+- Added real CRC16-CCITT source CRC emission from
+  `PayloadDriver_Lepton::dpWrittenIn_handler()`.
+
+Validated locally:
+
+- `fprime-util generate -f`
+- `fprime-util build`
+- `./tools/validate_local.sh --demo c3m`
+- `./tools/docker_cross_compile_pi_zero_w.sh --local-only`
+
+Important cross-build caveat:
+
+- The ARMv6 deployment cross-build passes, but the current local Pi sysroot did
+  not expose `libuvc`, `libuvc/libuvc.h`, or `libusb-1.0`.
+- That means the produced ARM artifact currently compiles the fail-hard
+  non-`libuvc` path. It is architecture-valid, but not real-camera HIL-ready.
+- Before HIL, install/sync the Pi camera libraries or build natively on the Pi
+  until CMake reports `PayloadDriver_Lepton: libuvc enabled`.
+
+Still pending hardware proof:
+
+- Pi/Linux `libuvc` discovery and link in the actual HIL artifact.
+- `LEPTON_CAMERA_BACKEND=uvc ./testLeptonCamera` on the Pi.
+- F Prime `payloadDriverLepton.ENABLE` using `uvc`.
+- Channel-1 RF downlink of a real-camera `.fdp`.
 
 ## Non-Goals
 
@@ -42,6 +80,8 @@ Pi harness.
 ## Work Plan
 
 ### 1. Add Explicit Lepton Frame-Source Selection
+
+Status: implemented.
 
 Add a runtime selector such as:
 
@@ -80,6 +120,8 @@ Implementation notes:
 - Preserve the sample CSV behavior that local validation already depends on.
 
 ### 2. Restore Conservative `libuvc` Build Support
+
+Status: implemented locally; Pi/HIL proof pending.
 
 Port the proven real-camera implementation from
 `EPSCOR_C3M_REFACTOR:.../PayloadAdapter_Lepton/LeptonCamera.*` into the current
@@ -123,10 +165,12 @@ Standalone harness:
 
 ### 3. Emit a Real `sourceCrc`
 
+Status: implemented and validated in local emulation.
+
 Make the C3M descriptor honest by computing CRC over the actual `.fdp` file
 after `DpWriter` confirms the write.
 
-Current issue:
+Original issue:
 
 - `PayloadDriver_Lepton::dpWrittenIn_handler()` emits the real file path and
   byte count, but uses `sourceCrc = 0`.
@@ -180,6 +224,7 @@ cd ArtemisRpiTeensy_N2
 Pi pre-HIL camera gate:
 
 ```bash
+cd /home/pi/artemis/current
 LEPTON_CAMERA_BACKEND=uvc ./testLeptonCamera
 ```
 
@@ -204,7 +249,7 @@ HIL proof gate:
 
 ## Atomic Commit Shape
 
-Recommended commit sequence:
+Original recommended commit sequence:
 
 1. `add selectable lepton camera frame sources`
    - backend selector
@@ -219,6 +264,10 @@ Recommended commit sequence:
    - file CRC helper
    - descriptor emits nonzero CRC
    - downlink path verifies expected CRC before transfer
+
+Actual implementation may land as one HIL-prep commit if the branch owner wants
+one atomic "restore real Lepton backend" change; the work is still split by
+source responsibility in the diff.
 
 ## Stop Point Before HIL
 
