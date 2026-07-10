@@ -339,6 +339,69 @@ Extend the web viewer using the behavior of the Python viewer in
   for missing pixels.
 - Partial-transfer metadata is visible in the UI and saved in `run.json`.
 
+## Deferred Plan — RF Mission Traffic Isolation
+
+This is also follow-on work for the next development session. Neutron 2 and
+EPSCoR C3M may use the same RFM23BP hardware, RadioHead stack, frequency, and
+similar framing while operating near one another. A ground station must not
+accept commands, telemetry, or payload data belonging to the other spacecraft.
+
+### Intent
+
+Add an explicit mission/network identity to the RF link so traffic is separated
+before it reaches the normal F Prime or payload decoder paths:
+
+- EPSCoR C3M ground hardware accepts only EPSCoR C3M traffic.
+- Neutron 2 ground hardware accepts only Neutron 2 traffic.
+- Satellite receivers likewise reject commands addressed to the other mission.
+- The rule applies to channel-0 commands/telemetry, channel-1 payload data, and
+  any future virtual channels.
+
+### Design Work
+
+- Inspect the RFM23BP driver and RadioHead header fields (`TO`, `FROM`, `ID`,
+  and `FLAGS`) before choosing where the mission identity belongs.
+- Decide whether RadioHead addressing is sufficient or whether the Artemis link
+  frame needs a small, versioned mission/network tag of its own.
+- Prefer a compact generated identifier defined once in
+  `config/transport_constants.json`; do not hand-edit separate constants in the
+  Pi, satellite Teensy, and ground Teensy implementations.
+- Include the identity in the protected frame data so corruption cannot turn
+  one mission's packet into another mission's accepted traffic.
+- Reject wrong-mission frames before RF reassembly, CCSDS/GDS forwarding, or
+  payload-file reconstruction whenever the selected framing layer permits it.
+- Add explicit wrong-network/wrong-mission counters to both Teensy debug
+  streams so intentional rejection is visible and distinguishable from CRC,
+  framing, or RF loss.
+- Preserve versioning space for future spacecraft or additional ground
+  stations without redesigning the entire link header.
+- Document that this is traffic isolation, not cryptographic authentication or
+  protection against an intentional spoofing attacker.
+
+### Compatibility and HIL Rules
+
+- Update the ground and satellite paths symmetrically; never deploy a mixed
+  tagged/untagged pair without an explicit transition mode.
+- Do not silently accept untagged traffic after the migration is complete.
+- Treat any header-size, segmentation, timing, or RadioHead configuration
+  change as a transport-contract change requiring regeneration, rebuilds of all
+  consumers, and a new HIL qualification run.
+- Preserve the current validated release and tag as the rollback baseline.
+
+### Proposed Acceptance
+
+- A C3M receiver accepts C3M channel-0 and channel-1 traffic normally.
+- A Neutron 2 receiver accepts Neutron 2 channel-0 and channel-1 traffic
+  normally.
+- Injected Neutron 2 frames are rejected by the C3M ground and satellite paths
+  without appearing in GDS, the payload viewer, or stored data products.
+- Injected C3M frames are rejected by the Neutron 2 ground and satellite paths
+  under the same criteria.
+- Wrong-mission counters increment while CRC/framing counters retain their
+  existing meanings.
+- Valid same-mission traffic still meets the demo timing and repeatability
+  targets after the added tag/header is enabled.
+
 ## Compaction / Resume Point
 
 If work is interrupted, resume from this document, then check:
