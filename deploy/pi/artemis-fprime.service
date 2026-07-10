@@ -4,7 +4,7 @@
 # so a new release can be installed without changing this unit file.
 
 [Unit]
-Description=Neutron 2 Artemis F Prime deployment
+Description=Artemis C3M F Prime deployment
 # Wait for local filesystems so /home/pi/artemis/current exists before launch.
 After=local-fs.target
 # The deployment talks to the satellite Teensy over /dev/serial0, so do not

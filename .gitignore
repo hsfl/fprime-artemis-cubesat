@@ -16,6 +16,7 @@ venv/
 logs/
 PrmDb.dat
 data/
+release-artifacts/
 
 # F' project generated artifacts
 ArtemisRpiTeensy_N2/build-artifacts/

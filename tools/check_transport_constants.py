@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import operator
 import re
 import subprocess
@@ -12,6 +13,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+MANIFEST = ROOT / "config/transport_constants.json"
+PAYLOAD_RECEIVER = ROOT / "ArtemisRpiTeensy_N2/tools/payload_receiver.py"
 
 SOURCES = {
     "fprime": ROOT / "ArtemisRpiTeensy_N2/Components/LinkCfg/LinkCfg.hpp",
@@ -60,6 +63,19 @@ def read_constants(path: Path) -> dict[str, int]:
     return values
 
 
+def read_python_constants(path: Path) -> dict[str, int | bytes]:
+    values: dict[str, int | bytes] = {}
+    for node in ast.parse(path.read_text()).body:
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        target = node.targets[0]
+        if not isinstance(target, ast.Name) or not isinstance(node.value, ast.Constant):
+            continue
+        if isinstance(node.value.value, (int, bytes)):
+            values[target.id] = node.value.value
+    return values
+
+
 def expect_equal(errors: list[str], label: str, *pairs: tuple[str, int]) -> None:
     expected = pairs[0][1]
     for name, value in pairs[1:]:
@@ -82,11 +98,29 @@ def main() -> int:
         return 1
 
     constants = {name: read_constants(path) for name, path in SOURCES.items()}
+    manifest = json.loads(MANIFEST.read_text())
+    receiver = read_python_constants(PAYLOAD_RECEIVER)
     errors: list[str] = []
 
     fp = constants["fprime"]
     sat = constants["satellite_teensy"]
     gnd = constants["ground_teensy"]
+
+    expected_payload_magic = bytes(
+        [manifest["payload"]["magic_0"], manifest["payload"]["magic_1"]]
+    )
+    if receiver.get("MAGIC") != expected_payload_magic:
+        errors.append(
+            "payload receiver magic does not match payload.magic_0/payload.magic_1"
+        )
+    if receiver.get("DATA_BYTES") != fp["PAYLOAD_PACKET_DATA_BYTES"]:
+        errors.append(
+            "payload receiver DATA_BYTES does not match F Prime PAYLOAD_PACKET_DATA_BYTES"
+        )
+    if receiver.get("MAX_PACKET") != fp["RF_SEGMENT_MAX_DATA_BYTES"]:
+        errors.append(
+            "payload receiver MAX_PACKET does not match RF segment data capacity"
+        )
 
     common_pairs = [
         ("frame magic 0", ("fprime", fp["UART_FRAME_MAGIC_0"]), ("satellite", sat["FRAME_MAGIC_0"]), ("ground", gnd["FRAME_MAGIC_0"])),
@@ -142,6 +176,7 @@ def main() -> int:
     print("transport constants OK")
     for name, path in SOURCES.items():
         print(f"- {name}: {path.relative_to(ROOT)}")
+    print(f"- payload_receiver: {PAYLOAD_RECEIVER.relative_to(ROOT)}")
     return 0
 
 

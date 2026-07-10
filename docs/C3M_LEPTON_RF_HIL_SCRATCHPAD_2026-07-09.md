@@ -268,3 +268,58 @@ with a responsive mid-transfer command and no retry packets or transport drops.
 - The maintained viewer decoded `160x120`, `19,200` pixels, `15.11..23.40 C`,
   mean `18.84 C`; PNG:
   `/tmp/neutron_hil/c3m_uartflow40_20260709_130422/viewer/Dp_20260709_131330.png`.
+
+### 2026-07-09 — refined-operations cleanup
+
+- Verified `artemis-fprime.service` remained active from
+  `/home/pi/artemis/releases/c3m-hil-uartflow37-channel`.
+- Deleted the obsolete legacy rollback binary
+  `/home/pi/artemis/backup/ArtemisRpiTeensyDeployment-9eba742-uvc` after the
+  user approved removal. The active release symlink, process, and service were
+  unchanged after deletion. Git history remains the reconstruction path for
+  that legacy architecture.
+
+### 2026-07-09 — refined web-app HIL rehearsal PASS (3/3)
+
+- Rebuilt and flashed both current firmwares using the pinned physical upload
+  IDs: ground `usb:100000`, satellite `usb:2100000`.
+  - ground HEX SHA-256:
+    `2d8f035173ffa4d5a8ad2348b3e5183f703c59d10be86e7e9b69a95717526b5d`
+  - satellite HEX SHA-256:
+    `938b4c53f73c262d6bd0bafd368a4cdb3492a45a13932f9be1ea152ce95075ca`
+- Performed a clean Pi Zero W cross-build after refreshing the live sysroot.
+  The result is ARM `v6KZ`, `VFPv2`, hard-float, uses
+  `/lib/ld-linux-armhf.so.3`, and was compiled with `LEPTON_USE_LIBUVC=1`.
+- Promoted immutable release
+  `/home/pi/artemis/releases/c3m-hil-20260710T013058Z-4bf43c6`:
+  - binary SHA-256:
+    `3be1a1af54c7a1f61aaf42385a603f0425794745807174cb8488a2e0212f9003`
+  - dictionary SHA-256:
+    `75ba50efa91c99a2219c62753b97a2efaa65c0d8971d1f1fd340b50ee769387b`
+  - service remained active at PID `1116`, `NRestarts=0`, with
+    `LEPTON_CAMERA_BACKEND=uvc`, `PortOpened`, and all three rate groups started.
+- The standalone Lepton harness opened the real UVC stream and returned a
+  non-flat frame (`min=28819`, `max=29827`, `mean=29186`).
+- Started the laptop web receiver on `/dev/cu.usbmodem115553305`. It reported
+  `Ready — awaiting downlink` before the first request and remained connected
+  across all three transfers.
+- Three consecutive fresh full-resolution products passed:
+
+| Product | Web run | Time | Retry rounds | CRC | Pi/local SHA-256 |
+| --- | --- | ---: | ---: | --- | --- |
+| 1 | `c3m_20260710_013546_transfer_1` | `58.573 s` | 0 | pass | `241eaad6093e4fa370180df907a948551b5dc1baba7b603ede0cbba22ffda38d` |
+| 2 | `c3m_20260710_013840_transfer_2` | `56.661 s` | 0 | pass | `87d9a5a8a9fa4018fcb870dcaf4ebb54dbd6907830164dcf416e70d4bc26b00b` |
+| 3 | `c3m_20260710_014031_transfer_3` | `56.268 s` | 0 | pass | `42f4eaff60fb2112104a73b6adcce199b72162b9dee69400356218737f608aef` |
+
+- Every run reconstructed `38,480` bytes from `1,100/1,100` packets, matched
+  the exact Pi source SHA-256, and decoded `160x120` / `19,200` pixels into
+  `.fdp`, `.json`, `.csv`, `.png`, and `run.json` under `data/<web-run>/`.
+- Channel 0 remained usable during channel-1 bulk: exactly one mid-transfer
+  ping per run returned (`37002`, `37003`, `37004`).
+- Final bridge counters kept `crc_drops=0`, `framing_drops=0`,
+  `uart_timeouts=0`, `rf_tx_drops=0`, `up_q_drops=0`, and `down_q_drops=0` on
+  both sides. Across the three-run session the ground bridge recovered three
+  RF ACK timeouts/retries and recorded three reassembly drops; these did not
+  cause a web-receiver retry round or corrupt any product. Ground
+  `rf_msg_id_gaps` ended at `588`; satellite remained at `0`.
+- No transport-constant values were changed during this rehearsal.

@@ -20,7 +20,11 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 4. Operator sends a command to schedule data collection after a short delay, for example `10` seconds.
 5. Flight software executes a data-collection action using payload data; simulated or temporary payload data is acceptable for the demo if the real payload path is not ready.
 6. After collection, the system transitions into a science downlink path and sends payload/science data to the ground side.
-7. Ground software on the laptop reviews, displays, or analyzes the downlinked science data. `fprime-gds` is the MVP command/event/telemetry interface for this phase, and the Neutron 2 payload viewer is the current science-data review surface. `Yamcs` is the longer-term end-goal ground presentation and analysis stack.
+7. Ground software on the laptop reviews, displays, or analyzes the downlinked
+   science data. `fprime-gds` remains the command/event/telemetry authority. For
+   the refined EPSCoR C3M demo, the C3M payload receiver web app is the primary
+   channel-1 receive/CRC/decode/history surface; raw receiver and decoder CLIs
+   are engineering fallbacks. `Yamcs` is the longer-term end-goal ground stack.
 
 ### What matters most for the demo
 
@@ -1083,3 +1087,19 @@ Driver tier, formerly repo "Adapter":
 - Repeat procedure and evidence live in
   `docs/EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md`; the investigation log is
   `docs/C3M_LEPTON_RF_HIL_SCRATCHPAD_2026-07-09.md`.
+
+## C3M Refined Mission Operations (2026-07-09)
+
+- Normal operator surfaces are now only F Prime GDS on channel 0 and
+  `ground-station/c3m-payload-receiver-ui/` on channel 1.
+- The web app starts in `Ready — awaiting downlink`, listens continuously,
+  writes unique runs under repo-root `data/`, verifies CRC, decodes the exact
+  current `.fdp`, and keeps older runs visibly separate in History.
+- Receiver protocol, retries, and CLI fallback remain implemented once in
+  `ArtemisRpiTeensy_N2/tools/payload_receiver.py` through structured events.
+- Local deterministic replay covers success, CRC failure, serial failures, and
+  consecutive transfers. It does not replace the required final `3/3` HIL
+  rehearsal at demo geometry.
+- The obsolete Pi legacy rollback binary was deleted; the supported active
+  release remains `/home/pi/artemis/releases/c3m-hil-uartflow37-channel`.
+- Durable work plan: `docs/C3M_DEMO_HARDENING_PLAN_2026-07-09.md`.

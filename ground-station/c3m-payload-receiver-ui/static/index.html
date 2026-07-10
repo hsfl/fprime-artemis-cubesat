@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>C3M Payload Receiver</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>C3M Payload Receiver</h1>
+      <p class="connection-line"><span class="radio-mark" aria-hidden="true"></span>Channel 1 · Ground payload link</p>
+    </div>
+    <div class="header-status">
+      <span id="connectionIndicator" class="connection-indicator"><span class="status-dot"></span><span>Receiver disconnected</span></span>
+      <time id="systemTime">System time: -- UTC</time>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Payload views">
+    <button id="currentTab" class="tab is-selected" type="button" role="tab" aria-selected="true" aria-controls="currentView" tabindex="0">Current</button>
+    <button id="historyTab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="historyView" tabindex="-1">History</button>
+  </nav>
+
+  <main>
+    <section id="currentView" class="current-layout" role="tabpanel" aria-labelledby="currentTab">
+      <article class="current-panel" aria-labelledby="stateHeading">
+        <section class="state-header">
+          <span id="stateIcon" class="state-icon" aria-hidden="true"></span>
+          <div>
+            <h2 id="stateHeading">Starting payload receiver</h2>
+            <p id="stateSupporting" class="state-supporting">Opening the Channel 1 payload link.</p>
+            <span id="stateAnnouncement" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></span>
+          </div>
+        </section>
+
+        <section id="timingBanner" class="timing-banner" role="status" aria-live="polite" aria-atomic="true" hidden></section>
+
+        <section id="portChooser" class="port-chooser" hidden>
+          <label for="portSelect">Payload serial port</label>
+          <div class="port-actions">
+            <select id="portSelect"></select>
+            <button id="connectButton" class="primary-button" type="button">Connect receiver</button>
+          </div>
+          <p>Choose the third Ground Teensy Triple Serial port. The app selects it automatically when the mapping is unambiguous.</p>
+        </section>
+
+        <section class="metadata-grid" aria-label="Current transfer metadata">
+          <div><span>Product</span><strong id="productValue">—</strong></div>
+          <div><span>Transfer</span><strong id="transferValue">—</strong></div>
+          <div><span>Bytes</span><strong id="bytesValue">—</strong></div>
+          <div><span>Packets</span><strong id="packetsValue">—</strong></div>
+        </section>
+
+        <section class="progress-section" aria-labelledby="progressLabel">
+          <div class="progress-heading">
+            <div>
+              <span id="progressLabel">Progress</span>
+              <strong id="progressValue">0 / 0 packets</strong>
+            </div>
+            <strong id="progressPercent">0%</strong>
+          </div>
+          <progress id="progressBar" max="1" value="0">0%</progress>
+        </section>
+
+        <section class="transfer-metrics" aria-label="Transfer timing and integrity">
+          <div><span>Elapsed</span><strong id="elapsedValue">00:00</strong></div>
+          <div><span>Estimated</span><strong id="etaValue">—</strong></div>
+          <div><span>Retries</span><strong id="retryValue">0</strong></div>
+          <div><span>Integrity</span><strong id="integrityValue">Waiting</strong></div>
+        </section>
+
+        <section class="evidence-grid">
+          <section class="log-panel" aria-labelledby="logHeading">
+            <div class="section-heading">
+              <h3 id="logHeading">Live log</h3>
+              <button id="clearLogButton" class="text-button" type="button">Clear</button>
+            </div>
+            <div id="liveLog" class="live-log" role="log" aria-live="polite"></div>
+          </section>
+
+          <section class="preview-panel" aria-labelledby="previewHeading">
+            <div class="section-heading">
+              <h3 id="previewHeading">Thermal preview</h3>
+            </div>
+            <div id="previewContent" class="preview-content">
+              <div class="preview-empty">
+                <span class="thermometer" aria-hidden="true"></span>
+                <p>Available after CRC verification</p>
+              </div>
+            </div>
+            <div id="outputActions" class="output-actions" hidden>
+              <span>Output files</span>
+              <div id="outputLinks" class="output-links"></div>
+              <button id="openFolderButton" class="secondary-button" type="button">Open output folder</button>
+            </div>
+          </section>
+        </section>
+
+        <div id="errorActions" class="error-actions" hidden>
+          <button id="reconnectButton" class="secondary-button" type="button">Reconnect receiver</button>
+        </div>
+      </article>
+
+      <aside id="recentHistory" class="history-rail" aria-labelledby="recentHistoryHeading">
+        <div class="section-heading history-heading">
+          <h2 id="recentHistoryHeading">History (0)</h2>
+          <button id="viewAllHistoryButton" class="text-button" type="button">View all</button>
+        </div>
+        <div id="recentHistoryList" class="history-list"></div>
+      </aside>
+    </section>
+
+    <section id="historyView" class="history-view" role="tabpanel" aria-labelledby="historyTab" hidden>
+      <section class="history-browser">
+        <div class="history-browser-heading">
+          <div>
+            <h2>Payload history</h2>
+            <p>Browse previous products stored under the repository data folder.</p>
+          </div>
+        </div>
+        <div id="fullHistoryList" class="full-history-list"></div>
+      </section>
+      <section id="archivedDetail" class="archived-detail">
+        <div class="archived-banner">Archived transfer — not the current downlink</div>
+        <div id="archivedContent" class="archived-content">
+          <p>Select a run to view archived payload data.</p>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer>
+    <span id="footerConnection"><span class="status-dot"></span>Receiver disconnected</span>
+    <span id="footerPort">No payload port selected</span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

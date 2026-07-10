@@ -103,7 +103,8 @@ python3 tools/check_transport_constants.py
 log "running Python local-emulation tests"
 python3 -m unittest \
   ArtemisRpiTeensy_N2/tools/tests/test_local_emulation_loop.py \
-  ArtemisRpiTeensy_N2/tools/tests/test_payload_receiver.py
+  ArtemisRpiTeensy_N2/tools/tests/test_payload_receiver.py \
+  ArtemisRpiTeensy_N2/tools/tests/test_c3m_payload_receiver_ui.py
 
 # shellcheck disable=SC1090
 . "$VENV_ACTIVATE"

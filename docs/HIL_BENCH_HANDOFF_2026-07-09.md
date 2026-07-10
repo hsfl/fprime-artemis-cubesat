@@ -2,11 +2,12 @@
 
 ## BLUF
 
-The C3M HIL bench now passes the real full-resolution Lepton RF downlink. Both
-Teensy boards are flashed with the current transport firmware, the Pi service
-runs the current ARMv6/libuvc deployment, and a 38,480-byte `160x120` `.fdp`
-arrived byte-identically in `58.557 s` with no retry request or transport drops.
-This result supersedes the earlier staging blockers recorded in this handoff.
+The C3M HIL bench now passes the refined laptop web-app demo 3/3. Both Teensy
+boards are freshly flashed with current transport firmware, the Pi service runs
+the current ARMv6/libuvc deployment, and three consecutive 38,480-byte
+`160x120` products arrived byte-identically in `58.573 s`, `56.661 s`, and
+`56.268 s`, each with zero web-receiver retry rounds. This result supersedes the
+earlier staging blockers recorded in this handoff.
 
 ## Repository State
 
@@ -121,16 +122,16 @@ active
 
 ## F' Cross-Build and Pi Deployment
 
-The final ARMv6/libuvc release is active at:
+The current clean-built ARMv6/libuvc release is active at:
 
 ```text
-/home/pi/artemis/releases/c3m-hil-uartflow37-channel
+/home/pi/artemis/releases/c3m-hil-20260710T013058Z-4bf43c6
 ```
 
 Binary SHA-256:
 
 ```text
-7b2959e0e1957a6fa14b9a9ed2c2873234f0dccd4edf997e06a50189e9e47372
+3be1a1af54c7a1f61aaf42385a603f0425794745807174cb8488a2e0212f9003
 ```
 
 The service is active through `/home/pi/artemis/current`, uses
@@ -148,14 +149,16 @@ The validated transport configuration is:
 - unACKed satellite telemetry and payload bulk
 - RFM23BP `0x58=0xC0` at 125 kbps on both radios
 
-Final acceptance evidence:
+Latest refined-operations acceptance evidence:
 
 ```text
-source/ground SHA-256: 87b61b387647a4e732918b93a071fe51bf64b9b1a55ede6ff30e99289465ac26
-receiver: 1100/1100, no retry request
-application: sent=1100 total=1100 error=0
-command-to-file: 58.557 s
-viewer: 160x120, 19200 pixels
+three consecutive web-app runs: PASS
+times: 58.573 s, 56.661 s, 56.268 s
+each receiver result: 1100/1100, retry_rounds=0, crc_ok=true
+each source/ground SHA-256: exact match
+each viewer result: 160x120, 19200 pixels, FDP/JSON/CSV/PNG/run.json
+mid-transfer channel-0 pings: 37002, 37003, 37004 returned
+Pi service after run: active, PID 1116, NRestarts=0
 ```
 
 For a fresh build without Pi copy:

@@ -1,0 +1,3 @@
+fprime-gds==4.2.1
+fprime-tools==4.2.1
+pyserial==3.5

@@ -1,9 +1,15 @@
-# EPSCoR C3M Lepton Local And RF MVP Runbook
+# EPSCoR C3M Lepton Local And RF Mission Operations Runbook
 
-BLUF: use this for the C3M Lepton laptop proof and the validated RF MVP bench
-flow. Local emulation proves the F Prime command/event/Data Product/channel-1
-path; the 2026-07-09 HIL run additionally proved real UVC capture and a
-byte-identical full-resolution RF downlink in `58.557 s`.
+BLUF: use this for the C3M Lepton laptop proof and refined RF demo operation.
+The normal operator uses `fprime-gds` for channel 0 and the C3M payload receiver
+web app for channel 1; the raw receiver and decoder CLIs are engineering
+fallbacks. The 2026-07-09 HIL run proved real UVC capture and a byte-identical
+full-resolution RF downlink in `58.557 s`.
+
+The active hardening scope is defined in
+[`C3M_DEMO_HARDENING_PLAN_2026-07-09.md`](C3M_DEMO_HARDENING_PLAN_2026-07-09.md).
+Do not change any HIL-validated transport-constant values while refining the
+operator workflow.
 
 ## Scope
 
@@ -120,18 +126,18 @@ python3 ground-station/lepton-dp-viewer/lepton_dp_viewer.py \
 
 Use the newest `.fdp` file from `DpCat` if the shell expands multiple products.
 
-## Local Optimization Gate
+## Validated Transport Freeze
 
-Local emulation can verify that these optimizations compile and preserve the
-generic C3M dataflow:
+Local emulation verifies that the generated transport configuration and generic
+C3M dataflow remain intact:
 
 - generated payload pacing constants.
 - generated per-channel RF ACK policy constants.
 - channel-1 payload transfer shape.
 - Lepton `.fdp` reconstruction and decode.
 
-Local emulation cannot prove RF throughput. Treat any ACK-off or pacing change
-as bench-candidate work until HIL counters prove it.
+Local emulation cannot prove RF throughput. The 2026-07-09 HIL values are frozen
+for this mission-operations work:
 
 Current optimized RF policy:
 
@@ -141,13 +147,49 @@ Current optimized RF policy:
 - App-level repair remains owned by `PayloadDownlinkApp` and
   `payload_receiver.py` through packet indexes, retry requests, and final CRC.
 
-Rollback rule:
+Do not adjust pacing, packet counts, UART values, ACK policy, RF gaps, or PHY
+values to compensate for a failed rehearsal. Preserve the run evidence and
+inspect the directional counters first. Any future transport-value change is a
+separate bench campaign that invalidates the validated Pi release and both
+Teensy firmware images until the local gate, rebuilds, and HIL acceptance flow
+pass again.
 
-- If HIL shows payload CRC failures, queue drops, or unacceptable retry rounds,
-  stop optimizing, inspect the directional counters, and increase the relevant
-  manifest-driven UART/RF pacing before considering per-packet payload ACK.
-  Regenerate transport constants, rebuild both Teensy sketches, and rerun both
-  the local gate and HIL acceptance flow after any change.
+### Transport Source-To-Artifact Map
+
+`config/transport_constants.json` is the only editable source for generated
+transport values. `tools/generate_transport_constants.py` renders three
+headers; never hand-edit those headers.
+
+| Manifest key group | Generated consumers | Runtime effect |
+| --- | --- | --- |
+| `frame.magic_*`, `frame.max_payload`, `frame.uart_baud`, `frame.inter_frame_margin_us`, `frame.ccsds_extra_margin_us` | F Prime `Components/LinkCfg/LinkCfg.hpp`; satellite and ground `link_protocol.hpp` | Pi UART framing and channel-aware drain pacing; both Teensy UART parsers |
+| `frame.timeout_ms` | satellite and ground `link_protocol.hpp` | Teensy partial-frame timeout |
+| `channels.*` | F Prime `LinkCfg.hpp`; satellite and ground `link_protocol.hpp` as applicable | virtual-channel identity and bounds |
+| `rf.packet_max_len`, `rf.segment_header_len`, `rf.inter_segment_gap_ms`, `rf.payload_inter_packet_gap_ms` | F Prime `LinkCfg.hpp`; both Teensy `link_protocol.hpp` | RF segmentation size and send pacing |
+| `rf.segment_magic_*`, `rf.ack_segment_index`, `rf.reassembly_timeout_ms`, `rf.ack_retries`, `rf.ack_timeout_ms` | both Teensy `link_protocol.hpp` | RF framing, reassembly, and link-layer ACK mechanics |
+| `rf.ack_directions.*` | F Prime `LinkCfg.hpp`; direction-specific TX/RX policy in both Teensy `link_protocol.hpp` files | per-direction, per-channel ACK policy |
+| `payload.packet_data_bytes`, `payload.magic_*` | F Prime `LinkCfg.hpp`; Python `payload_receiver.py` is drift-checked against these values | channel-1 payload packet shape and receiver identity |
+| `payload.packets_per_run`, `payload.retry_packets_per_run` | F Prime `LinkCfg.hpp`; both Teensy `link_protocol.hpp` files | 1 Hz application burst limits |
+| `teensy_rpc.*` | F Prime `LinkCfg.hpp`; satellite `link_protocol.hpp` | channel-2 local RPC identifiers/status values |
+| `command.*` | both Teensy `link_protocol.hpp` files | debug/control command parser strings and limits |
+
+Generated destinations:
+
+```text
+ArtemisRpiTeensy_N2/Components/LinkCfg/LinkCfg.hpp
+ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/link_protocol.hpp
+GDS_Teensy/firmware/gds_teensy/src/link_protocol.hpp
+```
+
+The RFM23BP PHY register profile, including the validated 125 kbps
+`0x58=0xC0` setting, still lives in the two firmware driver implementations and
+is not generated from this manifest. Do not relocate or retune it during the
+mission-operations pass.
+
+After any approved manifest or PHY change: regenerate, run
+`./tools/validate_local.sh --demo c3m`, rebuild the ARMv6/libuvc Pi release,
+rebuild and flash both Teensies, then repeat live HIL acceptance. Until all of
+those pass, the changed artifact set is not the validated demo configuration.
 
 ## Firmware Build Gates
 
@@ -165,6 +207,9 @@ Pass criteria:
 
 - both builds exit `0`.
 - no generated build/cache files are staged.
+
+Web-app-only changes do not require a Teensy rebuild or reflash. Never reflash a
+validated board merely to exercise the ground web UI.
 
 ## Pi Artifact Gate
 
@@ -215,11 +260,39 @@ SAT_DEBUG_PORT=/dev/cu.usbmodem...
 lsof "$GDS_DATA_PORT" "$GDS_DEBUG_PORT" "$GDS_PAYLOAD_PORT" "$SAT_DEBUG_PORT" 2>/dev/null || true
 ```
 
+### Ground Teensy USB Recovery Only If Missing
+
+Do not reflash during normal demo setup. If the ground triple-serial device is
+absent, press the physical PROGRAM button once, then confirm the physical upload
+ID before doing anything else:
+
+```bash
+arduino-cli board list
+```
+
+The current HIL identities are ground `usb:100000` and satellite
+`usb:2100000`. Never upload through `/dev/cu.usbmodem*` while both boards are
+attached; auto-search can flash the satellite and still report success.
+
+Only when `usb:100000` is visible and recovery is actually required:
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
+./tools/arduino-cli/build.sh
+./tools/arduino-cli/upload.sh usb:100000
+```
+
+On macOS, retry once if the first upload only launched `teensy.app`. After
+upload, re-enumerate all three ground serial ports and read the second port long
+enough to see `[GDS_Teensy]` counters. Triple-serial enumeration alone is not
+proof that the correct firmware is running. Stop rather than trying another
+upload ID if `usb:100000` does not appear.
+
 Pi service preflight:
 
 ```bash
-ssh artemis-pi 'systemctl is-active artemis-fprime.service; pgrep -af ArtemisRpiTeensyDeployment'
-ssh artemis-pi 'systemctl show artemis-fprime.service -p Environment'
+ssh artemis-pi-c3m 'systemctl is-active artemis-fprime.service; pgrep -af ArtemisRpiTeensyDeployment'
+ssh artemis-pi-c3m 'systemctl show artemis-fprime.service -p Environment'
 ```
 
 Expected:
@@ -244,9 +317,12 @@ Minimum pass:
 
 If this fails, stop and fix camera/libuvc access before running the RF demo.
 
-## Start RF MVP Tools
+## Start Mission Operations Tools
 
-Terminal 1: GDS over channel 0.
+The normal demo operator needs two surfaces: GDS and the payload web app. Start
+both before scheduling a capture.
+
+### GDS On Channel 0
 
 ```bash
 cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
@@ -258,46 +334,65 @@ cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
   --dictionary build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json
 ```
 
-Terminal 2: payload receiver on channel 1.
+Open the GDS URL printed by the launcher.
+
+### Payload Web App On Channel 1
 
 ```bash
 cd ~/Developer/fprime-artemis-cubesat
-RUN_DIR=/tmp/neutron_hil/c3m_rf_demo_$(date +%Y%m%d_%H%M%S)
+. ArtemisRpiTeensy_N2/fprime-venv/bin/activate
+python3 ground-station/c3m-payload-receiver-ui/c3m_payload_receiver_ui.py
+```
+
+The app opens `http://127.0.0.1:8064/`. It auto-selects the ground Teensy
+payload port only when the triple-serial grouping is unambiguous; otherwise,
+select `GDS_PAYLOAD_PORT` in the browser. Do not request a downlink until the
+app shows green `Ready — awaiting downlink`.
+
+The app listens continuously, writes one timestamped directory per transfer
+under repo-root `data/`, verifies whole-file CRC, decodes the exact current
+`.fdp`, and displays its PNG. History browses earlier `data/` runs without
+making them look current. See
+[`C3M_PAYLOAD_RECEIVER_WEB_UI_PLAN.md`](C3M_PAYLOAD_RECEIVER_WEB_UI_PLAN.md).
+
+### Engineering CLI Fallback
+
+Use this only when the web app is stopped. Only one process may own the
+channel-1 serial port.
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat
+RUN_DIR="$PWD/data/c3m_cli_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$RUN_DIR"
-echo "$RUN_DIR" | tee /tmp/neutron_hil/latest_c3m_rf_demo_dir
 python3 -u ArtemisRpiTeensy_N2/tools/payload_receiver.py \
   --port "$GDS_PAYLOAD_PORT" \
   --baud 115200 \
   --output-dir "$RUN_DIR" \
   --ext .fdp \
-  --idle-timeout 240 \
+  --idle-timeout 0 \
   --debug
 ```
 
-`--output-dir` is the receiver's continuous-listen mode; there is no separate
-`--continuous` flag. `--ext .fdp` is required so the Lepton viewer command
-below finds the reconstructed products. `--idle-timeout 240` exits only after
-four minutes with no serial activity; set it to `0` for an operator-stopped
-session.
-
-Future HIL quality-of-life plan: wrap this receiver in a local web UI so the
-operator can see ground-side packet progress, retry state, final CRC, and the
-decoded Lepton PNG next to GDS. See
-[`C3M_PAYLOAD_RECEIVER_WEB_UI_PLAN.md`](C3M_PAYLOAD_RECEIVER_WEB_UI_PLAN.md).
-
-After the receiver writes a `.fdp`, decode it:
+`--output-dir` is the CLI's explicit continuous-listen mode; the unchanged CLI
+default remains single-file mode. For manual decode after a completed fallback
+transfer, pass the exact `.fdp` path:
 
 ```bash
-cd ~/Developer/fprime-artemis-cubesat
-RUN_DIR="$(cat /tmp/neutron_hil/latest_c3m_rf_demo_dir)"
 python3 ground-station/lepton-dp-viewer/lepton_dp_viewer.py \
-  "$RUN_DIR"/*.fdp \
+  "$RUN_DIR/Dp_<timestamp>.fdp" \
+  --outdir "$RUN_DIR/decode" \
   --summary --no-show
 ```
 
-## RF MVP Command Sequence
+## Event-Gated Demo Command Sequence
 
-Use GDS or `fprime-cli` with the Pi dictionary.
+Use GDS for the normal operator flow. The equivalent `fprime-cli` commands
+below are an engineering reference; they are deliberately split at the fresh
+product gate so they cannot be copied as one stale-product-prone block.
+
+First confirm the payload web app is `Ready`, note the current
+`storageManager.StoredProducts` count in GDS, then configure and schedule a
+fresh capture:
 
 ```bash
 DICT=~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2/build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json
@@ -307,27 +402,86 @@ fprime-cli command-send ArtemisRpiTeensyDeployment.sohApp.EMIT_SOH_SNAPSHOT --di
 fprime-cli command-send ArtemisRpiTeensyDeployment.payloadDriverLepton.ENABLE --dictionary "$DICT" --log-level-gds ERROR
 fprime-cli command-send ArtemisRpiTeensyDeployment.scienceApp.CONFIGURE_CAPTURE_DURATION --arguments 10 --dictionary "$DICT" --log-level-gds ERROR
 fprime-cli command-send ArtemisRpiTeensyDeployment.missionApp.SCHEDULE_COLLECTION --arguments 10 --dictionary "$DICT" --log-level-gds ERROR
+```
+
+Stop here. Wait for a new `StorageManager.ScienceStored` event whose product
+count is greater than the count noted before scheduling. Confirm the new product
+has the expected nonzero/full-resolution size. Do not request downlink against
+an old `LatestDataset` report.
+
+After the fresh-product gate passes, report and request that product:
+
+```bash
 fprime-cli command-send ArtemisRpiTeensyDeployment.storageManager.REPORT_LATEST_DATASET --dictionary "$DICT" --log-level-gds ERROR
 fprime-cli command-send ArtemisRpiTeensyDeployment.commsApp.REQUEST_SCIENCE_DOWNLINK --dictionary "$DICT" --log-level-gds ERROR
-fprime-cli command-send ArtemisRpiTeensyDeployment.payloadDownlinkApp.GET_PAYLOAD_STATUS --dictionary "$DICT" --log-level-gds ERROR
 ```
+
+Confirm the GDS `PayloadDownlinkStarted` product ID agrees with the web-app
+header. During the bulk transfer, send exactly one PING to prove channel 0
+remains usable:
+
+```bash
+fprime-cli command-send ArtemisRpiTeensyDeployment.missionApp.PING \
+  --arguments 37002 \
+  --dictionary "$DICT" \
+  --log-level-gds ERROR
+```
+
+Otherwise keep channel 0 quiet until the web app reaches CRC-complete decode.
+Do not add `GET_PAYLOAD_STATUS` or other convenience commands to the normal
+bulk-transfer sequence; use them only after the timed run or while explicitly
+troubleshooting.
 
 ## HIL Pass Criteria
 
-Record these before changing pacing or ACK policy again:
+Record these without changing pacing or ACK policy:
 
+- payload web app showed `Ready` before the downlink request.
 - GDS event `LeptonBackendSelected backend=uvc`.
+- a new `ScienceStored` product count appeared after scheduling.
 - `ScienceProductDescriptor` handoff has nonzero source path, byte count, and
   source CRC.
-- wall-clock time from `PayloadDownlinkStarted` to `PayloadDownlinkComplete`.
-- receiver reports `complete` and exits cleanly when not in continuous mode.
-- Lepton viewer parses `width=160`, `height=120`, `pixels=19200`.
-- final CRC succeeds.
+- GDS `PayloadDownlinkStarted` and the web-app header identify the same product.
+- command-to-file time is recorded from downlink request to web-app completion.
+- web app reaches `Complete`, final CRC succeeds, and its exact current product
+  decodes as `width=160`, `height=120`, `pixels=19200`.
+- the app writes `.fdp`, JSON, CSV, PNG, and `run.json` under repo-root `data/`.
 - `rf_retries`, `rf_ack_timeouts`, `rf_msg_id_gaps`, and queue drops are
   recorded from both Teensy debug ports.
-- channel-0 commands remain responsive during channel-1 payload downlink.
+- exactly one mid-transfer PING proves channel 0 remains responsive; otherwise
+  channel 0 remains quiet during bulk transfer.
 - any retry round count is acceptable only if the final file is byte-correct and
-  the demo timing remains acceptable.
+  the demo timing remains within `120 s`.
+
+Timing interpretation:
+
+- under `60 s`: nominal.
+- `60–120 s`: degraded but acceptable when progress remains visible and CRC
+  succeeds.
+- over `120 s`: outside the live-demo acceptance window. Let the app continue
+  showing real progress, but mark the rehearsal run unsuccessful and preserve
+  its evidence for diagnosis. If progress has stopped, click `Reset receiver`,
+  wait for `Ready`, then make any retry an explicit new GDS action.
+
+## Three-Run Demo Rehearsal
+
+At the intended demo geometry, complete three consecutive fresh:
+
+```text
+capture -> fresh ScienceStored gate -> downlink -> CRC -> decode -> display
+```
+
+The first run begins from a fresh web-app and bench startup. For each run,
+record the product/transfer identity, elapsed time, retry count, CRC result, and
+`data/` output directory. Require:
+
+- `3/3` newly captured products reach CRC-complete decode.
+- each finishes within `120 s`; under `60 s` remains the nominal target.
+- exactly one mid-transfer PING per run and no other bulk-transfer channel-0
+  traffic.
+- channel 0 remains usable and the transport/parser queue-drop counters remain
+  zero.
+- no transport-value changes between runs.
 
 ## Validated Final Bench Configuration (2026-07-09)
 
@@ -367,21 +521,26 @@ Final acceptance evidence:
 
 ## Stop Rules
 
-Stop and roll back or slow down the optimization if any of these happen:
+Stop the timed run and preserve its evidence if any of these happen:
 
 - channel-0 commands or telemetry become unreliable.
-- payload receiver never reaches final CRC.
+- payload web app never reaches final CRC or reports an explicit failure.
 - Teensy queue drops appear.
 - RF message-id gaps climb continuously.
 - Pi deployment restarts or watchdogs.
-- C3M full-res HIL timing exceeds the live-demo window after retries.
+- C3M full-res HIL timing exceeds `120 s` after retries.
+
+Do not retune transport values during this mission-operations hardening pass.
+First distinguish serial ownership, stale-product sequencing, camera/backend,
+decode/filesystem, and genuine RF transport failures using the saved `run.json`,
+GDS events, Pi journal, and Teensy counters.
 
 ## Cleanup
 
-```bash
-pkill -f 'tools/payload_receiver.py' 2>/dev/null || true
-rm -rf /tmp/neutron_hil/c3m_rf_demo_*
-```
+Stop the web app with `Ctrl-C` in its terminal after the demo session. If the
+engineering CLI fallback was used instead, stop that process before reopening
+the web app.
 
-Do not delete run folders until hashes, logs, and screenshots needed for the
-FSR writeup have been saved.
+Keep repo-root `data/` as the operator's local payload history. It is ignored by
+Git; do not delete run folders until hashes, logs, and screenshots needed for
+the FSR writeup and three-run rehearsal record have been saved.

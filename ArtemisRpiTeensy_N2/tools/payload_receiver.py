@@ -17,6 +17,8 @@ import pathlib
 import struct
 import sys
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
 
 import serial
 
@@ -30,6 +32,33 @@ MAX_PACKET = 44
 DATA_BYTES = 35
 RETRY_INTERVAL_S = 5.0
 RETRY_AFTER_SILENCE_S = 8.0
+
+
+@dataclass(frozen=True)
+class ReceiverEvent:
+    """Immutable receiver state update for operator-facing integrations."""
+
+    kind: str
+    timestamp_s: float
+    message: str
+    port: str
+    product_id: int
+    transfer_id: int | None
+    total_bytes: int
+    received_bytes: int
+    total_packets: int
+    received_packets: int
+    missing_packets: int
+    retry_rounds: int
+    expected_crc: int | None
+    actual_crc: int | None = None
+    crc_ok: bool | None = None
+    output_path: str | None = None
+    retry_start: int | None = None
+    retry_count: int | None = None
+    retry_bitmap_bytes: int | None = None
+    error_phase: str | None = None
+    error: str | None = None
 
 
 def crc16_ccitt(data: bytes) -> int:
@@ -54,6 +83,9 @@ class PayloadReceiver:
         output_dir: pathlib.Path | None = None,
         ext: str = ".bin",
         debug: bool = False,
+        on_event: Callable[[ReceiverEvent], None] | None = None,
+        serial_factory: Callable[..., object] | None = None,
+        stop_requested: Callable[[], bool] | None = None,
     ) -> None:
         self.port = port
         self.baud = baud
@@ -61,6 +93,9 @@ class PayloadReceiver:
         self.output_dir = output_dir
         self.ext = ext
         self.debug = debug
+        self.on_event = on_event
+        self.serial_factory = serial_factory or serial.Serial
+        self.stop_requested = stop_requested or (lambda: False)
         self.debug_total_bytes = 0
         self.debug_last_report_s = 0.0
         self.debug_seen_magic = False
@@ -78,48 +113,117 @@ class PayloadReceiver:
         self.rx_buffer = bytearray()
         self.next_retry_request_s = 0.0
         self.last_packet_s = 0.0
+        self.retry_rounds = 0
+
+    @property
+    def received_bytes(self) -> int:
+        return sum(len(chunk) for chunk in self.packets.values())
+
+    def emit(
+        self,
+        kind: str,
+        message: str = "",
+        *,
+        actual_crc: int | None = None,
+        crc_ok: bool | None = None,
+        output_path: pathlib.Path | None = None,
+        retry_start: int | None = None,
+        retry_count: int | None = None,
+        retry_bitmap_bytes: int | None = None,
+        error_phase: str | None = None,
+        error: str | None = None,
+    ) -> None:
+        if self.on_event is None:
+            return
+        missing = len(self.missing_packets()) if self.total_packets > 0 else 0
+        self.on_event(
+            ReceiverEvent(
+                kind=kind,
+                timestamp_s=time.time(),
+                message=message,
+                port=self.port,
+                product_id=self.product_id,
+                transfer_id=self.transfer_id,
+                total_bytes=self.total_bytes,
+                received_bytes=self.received_bytes,
+                total_packets=self.total_packets,
+                received_packets=len(self.packets),
+                missing_packets=missing,
+                retry_rounds=self.retry_rounds,
+                expected_crc=self.file_crc if self.transfer_id is not None else None,
+                actual_crc=actual_crc,
+                crc_ok=crc_ok,
+                output_path=str(output_path) if output_path is not None else None,
+                retry_start=retry_start,
+                retry_count=retry_count,
+                retry_bitmap_bytes=retry_bitmap_bytes,
+                error_phase=error_phase,
+                error=error,
+            )
+        )
 
     def run(self) -> int:
         deadline = time.monotonic() + self.timeout_s
-        with serial.Serial(self.port, self.baud, timeout=0.2) as ser:
-            while time.monotonic() < deadline:
-                packet = self.read_packet(ser)
-                if not packet:
+        opened = False
+        try:
+            with self.serial_factory(self.port, self.baud, timeout=0.2) as ser:
+                opened = True
+                self.emit("ready", f"listening on {self.port}")
+                while time.monotonic() < deadline:
+                    packet = self.read_packet(ser)
+                    if not packet:
+                        self.request_retries_if_due(ser)
+                        if self.complete:
+                            break
+                        continue
+                    self.handle_packet(packet, ser)
                     self.request_retries_if_due(ser)
                     if self.complete:
                         break
-                    continue
-                self.handle_packet(packet, ser)
-                self.request_retries_if_due(ser)
-                if self.complete:
-                    break
 
-            if not self.complete:
-                self.request_retries_if_due(ser, force=True)
-                retry_deadline = time.monotonic() + min(20.0, self.timeout_s)
-                while time.monotonic() < retry_deadline and not self.complete:
-                    packet = self.read_packet(ser)
-                    if packet:
-                        self.handle_packet(packet, ser)
-                    self.request_retries_if_due(ser)
+                if not self.complete:
+                    self.request_retries_if_due(ser, force=True)
+                    retry_deadline = time.monotonic() + min(20.0, self.timeout_s)
+                    while time.monotonic() < retry_deadline and not self.complete:
+                        packet = self.read_packet(ser)
+                        if packet:
+                            self.handle_packet(packet, ser)
+                        self.request_retries_if_due(ser)
+        except serial.SerialException as exc:
+            phase = "io" if opened else "open"
+            self.emit("serial_error", str(exc), error_phase=phase, error=str(exc))
+            raise
 
         if not self.complete:
             missing = self.missing_packets()
-            print(f"incomplete: received={len(self.packets)} total={self.total_packets} missing={len(missing)}")
+            message = f"incomplete: received={len(self.packets)} total={self.total_packets} missing={len(missing)}"
+            print(message)
+            self.emit("incomplete", message)
             return 2
 
         blob = self.reconstruct()
         actual_crc = crc16_ccitt(blob)
         if actual_crc != self.file_crc:
-            print(f"crc mismatch: actual=0x{actual_crc:04x} expected=0x{self.file_crc:04x}")
+            message = f"crc mismatch: actual=0x{actual_crc:04x} expected=0x{self.file_crc:04x}"
+            print(message)
+            self.emit("crc_checked", message, actual_crc=actual_crc, crc_ok=False)
             return 3
 
         self.output.parent.mkdir(parents=True, exist_ok=True)
         self.output.write_bytes(blob)
-        print(
+        message = (
             "complete: "
             f"product={self.product_id} transfer={self.transfer_id} bytes={len(blob)} "
             f"packets={self.total_packets} crc=0x{actual_crc:04x} output={self.output}"
+        )
+        print(message)
+        self.emit("crc_checked", "CRC verified", actual_crc=actual_crc, crc_ok=True)
+        self.emit(
+            "transfer_saved",
+            message,
+            actual_crc=actual_crc,
+            crc_ok=True,
+            output_path=self.output,
         )
         return 0
 
@@ -175,7 +279,9 @@ class PayloadReceiver:
         while True:
             magic_index = self.rx_buffer.find(MAGIC)
             if magic_index < 0:
+                trailing_magic_prefix = self.rx_buffer[-1:] if self.rx_buffer.endswith(MAGIC[:1]) else b""
                 self.rx_buffer.clear()
+                self.rx_buffer += trailing_magic_prefix
                 return b""
             if magic_index > 0:
                 del self.rx_buffer[:magic_index]
@@ -277,11 +383,13 @@ class PayloadReceiver:
         self.packets.clear()
         self.end_seen = False
         self.last_packet_s = time.monotonic()
-        print(
+        message = (
             "header: "
             f"product={self.product_id} transfer={self.transfer_id} bytes={self.total_bytes} "
             f"packets={self.total_packets} crc=0x{self.file_crc:04x}"
         )
+        print(message)
+        self.emit("transfer_started", message)
 
     def handle_data(self, packet: bytes) -> None:
         if len(packet) < 9:
@@ -295,8 +403,11 @@ class PayloadReceiver:
         if crc16_ccitt(packet[:crc_offset]) != expected_crc:
             return
         if index < self.total_packets:
+            is_new = index not in self.packets
             self.packets[index] = packet[7:crc_offset]
             self.last_packet_s = time.monotonic()
+            if is_new:
+                self.emit("progress")
             if len(self.packets) % 50 == 0 or len(self.packets) == self.total_packets:
                 print(f"progress: {len(self.packets)}/{self.total_packets}")
 
@@ -321,7 +432,16 @@ class PayloadReceiver:
         request += bytes([len(bitmap)])
         request += bitmap
         ser.write(bytes(request))
-        print(f"retry: start={start} count={len(span)} bitmap_bytes={len(bitmap)}")
+        self.retry_rounds += 1
+        message = f"retry: start={start} count={len(span)} bitmap_bytes={len(bitmap)}"
+        print(message)
+        self.emit(
+            "retry_requested",
+            message,
+            retry_start=start,
+            retry_count=len(span),
+            retry_bitmap_bytes=len(bitmap),
+        )
         return True
 
     def missing_packets(self) -> list[int]:
@@ -342,6 +462,7 @@ class PayloadReceiver:
         self.end_seen = False
         self.next_retry_request_s = 0.0
         self.last_packet_s = 0.0
+        self.retry_rounds = 0
 
     def finalize_to_dir(self) -> None:
         assert self.output_dir is not None
@@ -360,9 +481,18 @@ class PayloadReceiver:
             dupe += 1
         target.write_bytes(blob)
         status = "ok" if crc_ok else f"CRC MISMATCH actual=0x{actual_crc:04x} expected=0x{self.file_crc:04x}"
-        print(
+        message = (
             f"saved: {target.name} product={self.product_id} transfer={self.transfer_id} "
             f"bytes={len(blob)} packets={self.total_packets} [{status}]"
+        )
+        print(message)
+        self.emit("crc_checked", status, actual_crc=actual_crc, crc_ok=crc_ok)
+        self.emit(
+            "transfer_saved",
+            message,
+            actual_crc=actual_crc,
+            crc_ok=crc_ok,
+            output_path=target,
         )
 
     def run_directory(self, idle_timeout_s: float = 0.0) -> int:
@@ -370,9 +500,12 @@ class PayloadReceiver:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         print(f"listening on {self.port}: saving completed transfers to {self.output_dir}/ (Ctrl-C to stop)")
         last_activity = time.monotonic()
-        with serial.Serial(self.port, self.baud, timeout=0.2) as ser:
-            try:
-                while True:
+        opened = False
+        try:
+            with self.serial_factory(self.port, self.baud, timeout=0.2) as ser:
+                opened = True
+                self.emit("ready", f"listening on {self.port}")
+                while not self.stop_requested():
                     packet = self.read_packet(ser)
                     if packet:
                         self.handle_packet(packet, ser)
@@ -388,9 +521,15 @@ class PayloadReceiver:
                         and (time.monotonic() - last_activity) > idle_timeout_s
                     ):
                         print("idle timeout reached; exiting")
+                        self.emit("idle_timeout", "idle timeout reached; exiting")
                         break
-            except KeyboardInterrupt:
-                print("\nstopped by user")
+        except KeyboardInterrupt:
+            print("\nstopped by user")
+            self.emit("stopped", "stopped by user")
+        except serial.SerialException as exc:
+            phase = "io" if opened else "open"
+            self.emit("serial_error", str(exc), error_phase=phase, error=str(exc))
+            raise
         return 0
 
 
