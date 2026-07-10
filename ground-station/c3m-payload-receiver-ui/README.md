@@ -51,6 +51,22 @@ python3 ground-station/c3m-payload-receiver-ui/c3m_payload_receiver_ui.py \
 Use `--replay-bad-crc` to exercise the CRC failure state. Replay is local test
 evidence, not a substitute for the final three-run HIL rehearsal.
 
+Exercise best-effort recovery with a controlled missing packet:
+
+```bash
+python3 ground-station/c3m-payload-receiver-ui/c3m_payload_receiver_ui.py \
+  --replay-fdp ground-station/c3m-lepton-test-data/Dp_20260707_120740.fdp \
+  --replay-drop-packet 500 \
+  --transfer-timeout 5 \
+  --no-open
+```
+
+Normal operation keeps the preferred CRC-verified path. If repair is still
+incomplete at the default 90-second deadline, the app saves a positional
+`.fdp.partial`, labels it partial, renders pixels touched by missing packets as
+white/`NaN`, and records the missing packet map and timeout reason in
+`run.json`. Hovering over white pixels reports `No data`.
+
 ## Validation
 
 ```bash

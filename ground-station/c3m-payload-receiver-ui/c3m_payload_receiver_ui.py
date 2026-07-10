@@ -152,6 +152,7 @@ def build_channel1_stream(
     product_id: int = 314549,
     transfer_id: int = 42,
     expected_crc: int | None = None,
+    omit_packet_indices: set[int] | None = None,
 ) -> bytes:
     """Build a deterministic raw receiver stream for local UI replay."""
 
@@ -168,7 +169,10 @@ def build_channel1_stream(
     header += struct.pack("<H", file_crc)
 
     packets = [bytes(header)]
+    omitted = omit_packet_indices or set()
     for index in range(total_packets):
+        if index in omitted:
+            continue
         chunk = blob[index * data_bytes : (index + 1) * data_bytes]
         packet = bytearray(payload_receiver.MAGIC)
         packet += bytes([payload_receiver.TYPE_DATA, transfer_id])
@@ -244,6 +248,9 @@ def default_current_state() -> dict[str, Any]:
         "run_id": None,
         "outputs": {},
         "decode": None,
+        "partial": False,
+        "timeout_reason": None,
+        "missing_packet_indices": [],
     }
 
 
@@ -255,19 +262,23 @@ class ReceiverController:
         baud: int = 115200,
         dictionary: Path | None = None,
         decode_fn: Callable[[Path, Path, Path | None], dict[str, Any]] | None = None,
+        partial_decode_fn: Callable[[Path, Path, list[int], int], dict[str, Any]] | None = None,
+        transfer_timeout_s: float = 90.0,
     ) -> None:
         self.data_dir = data_dir.resolve()
         self.incoming_dir = self.data_dir / ".incoming"
         self.baud = baud
         self.dictionary = dictionary.resolve() if dictionary is not None else None
         self.decode_fn = decode_fn or self._decode_lepton
+        self.partial_decode_fn = partial_decode_fn or self._decode_partial_lepton
+        self.transfer_timeout_s = transfer_timeout_s
         self.lock = threading.RLock()
         self.worker_lock = threading.RLock()
         self.current = default_current_state()
         self.logs: deque[dict[str, Any]] = deque(maxlen=160)
         self.thread: threading.Thread | None = None
         self.stop_event = threading.Event()
-        self.last_replay: tuple[bytes, float, int | None] | None = None
+        self.last_replay: tuple[bytes, float, int | None, set[int]] | None = None
         self.worker_generation = 0
         self.transfer_sequence = 0
         self.finalize_lock = threading.Lock()
@@ -283,6 +294,21 @@ class ReceiverController:
             no_show=True,
         )
         return lepton_viewer.decode_product(namespace)
+
+    def _decode_partial_lepton(
+        self,
+        fdp_path: Path,
+        outdir: Path,
+        missing_packet_indices: list[int],
+        packet_data_bytes: int,
+    ) -> dict[str, Any]:
+        return lepton_viewer.decode_partial_product(
+            fdp_path,
+            outdir,
+            missing_packet_indices,
+            packet_data_bytes,
+            no_show=True,
+        )
 
     def _append_log(self, message: str, timestamp_s: float | None = None, level: str = "info") -> None:
         if not message:
@@ -317,8 +343,15 @@ class ReceiverController:
             self.last_replay = None
         self._start_worker(port=port, replay=None)
 
-    def connect_replay(self, blob: bytes, *, delay_s: float = 0.0, expected_crc: int | None = None) -> None:
-        self.last_replay = (bytes(blob), delay_s, expected_crc)
+    def connect_replay(
+        self,
+        blob: bytes,
+        *,
+        delay_s: float = 0.0,
+        expected_crc: int | None = None,
+        omit_packet_indices: set[int] | None = None,
+    ) -> None:
+        self.last_replay = (bytes(blob), delay_s, expected_crc, omit_packet_indices or set())
         self._start_worker(port="Local channel-1 replay", replay=self.last_replay)
 
     def reconnect(self) -> None:
@@ -326,13 +359,15 @@ class ReceiverController:
             port = self.current.get("port")
             replay = self.last_replay
         if replay is not None:
-            self.connect_replay(replay[0], delay_s=replay[1], expected_crc=replay[2])
+            self.connect_replay(
+                replay[0], delay_s=replay[1], expected_crc=replay[2], omit_packet_indices=replay[3]
+            )
         elif isinstance(port, str) and port:
             self._start_worker(port=port, replay=None)
         else:
             self.set_port_required()
 
-    def _start_worker(self, port: str, replay: tuple[bytes, float, int | None] | None) -> None:
+    def _start_worker(self, port: str, replay: tuple[bytes, float, int | None, set[int]] | None) -> None:
         with self.worker_lock:
             self.stop()
             self.stop_event = threading.Event()
@@ -381,14 +416,16 @@ class ReceiverController:
     def _run_receiver(
         self,
         port: str,
-        replay: tuple[bytes, float, int | None] | None,
+        replay: tuple[bytes, float, int | None, set[int]] | None,
         stop_event: threading.Event,
         generation: int,
     ) -> None:
         serial_factory: Callable[..., object] | None = None
         idle_timeout = 0.0
         if replay is not None:
-            raw = build_channel1_stream(replay[0], expected_crc=replay[2])
+            raw = build_channel1_stream(
+                replay[0], expected_crc=replay[2], omit_packet_indices=replay[3]
+            )
             replay_serial = ReplaySerial(raw, delay_s=replay[1])
             serial_factory = lambda *_args, **_kwargs: replay_serial
             idle_timeout = 0.5
@@ -405,6 +442,8 @@ class ReceiverController:
             on_event=lambda event: self.on_receiver_event(event, generation),
             serial_factory=serial_factory,
             stop_requested=stop_event.is_set,
+            transfer_timeout_s=self.transfer_timeout_s,
+            save_partial_on_timeout=True,
         )
         try:
             receiver.run_directory(idle_timeout_s=idle_timeout)
@@ -426,7 +465,7 @@ class ReceiverController:
 
     def on_receiver_event(self, event: Any, generation: int | None = None) -> None:
         event_data = dataclasses.asdict(event)
-        finalize = event.kind == "transfer_saved"
+        finalize = event.kind in {"transfer_saved", "partial_saved"}
         transfer_sequence: int | None = None
         with self.lock:
             if generation is not None and generation != self.worker_generation:
@@ -439,6 +478,7 @@ class ReceiverController:
                 "crc_checked",
                 "transfer_saved",
                 "incomplete",
+                "partial_saved",
             }:
                 self.current.update(
                     {
@@ -480,6 +520,9 @@ class ReceiverController:
                         "run_id": None,
                         "outputs": {},
                         "decode": None,
+                        "partial": False,
+                        "timeout_reason": None,
+                        "missing_packet_indices": [],
                     }
                 )
                 self._append_log(event.message, event.timestamp_s)
@@ -520,6 +563,19 @@ class ReceiverController:
                     }
                 )
                 self._append_log(event.message, event.timestamp_s, level="error")
+            elif event.kind == "partial_saved":
+                self.current.update(
+                    {
+                        "status": "decoding",
+                        "message": "Decoding best-effort thermal product",
+                        "crc_ok": False,
+                        "partial": True,
+                        "timeout_reason": event.timeout_reason,
+                        "missing_packet_indices": list(event.missing_packet_indices),
+                        "failure_reason": None,
+                    }
+                )
+                self._append_log(event.message, event.timestamp_s, level="warning")
             elif event.kind == "serial_error":
                 self.current.update(
                     {
@@ -532,7 +588,7 @@ class ReceiverController:
                 self._append_log(event.error or event.message, event.timestamp_s, level="error")
             elif event.kind == "idle_timeout":
                 self.current["connected"] = False
-                if self.current["status"] not in {"complete", "failed"}:
+                if self.current["status"] not in {"complete", "partial", "failed"}:
                     self.current.update(
                         {
                             "status": "disconnected",
@@ -607,15 +663,22 @@ class ReceiverController:
         source = Path(str(event["output_path"])).resolve()
         crc_ok = event.get("crc_ok") is True
         run_dir = self._next_run_dir(float(event["timestamp_s"]), event.get("transfer_id"))
-        target = run_dir / ("payload.fdp" if crc_ok else "payload.fdp.badcrc")
+        partial = event.get("partial") is True
+        target = run_dir / (
+            "payload.fdp.partial" if partial else ("payload.fdp" if crc_ok else "payload.fdp.badcrc")
+        )
         shutil.move(str(source), str(target))
         digest = sha256_file(target)
         with self.lock:
             if self._is_current_transfer(generation, transfer_sequence):
                 self.current.update(
                     {
-                        "status": "decoding" if crc_ok else "verifying",
-                        "message": "Decoding thermal product" if crc_ok else "CRC failed",
+                        "status": "decoding" if (crc_ok or partial) else "verifying",
+                        "message": (
+                            "Decoding best-effort thermal product"
+                            if partial
+                            else ("Decoding thermal product" if crc_ok else "CRC failed")
+                        ),
                         "run_id": run_dir.name,
                     }
                 )
@@ -633,6 +696,18 @@ class ReceiverController:
             except Exception as exc:
                 failure_reason = str(exc)
                 result = "decode_failed"
+        elif partial:
+            try:
+                summary = self.partial_decode_fn(
+                    target,
+                    run_dir,
+                    list(event.get("missing_packet_indices") or []),
+                    int(event.get("packet_data_bytes") or payload_receiver.DATA_BYTES),
+                )
+                result = "partial"
+            except Exception as exc:
+                failure_reason = str(exc)
+                result = "partial_decode_failed"
         else:
             failure_reason = (
                 f"CRC mismatch: actual=0x{int(event.get('actual_crc') or 0):04x} "
@@ -667,6 +742,9 @@ class ReceiverController:
             "expected_crc": event.get("expected_crc"),
             "actual_crc": event.get("actual_crc"),
             "crc_ok": crc_ok,
+            "partial": partial,
+            "timeout_reason": event.get("timeout_reason"),
+            "missing_packet_indices": event.get("missing_packet_indices") or [],
             "sha256": digest,
             "outputs": output_paths,
             "decode": summary,
@@ -681,13 +759,15 @@ class ReceiverController:
                 return
             if result == "complete":
                 message = "Payload complete"
+            elif result == "partial":
+                message = "Partial — viewable with missing data"
             elif result == "crc_failed":
                 message = "CRC failed"
             else:
                 message = "Payload received — decode failed"
             self.current.update(
                 {
-                    "status": "complete" if result == "complete" else "failed",
+                    "status": "partial" if result == "partial" else ("complete" if result == "complete" else "failed"),
                     "message": message,
                     "failure_reason": failure_reason,
                     "completed_at_s": completed_at,
@@ -699,6 +779,8 @@ class ReceiverController:
             )
             if result == "complete":
                 self._append_log("Decode complete", completed_at)
+            elif result == "partial":
+                self._append_log("Best-effort decode complete; missing pixels are shown in white", completed_at, level="warning")
             elif failure_reason:
                 self._append_log(failure_reason, completed_at, level="error")
 
@@ -902,6 +984,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--replay-fdp", type=Path, help="Replay one local .fdp through the raw channel-1 receiver")
     parser.add_argument("--replay-delay-ms", type=float, default=2.0)
     parser.add_argument("--replay-bad-crc", action="store_true", help="Intentionally fail replay whole-file CRC")
+    parser.add_argument(
+        "--replay-drop-packet",
+        action="append",
+        type=int,
+        default=[],
+        help="Omit a channel-1 packet index during replay (repeatable)",
+    )
+    parser.add_argument(
+        "--transfer-timeout",
+        type=float,
+        default=90.0,
+        help="Seconds before finalizing an incomplete transfer as best-effort partial data",
+    )
     return parser
 
 
@@ -914,6 +1009,7 @@ def main(argv: list[str] | None = None) -> int:
         args.data_dir,
         baud=args.baud,
         dictionary=args.dictionary,
+        transfer_timeout_s=args.transfer_timeout,
     )
     if args.replay_fdp is not None:
         blob = args.replay_fdp.read_bytes()
@@ -922,6 +1018,7 @@ def main(argv: list[str] | None = None) -> int:
             blob,
             delay_s=max(0.0, args.replay_delay_ms) / 1000.0,
             expected_crc=expected_crc,
+            omit_packet_indices=set(args.replay_drop_packet),
         )
     elif args.port:
         controller.connect(args.port)

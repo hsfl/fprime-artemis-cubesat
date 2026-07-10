@@ -285,8 +285,25 @@ Evidence is recorded in `docs/C3M_LEPTON_RF_HIL_SCRATCHPAD_2026-07-09.md`.
 
 ## Deferred Plan — Best-Effort Thermal Image Reception
 
-This is follow-on work for the next development session. Do not treat it as
-part of the completed 2026-07-09 HIL acceptance result.
+Implementation status (2026-07-10): implemented and locally validated. This
+does not alter or replace the completed 2026-07-09 HIL acceptance result; live
+RF packet-loss qualification remains a separate bench gate.
+
+The web receiver now keeps the complete CRC-verified path as preferred, caps
+an incomplete transfer at 90 seconds, saves a positional `.fdp.partial`, and
+decodes recoverable Lepton samples without shifting bytes. Samples touched by
+missing channel-1 packets are exported as CSV `NaN` / JSON `null` and rendered
+white. The UI labels the result partial, shows received/missing counts, timeout
+reason, thermal min/max/mean/range, and hover inspection (`No data` for missing
+pixels). `run.json` retains the packet map and explicitly records
+`crc_ok: false`.
+
+Local evidence used the checked-in 38,480-byte Lepton product with packet 500
+omitted: 1,099/1,100 packets, 19,182 valid pixels, 18 missing pixels, and a
+viewable thermal image with the missing region shown in white. The complete,
+bad-CRC, consecutive-transfer, disconnect, and packet-loss tests pass, and
+`./tools/validate_local.sh --skip-demo` passes including the F Prime build and
+6/6 component unit-test executables.
 
 ### Intent
 

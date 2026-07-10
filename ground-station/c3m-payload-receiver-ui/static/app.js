@@ -91,6 +91,7 @@ function headingFor(current) {
     verifying: "Verifying payload integrity",
     decoding: "Decoding thermal product",
     complete: "Payload complete",
+    partial: "Partial — viewable with missing data",
     disconnected: "Payload receiver disconnected",
   };
   return headings[current.status] || "Payload receiver";
@@ -101,12 +102,14 @@ function supportingFor(current) {
   if (current.status === "receiving") return `${formatNumber(current.received_packets)} / ${formatNumber(current.total_packets)} packets`;
   if (current.status === "retrying") return `${formatNumber(current.missing_packets)} packets missing · Retry round ${formatNumber(current.retry_rounds)}`;
   if (current.status === "complete") return "CRC passed · Current thermal product decoded";
+  if (current.status === "partial") return `${formatNumber(current.missing_packets)} packets missing · Unknown pixels shown in white`;
   if (current.status === "failed") return current.failure_reason || "The current transfer could not be completed.";
   if (current.status === "disconnected" || current.status === "select_port") return current.failure_reason || current.message;
   return current.message || "Opening the Channel 1 payload link.";
 }
 
 function integrityFor(current) {
+  if (current.partial) return ["Partial · CRC unavailable", "is-warning"];
   if (current.crc_ok === true) return ["CRC passed", "is-success"];
   if (current.crc_ok === false) return ["CRC failed", "is-danger"];
   if (["receiving", "retrying", "verifying"].includes(current.status)) return ["CRC pending", "is-warning"];
@@ -201,12 +204,25 @@ function renderPreview(current) {
     current.crc_ok,
     current.failure_reason,
     current.outputs || {},
+    current.decode || {},
   ]);
   if (nextSignature === previewSignature) return;
   previewSignature = nextSignature;
   const png = current.outputs?.png;
-  if (png && current.status === "complete") {
-    previewContent.innerHTML = `<img src="${escapeHtml(png)}" alt="Current Lepton thermal image for product ${escapeHtml(current.product_id)}, transfer ${escapeHtml(current.transfer_id)}">`;
+  if (png && ["complete", "partial"].includes(current.status)) {
+    const decode = current.decode || {};
+    previewContent.innerHTML = `
+      <div class="thermal-inspector">
+        <img id="thermalImage" src="${escapeHtml(png)}" alt="Current Lepton thermal image for product ${escapeHtml(current.product_id)}, transfer ${escapeHtml(current.transfer_id)}">
+        <output id="thermalHover" class="thermal-hover">Move over image to inspect temperature</output>
+      </div>
+      <div class="thermal-stats">
+        <span>Min <strong>${decode.min_c ?? "—"}°C</strong></span>
+        <span>Max <strong>${decode.max_c ?? "—"}°C</strong></span>
+        <span>Mean <strong>${decode.mean_c ?? "—"}°C</strong></span>
+        <span>Range <strong>${decode.min_c ?? "—"}–${decode.max_c ?? "—"}°C</strong></span>
+      </div>`;
+    attachThermalInspection(current.outputs?.csv, decode.width || 160, decode.height || 120);
   } else {
     let message = "Available after CRC verification";
     if (current.crc_ok === false) message = "Thermal preview unavailable because integrity verification failed.";
@@ -222,8 +238,38 @@ function renderPreview(current) {
   openFolderButton.dataset.runId = current.run_id || "";
 }
 
+async function attachThermalInspection(csvUrl, width, height) {
+  const image = document.getElementById("thermalImage");
+  const hover = document.getElementById("thermalHover");
+  if (!image || !hover || !csvUrl) return;
+  let grid;
+  try {
+    const response = await fetch(csvUrl, { cache: "no-store" });
+    const text = await response.text();
+    grid = text.split(/\r?\n/)
+      .filter((line) => line && !line.startsWith("#"))
+      .map((line) => line.split(",").map((value) => value === "NaN" ? null : Number(value)));
+  } catch (_error) {
+    hover.textContent = "Temperature data unavailable";
+    return;
+  }
+  image.addEventListener("mousemove", (event) => {
+    const rect = image.getBoundingClientRect();
+    const column = Math.min(width - 1, Math.max(0, Math.floor((event.clientX - rect.left) * width / rect.width)));
+    const row = Math.min(height - 1, Math.max(0, Math.floor((event.clientY - rect.top) * height / rect.height)));
+    const value = grid?.[row]?.[column];
+    hover.textContent = value === null || !Number.isFinite(value)
+      ? `Column ${column}, row ${row} · No data`
+      : `Column ${column}, row ${row} · ${value.toFixed(2)}°C`;
+  });
+  image.addEventListener("mouseleave", () => {
+    hover.textContent = "Move over image to inspect temperature";
+  });
+}
+
 function runResult(run) {
   if (run.result === "complete") return ["Complete", "run-complete"];
+  if (run.result === "partial") return ["Partial", "run-partial"];
   if (run.result === "decode_failed") return ["Decode failed", "run-failed"];
   if (run.result === "crc_failed") return ["CRC failed", "run-failed"];
   return run.crc_ok ? ["Complete", "run-complete"] : ["CRC failed", "run-failed"];
@@ -303,7 +349,7 @@ function renderHistory(history) {
       <div><span>Transfer</span><strong>${escapeHtml(selected.transfer_id ?? "—")}</strong></div>
       <div><span>Duration</span><strong>${formatDuration(selected.elapsed_seconds)}</strong></div>
       <div><span>Retries</span><strong>${formatNumber(selected.retry_rounds)}</strong></div>
-      <div><span>Integrity</span><strong class="${selected.crc_ok ? "crc-pass" : "crc-fail"}">${selected.crc_ok ? "CRC passed" : "CRC failed"}</strong></div>
+      <div><span>Integrity</span><strong class="${selected.partial ? "is-warning" : (selected.crc_ok ? "crc-pass" : "crc-fail")}">${selected.partial ? "Partial · no CRC" : (selected.crc_ok ? "CRC passed" : "CRC failed")}</strong></div>
     </div>
     ${png ? `<img src="${escapeHtml(png)}" alt="Archived Lepton thermal image for product ${escapeHtml(selected.product_id)}, transfer ${escapeHtml(selected.transfer_id)}">` : ""}
     <p>${links || "No output files available."}</p>`;

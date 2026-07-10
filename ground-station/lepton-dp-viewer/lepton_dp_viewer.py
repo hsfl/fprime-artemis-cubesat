@@ -21,6 +21,8 @@ from typing import Any
 WIDTH = 160
 HEIGHT = 120
 NUM_PIXELS = WIDTH * HEIGHT
+PIXEL_DATA_OFFSET = 76
+PIXEL_DATA_BYTES = NUM_PIXELS * 2
 
 
 def find_repo_root(start: Path) -> Path:
@@ -149,13 +151,13 @@ def centikelvin_to_celsius(pixels: list[int]) -> list[float]:
     return [(pixel / 100.0) - 273.15 for pixel in pixels]
 
 
-def write_csv(path: Path, values_c: list[float], captured_at: str | None) -> None:
+def write_csv(path: Path, values_c: list[float | None], captured_at: str | None) -> None:
     with path.open("w", encoding="utf-8") as handle:
         if captured_at:
             handle.write(f"# CAPTURED_AT,{captured_at}\n")
         for row in range(HEIGHT):
             offset = row * WIDTH
-            line = ",".join(f"{value:.2f}" for value in values_c[offset : offset + WIDTH])
+            line = ",".join("NaN" if value is None else f"{value:.2f}" for value in values_c[offset : offset + WIDTH])
             handle.write(line)
             handle.write("\n")
 
@@ -177,16 +179,19 @@ def write_png_chunk(tag: bytes, data: bytes) -> bytes:
     )
 
 
-def write_fallback_png(path: Path, values_c: list[float], scale: int = 4) -> None:
-    min_c = min(values_c)
-    max_c = max(values_c)
+def write_fallback_png(path: Path, values_c: list[float | None], scale: int = 4) -> None:
+    valid_values = [value for value in values_c if value is not None]
+    if not valid_values:
+        raise ValueError("thermal product contains no valid pixels")
+    min_c = min(valid_values)
+    max_c = max(valid_values)
     span = max(max_c - min_c, 1.0)
     rows: list[bytes] = []
     for row in range(HEIGHT):
         out = bytearray()
         offset = row * WIDTH
         for value in values_c[offset : offset + WIDTH]:
-            color = bytes(hot_color((value - min_c) / span))
+            color = b"\xff\xff\xff" if value is None else bytes(hot_color((value - min_c) / span))
             out.extend(color * scale)
         row_bytes = bytes(out)
         for _ in range(scale):
@@ -217,7 +222,7 @@ def open_image(path: Path) -> None:
         subprocess.Popen([opener, str(path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def write_png(path: Path, values_c: list[float], title: str, no_show: bool) -> bool:
+def write_png(path: Path, values_c: list[float | None], title: str, no_show: bool) -> bool:
     try:
         import matplotlib.pyplot as plt  # type: ignore
     except ImportError:
@@ -226,9 +231,14 @@ def write_png(path: Path, values_c: list[float], title: str, no_show: bool) -> b
             open_image(path)
         return True
 
-    grid = [values_c[row * WIDTH : (row + 1) * WIDTH] for row in range(HEIGHT)]
+    grid = [
+        [float("nan") if value is None else value for value in values_c[row * WIDTH : (row + 1) * WIDTH]]
+        for row in range(HEIGHT)
+    ]
     fig, ax = plt.subplots(figsize=(8, 6))
-    image = ax.imshow(grid, cmap="hot", aspect="equal", interpolation="nearest")
+    cmap = plt.get_cmap("hot").copy()
+    cmap.set_bad(color="white")
+    image = ax.imshow(grid, cmap=cmap, aspect="equal", interpolation="nearest")
     fig.colorbar(image, ax=ax, label="Temperature (C)")
     ax.set_title(title)
     ax.set_xlabel("Column")
@@ -239,6 +249,88 @@ def write_png(path: Path, values_c: list[float], title: str, no_show: bool) -> b
         plt.show()
     plt.close(fig)
     return True
+
+
+def decode_partial_product(
+    bin_file: Path,
+    outdir: Path,
+    missing_packet_indices: list[int] | tuple[int, ...],
+    packet_data_bytes: int,
+    *,
+    no_show: bool = True,
+) -> dict[str, Any]:
+    """Decode a positional Lepton FDP with known channel-1 packet gaps.
+
+    This deliberately bypasses ``fprime-dp`` because the container checksum is
+    invalid. Only the fixed Lepton pixel record is recovered, and any sample
+    whose two source bytes intersect a missing packet is represented as null.
+    """
+
+    blob = bin_file.read_bytes()
+    if len(blob) < PIXEL_DATA_OFFSET + PIXEL_DATA_BYTES:
+        raise ValueError(f"partial Lepton product has unsafe size {len(blob)}")
+    missing = {int(index) for index in missing_packet_indices}
+    values_c: list[float | None] = []
+    raw_values: list[int | None] = []
+    for pixel_index in range(NUM_PIXELS):
+        byte_offset = PIXEL_DATA_OFFSET + pixel_index * 2
+        source_packets = {byte_offset // packet_data_bytes, (byte_offset + 1) // packet_data_bytes}
+        if source_packets & missing:
+            raw_values.append(None)
+            values_c.append(None)
+            continue
+        raw = struct.unpack_from(">H", blob, byte_offset)[0]
+        raw_values.append(raw)
+        values_c.append((raw / 100.0) - 273.15)
+
+    valid_values = [value for value in values_c if value is not None]
+    if not valid_values:
+        raise ValueError("partial Lepton product has no recoverable thermal samples")
+
+    outdir.mkdir(parents=True, exist_ok=True)
+    out_json = outdir / "payload.json"
+    out_csv = outdir / "payload.csv"
+    out_png = outdir / "payload.png"
+    out_json.write_text(
+        json.dumps(
+            {
+                "partial": True,
+                "width": WIDTH,
+                "height": HEIGHT,
+                "pixels_centikelvin": raw_values,
+                "missing_packet_indices": sorted(missing),
+            },
+            indent=2,
+            allow_nan=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    write_csv(out_csv, values_c, None)
+    title = (
+        f"Partial thermal product — {len(valid_values)}/{NUM_PIXELS} pixels\n"
+        f"min {min(valid_values):.1f}C  max {max(valid_values):.1f}C  "
+        f"mean {statistics.fmean(valid_values):.1f}C"
+    )
+    write_png(out_png, values_c, title, no_show)
+    return {
+        "input": str(bin_file),
+        "dictionary": None,
+        "json": str(out_json),
+        "csv": str(out_csv),
+        "png": str(out_png),
+        "width": WIDTH,
+        "height": HEIGHT,
+        "pixels": NUM_PIXELS,
+        "valid_pixels": len(valid_values),
+        "missing_pixels": NUM_PIXELS - len(valid_values),
+        "received_percent": round(100.0 * len(valid_values) / NUM_PIXELS, 3),
+        "captured_at": None,
+        "min_c": round(min(valid_values), 2),
+        "max_c": round(max(valid_values), 2),
+        "mean_c": round(statistics.fmean(valid_values), 2),
+        "partial": True,
+    }
 
 
 def decode_product(args: argparse.Namespace) -> dict[str, Any]:

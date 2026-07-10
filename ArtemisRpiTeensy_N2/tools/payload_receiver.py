@@ -59,6 +59,10 @@ class ReceiverEvent:
     retry_bitmap_bytes: int | None = None
     error_phase: str | None = None
     error: str | None = None
+    partial: bool = False
+    missing_packet_indices: tuple[int, ...] = ()
+    timeout_reason: str | None = None
+    packet_data_bytes: int = DATA_BYTES
 
 
 def crc16_ccitt(data: bytes) -> int:
@@ -86,6 +90,8 @@ class PayloadReceiver:
         on_event: Callable[[ReceiverEvent], None] | None = None,
         serial_factory: Callable[..., object] | None = None,
         stop_requested: Callable[[], bool] | None = None,
+        transfer_timeout_s: float | None = None,
+        save_partial_on_timeout: bool = False,
     ) -> None:
         self.port = port
         self.baud = baud
@@ -96,6 +102,8 @@ class PayloadReceiver:
         self.on_event = on_event
         self.serial_factory = serial_factory or serial.Serial
         self.stop_requested = stop_requested or (lambda: False)
+        self.transfer_timeout_s = transfer_timeout_s
+        self.save_partial_on_timeout = save_partial_on_timeout
         self.debug_total_bytes = 0
         self.debug_last_report_s = 0.0
         self.debug_seen_magic = False
@@ -114,6 +122,7 @@ class PayloadReceiver:
         self.next_retry_request_s = 0.0
         self.last_packet_s = 0.0
         self.retry_rounds = 0
+        self.transfer_started_s = 0.0
 
     @property
     def received_bytes(self) -> int:
@@ -132,6 +141,9 @@ class PayloadReceiver:
         retry_bitmap_bytes: int | None = None,
         error_phase: str | None = None,
         error: str | None = None,
+        partial: bool = False,
+        missing_packet_indices: tuple[int, ...] = (),
+        timeout_reason: str | None = None,
     ) -> None:
         if self.on_event is None:
             return
@@ -159,6 +171,10 @@ class PayloadReceiver:
                 retry_bitmap_bytes=retry_bitmap_bytes,
                 error_phase=error_phase,
                 error=error,
+                partial=partial,
+                missing_packet_indices=missing_packet_indices,
+                timeout_reason=timeout_reason,
+                packet_data_bytes=self.packet_data_bytes,
             )
         )
 
@@ -383,6 +399,7 @@ class PayloadReceiver:
         self.packets.clear()
         self.end_seen = False
         self.last_packet_s = time.monotonic()
+        self.transfer_started_s = self.last_packet_s
         message = (
             "header: "
             f"product={self.product_id} transfer={self.transfer_id} bytes={self.total_bytes} "
@@ -451,6 +468,24 @@ class PayloadReceiver:
         chunks = [self.packets[idx] for idx in range(self.total_packets)]
         return b"".join(chunks)[: self.total_bytes]
 
+    def reconstruct_partial(self) -> bytes:
+        """Preserve byte positions while zero-filling unavailable packets.
+
+        The zero bytes are placeholders only. Consumers must use the emitted
+        missing-packet map to mark affected samples as unknown; this blob is
+        never eligible for whole-file CRC success.
+        """
+
+        chunks = [
+            self.packets.get(index, b"\x00" * self._expected_packet_size(index))
+            for index in range(self.total_packets)
+        ]
+        return b"".join(chunks)[: self.total_bytes]
+
+    def _expected_packet_size(self, index: int) -> int:
+        start = index * self.packet_data_bytes
+        return max(0, min(self.packet_data_bytes, self.total_bytes - start))
+
     def reset_transfer(self) -> None:
         self.transfer_id = None
         self.product_id = 0
@@ -463,6 +498,7 @@ class PayloadReceiver:
         self.next_retry_request_s = 0.0
         self.last_packet_s = 0.0
         self.retry_rounds = 0
+        self.transfer_started_s = 0.0
 
     def finalize_to_dir(self) -> None:
         assert self.output_dir is not None
@@ -495,6 +531,37 @@ class PayloadReceiver:
             output_path=target,
         )
 
+    def finalize_partial_to_dir(self, timeout_reason: str) -> None:
+        """Save an incomplete positional blob for format-aware recovery."""
+
+        assert self.output_dir is not None
+        missing = tuple(self.missing_packets())
+        blob = self.reconstruct_partial()
+        self.received_count += 1
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        base = f"Dp_{time.strftime('%Y%m%d_%H%M%S')}"
+        target = self.output_dir / f"{base}{self.ext}.partial"
+        dupe = 1
+        while target.exists():
+            target = self.output_dir / f"{base}_{dupe:03d}{self.ext}.partial"
+            dupe += 1
+        target.write_bytes(blob)
+        message = (
+            f"partial: {target.name} product={self.product_id} transfer={self.transfer_id} "
+            f"received={len(self.packets)}/{self.total_packets} missing={len(missing)} "
+            f"reason={timeout_reason}"
+        )
+        print(message)
+        self.emit(
+            "partial_saved",
+            message,
+            crc_ok=False,
+            output_path=target,
+            partial=True,
+            missing_packet_indices=missing,
+            timeout_reason=timeout_reason,
+        )
+
     def run_directory(self, idle_timeout_s: float = 0.0) -> int:
         assert self.output_dir is not None
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -513,6 +580,17 @@ class PayloadReceiver:
                     self.request_retries_if_due(ser)
                     if self.complete:
                         self.finalize_to_dir()
+                        self.reset_transfer()
+                        last_activity = time.monotonic()
+                    elif (
+                        self.save_partial_on_timeout
+                        and self.transfer_timeout_s is not None
+                        and self.transfer_id is not None
+                        and self.transfer_started_s > 0.0
+                        and (time.monotonic() - self.transfer_started_s) >= self.transfer_timeout_s
+                    ):
+                        reason = f"transfer deadline reached after {self.transfer_timeout_s:g} seconds"
+                        self.finalize_partial_to_dir(reason)
                         self.reset_transfer()
                         last_activity = time.monotonic()
                     elif (

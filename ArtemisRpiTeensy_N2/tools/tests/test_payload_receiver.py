@@ -398,6 +398,64 @@ class PayloadReceiverTests(unittest.TestCase):
         receiver.run.assert_called_once_with()
         receiver.run_directory.assert_not_called()
 
+    def test_partial_reconstruction_preserves_packet_positions(self) -> None:
+        blob = bytes(range(105))
+        receiver = payload_receiver.PayloadReceiver(
+            "unused",
+            115200,
+            pathlib.Path("/tmp/unused.bin"),
+            1.0,
+        )
+        receiver.handle_header(make_header(301, 31, blob))
+        receiver.handle_data(make_data(31, 0, blob[:35]))
+        receiver.handle_data(make_data(31, 2, blob[70:]))
+
+        partial = receiver.reconstruct_partial()
+
+        self.assertEqual(len(partial), len(blob))
+        self.assertEqual(partial[:35], blob[:35])
+        self.assertEqual(partial[35:70], b"\x00" * 35)
+        self.assertEqual(partial[70:], blob[70:])
+
+    def test_directory_deadline_saves_partial_with_missing_map(self) -> None:
+        blob = bytes(range(105))
+        stream = (
+            make_header(302, 32, blob)
+            + make_data(32, 0, blob[:35])
+            + make_data(32, 2, blob[70:])
+            + make_end(32, 3, blob)
+        )
+        events: list[payload_receiver.ReceiverEvent] = []
+        serial = ScriptedSerial(stream)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = pathlib.Path(tmp)
+            receiver: payload_receiver.PayloadReceiver
+            receiver = payload_receiver.PayloadReceiver(
+                "test-port",
+                115200,
+                output_dir / "unused.bin",
+                1.0,
+                output_dir=output_dir,
+                ext=".fdp",
+                on_event=events.append,
+                serial_factory=lambda *args, **kwargs: serial,
+                stop_requested=lambda: receiver.received_count >= 1,
+                transfer_timeout_s=0.01,
+                save_partial_on_timeout=True,
+            )
+
+            self.assertEqual(receiver.run_directory(), 0)
+            outputs = list(output_dir.glob("*.fdp.partial"))
+            self.assertEqual(len(outputs), 1)
+            self.assertEqual(len(outputs[0].read_bytes()), len(blob))
+
+        event = next(item for item in events if item.kind == "partial_saved")
+        self.assertTrue(event.partial)
+        self.assertEqual(event.missing_packet_indices, (1,))
+        self.assertFalse(event.crc_ok)
+        self.assertIn("deadline", event.timeout_reason or "")
+
 
 if __name__ == "__main__":
     unittest.main()

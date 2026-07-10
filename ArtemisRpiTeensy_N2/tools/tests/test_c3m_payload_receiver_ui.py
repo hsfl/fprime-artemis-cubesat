@@ -76,6 +76,27 @@ def fake_decode(fdp_path: pathlib.Path, outdir: pathlib.Path, dictionary: pathli
     }
 
 
+def fake_partial_decode(
+    fdp_path: pathlib.Path,
+    outdir: pathlib.Path,
+    missing_packet_indices: list[int],
+    packet_data_bytes: int,
+):
+    result = fake_decode(fdp_path, outdir, None)
+    result.update(
+        {
+            "partial": True,
+            "valid_pixels": 19182,
+            "missing_pixels": 18,
+            "received_percent": 99.906,
+            "min_c": 18.0,
+            "max_c": 31.0,
+            "mean_c": 22.0,
+        }
+    )
+    return result
+
+
 def receiver_event(
     kind: str,
     *,
@@ -263,6 +284,33 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
                 controller.reconnect()
 
             start_worker.assert_called_once_with(port="test-channel-1", replay=None)
+
+    def test_packet_loss_replay_finishes_as_honest_partial_product(self) -> None:
+        blob = bytes(index % 251 for index in range(38480))
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = ui.ReceiverController(
+                pathlib.Path(tmp),
+                decode_fn=fake_decode,
+                partial_decode_fn=fake_partial_decode,
+                transfer_timeout_s=2.0,
+            )
+            try:
+                controller.connect_replay(blob, omit_packet_indices={100})
+                snapshot = wait_for_status(controller, "partial")
+            finally:
+                controller.stop()
+
+            current = snapshot["current"]
+            self.assertTrue(current["partial"])
+            self.assertFalse(current["crc_ok"])
+            self.assertEqual(current["missing_packets"], 1)
+            self.assertEqual(current["missing_packet_indices"], [100])
+            self.assertIn("png", current["outputs"])
+            run = snapshot["history"][0]
+            self.assertEqual(run["result"], "partial")
+            self.assertFalse(run["crc_ok"])
+            self.assertEqual(run["missing_packet_indices"], [100])
+            self.assertTrue(run["outputs"]["fdp"].endswith(".fdp.partial"))
 
 
 if __name__ == "__main__":

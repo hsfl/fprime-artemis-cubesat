@@ -437,6 +437,31 @@ progress::-moz-progress-bar { background: var(--primary); border-radius: 8px; }
 }
 
 .history-item:hover { background: #fbfcff; }
+
+.thermal-inspector { position: relative; width: 100%; }
+.thermal-inspector img { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+.thermal-hover {
+  display: block;
+  margin-top: 0.45rem;
+  min-height: 1.25rem;
+  color: var(--muted, #536273);
+  font-size: 0.82rem;
+}
+.thermal-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+}
+.thermal-stats span { color: var(--muted, #536273); }
+.thermal-stats strong { display: block; color: var(--ink, #10243e); margin-top: 0.15rem; }
+.run-partial { color: #9a6700; }
+.current-panel[data-state="partial"] .state-icon { background: #d99a00; }
+
+@media (max-width: 720px) {
+  .thermal-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .history-item img { width: 112px; height: 94px; align-self: center; object-fit: cover; border-radius: 4px; background: #080835; }
 .history-item-copy { min-width: 0; }
 .history-item-title { display: flex; justify-content: space-between; gap: 10px; font-size: 16px; font-weight: 750; }

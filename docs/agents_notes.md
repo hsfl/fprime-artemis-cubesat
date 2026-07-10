@@ -1103,3 +1103,23 @@ Driver tier, formerly repo "Adapter":
 - The obsolete Pi legacy rollback binary was deleted; the supported active
   release remains `/home/pi/artemis/releases/c3m-hil-uartflow37-channel`.
 - Durable work plan: `docs/C3M_DEMO_HARDENING_PLAN_2026-07-09.md`.
+
+## C3M Best-Effort Thermal Reception (2026-07-10)
+
+- The channel-1 web receiver preserves the complete CRC-verified happy path
+  and finalizes incomplete transfers after a 90-second total window.
+- Partial products are position-preserving `.fdp.partial` files. Missing
+  channel-1 packets are never collapsed out of the byte stream.
+- The Lepton partial decoder treats pixels intersecting missing packet bytes as
+  unknown, exports CSV `NaN` / JSON `null`, and renders them white.
+- Partial results are explicitly non-CRC (`crc_ok: false`) and retain the
+  packet map, timeout reason, counts, and thermal statistics in `run.json`.
+- The UI supports pixel hover temperature inspection and reports `No data` on
+  white unknown samples.
+- Deterministic local replay supports repeatable `--replay-drop-packet` fault
+  injection. Packet-500 evidence recovered 19,182/19,200 pixels without
+  shifting valid data.
+- `./tools/validate_local.sh --skip-demo` passes after the change, including
+  Python tests, native F Prime build, and 6/6 component UT executables.
+- HIL packet-loss qualification remains open; local replay does not prove RF
+  timing or retry behavior.
