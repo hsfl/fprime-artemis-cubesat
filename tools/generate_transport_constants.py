@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "config/transport_constants.json"
+RF_NETWORKS = ROOT / "config/rf_networks.json"
 
 OUTPUTS = {
     "fprime": ROOT / "ArtemisRpiTeensy_N2/Components/LinkCfg/LinkCfg.hpp",
@@ -43,13 +44,42 @@ def cpp_flag(value: bool) -> int:
 
 def generated_notice() -> str:
     return (
-        "// Generated from config/transport_constants.json by "
+        "// Generated from config/transport_constants.json and config/rf_networks.json by "
         "tools/generate_transport_constants.py.\n"
         "// Do not hand-edit constants here; update the manifest and regenerate.\n\n"
     )
 
 
-def render_fprime(cfg: dict) -> str:
+def resolve_rf_identity(cfg: dict, registry: dict) -> dict:
+    networks = registry.get("networks", {})
+    network_key = cfg["rf"].get("network")
+    if network_key not in networks:
+        raise ValueError(f"rf.network {network_key!r} is not defined in config/rf_networks.json")
+    ids = [entry.get("id") for entry in networks.values()]
+    if any(not isinstance(value, int) or not 1 <= value <= 254 for value in ids):
+        raise ValueError("RF network IDs must be unique integers in the range 1..254")
+    if len(ids) != len(set(ids)):
+        raise ValueError("RF network IDs must be unique")
+    addresses = registry.get("addresses", {})
+    ground = addresses.get("ground")
+    satellite = addresses.get("satellite")
+    if not all(isinstance(value, int) and 1 <= value <= 254 for value in (ground, satellite)):
+        raise ValueError("RF role addresses must be integers in the range 1..254")
+    if ground == satellite:
+        raise ValueError("RF ground and satellite role addresses must differ")
+    version = registry.get("protocol_version")
+    if not isinstance(version, int) or not 1 <= version <= 255:
+        raise ValueError("RF protocol version must be an integer in the range 1..255")
+    return {
+        "network_key": network_key,
+        "network_id": networks[network_key]["id"],
+        "protocol_version": version,
+        "ground_address": ground,
+        "satellite_address": satellite,
+    }
+
+
+def render_fprime(cfg: dict, identity: dict) -> str:
     frame = cfg["frame"]
     channels = cfg["channels"]
     rpc = cfg["teensy_rpc"]
@@ -90,6 +120,10 @@ static constexpr FwSizeType UART_FRAME_MAX_ENCODED =
     UART_FRAME_MAX_PAYLOAD + UART_FRAME_OVERHEAD;
 
 static constexpr FwSizeType RF_PACKET_MAX_LEN = {rf["packet_max_len"]};
+static constexpr U8 RF_NETWORK_ID = {hex_byte(identity["network_id"])};
+static constexpr U8 RF_PROTOCOL_VERSION = {hex_byte(identity["protocol_version"])};
+static constexpr U8 RF_GROUND_ADDRESS = {hex_byte(identity["ground_address"])};
+static constexpr U8 RF_SATELLITE_ADDRESS = {hex_byte(identity["satellite_address"])};
 static constexpr FwSizeType RF_SEGMENT_HEADER_LEN = {rf["segment_header_len"]};
 static constexpr FwSizeType RF_SEGMENT_MAX_DATA_BYTES =
     RF_PACKET_MAX_LEN - RF_SEGMENT_HEADER_LEN;
@@ -129,7 +163,7 @@ inline bool rfSatelliteTxAckRequiredForChannel(const U8 channel) {{
 """
 
 
-def render_teensy(cfg: dict, *, satellite: bool) -> str:
+def render_teensy(cfg: dict, identity: dict, *, satellite: bool) -> str:
     frame = cfg["frame"]
     channels = cfg["channels"]
     rpc = cfg["teensy_rpc"]
@@ -141,6 +175,8 @@ def render_teensy(cfg: dict, *, satellite: bool) -> str:
     payload = cfg["payload"]
     command = cfg["command"]
     count = channels["satellite_count"] if satellite else channels["ground_count"]
+    local_address = identity["satellite_address"] if satellite else identity["ground_address"]
+    remote_address = identity["ground_address"] if satellite else identity["satellite_address"]
     local_channel = ""
     local_rpc = ""
     if satellite:
@@ -178,6 +214,10 @@ static constexpr uint32_t UART_INTER_FRAME_MARGIN_US = {frame["inter_frame_margi
 static constexpr uint32_t UART_CCSDS_EXTRA_MARGIN_US = {frame["ccsds_extra_margin_us"]};
 
 // RF segmentation parameters.
+static constexpr uint8_t RF_NETWORK_ID = {hex_byte(identity["network_id"])};
+static constexpr uint8_t RF_PROTOCOL_VERSION = {hex_byte(identity["protocol_version"])};
+static constexpr uint8_t RF_LOCAL_ADDRESS = {hex_byte(local_address)};
+static constexpr uint8_t RF_REMOTE_ADDRESS = {hex_byte(remote_address)};
 static constexpr uint8_t RF_SEGMENT_MAGIC_CCSDS = {hex_byte(rf["segment_magic_ccsds"])};
 static constexpr uint8_t RF_SEGMENT_MAGIC_PAYLOAD = {hex_byte(rf["segment_magic_payload"])};
 static constexpr uint8_t RF_ACK_SEGMENT_INDEX = {hex_byte(rf["ack_segment_index"])};
@@ -215,6 +255,26 @@ inline bool isRfChannel(uint8_t channel) {{
   return channel < CHANNEL_RF_COUNT;
 }}
 
+enum class RfHeaderStatus : uint8_t {{
+  ACCEPT = 0,
+  WRONG_NETWORK = 1,
+  WRONG_ADDRESS = 2,
+  WRONG_VERSION = 3,
+}};
+
+inline RfHeaderStatus classifyRfHeader(uint8_t to, uint8_t from, uint8_t id, uint8_t flags) {{
+  if (id != RF_NETWORK_ID) {{
+    return RfHeaderStatus::WRONG_NETWORK;
+  }}
+  if (to != RF_LOCAL_ADDRESS || from != RF_REMOTE_ADDRESS) {{
+    return RfHeaderStatus::WRONG_ADDRESS;
+  }}
+  if (flags != RF_PROTOCOL_VERSION) {{
+    return RfHeaderStatus::WRONG_VERSION;
+  }}
+  return RfHeaderStatus::ACCEPT;
+}}
+
 inline bool txAckRequiredForChannel(uint8_t channel) {{
   return channel == CHANNEL_PAYLOAD
              ? RF_TX_ACK_REQUIRED_PAYLOAD != 0
@@ -249,11 +309,12 @@ inline bool channelForMagic(uint8_t magic, uint8_t& channel) {{
 """
 
 
-def render_all(cfg: dict) -> dict[Path, str]:
+def render_all(cfg: dict, registry: dict) -> dict[Path, str]:
+    identity = resolve_rf_identity(cfg, registry)
     return {
-        OUTPUTS["fprime"]: render_fprime(cfg),
-        OUTPUTS["satellite"]: render_teensy(cfg, satellite=True),
-        OUTPUTS["ground"]: render_teensy(cfg, satellite=False),
+        OUTPUTS["fprime"]: render_fprime(cfg, identity),
+        OUTPUTS["satellite"]: render_teensy(cfg, identity, satellite=True),
+        OUTPUTS["ground"]: render_teensy(cfg, identity, satellite=False),
     }
 
 
@@ -263,7 +324,8 @@ def main() -> int:
     args = parser.parse_args()
 
     cfg = json.loads(MANIFEST.read_text())
-    generated = render_all(cfg)
+    registry = json.loads(RF_NETWORKS.read_text())
+    generated = render_all(cfg, registry)
 
     if args.check:
         stale = []

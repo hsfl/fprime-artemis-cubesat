@@ -136,6 +136,12 @@ void debugPrintCounters(const char* prefix) {
   Serial.print(g_linkCounters.rfRetries);
   Serial.print(" rf_ack_timeouts=");
   Serial.print(g_linkCounters.rfAckTimeouts);
+  Serial.print(" rf_wrong_network=");
+  Serial.print(g_linkCounters.rfWrongNetworkDrops);
+  Serial.print(" rf_wrong_address=");
+  Serial.print(g_linkCounters.rfWrongAddressDrops);
+  Serial.print(" rf_wrong_version=");
+  Serial.print(g_linkCounters.rfVersionDrops);
   Serial.print(" rf_reasm_drops=");
   Serial.print(g_linkCounters.rfReassemblyDrops);
   Serial.print(" up_q_drops=");

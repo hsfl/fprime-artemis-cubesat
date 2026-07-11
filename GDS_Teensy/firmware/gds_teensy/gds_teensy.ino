@@ -143,6 +143,12 @@ void debugPrintCounters(const char* prefix) {
   SerialUSB1.print(g_linkCounters.rfRetries);
   SerialUSB1.print(" rf_ack_timeouts=");
   SerialUSB1.print(g_linkCounters.rfAckTimeouts);
+  SerialUSB1.print(" rf_wrong_network=");
+  SerialUSB1.print(g_linkCounters.rfWrongNetworkDrops);
+  SerialUSB1.print(" rf_wrong_address=");
+  SerialUSB1.print(g_linkCounters.rfWrongAddressDrops);
+  SerialUSB1.print(" rf_wrong_version=");
+  SerialUSB1.print(g_linkCounters.rfVersionDrops);
   SerialUSB1.print(" rf_reasm_drops=");
   SerialUSB1.print(g_linkCounters.rfReassemblyDrops);
   SerialUSB1.print(" up_q_drops=");

@@ -3,6 +3,15 @@
 
 #include <Arduino.h>
 #include "artemis_rf23bp.hpp"
+#include "link_protocol.hpp"
+
+enum class Rf23ReceiveResult : uint8_t {
+  NO_PACKET = 0,
+  ACCEPTED = 1,
+  WRONG_NETWORK = 2,
+  WRONG_ADDRESS = 3,
+  WRONG_VERSION = 4,
+};
 
 class Rf23Driver {
  public:
@@ -10,7 +19,7 @@ class Rf23Driver {
 
   bool begin();
   bool available();
-  bool recv(uint8_t* buf, uint8_t* len);
+  Rf23ReceiveResult recv(uint8_t* buf, uint8_t* len);
   bool send(const uint8_t* data, uint8_t len);
 
  private:

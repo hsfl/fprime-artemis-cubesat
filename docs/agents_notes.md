@@ -1123,3 +1123,21 @@ Driver tier, formerly repo "Adapter":
   Python tests, native F Prime build, and 6/6 component UT executables.
 - HIL packet-loss qualification remains open; local replay does not prove RF
   timing or retry behavior.
+
+## RF Mission Traffic Isolation (2026-07-10)
+
+- C3M now assigns RadioHead's existing CRC-protected header as a strict mission
+  identity: network `0xC3`, ground `0xA1`, satellite `0xA2`, version `1`.
+- Neutron 2 network ID `0xD2` is reserved in `config/rf_networks.json`; its
+  branch must deliberately select `rf.network: neutron2` and rebuild both
+  Teensys before use.
+- Wrong network, role direction, or version is rejected before ACK handling,
+  reassembly, UART/USB forwarding, GDS, or payload decode.
+- Dedicated `rf_wrong_network`, `rf_wrong_address`, and `rf_wrong_version`
+  counters appear in periodic debug output and `#LINK_STATUS`.
+- There is no new packet overhead: RadioHead already sends these four bytes, so
+  the 49-byte RF packet and 44-byte Artemis segment capacity remain unchanged.
+- This protects against accidental nearby-booth cross-talk, not RF collisions,
+  intentional spoofing, encryption, or authentication.
+- Local generator/isolation tests and both Teensy builds pass. No firmware was
+  flashed; same-mission and cross-mission HIL qualification remains deferred.

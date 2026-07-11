@@ -1,7 +1,7 @@
 #ifndef Components_LinkCfg_HPP
 #define Components_LinkCfg_HPP
 
-// Generated from config/transport_constants.json by tools/generate_transport_constants.py.
+// Generated from config/transport_constants.json and config/rf_networks.json by tools/generate_transport_constants.py.
 // Do not hand-edit constants here; update the manifest and regenerate.
 
 #include <Fw/FPrimeBasicTypes.hpp>
@@ -34,6 +34,10 @@ static constexpr FwSizeType UART_FRAME_MAX_ENCODED =
     UART_FRAME_MAX_PAYLOAD + UART_FRAME_OVERHEAD;
 
 static constexpr FwSizeType RF_PACKET_MAX_LEN = 49;
+static constexpr U8 RF_NETWORK_ID = 0xC3;
+static constexpr U8 RF_PROTOCOL_VERSION = 0x01;
+static constexpr U8 RF_GROUND_ADDRESS = 0xA1;
+static constexpr U8 RF_SATELLITE_ADDRESS = 0xA2;
 static constexpr FwSizeType RF_SEGMENT_HEADER_LEN = 5;
 static constexpr FwSizeType RF_SEGMENT_MAX_DATA_BYTES =
     RF_PACKET_MAX_LEN - RF_SEGMENT_HEADER_LEN;

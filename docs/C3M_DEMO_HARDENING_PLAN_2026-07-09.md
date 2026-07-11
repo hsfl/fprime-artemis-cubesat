@@ -358,10 +358,23 @@ Extend the web viewer using the behavior of the Python viewer in
 
 ## Deferred Plan — RF Mission Traffic Isolation
 
-This is also follow-on work for the next development session. Neutron 2 and
-EPSCoR C3M may use the same RFM23BP hardware, RadioHead stack, frequency, and
-similar framing while operating near one another. A ground station must not
-accept commands, telemetry, or payload data belonging to the other spacecraft.
+Implementation status (2026-07-10): implemented for the C3M branch and
+validated through generated-contract tests, both Teensy firmware builds, and
+laptop-local regression. No boards were flashed and the cross-mission HIL
+matrix remains deferred.
+
+Neutron 2 and EPSCoR C3M may use the same RFM23BP hardware, RadioHead stack,
+frequency, and similar framing while operating near one another. A ground
+station must not accept commands, telemetry, or payload data belonging to the
+other spacecraft.
+
+The implementation uses RadioHead's existing CRC-protected `TO`, `FROM`, `ID`,
+and `FLAGS` header, so it adds no packet overhead and does not reduce the
+44-byte Artemis segment payload. Strict software validation occurs before ACK,
+reassembly, or forwarding. The C3M network is `0xC3`; `0xD2` is reserved for
+Neutron 2; ground and satellite roles are `0xA1` and `0xA2`; protocol version
+is `1`. Wrong-network, wrong-address, and wrong-version counters are operator
+visible.
 
 ### Intent
 

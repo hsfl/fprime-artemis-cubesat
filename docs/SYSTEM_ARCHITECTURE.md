@@ -208,6 +208,30 @@ The RFM23BP has a small packet budget, so each cross-RF channel is segmented:
   retry requests, and final CRC repair at the application layer.
 - Reassembly timeout is `500 ms`; inter-segment gap is `8 ms`.
 
+### RF mission identity and nearby-booth isolation
+
+The RadioHead `TO`, `FROM`, `ID`, and `FLAGS` bytes are assigned as a strict,
+CRC-protected mission header before any Artemis segment is accepted:
+
+- `ID` identifies the mission network (`0xC3` for EPSCoR C3M; `0xD2` is
+  reserved for Neutron 2).
+- `TO` / `FROM` identify the ground (`0xA1`) and satellite (`0xA2`) roles.
+- `FLAGS` carries link-protocol version `1`.
+
+The receiver rejects a wrong network, role direction, or protocol version
+before ACK handling, reassembly, UART/USB forwarding, GDS, or payload decode.
+Dedicated debug counters distinguish these intentional drops from CRC and RF
+loss. The constants are generated from `config/rf_networks.json` plus the
+active `rf.network` selection in `config/transport_constants.json`.
+
+This is intended as accidental cross-talk protection when C3M and Neutron 2
+operate in nearby conference booths. It adds no on-air bytes because RadioHead
+already transmits and CRC-protects this four-byte header, so the 49-byte RF
+packet and 44-byte Artemis segment capacity are unchanged. It does not prevent
+same-frequency collisions, provide encryption, or stop intentional spoofing.
+The planned shared-ground-station mapping for `N2-A` and `N2-B` is summarized
+in [Neutron 2 Radio Architecture Summary](NEUTRON2_RADIO_ARCHITECTURE_SUMMARY.md).
+
 See the [RFM23BP datasheet](#reference-documents) for the radio's packet/FIFO limits that drive these numbers.
 
 ### The three ground USB serial ports

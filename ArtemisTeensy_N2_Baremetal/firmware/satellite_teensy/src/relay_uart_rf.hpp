@@ -69,6 +69,7 @@ class RelayUartRf {
   bool isAckPacket(const uint8_t* packet, uint8_t packetLen, uint8_t channel, uint8_t msgId, uint8_t segIdx) const;
   bool sendAck(uint8_t channel, uint8_t msgId, uint8_t segIdx);
   void processRfSegment(const uint8_t* packet, uint8_t packetLen);
+  bool acceptRfReceiveResult(Rf23ReceiveResult result);
   void resetReassembly(uint8_t channel, bool timeoutReset, bool dropReset);
 
   uint16_t crc16Ccitt(const uint8_t* data, uint16_t len) const;

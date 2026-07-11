@@ -297,7 +297,8 @@ void RelayUartRf::flushRfToUart() {
 
   while (m_rf.available()) {
     rfLen = static_cast<uint8_t>(sizeof(rfBuffer));
-    if (m_rf.recv(rfBuffer, &rfLen) && rfLen > 0) {
+    const Rf23ReceiveResult result = m_rf.recv(rfBuffer, &rfLen);
+    if (acceptRfReceiveResult(result) && rfLen > 0) {
       m_counters.rfRxPackets += 1;
       processRfSegment(rfBuffer, rfLen);
     }
@@ -478,7 +479,8 @@ bool RelayUartRf::waitForAck(uint8_t channel, uint8_t msgId, uint8_t segIdx) {
     wdt_guard::feed();
     while (m_rf.available()) {
       uint8_t rfLen = static_cast<uint8_t>(sizeof(rfBuffer));
-      if (m_rf.recv(rfBuffer, &rfLen) && rfLen > 0) {
+      const Rf23ReceiveResult result = m_rf.recv(rfBuffer, &rfLen);
+      if (acceptRfReceiveResult(result) && rfLen > 0) {
         if (isAckPacket(rfBuffer, rfLen, channel, msgId, segIdx)) {
           m_counters.rfAckRx += 1;
           return true;
@@ -503,6 +505,25 @@ bool RelayUartRf::isAckPacket(const uint8_t* packet,
          packet[2] == link_protocol::RF_ACK_SEGMENT_INDEX &&
          packet[3] == segIdx &&
          packet[4] == 0;
+}
+
+bool RelayUartRf::acceptRfReceiveResult(Rf23ReceiveResult result) {
+  switch (result) {
+    case Rf23ReceiveResult::ACCEPTED:
+      return true;
+    case Rf23ReceiveResult::WRONG_NETWORK:
+      m_counters.rfWrongNetworkDrops += 1;
+      break;
+    case Rf23ReceiveResult::WRONG_ADDRESS:
+      m_counters.rfWrongAddressDrops += 1;
+      break;
+    case Rf23ReceiveResult::WRONG_VERSION:
+      m_counters.rfVersionDrops += 1;
+      break;
+    case Rf23ReceiveResult::NO_PACKET:
+      break;
+  }
+  return false;
 }
 
 bool RelayUartRf::sendAck(uint8_t channel, uint8_t msgId, uint8_t segIdx) {
@@ -666,11 +687,11 @@ uint16_t RelayUartRf::crc16Ccitt(const uint8_t* data, uint16_t len) const {
 }
 
 void RelayUartRf::emitLinkStatus() {
-  char statusLine[360] = {0};
+  char statusLine[480] = {0};
   const int n =
       snprintf(statusLine,
                sizeof(statusLine),
-               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu rf_msg_id_gaps=%lu rf_ack_rx=%lu rf_ack_tx=%lu rf_retries=%lu rf_ack_timeouts=%lu up_q_drops=%lu down_q_drops=%lu\\n",
+               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu rf_msg_id_gaps=%lu rf_ack_rx=%lu rf_ack_tx=%lu rf_retries=%lu rf_ack_timeouts=%lu rf_wrong_network=%lu rf_wrong_address=%lu rf_wrong_version=%lu up_q_drops=%lu down_q_drops=%lu\\n",
                static_cast<unsigned long>(m_counters.uartRxBytes),
                static_cast<unsigned long>(m_counters.uartTxBytes),
                static_cast<unsigned long>(m_counters.rfRxPackets),
@@ -691,12 +712,17 @@ void RelayUartRf::emitLinkStatus() {
                static_cast<unsigned long>(m_counters.rfAckTx),
                static_cast<unsigned long>(m_counters.rfRetries),
                static_cast<unsigned long>(m_counters.rfAckTimeouts),
+               static_cast<unsigned long>(m_counters.rfWrongNetworkDrops),
+               static_cast<unsigned long>(m_counters.rfWrongAddressDrops),
+               static_cast<unsigned long>(m_counters.rfVersionDrops),
                static_cast<unsigned long>(m_counters.uplinkQueueDrops),
                static_cast<unsigned long>(m_counters.downlinkQueueDrops));
 
   if (n > 0) {
-    m_linkIo.write(reinterpret_cast<const uint8_t*>(statusLine), static_cast<size_t>(n));
-    m_counters.uartTxBytes += static_cast<uint32_t>(n);
+    const size_t writeLen =
+        static_cast<size_t>(n) < sizeof(statusLine) ? static_cast<size_t>(n) : sizeof(statusLine) - 1U;
+    m_linkIo.write(reinterpret_cast<const uint8_t*>(statusLine), writeLen);
+    m_counters.uartTxBytes += static_cast<uint32_t>(writeLen);
   }
 }
 

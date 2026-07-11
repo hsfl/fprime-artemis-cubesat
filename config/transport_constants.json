@@ -27,6 +27,7 @@
     "rf_op_link_stats": 1
   },
   "rf": {
+    "network": "epscorc3m",
     "segment_magic_ccsds": 165,
     "segment_magic_payload": 166,
     "ack_segment_index": 255,

@@ -33,6 +33,9 @@ struct LinkCounters {
   uint32_t rfAckTx = 0;
   uint32_t rfRetries = 0;
   uint32_t rfAckTimeouts = 0;
+  uint32_t rfWrongNetworkDrops = 0;
+  uint32_t rfWrongAddressDrops = 0;
+  uint32_t rfVersionDrops = 0;
   uint32_t uplinkQueueDrops = 0;
   uint32_t downlinkQueueDrops = 0;
 
@@ -66,6 +69,9 @@ struct LinkCounters {
     rfAckTx = 0;
     rfRetries = 0;
     rfAckTimeouts = 0;
+    rfWrongNetworkDrops = 0;
+    rfWrongAddressDrops = 0;
+    rfVersionDrops = 0;
     uplinkQueueDrops = 0;
     downlinkQueueDrops = 0;
   }
