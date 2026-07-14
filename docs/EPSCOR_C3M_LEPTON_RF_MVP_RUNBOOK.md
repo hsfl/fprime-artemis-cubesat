@@ -324,6 +324,20 @@ both before scheduling a capture.
 
 ### GDS On Channel 0
 
+On macOS, the ground Teensy is the **Triple Serial** device. Its first serial
+port is channel 0 for GDS; do not use the satellite Teensy's separate
+single-serial port. Confirm the three ground ports, then export the first one:
+
+```bash
+ls -l /dev/cu.usbmodem* 2>/dev/null
+# Example ground triple serial ports: ...301 (GDS), ...303 (debug), ...305 (payload)
+export GDS_DATA_PORT=/dev/cu.usbmodem115553301
+```
+
+Replace the example value with the first port in the ground Teensy's
+triple-serial group on this laptop. Keep the terminal open so `$GDS_DATA_PORT`
+remains set.
+
 ```bash
 cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 . fprime-venv/bin/activate
@@ -386,51 +400,31 @@ python3 ground-station/lepton-dp-viewer/lepton_dp_viewer.py \
 
 ## Event-Gated Demo Command Sequence
 
-Use GDS for the normal operator flow. The equivalent `fprime-cli` commands
-below are an engineering reference; they are deliberately split at the fresh
-product gate so they cannot be copied as one stale-product-prone block.
+Use the **GDS Commanding** page for this entire sequence. Do not use the CLI
+for normal demo operations.
 
-First confirm the payload web app is `Ready`, note the current
-`storageManager.StoredProducts` count in GDS, then configure and schedule a
-fresh capture:
+1. In the payload web app, confirm green **Ready — awaiting downlink**. In
+   GDS, note `storageManager.StoredProducts`.
+2. Send these GDS commands in order:
 
-```bash
-DICT=~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2/build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json
+   | Command | Argument |
+   | --- | --- |
+   | `missionApp.ENTER_BASE_MODE` | none |
+   | `sohApp.EMIT_SOH_SNAPSHOT` | none |
+   | `payloadDriverLepton.ENABLE` | none |
+   | `scienceApp.CONFIGURE_CAPTURE_DURATION` | `durationSeconds = 10` |
+   | `missionApp.SCHEDULE_COLLECTION` | `delaySeconds = 10` |
 
-fprime-cli command-send ArtemisRpiTeensyDeployment.missionApp.ENTER_BASE_MODE --dictionary "$DICT" --log-level-gds ERROR
-fprime-cli command-send ArtemisRpiTeensyDeployment.sohApp.EMIT_SOH_SNAPSHOT --dictionary "$DICT" --log-level-gds ERROR
-fprime-cli command-send ArtemisRpiTeensyDeployment.payloadDriverLepton.ENABLE --dictionary "$DICT" --log-level-gds ERROR
-fprime-cli command-send ArtemisRpiTeensyDeployment.scienceApp.CONFIGURE_CAPTURE_DURATION --arguments 10 --dictionary "$DICT" --log-level-gds ERROR
-fprime-cli command-send ArtemisRpiTeensyDeployment.missionApp.SCHEDULE_COLLECTION --arguments 10 --dictionary "$DICT" --log-level-gds ERROR
-```
-
-Stop here. Wait for a new `StorageManager.ScienceStored` event whose product
-count is greater than the count noted before scheduling. Confirm the new product
-has the expected nonzero/full-resolution size. Do not request downlink against
-an old `LatestDataset` report.
-
-After the fresh-product gate passes, report and request that product:
-
-```bash
-fprime-cli command-send ArtemisRpiTeensyDeployment.storageManager.REPORT_LATEST_DATASET --dictionary "$DICT" --log-level-gds ERROR
-fprime-cli command-send ArtemisRpiTeensyDeployment.commsApp.REQUEST_SCIENCE_DOWNLINK --dictionary "$DICT" --log-level-gds ERROR
-```
-
-Confirm the GDS `PayloadDownlinkStarted` product ID agrees with the web-app
-header. During the bulk transfer, send exactly one PING to prove channel 0
-remains usable:
-
-```bash
-fprime-cli command-send ArtemisRpiTeensyDeployment.missionApp.PING \
-  --arguments 37002 \
-  --dictionary "$DICT" \
-  --log-level-gds ERROR
-```
-
-Otherwise keep channel 0 quiet until the web app reaches CRC-complete decode.
-Do not add `GET_PAYLOAD_STATUS` or other convenience commands to the normal
-bulk-transfer sequence; use them only after the timed run or while explicitly
-troubleshooting.
+3. Wait for a new `storageManager.ScienceStored` event. Its product count must
+   be greater than the value noted in step 1, and its size must be nonzero.
+   Do not downlink an older product.
+4. Send `storageManager.REPORT_LATEST_DATASET`, then send
+   `commsApp.REQUEST_SCIENCE_DOWNLINK`.
+5. Confirm GDS reports `PayloadDownlinkStarted` and that its product ID matches
+   the payload web-app header. During the transfer, send exactly one
+   `missionApp.PING` with token `37002` to prove channel 0 remains usable.
+6. Otherwise keep channel 0 quiet until the payload web app reports CRC-complete
+   decode. Do not use `GET_PAYLOAD_STATUS` during a normal timed run.
 
 ## HIL Pass Criteria
 
