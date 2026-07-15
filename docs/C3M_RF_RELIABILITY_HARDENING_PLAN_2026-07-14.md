@@ -29,9 +29,23 @@ package complete from a build or happy-path run alone.
 | Ground bridge fail-safe behavior | In progress | Local bounded RF TX and honest USB-write behavior implemented; HIL proof remains |
 | Receiver persistence and reconnect | In progress | Local restart/re-enumeration recovery implemented; HIL proof remains |
 | Flight transfer completion contract | In progress | N2 admission, repair, and local-delivery hardening implemented; ground verification remains |
+| Downlink goodput and channel-0 policy | Planned | Remove redundant progress events and reduce routine telemetry without retiming the scheduler |
 | Explicit half-duplex operation | Design drafted | N3 phase/lease proposal requires review and implementation |
 | Controlled failure matrix | In progress | Local fault cases pass; physical HIL cases remain |
 | Outdoor qualification | Not started | Three consecutive qualified transfers at each geometry |
+
+### Protocol Naming In Plain English
+
+- **N2** is the payload wire protocol implemented today. Its packets begin with
+  the bytes `N2`; it provides indexed data, a whole-product CRC-16, and
+  selective repair. It remains tomorrow's executable protocol.
+- **N3** is only the proposed third revision of this project's payload wire
+  protocol. It is not F Prime, CCSDS, RadioHead, a board, or a separate radio.
+  The proposal adds restart-aware identity, ground-proven completion, CRC-32,
+  durable repair state, and explicit half-duplex ownership windows.
+- N3 is deliberately a different wire version because those guarantees cannot
+  be added honestly while pretending old N2 receivers understand them. It is
+  design-only and must not distract from measuring and hardening N2 first.
 
 ### Live Bench At Plan Start
 
@@ -516,6 +530,74 @@ Acceptance:
 - Lost END, lost confirmation, duplicate repair, overlapping repair, and flight
   restart all reach explicit deterministic states.
 
+### WP3-A — Downlink goodput and channel-0 load policy
+
+The separate channel-1 payload receiver GUI is now the primary per-packet and
+percentage-progress display. The current flight component still emits a
+channel-0 `PayloadDownlinkProgress` activity event at each nominal 10-percent
+boundary, replays 100-percent completion events, and writes progress/status
+telemetry every five 1 Hz ticks while downlinking. Those events were useful
+when GDS was the only progress display, but they now duplicate the receiver's
+better ground-truth view and compete for the same half-duplex RF path.
+
+Decision for the next implementation pass:
+
+- [ ] Remove automatic 10-percent `PayloadDownlinkProgress` events and the
+      repeated 100-percent completion summaries from the normal RF profile.
+- [ ] Keep sparse authoritative lifecycle events: start, state transition,
+      warning/failure, repair requested, locally transmitted, ground verified
+      when supported, abort, and expiry.
+- [ ] Keep `GET_PAYLOAD_STATUS` as an explicit operator query and retain
+      low-rate state/error/transfer telemetry as a fallback when the channel-1
+      GUI is unavailable.
+- [ ] During bulk downlink, reduce routine payload telemetry to start, a slow
+      heartbeat, and terminal status.
+- [ ] Never suppress command responses, warnings/errors/fatal events, watchdog
+      and reset evidence, link-phase transitions, or transport/RF fault
+      counters. These are the channel-0 control-plane minimum.
+- [ ] Restore the normal telemetry policy deterministically on complete,
+      abort, error, expiry, or flight restart; no transfer may leave telemetry
+      silently stuck in a bulk-downlink mode.
+
+Do **not** dynamically retime `rateGroup1` to accomplish this. In the current
+topology its 1 Hz tick drives telemetry draining, file downlink, the
+communications queue, aggregation timeouts, the Teensy transport manager,
+mission logic, payload downlink, and science scheduling. The checked-out
+`Svc::RateGroupDriver` copies fixed divisors during initialization and exposes
+no runtime rate command. Retiming that group would change system scheduling,
+not merely reduce channel-0 telemetry, and could create new queue, health, and
+timeout failures.
+
+The current deployment uses `Svc::TlmChan`, which drains only changed channels
+when its `Run` port is invoked and has no rate-control command. Therefore the
+KISS solution is to emit fewer routine telemetry updates and events while the
+scheduler remains stable.
+
+F Prime's alternative `Svc::TlmPacketizer` does support runtime
+`CONFIGURE_GROUP_RATES`, group enable/disable, and silencing. This deployment
+is not using it. Treat a future migration as optional; it is not required to
+remove the redundant progress traffic.
+
+Goodput optimization order:
+
+1. Eliminate redundant channel-0 progress events and measure the result.
+2. Decimate only routine telemetry during bulk transfer while preserving the
+   critical control-plane minimum.
+3. Implement explicit half-duplex control/repair windows so uplink and payload
+   bursts do not collide opportunistically.
+4. Tune the current 18-frame per-run ceiling only after HIL confirms queue,
+   cycle-slip, retry, and command-latency behavior.
+5. Evaluate wire-efficiency changes only after the reliability gates pass.
+   N2 carries 35 data bytes per payload packet; the N3 draft carries 33 because
+   it spends two bytes on restart-safe identity, so N3 is a reliability design,
+   not automatically a raw-throughput improvement.
+
+Removing the progress events alone will probably provide a modest improvement,
+not the full outdoor fix. The larger reliability gain comes from explicit
+half-duplex ownership, bounded bursts, honest bridge queues, persistent repair,
+and final ground verification. Measure delivered goodput—CRC-valid bytes per
+second including retries—not just raw transmitted packet rate.
+
 ### WP4 — Explicit half-duplex arbitration
 
 - [ ] Define ownership, duration, and priority for each half-duplex phase.
@@ -704,6 +786,7 @@ Add entries after work begins. Keep them short and link the durable artifact.
 | 2026-07-14 19:57 | WP2/WP3 integration | PASS local | Commit `382ea51`; 52 Python/emulation tests, native build, 6/6 sanitized suites, 14/10/2 focused component cases, both Teensy builds, and exact real-sample Lepton local round trip passed. |
 | 2026-07-14 20:02 | ARMv6 cross-build | PASS local | Commit `9b163b2` fixed the cross-only FPP dependency defect. Local-only Pi build verified ARMv6KZ, VFPv2, `/lib/ld-linux-armhf.so.3`; binary SHA-256 `2f6f9206be30ec3aefb8fcabb3865f89b19247de598dba6d2166b13ad6a9d57e`. |
 | 2026-07-14 20:02 | N3 protocol design | Design only | Commit `87eca99`; audited verified-completion, restart identity, additive repair, and half-duplex lease proposal. Not implemented or approved. |
+| 2026-07-14 | Downlink goodput review | Design only | Current 10-percent progress events, five-second payload telemetry, shared 1 Hz scheduling, `Svc::TlmChan`, and optional `Svc::TlmPacketizer` runtime controls reviewed. KISS policy added; no code changed. |
 
 ## Start Here Tomorrow
 
@@ -748,7 +831,8 @@ Resume in this order:
    exact duplicate downlink request and require idempotent acceptance without
    resetting progress; issue a conflicting descriptor only if the operator
    command path can construct one safely and require `BUSY`. Require final N2
-   CRC/hash equality, no bridge reset, and no F Prime restart.
+   CRC/hash equality, no bridge reset, and no F Prime restart. Record transfer
+   duration, repairs, queue counters, rate-group slips, and restart count.
 7. Run HIL-02 by stopping only the channel-0 reader, then restoring it. Require
    counted backpressure/short-write behavior, no false complete-write growth,
    no watchdog reset, and a successful post-recovery PING.
