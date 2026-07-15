@@ -66,17 +66,19 @@ local demo.
 Pass criteria:
 
 - `validate_local.sh` exits `0`.
-- the C3M demo sends the mission, SOH, Lepton enable, capture-duration, and
-  scheduled-collection commands.
-- a new `ArtemisRpiTeensy_N2/DpCat/Dp_*.fdp` is produced.
-- the demo log includes `PayloadDownlinkComplete` and `DownlinkFinished`.
-- the viewer summary reports `width=160`, `height=120`, and `pixels=19200`.
-- a decoded Lepton PNG is written under the run log directory.
+- the C3M demo sends one-time mission/SOH commands, then runs three scheduled
+  capture/downlink cycles without restarting the app, GDS, or receiver.
+- each cycle produces a new satellite `Dp_*.fdp` and a separate
+  receiver-generated ground `.fdp`.
+- each cycle includes `PayloadDownlinkComplete` and `DownlinkFinished`.
+- each ground-copy viewer summary reports `width=160`, `height=120`, and
+  `pixels=19200`.
+- a decoded Lepton PNG is written for each cycle under the run log directory.
 - the decoded local-demo CSV matches
   `ground-station/c3m-lepton-test-data/data/Dp_20260707_120740.csv`, ignoring
   only capture-time metadata.
 - the script prints:
-  `PASS: local EPSCoR C3M demo produced, downlinked, and decoded a Lepton .fdp`.
+  `PASS: completed 3 consecutive C3M capture/downlink/decode cycles from ground-received artifacts`.
 
 ## Manual Local Demo
 
@@ -85,7 +87,17 @@ Use this when debugging a failure from the umbrella gate:
 ```bash
 cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 . fprime-venv/bin/activate
-./tools/run_c3m_local_demo.sh --delay 10 --capture-seconds 10 --exit-after-sequence
+./tools/run_c3m_local_demo.sh --delay 10 --captures 3 --exit-after-sequence
+```
+
+To exercise the actual N2 repair path at home, run one focused cycle with a
+single deterministic DATA loss. The emulator drops only the first copy, so the
+repair retransmission can pass:
+
+```bash
+./tools/run_c3m_local_demo.sh \
+  --delay 2 --captures 1 --drop-payload-data-index 100 \
+  --exit-after-sequence --no-open
 ```
 
 The manual demo writes JSON, CSV, and PNG outputs under the run log directory
@@ -405,26 +417,35 @@ for normal demo operations.
 
 1. In the payload web app, confirm green **Ready — awaiting downlink**. In
    GDS, note `storageManager.StoredProducts`.
-2. Send these GDS commands in order:
+2. Send these one-time GDS commands in order:
 
    | Command | Argument |
    | --- | --- |
    | `missionApp.ENTER_BASE_MODE` | none |
    | `sohApp.EMIT_SOH_SNAPSHOT` | none |
-   | `payloadDriverLepton.ENABLE` | none |
-   | `scienceApp.CONFIGURE_CAPTURE_DURATION` | `durationSeconds = 10` |
+
+3. For each requested picture, send:
+
+   | Command | Argument |
+   | --- | --- |
    | `missionApp.SCHEDULE_COLLECTION` | `delaySeconds = 10` |
 
-3. Wait for a new `storageManager.ScienceStored` event. Its product count must
+4. Wait for a new `storageManager.ScienceStored` event. Its product count must
    be greater than the value noted in step 1, and its size must be nonzero.
    Do not downlink an older product.
-4. Send `storageManager.REPORT_LATEST_DATASET`, then send
-   `commsApp.REQUEST_SCIENCE_DOWNLINK`.
-5. Confirm GDS reports `PayloadDownlinkStarted` and that its product ID matches
+5. Send `commsApp.REQUEST_SCIENCE_DOWNLINK`.
+6. Confirm GDS reports `PayloadDownlinkStarted` and that its product ID matches
    the payload web-app header. During the transfer, send exactly one
    `missionApp.PING` with token `37002` to prove channel 0 remains usable.
-6. Otherwise keep channel 0 quiet until the payload web app reports CRC-complete
+7. Otherwise keep channel 0 quiet until the payload web app reports CRC-complete
    decode. Do not use `GET_PAYLOAD_STATUS` during a normal timed run.
+8. Confirm the receiver is back at **Ready**, then repeat steps 3-7 for the
+   next picture. Leave all processes and both Teensys running between cycles.
+
+The Lepton driver opens the camera when the collection arrives and takes one
+frame; separate enable and capture-duration commands are not required for this
+MVP. Storage automatically hands the new descriptor to the downlink path, so
+storage report commands are optional diagnostics rather than demo steps.
 
 ## HIL Pass Criteria
 
