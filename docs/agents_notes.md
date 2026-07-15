@@ -1146,14 +1146,25 @@ Driver tier, formerly repo "Adapter":
 
 - Active evidence and remaining fault cases live in
   `docs/C3M_RF_RELIABILITY_HARDENING_PLAN_2026-07-14.md`.
-- Current ground/satellite HEX and ARMv6 Pi binary hashes were verified live;
-  the Pi remained on PID `706` with zero systemd restarts.
+- Current ground/satellite HEX and ARMv6 Pi binary hashes were verified live.
+  The initial nominal/fault campaign remained on PID `706` with zero systemd
+  restarts; the post-bridge-flash epoch booted as PID `256` with zero restarts.
 - HIL-MVP-1 startup, the separate one-capture gate, and the independent 3/3
   repeated-capture gate passed on basic antennas. All four new 38,480-byte
   ground files matched their Pi sources, CRC-checked, and decoded as 160x120.
 - Current downlink timing was 64.7-65.2 seconds. One repeat cycle completed a
   one-round selective repair; the other three transfers required none.
-- `rf_msg_id_gaps` is not a valid mixed-channel loss metric in the current
-  bridge: one global TX message ID is checked against per-channel RX history,
-  so normal channel interleaving creates false gaps. Queue, CRC, missing-map,
-  reassembly, ACK, and actual PING evidence remain authoritative until fixed.
+- The false mixed-channel `rf_msg_id_gaps` diagnostic was fixed in `bdca6a3`
+  by allocating rolling message IDs independently per channel on both bridges.
+  Focused tests, the 68-test local gate, both firmware builds, and a live
+  1,100-packet post-fix transfer passed. During that HIL transfer the ground
+  gap counter changed only 1 to 3 alongside one real reassembly loss/repair,
+  rather than climbing by hundreds from ordinary channel interleaving.
+- Focused HIL recovery gates also passed: duplicate active request, receiver
+  restart from a 253/1,100 checkpoint, and a six-second GDS-reader stop with
+  subsequent PING recovery. Physical RF fade and full ground-USB reconnect are
+  still pending.
+- The bounded RF TX-completion policy remains 500 ms per attempt with one retry
+  and passed focused injected timeout/recovery cases on both bridges. Simply
+  removing the peer does not trigger this local completion timeout, so the HIL
+  plan does not claim peer-offline ACK loss as proof of `waitPacketSent()`.

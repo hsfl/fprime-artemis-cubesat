@@ -305,12 +305,12 @@ hardware identities before every flash; do not assume July 14 device paths.
 | HIL-MVP-1 startup | Boot both sides, start GDS/receiver, request SOH/PING | Correct ports, SOH visible, no reset/restart, counters captured | **PASS** — PING 4245, SOH snapshot, direct UVC frame, PID 706 / zero restarts |
 | HIL-MVP-2a single nominal | Capture/downlink/display one new photo | Exact CRC/hash ground copy; 160x120 decode; all sides return ready | **PASS** — product/transfer 1, 1,100/1,100, 64.8 s, SHA-256 `d166dee7...e214` |
 | HIL-MVP-2b repeated nominal | Capture/downlink/display three new photos sequentially | Three unique CRC-valid ground images; all sides remain running/ready | **PASS** — products/transfers 2-4, 3/3 exact files, 64.7-65.2 s, PID unchanged |
-| HIL-MVP-3 duplicate command | Repeat active downlink request once | No progress reset, assertion, or F Prime restart | Pending |
+| HIL-MVP-3 duplicate command | Repeat active downlink request once | No progress reset, assertion, or F Prime restart | **PASS** — duplicate product 5 request preserved the active transfer; one start event; 1,100/1,100 and CRC complete; PID unchanged |
 | HIL-MVP-4 brief RF fade | Block/mispoint basic antennas briefly, then restore | Missing packets requested/repaired or honest partial; next cycle succeeds | Pending |
-| HIL-MVP-5 ground receiver restart | Restart only payload receiver during transfer | State reloads and completes or remains honest partial; following cycle succeeds | Pending |
-| HIL-MVP-6 channel-0 backpressure | Stop/restart only GDS reader | Short write/backpressure counted; no false delivery or watchdog reset; PING recovers | Pending |
+| HIL-MVP-5 ground receiver restart | Restart only payload receiver during transfer | State reloads and completes or remains honest partial; following cycle succeeds | **PASS** — replacement receiver resumed transfer 6 at 253/1,100; one repair round; CRC complete in 68.7 s; PID unchanged |
+| HIL-MVP-6 channel-0 backpressure | Stop/restart only GDS reader | Short write/backpressure counted; no false delivery or watchdog reset; PING recovers | **PASS** — six-second reader stop increased backpressure, then recovery count; no new discards/queue drops; PING 37606 returned; PID unchanged |
 | HIL-MVP-7 ground USB reconnect | Unplug/replug ground Teensy once | Ports rediscovered; no silent complete; current attempt resolves honestly; next cycle succeeds | Pending |
-| HIL-MVP-8 RF TX timeout injection | Make peer unavailable for the focused test | Bounded retry/recovery; no 12-second watchdog reset | Pending |
+| HIL-MVP-8 RF TX timeout injection | Exercise the bounded `waitPacketSent` failure path with a focused host-injected test; optionally remove the peer only to exercise ACK retry | Bounded retry/recovery; no 12-second watchdog reset; do not mislabel no-peer ACK loss as a TX-completion timeout | **PASS focused injection / N/A physical** — both bridges use a 500 ms completion timeout and one recovered retry; injected timeout/terminal cases pass; no MVP-only hardware hook added |
 
 For every case record:
 
@@ -330,18 +330,25 @@ cases pass.
 
 Verified on the live basic-antenna bench on 2026-07-15:
 
-- Branch/HEAD: `codex/c3m-rf-reliability-hardening` at `4e7de4045672b1a50c3ea2eb88197371a1bbbb07`.
-- Ground Teensy: `usb:100000`, triple serial `11555330`, HEX SHA-256
-  `7728412b83e7b9c55bf7106018b13d6e81bf528e96d108e21f743d3b91cd0017`.
-- Satellite Teensy: `usb:2100000`, serial `11556500`, HEX SHA-256
-  `1fa47ea1ab3a042249c27a2c14724228065ce7cce1e899f18872cf3d9b234921`.
-- C3M Pi: boot ID `e85f55e7-f734-4d30-be91-b6c41b440ef1`, service PID
-  `706`, restart count `0`, `/dev/serial0 -> /dev/ttyS0`.
+- Branch/HEAD after the message-ID fix:
+  `codex/c3m-rf-reliability-hardening` at
+  `bdca6a31a314099be5e0161e3d14b276a278675f`.
+- Ground Teensy: `usb:100000`, triple serial `11555330`; current per-channel-ID
+  HEX SHA-256
+  `ff5147205ca969072dff64e4b5e089c74481b2bcc4e649189e3d2eb9780fbd26`.
+- Satellite Teensy: `usb:2100000`, serial `11556500`; current per-channel-ID
+  HEX SHA-256
+  `fc637b46591bbf4a236bd8b5730c14b411017805a72e93c08bc022ab94c1fc27`.
+- C3M Pi after the bridge reflash/reboot epoch: boot ID
+  `aa5c81f5-9a1c-4c8f-a5d5-324e1c256bfc`, service PID `256`, restart count
+  `0`, `/dev/serial0 -> /dev/ttyS0`. The earlier nominal and focused-fault
+  cases ran under boot ID `e85f55e7-f734-4d30-be91-b6c41b440ef1`, PID `706`,
+  restart count `0`.
 - ARMv6 Pi binary SHA-256:
   `e0176a21b21b40f5b4e0fba469f2d643c6dd9194de4963267867e86cc8ff814b`.
 - GDS dictionary SHA-256:
   `e39e0c48023d180016ff17ca11011b14d36ef7e7c75b97e23134007a99fd508f`.
-- Post-integration local suite: 67 Python/emulation/bridge tests, fresh native
+- Post-message-ID-fix local suite: 68 Python/emulation/bridge tests, fresh native
   build, 6/6 F Prime component suites, both Teensy builds, two independent
   three-cycle exact ground-copy runs, deterministic loss/repair, and the
   ARMv6KZ/VFPv2 cross-build passed.
@@ -372,6 +379,12 @@ Re-query live USB identities before every future flash.
 | 2026-07-15 10:17 | HIL-MVP-2a single nominal | PASS HIL | Product/transfer 1, 38,480 bytes, 1,100/1,100, CRC 25776, 64.8 s, exact source/ground SHA-256 `d166dee7...e214`, 160x120 decode |
 | 2026-07-15 10:23 | HIL-MVP-2b repeated nominal | PASS HIL | Products/transfers 2-4; 3/3 CRC-valid exact source/ground files; 64.7-65.2 s; one successful repair round; zero progress events; PING each cycle; PID 706 / zero restarts |
 | 2026-07-15 10:24 | RF message-gap diagnostic audit | BUG FOUND | One global TX message ID is checked per-channel on RX, so normal channel interleaving produces false `rf_msg_id_gaps`; use payload missing map/CRC, reassembly, queue, ACK, and PING evidence until fixed |
+| 2026-07-15 10:27 | HIL-MVP-3 duplicate active command | PASS HIL | Product/transfer 5; duplicate request at packet 0 emitted `DownlinkRequestDuplicate`, did not reset progress or emit a second start, completed 1,100/1,100 with CRC in 64.7 s; PID 706 / zero restarts |
+| 2026-07-15 10:29 | HIL-MVP-5 payload receiver restart | PASS HIL | Product/transfer 6; replacement process loaded checkpoint at 253/1,100, completed after one repair round in 68.7 s; CRC/decode passed; PID 706 / zero restarts |
+| 2026-07-15 10:30 | HIL-MVP-6 GDS reader backpressure | PASS HIL | Six-second channel-0 reader stop increased `usb0_backpressure`; recovery count advanced after restart with no new discards/queue drops; PING 37606 returned; PID 706 / zero restarts |
+| 2026-07-15 10:35 | Per-channel RF message IDs | PASS local/build | Commit `bdca6a3`; message-ID allocator is per channel on both bridges; focused 5/5 regression, 68-test local gate, native build, 6/6 component suites, and both Teensy builds passed |
+| 2026-07-15 10:42 | Post-fix one-photo HIL regression | PASS HIL | Fresh Pi epoch product/transfer 1; 38,480 bytes, 1,100/1,100, CRC 19401, 65.1 s, one repair, exact Pi/ground SHA-256 `102448ad...0227`, 160x120 decode, PING 39002, PID 256 / zero restarts; ground `rf_msg_id_gaps` changed only 1 to 3 with one real reassembly loss instead of climbing by hundreds from channel interleaving |
+| 2026-07-15 10:44 | HIL-MVP-8 TX-completion policy | PASS focused injection / N/A physical | Both bridge policies pass injected SENT, timeout-then-success, and terminal-timeout cases; live constants bound each attempt to 500 ms with one retry. Peer removal would test ACK loss, not local TX completion, so no demo-only hardware injection hook was added |
 
 The hashes above were verified against the live Pi and the exact locally built
 HEX artifacts uploaded by physical Teensy IDs during this bench session.
