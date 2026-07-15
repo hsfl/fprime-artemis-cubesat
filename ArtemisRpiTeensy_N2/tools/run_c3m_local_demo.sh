@@ -20,6 +20,7 @@ LEPTON_SAMPLE_CSV="${C3M_LEPTON_SAMPLE_CSV:-$REPO_ROOT/ground-station/c3m-lepton
 LEPTON_CAMERA_BACKEND="${LEPTON_CAMERA_BACKEND:-sample}"
 PAYLOAD_RECEIVER_TIMEOUT_SECONDS="${PAYLOAD_RECEIVER_TIMEOUT_SECONDS:-180}"
 DROP_PAYLOAD_DATA_INDEX=""
+RESTART_RECEIVER_CYCLE=""
 
 usage() {
   cat <<'EOF'
@@ -36,6 +37,8 @@ Options:
   --captures <count>         consecutive capture/downlink/view cycles (default: 3)
   --drop-payload-data-index <index>
                              drop one N2 DATA packet once; its repair must pass
+  --restart-receiver-cycle <cycle>
+                             restart/checkpoint-resume receiver during this cycle
   --app-binary <path>        deployment binary path (default: host-platform artifact)
   --dictionary <path>        topology dictionary path (default: latest generated dict)
   --build-cache <path>       local build cache (default: ArtemisRpiTeensy_N2/build-c3m-local)
@@ -82,6 +85,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --drop-payload-data-index)
       DROP_PAYLOAD_DATA_INDEX="${2:-}"
+      shift 2
+      ;;
+    --restart-receiver-cycle)
+      RESTART_RECEIVER_CYCLE="${2:-}"
       shift 2
       ;;
     --app-binary)
@@ -137,6 +144,11 @@ done
 if [[ -n "$DROP_PAYLOAD_DATA_INDEX" ]]; then
   [[ "$DROP_PAYLOAD_DATA_INDEX" =~ ^[0-9]+$ ]] && (( DROP_PAYLOAD_DATA_INDEX <= 65535 )) || \
     fail "--drop-payload-data-index must be an integer from 0 through 65535"
+fi
+if [[ -n "$RESTART_RECEIVER_CYCLE" ]]; then
+  [[ "$RESTART_RECEIVER_CYCLE" =~ ^[0-9]+$ ]] && \
+    (( RESTART_RECEIVER_CYCLE >= 1 && RESTART_RECEIVER_CYCLE <= CAPTURES )) || \
+    fail "--restart-receiver-cycle must identify one requested capture cycle"
 fi
 
 [[ -f "$VENV_ACTIVATE" ]] || fail "Missing venv: $VENV_ACTIVATE"
@@ -201,6 +213,7 @@ RUN_ID="$(date +%Y%m%d_%H%M%S)"
 LOG_DIR="$ROOT_DIR/tools/logs/c3m_local_demo_$RUN_ID"
 DECODE_DIR="$LOG_DIR/lepton_decode"
 GROUND_RECEIVED_DIR="$LOG_DIR/ground_received"
+RECEIVER_CHECKPOINT_DIR="$LOG_DIR/receiver_checkpoint"
 mkdir -p "$LOG_DIR" "$DECODE_DIR" "$GROUND_RECEIVED_DIR"
 
 EMU_PID=""
@@ -291,10 +304,31 @@ wait_for_payload_uart() {
 }
 
 wait_for_receiver_ready() {
+  local expected_count="$1"
   local deadline
   deadline=$((SECONDS + 15))
   while (( SECONDS < deadline )); do
-    if grep -q '^listening on ' "$LOG_DIR/payload_receiver.log" 2>/dev/null; then
+    local actual_count
+    actual_count="$(grep -c '^listening on ' "$LOG_DIR/payload_receiver.log" 2>/dev/null || true)"
+    if (( actual_count >= expected_count )); then
+      return 0
+    fi
+    if ! kill -0 "$RECEIVER_PID" >/dev/null 2>&1; then
+      return 1
+    fi
+    sleep 0.25
+  done
+  return 1
+}
+
+wait_for_receiver_progress_after() {
+  local baseline="$1"
+  local deadline
+  deadline=$((SECONDS + 45))
+  while (( SECONDS < deadline )); do
+    local actual_count
+    actual_count="$(grep -c '^progress:' "$LOG_DIR/payload_receiver.log" 2>/dev/null || true)"
+    if (( actual_count > baseline )); then
       return 0
     fi
     if ! kill -0 "$RECEIVER_PID" >/dev/null 2>&1; then
@@ -397,6 +431,26 @@ send_command() {
   return 1
 }
 
+start_payload_receiver() {
+  local ready_baseline
+  ready_baseline="$(grep -c '^listening on ' "$LOG_DIR/payload_receiver.log" 2>/dev/null || true)"
+  local receiver_args=(
+    --port "$PAYLOAD_UART_DEVICE"
+    --output-dir "$GROUND_RECEIVED_DIR"
+    --ext .fdp
+    --timeout "$PAYLOAD_RECEIVER_TIMEOUT_SECONDS"
+  )
+  if [[ -n "$RESTART_RECEIVER_CYCLE" ]]; then
+    receiver_args+=(--checkpoint-dir "$RECEIVER_CHECKPOINT_DIR")
+  fi
+  PYTHONUNBUFFERED=1 python3 "$ROOT_DIR/tools/payload_receiver.py" \
+    "${receiver_args[@]}" >>"$LOG_DIR/payload_receiver.log" 2>&1 &
+  RECEIVER_PID="$!"
+  log "started ground payload receiver pid=$RECEIVER_PID"
+  wait_for_receiver_ready "$((ready_baseline + 1))" || \
+    fail "Ground payload receiver did not become ready; see $LOG_DIR/payload_receiver.log"
+}
+
 open_png_viewer() {
   local png_path="$1"
   [[ -f "$png_path" ]] || fail "PNG not found: $png_path"
@@ -497,6 +551,9 @@ log "capture/downlink cycles: $CAPTURES"
 if [[ -n "$DROP_PAYLOAD_DATA_INDEX" ]]; then
   log "one-shot payload DATA drop index: $DROP_PAYLOAD_DATA_INDEX"
 fi
+if [[ -n "$RESTART_RECEIVER_CYCLE" ]]; then
+  log "receiver checkpoint/restart cycle: $RESTART_RECEIVER_CYCLE"
+fi
 log "logs: $LOG_DIR"
 
 EMULATOR_ARGS=(
@@ -519,15 +576,7 @@ log "started local emulator pid=$EMU_PID; GDS: http://127.0.0.1:$GUI_PORT"
 PAYLOAD_UART_DEVICE="$(wait_for_payload_uart)" || fail "Local emulator did not publish a payload UART device"
 log "payload UART: $PAYLOAD_UART_DEVICE"
 
-PYTHONUNBUFFERED=1 python3 "$ROOT_DIR/tools/payload_receiver.py" \
-  --port "$PAYLOAD_UART_DEVICE" \
-  --output-dir "$GROUND_RECEIVED_DIR" \
-  --ext .fdp \
-  --timeout "$PAYLOAD_RECEIVER_TIMEOUT_SECONDS" \
-  >"$LOG_DIR/payload_receiver.log" 2>&1 &
-RECEIVER_PID="$!"
-log "started ground payload receiver pid=$RECEIVER_PID"
-wait_for_receiver_ready || fail "Ground payload receiver did not become ready; see $LOG_DIR/payload_receiver.log"
+start_payload_receiver
 
 wait_for_port "$GUI_PORT" "fprime-gds"
 
@@ -557,8 +606,18 @@ for ((cycle = 1; cycle <= CAPTURES; cycle++)); do
   SOURCE_PRODUCT_COUNT="$CURRENT_SOURCE_COUNT"
   log "cycle $cycle satellite product: $FDP_FILE"
 
+  RECEIVER_PROGRESS_BASELINE="$(grep -c '^progress:' "$LOG_DIR/payload_receiver.log" 2>/dev/null || true)"
   send_command "commsApp.REQUEST_SCIENCE_DOWNLINK" || \
     fail "Cycle $cycle command failed: commsApp.REQUEST_SCIENCE_DOWNLINK"
+  if [[ "$RESTART_RECEIVER_CYCLE" == "$cycle" ]]; then
+    wait_for_receiver_progress_after "$RECEIVER_PROGRESS_BASELINE" || \
+      fail "Cycle $cycle receiver never made progress before restart"
+    log "cycle $cycle: restarting ground receiver after checkpointed progress"
+    kill "$RECEIVER_PID" >/dev/null 2>&1 || true
+    wait "$RECEIVER_PID" >/dev/null 2>&1 || true
+    RECEIVER_PID=""
+    start_payload_receiver
+  fi
   wait_for_log_count "PayloadDownlinkComplete" "$cycle" "cycle $cycle payload completion" || \
     fail "Cycle $cycle payload downlink did not complete"
   wait_for_log_count "DownlinkFinished" "$cycle" "cycle $cycle comms completion" || \

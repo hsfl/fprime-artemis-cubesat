@@ -49,6 +49,16 @@ class C3mLocalDemoScriptTest(unittest.TestCase):
             result.stderr,
         )
 
+    def test_receiver_restart_cycle_must_be_requested(self) -> None:
+        result = self.run_script(
+            "--captures", "2", "--restart-receiver-cycle", "3", "--exit-after-sequence"
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "--restart-receiver-cycle must identify one requested capture cycle",
+            result.stderr,
+        )
+
     def test_c3m_sequence_omits_unneeded_conops_commands(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertNotIn('send_command "payloadDriverLepton.ENABLE"', source)
@@ -59,6 +69,7 @@ class C3mLocalDemoScriptTest(unittest.TestCase):
         self.assertIn('send_command "commsApp.REQUEST_SCIENCE_DOWNLINK"', source)
         self.assertIn('tools/payload_receiver.py', source)
         self.assertIn('--drop-payload-data-index', source)
+        self.assertIn('--checkpoint-dir', source)
 
 
 if __name__ == "__main__":

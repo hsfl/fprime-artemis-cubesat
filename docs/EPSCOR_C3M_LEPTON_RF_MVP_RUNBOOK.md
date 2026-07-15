@@ -100,6 +100,14 @@ repair retransmission can pass:
   --exit-after-sequence --no-open
 ```
 
+To prove receiver checkpoint/resume across a real process replacement:
+
+```bash
+./tools/run_c3m_local_demo.sh \
+  --delay 2 --captures 1 --restart-receiver-cycle 1 \
+  --exit-after-sequence --no-open
+```
+
 The manual demo writes JSON, CSV, and PNG outputs under the run log directory
 and opens the decoded Lepton PNG after the downlink and decode checks pass. Use
 `--no-open` when running headless or inside automated validation.

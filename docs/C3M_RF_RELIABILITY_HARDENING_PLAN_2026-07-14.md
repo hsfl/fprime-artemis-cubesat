@@ -207,8 +207,8 @@ an entirely new flight protocol for a different future radio.
 - [x] Inject one deterministic DATA-packet loss and complete through the actual
   bidirectional N2 retry path. The injection ran as a focused transfer rather
   than the middle of the nominal three-cycle evidence run.
-- [ ] Restart/disconnect the receiver during another full emulated transfer and resume or
-  save an honest partial.
+- [x] Restart the receiver during a full emulated transfer, reload its
+  checkpoint, repair packets lost during the handoff, and complete CRC-valid.
 - [ ] Abandon/fail one transfer, then complete a fresh capture/downlink.
 - [x] Reject stale/conflicting packets in focused tests and prove three nominal
   transfers do not mix products.
@@ -332,7 +332,7 @@ These are home/local build artifacts, not proof of what is presently flashed:
   `1fa47ea1ab3a042249c27a2c14724228065ce7cce1e899f18872cf3d9b234921`.
 - ARMv6 Pi binary SHA-256:
   `e0176a21b21b40f5b4e0fba469f2d643c6dd9194de4963267867e86cc8ff814b`.
-- Post-integration local suite: 63 Python/emulation/bridge tests, fresh native
+- Post-integration local suite: 64 Python/emulation/bridge tests, fresh native
   build, 6/6 F Prime component suites, both Teensy builds, two independent
   three-cycle exact ground-copy runs, deterministic loss/repair, and the
   ARMv6KZ/VFPv2 cross-build passed.
@@ -355,8 +355,9 @@ the live boards and Pi tomorrow before calling any artifact deployed.
 | 2026-07-14 | Protocol rescope | ACTIVE | N2 retained; mission-grade v2 mechanisms deferred; repeated-cycle MVP is current target |
 | 2026-07-14 21:01 | Three-cycle ground-copy proof | PASS local | `tools/logs/c3m_local_demo_20260714_205808`; products/transfers 1-3, three 38,480-byte/1,100-packet receiver files, exact source/ground SHA-256 pairs, 160x120 decode |
 | 2026-07-14 21:05 | Deterministic DATA loss and N2 repair | PASS local | `tools/logs/c3m_local_demo_20260714_210435`; dropped index 100 once, receiver retry `start=100 count=1`, repair completed, CRC/content/hash/decode passed |
-| 2026-07-14 21:10 | Complete post-integration local gate | PASS local | 63 Python/bridge tests; fresh native build; 6/6 F Prime suites; `tools/logs/c3m_local_demo_20260714_210708` three-cycle ground-copy proof; both Teensy builds passed |
+| 2026-07-14 21:10 | Complete post-integration local gate | PASS local | 64 Python/bridge tests; fresh native build; 6/6 F Prime suites; `tools/logs/c3m_local_demo_20260714_210708` three-cycle ground-copy proof; both Teensy builds passed |
 | 2026-07-14 21:11 | Pi Zero W target build | PASS local | ARMv6KZ, VFPv2, `/lib/ld-linux-armhf.so.3`; binary SHA-256 `e0176a21...ff814b`; deployment/HIL still pending |
+| 2026-07-14 21:15 | Mid-transfer receiver process restart | PASS local | `tools/logs/c3m_local_demo_20260714_211416`; replacement resumed 55/1,100, retried two handoff gaps, completed CRC/decode, source/ground SHA-256 `55392fb9...ec63ac` |
 
 The current artifacts above are build outputs only. Confirm the actual flashed
 firmware and deployed Pi binary tomorrow before treating those hashes as live.
