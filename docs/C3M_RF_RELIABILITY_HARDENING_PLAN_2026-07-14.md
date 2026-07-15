@@ -422,6 +422,8 @@ Acceptance:
 
 ### WP3 — Flight completion and repair contract
 
+- [ ] Reject or idempotently reconcile a duplicate downlink start while a
+      transfer is active.
 - [ ] Separate local `TRANSMIT_COMPLETE` from ground
       `VERIFIED_COMPLETE` events and telemetry.
 - [ ] Retain the product, metadata, and packet source after nominal transmit.
@@ -436,9 +438,20 @@ Acceptance:
 - [ ] Keep UART work out of timing-critical rate-group execution where blocking
       or approximately one-second drain time can cause cycle slips.
 
+The 2026-07-14 WP1 recovery attempt exposed the duplicate-start and scheduling
+failures directly. Transfer `1` was still active and had reached `60%` when a
+second `REQUEST_SCIENCE_DOWNLINK` was accepted. `PayloadDownlinkApp` reset its
+state and began transfer `2` instead of rejecting or reconciling the duplicate.
+At transfer `2` `60%`, rate-group work remained blocked long enough to fill an
+F Prime queue: `ActiveRateGroupComponentAc.cpp:686` asserted with queue status
+`8`, the process aborted with `SIGABRT`, and `artemis-fprime.service` restarted
+from PID `256` to PID `675` (`NRestarts=1`) while the Pi boot ID remained
+unchanged. This is a deterministic software failure, not a Pi power cycle.
+
 Acceptance:
 
 - Flight never reports verified completion before ground CRC proof.
+- A duplicate start cannot reset an active transfer or crash the rate group.
 - Lost END, lost confirmation, duplicate repair, overlapping repair, and flight
   restart all reach explicit deterministic states.
 
