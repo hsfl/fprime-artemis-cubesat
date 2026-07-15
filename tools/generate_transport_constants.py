@@ -129,6 +129,7 @@ static constexpr FwSizeType RF_SEGMENT_MAX_DATA_BYTES =
     RF_PACKET_MAX_LEN - RF_SEGMENT_HEADER_LEN;
 static constexpr U8 RF_INTER_SEGMENT_GAP_MS = {rf["inter_segment_gap_ms"]};
 static constexpr U8 RF_PAYLOAD_INTER_PACKET_GAP_MS = {rf["payload_inter_packet_gap_ms"]};
+static constexpr U16 RF_TX_COMPLETE_TIMEOUT_MS = {rf["tx_complete_timeout_ms"]};
 static constexpr U8 RF_GROUND_TX_ACK_REQUIRED_CCSDS = {cpp_flag(ground_ack["ccsds"])};
 static constexpr U8 RF_GROUND_TX_ACK_REQUIRED_PAYLOAD = {cpp_flag(ground_ack["payload"])};
 static constexpr U8 RF_SATELLITE_TX_ACK_REQUIRED_CCSDS = {cpp_flag(satellite_ack["ccsds"])};
@@ -227,6 +228,7 @@ static constexpr uint8_t RF_SEGMENT_MAX_DATA = RF_PACKET_MAX_LEN - RF_SEGMENT_HE
 static constexpr uint32_t RF_REASSEMBLY_TIMEOUT_MS = {rf["reassembly_timeout_ms"]};
 static constexpr uint8_t RF_INTER_SEGMENT_GAP_MS = {rf["inter_segment_gap_ms"]};
 static constexpr uint8_t RF_PAYLOAD_INTER_PACKET_GAP_MS = {rf["payload_inter_packet_gap_ms"]};
+static constexpr uint16_t RF_TX_COMPLETE_TIMEOUT_MS = {rf["tx_complete_timeout_ms"]};
 static constexpr uint8_t RF_ACK_RETRIES = {rf["ack_retries"]};
 static constexpr uint16_t RF_ACK_TIMEOUT_MS = {rf["ack_timeout_ms"]};
 static constexpr uint8_t RF_TX_ACK_REQUIRED_CCSDS = {cpp_flag(tx_ack["ccsds"])};

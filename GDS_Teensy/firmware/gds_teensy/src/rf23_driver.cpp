@@ -15,7 +15,7 @@ Rf23Driver::Rf23Driver(int csPin, int irqPin, uint8_t rxOnPin, uint8_t txOnPin)
 }
 
 bool Rf23Driver::begin() {
-  if (!artemis::rf23bp::initRadio(m_radio, m_radioPins, m_radioProfile, &Serial)) {
+  if (!artemis::rf23bp::initRadio(m_radio, m_radioPins, m_radioProfile, &SerialUSB1)) {
     return false;
   }
   m_radio.setPromiscuous(true);
@@ -49,6 +49,12 @@ Rf23ReceiveResult Rf23Driver::recv(uint8_t* buf, uint8_t* len) {
   return Rf23ReceiveResult::NO_PACKET;
 }
 
-bool Rf23Driver::send(const uint8_t* data, uint8_t len) {
-  return artemis::rf23bp::sendPacket(m_radio, m_radioPins, m_radioProfile, data, len);
+Rf23SendResult Rf23Driver::send(const uint8_t* data, uint8_t len) {
+  return artemis::rf23bp::sendPacket(m_radio,
+                                     m_radioPins,
+                                     m_radioProfile,
+                                     data,
+                                     len,
+                                     link_protocol::RF_TX_COMPLETE_TIMEOUT_MS,
+                                     &SerialUSB1);
 }

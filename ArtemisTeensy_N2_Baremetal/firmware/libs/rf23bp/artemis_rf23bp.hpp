@@ -91,6 +91,12 @@ struct LinkStats {
   int16_t last_rssi_dbm = 0;
 };
 
+enum class SendResult : uint8_t {
+  SENT = 0,
+  START_FAILED = 1,
+  TX_TIMEOUT = 2,
+};
+
 // Configure Teensy SPI1 pin mux and start the bus.
 inline void setupSpi1(const Spi1Pins& pins) {
   SPI1.setMISO(pins.miso_pin);
@@ -220,28 +226,49 @@ inline bool initRadio(RH_RF22& radio, const RadioPins& pins = RadioPins(),
   return true;
 }
 
-// Send one packet and restore post-send state (RX or IDLE).
-// Optional timeout avoids indefinite wait when TX-done interrupt is missing.
-inline bool sendPacket(RH_RF22& radio, const RadioPins& pins,
-                       const RadioProfile& profile, const uint8_t* data,
-                       uint8_t len, uint16_t tx_complete_timeout_ms = 0) {
-  if (data == nullptr || len == 0 || len > radio.maxMessageLength()) {
-    return false;
+// Recover the radio after a terminal TX wait timeout. Always return to RX so
+// the peer can re-establish the link after the local transmit path wedges.
+inline void recoverTransmitPath(RH_RF22& radio, const RadioPins& pins,
+                                const RadioProfile& profile) {
+  radio.setModeIdle();
+  const uint8_t op_mode2 = radio.spiRead(RH_RF22_REG_08_OPERATING_MODE2);
+  radio.spiWrite(RH_RF22_REG_08_OPERATING_MODE2,
+                 op_mode2 | RH_RF22_FFCLRTX | RH_RF22_FFCLRRX);
+  radio.spiWrite(RH_RF22_REG_08_OPERATING_MODE2, op_mode2);
+  (void)radio.spiRead(RH_RF22_REG_03_INTERRUPT_STATUS1);
+  (void)radio.spiRead(RH_RF22_REG_04_INTERRUPT_STATUS2);
+  setAmpReceive(pins, profile);
+  radio.setModeRx();
+}
+
+// Send one packet with a mandatory bounded completion wait.
+inline SendResult sendPacket(RH_RF22& radio, const RadioPins& pins,
+                             const RadioProfile& profile, const uint8_t* data,
+                             uint8_t len, uint16_t tx_complete_timeout_ms,
+                             Print* log = nullptr) {
+  if (data == nullptr || len == 0 || len > radio.maxMessageLength() ||
+      tx_complete_timeout_ms == 0) {
+    return SendResult::START_FAILED;
   }
 
   setAmpTransmit(pins, profile);
-  const bool sent = radio.send(data, len);
-
-  bool tx_complete = false;
-  if (sent) {
-    if (tx_complete_timeout_ms > 0) {
-      // Prevent lock-up if TX completion interrupt never arrives.
-      tx_complete =
-          static_cast<RHGenericDriver&>(radio).waitPacketSent(tx_complete_timeout_ms);
+  if (!radio.send(data, len)) {
+    if (profile.start_in_receive) {
+      setAmpReceive(pins, profile);
+      radio.setModeRx();
     } else {
-      radio.waitPacketSent();
-      tx_complete = true;
+      setAmpIdle(pins);
+      radio.setModeIdle();
     }
+    return SendResult::START_FAILED;
+  }
+
+  if (!static_cast<RHGenericDriver&>(radio).waitPacketSent(tx_complete_timeout_ms)) {
+    recoverTransmitPath(radio, pins, profile);
+    if (log != nullptr) {
+      log->println(F("RF23BP TX completion timeout; FIFOs cleared and RX restored"));
+    }
+    return SendResult::TX_TIMEOUT;
   }
 
   if (profile.start_in_receive) {
@@ -252,7 +279,7 @@ inline bool sendPacket(RH_RF22& radio, const RadioPins& pins,
     radio.setModeIdle();
   }
 
-  return sent && tx_complete;
+  return SendResult::SENT;
 }
 
 // Receive one packet if available.
@@ -328,13 +355,7 @@ inline LinkStats readLinkStats(RH_RF22& radio) {
 // 4) return to RX
 inline void recoverFromFifoError(RH_RF22& radio, const RadioPins& pins,
                                  const RadioProfile& profile) {
-  radio.setModeIdle();
-  const uint8_t op_mode2 = radio.spiRead(RH_RF22_REG_08_OPERATING_MODE2);
-  radio.spiWrite(RH_RF22_REG_08_OPERATING_MODE2,
-                 op_mode2 | RH_RF22_FFCLRTX | RH_RF22_FFCLRRX);
-  (void)readAndClearInterruptStatus(radio);
-  setAmpReceive(pins, profile);
-  radio.setModeRx();
+  recoverTransmitPath(radio, pins, profile);
 }
 
 }  // namespace rf23bp

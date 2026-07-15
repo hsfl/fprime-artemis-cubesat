@@ -141,6 +141,7 @@ def main() -> int:
         ("RF satellite address", ("registry", registry["addresses"]["satellite"]), ("fprime", fp["RF_SATELLITE_ADDRESS"]), ("satellite local", sat["RF_LOCAL_ADDRESS"]), ("ground remote", gnd["RF_REMOTE_ADDRESS"])),
         ("RF inter-segment gap", ("fprime", fp["RF_INTER_SEGMENT_GAP_MS"]), ("satellite", sat["RF_INTER_SEGMENT_GAP_MS"]), ("ground", gnd["RF_INTER_SEGMENT_GAP_MS"])),
         ("RF payload inter-packet gap", ("fprime", fp["RF_PAYLOAD_INTER_PACKET_GAP_MS"]), ("satellite", sat["RF_PAYLOAD_INTER_PACKET_GAP_MS"]), ("ground", gnd["RF_PAYLOAD_INTER_PACKET_GAP_MS"])),
+        ("RF TX completion timeout", ("manifest", manifest["rf"]["tx_complete_timeout_ms"]), ("fprime", fp["RF_TX_COMPLETE_TIMEOUT_MS"]), ("satellite", sat["RF_TX_COMPLETE_TIMEOUT_MS"]), ("ground", gnd["RF_TX_COMPLETE_TIMEOUT_MS"])),
         ("ground TX CCSDS ACK", ("fprime", fp["RF_GROUND_TX_ACK_REQUIRED_CCSDS"]), ("ground TX", gnd["RF_TX_ACK_REQUIRED_CCSDS"]), ("satellite RX", sat["RF_RX_ACK_REQUIRED_CCSDS"])),
         ("ground TX payload ACK", ("fprime", fp["RF_GROUND_TX_ACK_REQUIRED_PAYLOAD"]), ("ground TX", gnd["RF_TX_ACK_REQUIRED_PAYLOAD"]), ("satellite RX", sat["RF_RX_ACK_REQUIRED_PAYLOAD"])),
         ("satellite TX CCSDS ACK", ("fprime", fp["RF_SATELLITE_TX_ACK_REQUIRED_CCSDS"]), ("satellite TX", sat["RF_TX_ACK_REQUIRED_CCSDS"]), ("ground RX", gnd["RF_RX_ACK_REQUIRED_CCSDS"])),

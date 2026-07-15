@@ -49,8 +49,14 @@ Rf23ReceiveResult Rf23Driver::recv(uint8_t* buf, uint8_t* len) {
   return Rf23ReceiveResult::NO_PACKET;
 }
 
-bool Rf23Driver::send(const uint8_t* data, uint8_t len) {
-  return artemis::rf23bp::sendPacket(m_radio, m_radioPins, m_radioProfile, data, len);
+Rf23SendResult Rf23Driver::send(const uint8_t* data, uint8_t len) {
+  return artemis::rf23bp::sendPacket(m_radio,
+                                     m_radioPins,
+                                     m_radioProfile,
+                                     data,
+                                     len,
+                                     link_protocol::RF_TX_COMPLETE_TIMEOUT_MS,
+                                     &Serial);
 }
 
 artemis::rf23bp::LinkStats Rf23Driver::linkStats() {

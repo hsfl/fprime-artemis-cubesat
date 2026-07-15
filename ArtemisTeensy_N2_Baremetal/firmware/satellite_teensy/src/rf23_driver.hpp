@@ -13,6 +13,8 @@ enum class Rf23ReceiveResult : uint8_t {
   WRONG_VERSION = 4,
 };
 
+using Rf23SendResult = artemis::rf23bp::SendResult;
+
 class Rf23Driver {
  public:
   Rf23Driver(int csPin, int irqPin, uint8_t rxOnPin, uint8_t txOnPin);
@@ -20,7 +22,7 @@ class Rf23Driver {
   bool begin();
   bool available();
   Rf23ReceiveResult recv(uint8_t* buf, uint8_t* len);
-  bool send(const uint8_t* data, uint8_t len);
+  Rf23SendResult send(const uint8_t* data, uint8_t len);
   artemis::rf23bp::LinkStats linkStats();
 
  private:

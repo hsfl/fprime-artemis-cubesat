@@ -36,6 +36,7 @@ static constexpr uint8_t RF_SEGMENT_MAX_DATA = RF_PACKET_MAX_LEN - RF_SEGMENT_HE
 static constexpr uint32_t RF_REASSEMBLY_TIMEOUT_MS = 500;
 static constexpr uint8_t RF_INTER_SEGMENT_GAP_MS = 8;
 static constexpr uint8_t RF_PAYLOAD_INTER_PACKET_GAP_MS = 15;
+static constexpr uint16_t RF_TX_COMPLETE_TIMEOUT_MS = 500;
 static constexpr uint8_t RF_ACK_RETRIES = 4;
 static constexpr uint16_t RF_ACK_TIMEOUT_MS = 80;
 static constexpr uint8_t RF_TX_ACK_REQUIRED_CCSDS = 1;

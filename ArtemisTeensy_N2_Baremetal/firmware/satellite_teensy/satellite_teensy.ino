@@ -120,6 +120,12 @@ void debugPrintCounters(const char* prefix) {
   Serial.print(g_linkCounters.payloadRfTxSegments);
   Serial.print(" rf_tx_drops=");
   Serial.print(g_linkCounters.rfTxDrops);
+  Serial.print(" rf_tx_timeouts=");
+  Serial.print(g_linkCounters.rfTxTimeouts);
+  Serial.print(" rf_recoveries=");
+  Serial.print(g_linkCounters.rfRecoveries);
+  Serial.print(" rf_tx_terminal_failures=");
+  Serial.print(g_linkCounters.rfTxTerminalFailures);
   Serial.print(" crc_drops=");
   Serial.print(g_linkCounters.crcDrops);
   Serial.print(" framing_drops=");

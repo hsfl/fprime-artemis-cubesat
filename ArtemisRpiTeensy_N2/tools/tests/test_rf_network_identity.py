@@ -139,6 +139,65 @@ int main() {{
                 )
                 self.assertEqual(len(guarded_receives), 2)
 
+    def test_rf_tx_completion_is_bounded_recoverable_and_observable(self) -> None:
+        self.assertEqual(self.transport["rf"]["tx_complete_timeout_ms"], 500)
+        identity = generator.resolve_rf_identity(self.transport, self.registry)
+        self.assertIn(
+            "RF_TX_COMPLETE_TIMEOUT_MS = 500",
+            generator.render_fprime(self.transport, identity),
+        )
+        for satellite in (False, True):
+            self.assertIn(
+                "RF_TX_COMPLETE_TIMEOUT_MS = 500",
+                generator.render_teensy(self.transport, identity, satellite=satellite),
+            )
+
+        helper_paths = (
+            REPO_ROOT / "ArtemisTeensy_N2_Baremetal/firmware/libs/rf23bp/artemis_rf23bp.hpp",
+            REPO_ROOT / "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/artemis_rf23bp.hpp",
+            REPO_ROOT / "GDS_Teensy/firmware/gds_teensy/src/artemis_rf23bp.hpp",
+        )
+        fifo_clear_pulse = re.compile(
+            r"spiWrite\(RH_RF22_REG_08_OPERATING_MODE2,\s*"
+            r"op_mode2 \| RH_RF22_FFCLRTX \| RH_RF22_FFCLRRX\);\s*"
+            r"radio\.spiWrite\(RH_RF22_REG_08_OPERATING_MODE2, op_mode2\);"
+        )
+        for helper_path in helper_paths:
+            with self.subTest(helper=helper_path):
+                helper = helper_path.read_text()
+                for outcome in ("SENT", "START_FAILED", "TX_TIMEOUT"):
+                    self.assertIn(outcome, helper)
+                self.assertNotIn("radio.waitPacketSent();", helper)
+                self.assertIn("waitPacketSent(tx_complete_timeout_ms)", helper)
+                self.assertIn("tx_complete_timeout_ms == 0", helper)
+                self.assertRegex(helper, fifo_clear_pulse)
+                self.assertIn("setModeRx();", helper)
+
+        roots = (
+            REPO_ROOT / "GDS_Teensy/firmware/gds_teensy",
+            REPO_ROOT / "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy",
+        )
+        for root in roots:
+            with self.subTest(root=root):
+                driver = (root / "src/rf23_driver.cpp").read_text()
+                relay = (root / "src/relay_uart_rf.cpp").read_text()
+                counters = (root / "src/link_counters.hpp").read_text()
+                debug = next(root.glob("*.ino")).read_text()
+                self.assertIn("link_protocol::RF_TX_COMPLETE_TIMEOUT_MS", driver)
+                for member, field in (
+                    ("rfTxTimeouts", "rf_tx_timeouts="),
+                    ("rfRecoveries", "rf_recoveries="),
+                    ("rfTxTerminalFailures", "rf_tx_terminal_failures="),
+                ):
+                    self.assertIn(member, counters)
+                    self.assertIn(member, relay)
+                    self.assertIn(field, relay)
+                    self.assertIn(field, debug)
+
+        ground_driver = (roots[0] / "src/rf23_driver.cpp").read_text()
+        self.assertIn("initRadio(m_radio, m_radioPins, m_radioProfile, &SerialUSB1)", ground_driver)
+        self.assertIn("&SerialUSB1);", ground_driver)
+
 
 if __name__ == "__main__":
     unittest.main()

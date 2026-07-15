@@ -414,7 +414,7 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
     wdt_guard::feed();
     const bool sentOk = link_protocol::txAckRequiredForChannel(channel)
                             ? sendRfPacketWithAck(rfPacket, rfLen, channel, msgId, segIdx)
-                            : m_rf.send(rfPacket, rfLen);
+                            : sendRfPacket(rfPacket, rfLen);
     wdt_guard::feed();
     if (!sentOk) {
       m_counters.rfTxDrops += 1;
@@ -450,6 +450,23 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
   return true;
 }
 
+bool RelayUartRf::sendRfPacket(const uint8_t* packet, uint8_t packetLen) {
+  switch (m_rf.send(packet, packetLen)) {
+    case Rf23SendResult::SENT:
+      return true;
+    case Rf23SendResult::TX_TIMEOUT:
+      m_counters.rfTxTimeouts += 1;
+      m_counters.rfRecoveries += 1;
+      m_counters.rfTxTerminalFailures += 1;
+      return false;
+    case Rf23SendResult::START_FAILED:
+      m_counters.rfTxTerminalFailures += 1;
+      return false;
+  }
+  m_counters.rfTxTerminalFailures += 1;
+  return false;
+}
+
 bool RelayUartRf::sendRfPacketWithAck(const uint8_t* packet,
                                       uint8_t packetLen,
                                       uint8_t channel,
@@ -457,7 +474,7 @@ bool RelayUartRf::sendRfPacketWithAck(const uint8_t* packet,
                                       uint8_t segIdx) {
   for (uint8_t attempt = 0; attempt <= link_protocol::RF_ACK_RETRIES; attempt++) {
     wdt_guard::feed();
-    if (!m_rf.send(packet, packetLen)) {
+    if (!sendRfPacket(packet, packetLen)) {
       return false;
     }
     if (waitForAck(channel, msgId, segIdx)) {
@@ -534,7 +551,7 @@ bool RelayUartRf::sendAck(uint8_t channel, uint8_t msgId, uint8_t segIdx) {
       segIdx,
       0,
   };
-  const bool ok = m_rf.send(ackPacket, sizeof(ackPacket));
+  const bool ok = sendRfPacket(ackPacket, sizeof(ackPacket));
   if (ok) {
     m_counters.rfAckTx += 1;
   }
@@ -687,11 +704,11 @@ uint16_t RelayUartRf::crc16Ccitt(const uint8_t* data, uint16_t len) const {
 }
 
 void RelayUartRf::emitLinkStatus() {
-  char statusLine[480] = {0};
+  char statusLine[640] = {0};
   const int n =
       snprintf(statusLine,
                sizeof(statusLine),
-               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu rf_msg_id_gaps=%lu rf_ack_rx=%lu rf_ack_tx=%lu rf_retries=%lu rf_ack_timeouts=%lu rf_wrong_network=%lu rf_wrong_address=%lu rf_wrong_version=%lu up_q_drops=%lu down_q_drops=%lu\\n",
+               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu rf_tx_timeouts=%lu rf_recoveries=%lu rf_tx_terminal_failures=%lu rf_msg_id_gaps=%lu rf_ack_rx=%lu rf_ack_tx=%lu rf_retries=%lu rf_ack_timeouts=%lu rf_wrong_network=%lu rf_wrong_address=%lu rf_wrong_version=%lu up_q_drops=%lu down_q_drops=%lu\\n",
                static_cast<unsigned long>(m_counters.uartRxBytes),
                static_cast<unsigned long>(m_counters.uartTxBytes),
                static_cast<unsigned long>(m_counters.rfRxPackets),
@@ -707,6 +724,9 @@ void RelayUartRf::emitLinkStatus() {
                static_cast<unsigned long>(m_counters.rfReassemblyDrops),
                static_cast<unsigned long>(m_counters.rfOversizeDrops),
                static_cast<unsigned long>(m_counters.rfTxDrops),
+               static_cast<unsigned long>(m_counters.rfTxTimeouts),
+               static_cast<unsigned long>(m_counters.rfRecoveries),
+               static_cast<unsigned long>(m_counters.rfTxTerminalFailures),
                static_cast<unsigned long>(m_counters.rfMsgIdGaps),
                static_cast<unsigned long>(m_counters.rfAckRx),
                static_cast<unsigned long>(m_counters.rfAckTx),

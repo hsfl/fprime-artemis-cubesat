@@ -56,6 +56,7 @@ class RelayUartRf {
   bool sendRawToUart(const uint8_t* payload, uint16_t length);
 
   bool sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uint16_t length);
+  bool sendRfPacket(const uint8_t* packet, uint8_t packetLen);
   bool sendRfPacketWithAck(const uint8_t* packet, uint8_t packetLen, uint8_t channel, uint8_t msgId, uint8_t segIdx);
   bool waitForAck(uint8_t channel, uint8_t msgId, uint8_t segIdx);
   bool isAckPacket(const uint8_t* packet, uint8_t packetLen, uint8_t channel, uint8_t msgId, uint8_t segIdx) const;

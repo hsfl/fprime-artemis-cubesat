@@ -43,6 +43,7 @@ static constexpr FwSizeType RF_SEGMENT_MAX_DATA_BYTES =
     RF_PACKET_MAX_LEN - RF_SEGMENT_HEADER_LEN;
 static constexpr U8 RF_INTER_SEGMENT_GAP_MS = 8;
 static constexpr U8 RF_PAYLOAD_INTER_PACKET_GAP_MS = 15;
+static constexpr U16 RF_TX_COMPLETE_TIMEOUT_MS = 500;
 static constexpr U8 RF_GROUND_TX_ACK_REQUIRED_CCSDS = 1;
 static constexpr U8 RF_GROUND_TX_ACK_REQUIRED_PAYLOAD = 0;
 static constexpr U8 RF_SATELLITE_TX_ACK_REQUIRED_CCSDS = 0;

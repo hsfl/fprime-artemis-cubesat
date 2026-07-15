@@ -36,6 +36,7 @@
     "reassembly_timeout_ms": 500,
     "inter_segment_gap_ms": 8,
     "payload_inter_packet_gap_ms": 15,
+    "tx_complete_timeout_ms": 500,
     "ack_retries": 4,
     "ack_timeout_ms": 80,
     "ack_directions": {
