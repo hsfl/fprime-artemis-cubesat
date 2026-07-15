@@ -3,6 +3,7 @@
 # add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/MyComponent")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/Types/")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/LinkCfg/")
+add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/PayloadLinkTypes/")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/UartChannelMux/")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/DpWrittenRouter/")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/PayloadDownlinkApp/")

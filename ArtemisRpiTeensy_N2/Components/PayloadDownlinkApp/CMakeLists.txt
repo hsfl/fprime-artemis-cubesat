@@ -7,6 +7,7 @@ register_fprime_library(
         ${CMAKE_CURRENT_LIST_DIR}/PayloadDownlinkApp.hpp
     DEPENDS
         Components_LinkCfg
+        Components_PayloadLinkTypes
         Components_Types
         Os
 )
@@ -19,6 +20,7 @@ set(UT_SOURCE_FILES
 
 set(UT_MOD_DEPS
     Components_LinkCfg
+    Components_PayloadLinkTypes
     Components_Types
     Os
     STest
