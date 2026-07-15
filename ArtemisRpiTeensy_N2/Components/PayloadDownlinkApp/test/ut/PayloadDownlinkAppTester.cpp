@@ -227,11 +227,12 @@ void PayloadDownlinkAppTester::testRetryBurstCountSendsGeneratedRetryPacketsPerR
 
     this->invoke_to_run(0, 0);
     this->component.doDispatch();
-    ASSERT_from_packetOut_SIZE(initialPacketCount + LinkCfg::PAYLOAD_RETRY_PACKETS_PER_RUN + 1U);
-    ASSERT_EQ(this->m_packets.size(), initialPacketCount + LinkCfg::PAYLOAD_RETRY_PACKETS_PER_RUN + 1U);
+    ASSERT_from_packetOut_SIZE(initialPacketCount + LinkCfg::PAYLOAD_RETRY_PACKETS_PER_RUN + 2U);
+    ASSERT_EQ(this->m_packets.size(), initialPacketCount + LinkCfg::PAYLOAD_RETRY_PACKETS_PER_RUN + 2U);
     EXPECT_EQ(this->m_packets[initialPacketCount + LinkCfg::PAYLOAD_RETRY_PACKETS_PER_RUN][2], 2U);
     EXPECT_EQ(this->m_packets[initialPacketCount + LinkCfg::PAYLOAD_RETRY_PACKETS_PER_RUN][4],
               LinkCfg::PAYLOAD_RETRY_PACKETS_PER_RUN);
+    EXPECT_EQ(this->m_packets.back()[2], 3U);
 }
 
 void PayloadDownlinkAppTester::testActiveRequestGuardPreservesTransferAndProgress() {
@@ -333,9 +334,10 @@ void PayloadDownlinkAppTester::testControlMailboxCopiesInputAndReportsOverflow()
     this->component.doDispatch();
     ASSERT_EVENTS_PayloadRetryRequested_SIZE(1);
     ASSERT_EVENTS_PayloadRetryRequested(0, 0, 1);
-    ASSERT_EQ(this->m_packets.size(), packetsBeforeRetry + 1U);
-    EXPECT_EQ(this->m_packets.back()[2], 2U);
-    EXPECT_EQ(this->m_packets.back()[4], 0U);
+    ASSERT_EQ(this->m_packets.size(), packetsBeforeRetry + 2U);
+    EXPECT_EQ(this->m_packets[this->m_packets.size() - 2U][2], 2U);
+    EXPECT_EQ(this->m_packets[this->m_packets.size() - 2U][4], 0U);
+    EXPECT_EQ(this->m_packets.back()[2], 3U);
     ASSERT_TLM_ControlMailboxHighWater(0, 1);
 
     retry[3] = 1U;
@@ -416,12 +418,13 @@ void PayloadDownlinkAppTester::testRetryRequestsMergeAdditivelyAndIgnoreEmptyReq
 
     this->invoke_to_run(0, 0);
     this->component.doDispatch();
-    ASSERT_EQ(this->m_packets.size(), packetsBeforeRepair + 24U);
+    ASSERT_EQ(this->m_packets.size(), packetsBeforeRepair + 25U);
     for (U32 packetIndex = LinkCfg::PAYLOAD_RETRY_PACKETS_PER_RUN; packetIndex < 24U; ++packetIndex) {
         const std::vector<U8>& packet = this->m_packets[packetsBeforeRepair + packetIndex];
         const U32 encodedIndex = static_cast<U32>(packet[4]) | (static_cast<U32>(packet[5]) << 8U);
         EXPECT_EQ(encodedIndex, packetIndex);
     }
+    EXPECT_EQ(this->m_packets.back()[2], 3U);
 
     const std::size_t packetsAfterRepair = this->m_packets.size();
     this->invoke_to_run(0, 0);
@@ -560,9 +563,10 @@ void PayloadDownlinkAppTester::testRepairRetryPreservesCursor() {
 
     this->invoke_to_run(0, 0);
     this->component.doDispatch();
-    ASSERT_EQ(this->m_packets.size(), 3U);
+    ASSERT_EQ(this->m_packets.size(), 4U);
     EXPECT_EQ(this->m_packets[0], this->m_packets[1]);
     EXPECT_EQ(this->m_packets[2][4], 1U);
+    EXPECT_EQ(this->m_packets[3][2], 3U);
 }
 
 void PayloadDownlinkAppTester::testLocalErrorFailsWithoutAdvance() {
@@ -656,6 +660,17 @@ void PayloadDownlinkAppTester::testMalformedControlIsRejectedWithoutPoisoningSta
     this->component.doDispatch();
     ASSERT_EVENTS_PayloadControlPacketRejected_SIZE(1);
     ASSERT_EVENTS_PayloadControlPacketRejected(0, 4, 1);
+
+    U8 oversizedBitmap[44] = {
+        LinkCfg::PAYLOAD_MAGIC_0, LinkCfg::PAYLOAD_MAGIC_1, 4, 1, 0, 0, 37
+    };
+    Fw::Buffer oversizedBitmapBuffer(oversizedBitmap, sizeof(oversizedBitmap));
+    this->clearHistory();
+    this->invoke_to_packetIn(0, oversizedBitmapBuffer);
+    this->invoke_to_run(0, 0);
+    this->component.doDispatch();
+    ASSERT_EVENTS_PayloadControlPacketRejected_SIZE(1);
+    ASSERT_EVENTS_PayloadControlPacketRejected(0, 5, 2);
 
     this->clearHistory();
     this->sendCmd_GET_PAYLOAD_STATUS(0, 1);

@@ -106,6 +106,7 @@ class PayloadDownlinkApp final : public PayloadDownlinkAppComponentBase {
     U16 m_blobCrc;
     bool m_sentHeader;
     bool m_sentEnd;
+    bool m_endRefreshPending;
     bool m_sourceReady;
     U32 m_sourceBytes;
     std::string m_sourcePath;

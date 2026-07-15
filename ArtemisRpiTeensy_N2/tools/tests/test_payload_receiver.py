@@ -160,6 +160,26 @@ class PayloadReceiverTests(unittest.TestCase):
         self.assertEqual(event.retry_rounds, 1)
         self.assertEqual(event.missing_packets, 10)
 
+    def test_retry_waits_for_quiet_after_repair_data(self) -> None:
+        blob = b"x" * (payload_receiver.DATA_BYTES * 2)
+        receiver = payload_receiver.PayloadReceiver(
+            "unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0
+        )
+        receiver.handle_header(make_header(7, 3, blob))
+        receiver.end_seen = True
+        receiver.last_end_s = 100.0
+        receiver.last_packet_s = 105.0
+        receiver.next_retry_request_s = 0.0
+        serial = DummySerial()
+
+        with mock.patch.object(payload_receiver.time, "monotonic", return_value=105.1):
+            receiver.request_retries_if_due(serial)  # type: ignore[arg-type]
+        self.assertEqual(serial.writes, [])
+
+        with mock.patch.object(payload_receiver.time, "monotonic", return_value=105.6):
+            receiver.request_retries_if_due(serial)  # type: ignore[arg-type]
+        self.assertEqual(len(serial.writes), 1)
+
     def test_repeated_header_preserves_packets_for_same_transfer(self) -> None:
         blob = b"a" * payload_receiver.DATA_BYTES + b"tail"
         transfer_id = 11

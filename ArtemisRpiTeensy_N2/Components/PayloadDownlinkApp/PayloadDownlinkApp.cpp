@@ -105,6 +105,7 @@ PayloadDownlinkApp::PayloadDownlinkApp(const char* const compName)
       m_blobCrc(0),
       m_sentHeader(false),
       m_sentEnd(false),
+      m_endRefreshPending(false),
       m_sourceReady(false),
       m_sourceBytes(0),
       m_sourcePath(),
@@ -174,6 +175,22 @@ void PayloadDownlinkApp::run_handler(FwIndexType portNum, U32 context) {
         this->m_retryCount = 0;
         this->m_retryCursor = 0;
         this->m_packetsMissing = 0;
+    }
+
+    if (this->m_state == STATE_DONE && this->m_endRefreshPending && this->m_retryCount == 0U &&
+        packetsSentThisRun < totalPacketsPerRun) {
+        const Components::PayloadSendStatus status = this->sendEndPacket();
+        if (status == Components::PayloadSendStatus::LOCAL_RETRY) {
+            this->emitTelemetry();
+            return;
+        }
+        if (status != Components::PayloadSendStatus::LOCAL_ACCEPTED) {
+            this->failTransfer(3U, this->m_lastError);
+            this->emitTelemetry();
+            return;
+        }
+        this->m_endRefreshPending = false;
+        packetsSentThisRun++;
     }
 
     if (this->m_state == STATE_DONE) {
@@ -410,6 +427,7 @@ void PayloadDownlinkApp::clearRepairWork() {
     this->m_retryCount = 0U;
     this->m_retryCursor = 0U;
     this->m_packetsMissing = 0U;
+    this->m_endRefreshPending = false;
 
     Os::ScopeLock lock(this->m_controlMailboxMutex);
     this->m_controlMailboxHead = 0U;
@@ -685,7 +703,8 @@ void PayloadDownlinkApp::handleRetryRequest(const U8* data, FwSizeType size) {
 
     const U16 startIndex = this->getU16(data, 4);
     const U8 bitmapBytes = data[6];
-    if (static_cast<FwSizeType>(7 + bitmapBytes) > size) {
+    if ((bitmapBytes == 0U) || (bitmapBytes > 36U) ||
+        (static_cast<FwSizeType>(7U + bitmapBytes) != size)) {
         this->rejectControlPacket(5U);
         return;
     }
@@ -738,6 +757,9 @@ void PayloadDownlinkApp::handleRetryRequest(const U8* data, FwSizeType size) {
         return;
     }
     this->m_packetsMissing = this->m_retryCount;
+    if (requestedMissing > 0U) {
+        this->m_endRefreshPending = true;
+    }
     this->log_ACTIVITY_LO_PayloadRetryRequested(startIndex, requestedMissing);
     this->emitStatus();
 }

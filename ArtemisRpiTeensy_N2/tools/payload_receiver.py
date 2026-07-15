@@ -35,6 +35,7 @@ MAX_PACKET = 44
 DATA_BYTES = 35
 RETRY_INTERVAL_S = 5.0
 RETRY_AFTER_SILENCE_S = 8.0
+RETRY_AFTER_REPAIR_QUIET_S = 0.5
 CHECKPOINT_SCHEMA_VERSION = 1
 DEFAULT_CHECKPOINT_MAX_AGE_S = 24 * 60 * 60
 CHECKPOINT_OWNER_FILENAME = ".payload-receiver-owned"
@@ -157,6 +158,7 @@ class PayloadReceiver:
         self.rx_buffer = bytearray()
         self.next_retry_request_s = 0.0
         self.last_packet_s = 0.0
+        self.last_end_s = 0.0
         self.retry_rounds = 0
         self.transfer_started_s = 0.0
         self.transfer_started_wall_s = 0.0
@@ -377,6 +379,7 @@ class PayloadReceiver:
             self.file_crc = file_crc
             self.packets = packets
             self.end_seen = bool(manifest.get("end_seen"))
+            self.last_end_s = now_mono if self.end_seen else 0.0
             self.retry_rounds = max(0, int(manifest.get("retry_rounds") or 0))
             self.transfer_started_wall_s = started_wall
             self.last_packet_wall_s = last_wall
@@ -633,6 +636,7 @@ class PayloadReceiver:
             self.handle_data(packet)
         elif packet_type == TYPE_END:
             self.end_seen = True
+            self.last_end_s = time.monotonic()
             self.persist_checkpoint(reason="end packet accepted")
             if not self.complete:
                 self.request_retries_if_due(ser, force=True)
@@ -642,6 +646,12 @@ class PayloadReceiver:
         header_seen = self.transfer_id is not None and self.total_packets > 0
         if not self.end_seen and (
             not header_seen or self.last_packet_s == 0.0 or now - self.last_packet_s < RETRY_AFTER_SILENCE_S
+        ):
+            return
+        if (
+            self.end_seen
+            and self.last_packet_s > self.last_end_s
+            and now - self.last_packet_s < RETRY_AFTER_REPAIR_QUIET_S
         ):
             return
         if not force and now < self.next_retry_request_s:
@@ -687,6 +697,7 @@ class PayloadReceiver:
         self.file_crc = file_crc
         self.packets.clear()
         self.end_seen = False
+        self.last_end_s = 0.0
         self.last_packet_s = time.monotonic()
         self.last_packet_wall_s = time.time()
         self.transfer_started_s = self.last_packet_s
@@ -800,6 +811,7 @@ class PayloadReceiver:
         self.packet_data_bytes = DATA_BYTES
         self.packets = {}
         self.end_seen = False
+        self.last_end_s = 0.0
         self.next_retry_request_s = 0.0
         self.last_packet_s = 0.0
         self.retry_rounds = 0
