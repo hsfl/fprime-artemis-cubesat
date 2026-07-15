@@ -312,30 +312,176 @@ hardware identities before every flash; do not assume July 14 device paths.
 | HIL-MVP-7 ground USB reconnect | Unplug/replug ground Teensy once | Ports rediscovered; no silent complete; current attempt resolves honestly; next cycle succeeds | **PASS** — all ground ports disappeared at 423/1,100; receiver entered `recovering`; ports, receiver, and GDS auto-reconnected; transfer completed after two repairs; PING 39008 and a zero-repair next cycle passed |
 | HIL-MVP-8 RF TX timeout injection | Exercise the bounded `waitPacketSent` failure path with a focused host-injected test; optionally remove the peer only to exercise ACK retry | Bounded retry/recovery; no 12-second watchdog reset; do not mislabel no-peer ACK loss as a TX-completion timeout | **PASS focused injection / N/A physical** — both bridges use a 500 ms completion timeout and one recovered retry; injected timeout/terminal cases pass; no MVP-only hardware hook added |
 
-### Planned Local Radio-Recovery Task — Not Implemented Yet
+### Post-HIL Follow-Up Backlog — Plan Only, Not Implemented
 
-The aluminum incident exposed a persistent local satellite RFM23BP TX-completion
-wedge, but it was not a valid RF-fade test. Preserve the current firmware for
-the remaining existing HIL cases. Plan a separate evidence-backed follow-up:
+Preserve the currently proven firmware and F Prime build for the outdoor/Yagi
+campaign. The following tasks capture findings from the July 15 HIL session
+and the subsequent source investigation. They are intentionally deferred until
+after range testing so the outdoor comparison is not contaminated by an
+untested boot, firmware, or UI change.
 
-1. Let the Pi boot fully and start F Prime before local radio recovery is
-   eligible.
-2. Extend the existing satellite-local channel `2` RPC boundary with bounded
-   radio-health/status and radio-reinitialize operations. Channel `2` remains
-   local to the Pi/Teensy UART and never crosses RF.
-3. Initiate recovery locally from F Prime/bridge health state after a defined
-   terminal-timeout threshold. Do not require a ground command over an already
-   wedged RF link.
-4. Reinitialize only the radio/IRQ/profile state first; do not toggle
-   `RPI_ENABLE_PIN` or reboot the whole satellite for a radio-only fault.
-5. Bound every request/result, report attempted/succeeded/failed state through
-   counters/events after the link returns, and preserve honest packet loss for
-   the existing N2 repair/partial logic.
-6. Add focused channel-2 and retry-policy tests, both Teensy builds, a nominal
-   regression, and a safe HIL recovery case before claiming the task complete.
+#### Follow-up 1 — Pi-First Boot and Bounded Local Radio Recovery
 
-This is a planned task only. Do not implement it during the current remaining
-HIL matrix run.
+**Context:** The aluminum incident was not a valid RF-fade test, but it exposed
+a persistent local satellite RFM23BP TX-completion wedge. Static inspection also
+found that the satellite Teensy currently holds `RPI_ENABLE_PIN` low until
+`g_rfDriver.begin()` returns. The wrapper performs a mutating software-reset
+probe before RadioHead performs additional resets and enters an unbounded
+chip-ready wait. A bad radio initialization can therefore watchdog-loop before
+the Pi or F Prime boots. The existing channel `2` RPC is Pi-to-Teensy local and
+already carries RF statistics, but it has no radio-init or recovery operation.
+
+Plan:
+
+1. Assert Pi power and initialize the Pi UART/channel `2` service path before
+   any potentially blocking radio initialization. Verify in HIL that a Teensy
+   reset does not pulse `RPI_ENABLE_PIN` long enough to brown out the Pi.
+2. Put the RFM23BP into a safe startup condition using the real active-high SDN
+   pin. Do not treat the board net named `RADIO_RESET` as a reset input; it is
+   the radio GPIO0/POR output and must not be driven as a reset.
+3. Start the Teensy radio state as `UNINITIALIZED`, keep channel `2` available,
+   and let a bounded onboard F Prime boot coordinator request `RADIO_STATUS`
+   followed by one `RADIO_INIT`. A ground command cannot be the recovery
+   dependency because a wedged RF link cannot deliver that command.
+4. Replace the mutating preflight with stable, non-mutating device-type reads,
+   then call the existing RadioHead `radio.init()` path once. Do not patch the
+   vendored RadioHead or hardware-definition files for the MVP follow-up.
+5. Add a radio-ready guard to `available`, `recv`, `send`, and `linkStats` so a
+   failed or incomplete initialization cannot continue touching the radio.
+6. Record an init-in-progress marker before the potentially blocking call. If
+   the hardware watchdog resets during that stage, boot with the Pi/channel `2`
+   path alive, report `DEGRADED`, and do not automatically repeat the same
+   initialization loop.
+7. Add bounded channel `2` operations for status and explicit reinitialize;
+   optionally include one SDN cycle. Permit one deliberate recovery attempt,
+   then remain degraded until the next operator-approved attempt or power
+   cycle.
+8. Report ready state, exact init stage, watchdog/init-failure reason, attempt
+   count, and radio recovery result through counters, F Prime events, and
+   telemetry once communications are available.
+
+Acceptance:
+
+- the Pi and F Prime boot even when radio initialization fails or hangs;
+- a watchdog-reset init attempt cannot create an endless automatic loop;
+- channel `2` returns an honest ready/degraded state after Teensy recovery;
+- nominal capture/downlink behavior and packet-repair semantics are unchanged;
+- focused local/channel-2 tests, both Teensy builds, the F Prime test/build
+  gates, a 10-20-cycle cold-boot HIL soak, and one safe recovery HIL case pass.
+
+Do not simply reconnect `commsApp.run` at its current full rate: it polls and
+emits telemetry every tick and was intentionally removed from the RF MVP rate
+group. Use a boot-only or otherwise explicitly paced coordinator.
+
+#### Follow-up 2 — Reconcile Receiver Status After USB Reconnect
+
+**Context:** After the powered-off ground antenna swap and USB reconnect, the
+payload receiver UI temporarily labeled completed product/transfer 5 as
+`receiving` while still displaying `1,100/1,100`, zero missing packets, and
+`crc_ok=true`. The receiver currently treats any retained non-null transfer ID
+as an active transfer when it handles a new `ready` event. This is stale UI
+state, not RF corruption.
+
+Plan:
+
+1. Determine active transfer state from terminal/incomplete evidence rather
+   than `transfer_id != null` alone.
+2. On reconnect, preserve `complete`, `partial`, or `failed` for a terminal run
+   while separately setting the serial connection state to connected/ready.
+3. Change to `receiving` only for a genuinely incomplete checkpoint or a new
+   transfer-start/resume event.
+4. Add a regression covering the observed sequence: exact completion, USB
+   reconnect, `ready`, terminal label retained, then a new header changes the
+   UI to receiving.
+
+Acceptance: a reconnect never presents a CRC-complete transfer as actively
+receiving, and the next fresh product still replaces the prior presentation
+without restarting the UI.
+
+#### Follow-up 3 — Temperature Hover Overlay for Archived History Images
+
+**Context:** The live thermal preview already loads its CSV and reports the
+pixel temperature under the pointer. The selected history detail currently
+shows only the archived PNG even though its archived CSV URL is already
+available.
+
+Plan:
+
+1. Reuse one thermal-grid loader and coordinate-mapping helper for the live
+   preview and the large selected history image.
+2. Show an overlay tooltip on the history image with temperature and row/column;
+   show `No data` for missing/white pixels.
+3. Keep the small history-list thumbnails passive; apply inspection only to the
+   selected full image.
+4. Preserve correct coordinate mapping when the image is responsively scaled.
+
+Acceptance: hovering a selected archived image displays the value from that
+run's CSV at the correct pixel without affecting history selection or mobile
+layout.
+
+#### Follow-up 4 — Boot Link Acquisition and GDS RSSI Visibility
+
+**Context:** The satellite channel `2` RF-statistics response and F Prime comms
+driver already carry `last_rssi_dbm`, but the MVP does not provide a clear,
+fresh, operator-facing link-strength indication. An RSSI register read before a
+real received packet is normally a noise-floor/instantaneous measurement, not
+proof of end-to-end link strength, so the UI must not present it as a valid
+link sample.
+
+Plan:
+
+1. After the Pi-first radio initialization reaches `READY`, start a bounded
+   boot link-acquisition step and request the local channel `2` RF status.
+2. Treat RSSI as `UNKNOWN` until the satellite radio receives a valid packet.
+   After a successful PING/status exchange, publish the satellite's most recent
+   receive RSSI, validity, and sample age through F Prime telemetry.
+3. Expose a plainly labeled GDS indication such as `Satellite RX RSSI (uplink)`
+   with `UNKNOWN`, `FRESH`, and `STALE` semantics. Do not imply that this is the
+   ground receiver's downlink RSSI.
+4. Retain counters and PING success as the primary link-health evidence; RSSI
+   supplements them and does not replace packet/repair/error evidence.
+5. If ground-side downlink RSSI is later required, plan a separate ground-bridge
+   metadata path rather than silently mixing it with satellite receive RSSI.
+
+Acceptance: a normal boot produces either an honest unknown/no-packet state or
+a timestamped RSSI from a verified received packet, and GDS never displays a
+stale/default value as current link strength.
+
+#### Follow-up 5 — Visible Teensy/F Prime Fault LED Patterns
+
+**Context:** The OBC exposes the Teensy LED and the Raspberry Pi activity LED,
+which are useful during field work when serial logs or SSH are not immediately
+visible. Normal radio traffic already influences the Teensy LED, but there is
+no distinct visual indication for terminal bridge errors, impending
+software-requested resets, or a previous watchdog reset.
+
+Plan:
+
+1. Define and document a small non-conflicting LED contract: retain normal
+   activity behavior, use a rapid Teensy blink for a detected terminal/fatal
+   bridge error, and use a recognizable diagnostic burst after boot when the
+   watchdog-reset flag is present.
+2. Before an intentional software-requested watchdog reset, blink rapidly for
+   a short bounded grace period and record the reset reason. Do not delay a
+   safety-critical reset indefinitely for LED presentation.
+3. Be explicit that firmware blocked inside an unbounded call cannot reliably
+   execute a pre-reset blink. For that case, use the post-watchdog boot pattern
+   and retained reset/init-stage reason.
+4. Inspect current OBC wiring and Linux ownership before assigning the Pi
+   activity LED. Prefer using it only as a Pi/F Prime alive indicator; do not
+   disable storage/activity behavior or repurpose an unavailable LED blindly.
+5. Document the final patterns in the operator runbook so a field operator can
+   distinguish normal RF traffic, Pi/F Prime alive, detected fatal error, and
+   previous watchdog recovery without opening a serial console.
+
+Acceptance: focused tests or controlled HIL injection demonstrate the normal,
+detected-fatal, intentional-reset, and post-watchdog patterns; the Pi stays
+powered during a radio-only fault; and the patterns do not interfere with RF
+timing, watchdog servicing, or normal activity indication.
+
+These are planned tasks only. Do not implement them during the current outdoor
+range campaign. After range evidence is captured, implement and validate them
+as small, independently reviewable changes rather than one combined refactor.
 
 For every case record:
 
