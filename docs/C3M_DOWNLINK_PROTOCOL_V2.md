@@ -1,4 +1,4 @@
-# C3M Reliable Payload Protocol N3 — Design Proposal
+# C3M Downlink Protocol v2 — Design Proposal
 
 ## Status
 
@@ -7,10 +7,17 @@ document is a concrete proposal for WP3–WP6 of the
 [RF reliability hardening plan](C3M_RF_RELIABILITY_HARDENING_PLAN_2026-07-14.md).
 It does not mark any work package or acceptance gate complete.
 
+Repository history contains no implemented `N1` payload wire protocol. The
+current `N2` magic was the first custom channel-1 payload protocol and appears
+to have been named for the Neutron-2 project. This successor design is named
+**C3M Downlink Protocol v2**, abbreviated **C3M-DL v2**, with proposed two-byte
+wire magic `C2` (`0x43 0x32`). It is the second protocol design in this lineage,
+not a Neutron-3 mission or a third implemented generation.
+
 ## BLUF
 
-N3 keeps channel 0 as the control plane and channel 1 as bulk payload, but adds
-the contracts missing from N2:
+C3M-DL v2 keeps channel 0 as the control plane and channel 1 as bulk payload,
+but adds the contracts missing from N2:
 
 - a restart-aware transfer identity
 - distinct transmit and ground-verified completion
@@ -19,16 +26,17 @@ the contracts missing from N2:
 - bounded half-duplex ownership windows
 - explicit expiry and honest partial outcomes
 
-N3 uses a distinct `N3` magic and remains within the existing 44-byte RF
-segment payload. The ground receiver must decode N2 and N3 before flight is
-allowed to transmit N3. N2 completion must be labeled
-`LEGACY_UNVERIFIED_COMPLETE`; it must never be presented as N3 ground-verified
-completion.
+C3M-DL v2 uses distinct `C2` magic and remains within the existing 44-byte RF
+segment payload. The ground receiver must decode N2 and C3M-DL v2 before flight
+is allowed to transmit C3M-DL v2. N2 completion must be labeled
+`LEGACY_UNVERIFIED_COMPLETE`; it must never be presented as C3M-DL v2
+ground-verified completion.
 
 ## Invariants
 
 1. Channel `0` remains bounded command, event, and telemetry traffic.
-2. Channel `1` carries N3 payload data, status, repair, and final confirmation.
+2. Channel `1` carries C3M-DL v2 payload data, status, repair, and final
+   confirmation.
 3. A packet or repair bit is retired only after the local copy-and-status output
    reports `LOCAL_ACCEPTED`; enqueue or attempted transmission is not local
    acceptance and local acceptance is not RF delivery.
@@ -57,16 +65,16 @@ all preceding bytes in that packet.
 | Whole-product proof | CRC-32/IEEE (`CRC-32/ISO-HDLC`) | reflected polynomial `0xEDB88320`, init `0xFFFFFFFF`, refin/refout true, xorout `0xFFFFFFFF`; `"123456789" -> 0xCBF43926` |
 
 CRC-32 is computed over exactly `totalBytes` source bytes in ascending byte
-order. It replaces the current whole-product CRC-16 as the N3 identity and
-completion proof. Packet CRC-16 remains local corruption detection.
+order. It replaces the current whole-product CRC-16 as the C3M-DL v2 identity
+and completion proof. Packet CRC-16 remains local corruption detection.
 
 ### Common prefix
 
-Every N3 packet begins with this six-byte prefix:
+Every C3M-DL v2 packet begins with this six-byte prefix:
 
 | Offset | Size | Field | Value |
 | ---: | ---: | --- | --- |
-| 0 | 2 | `magic` | `0x4E 0x33` (`N3`) |
+| 0 | 2 | `magic` | `0x43 0x32` (`C2`) |
 | 2 | 1 | `type` | packet type below |
 | 3 | 2 | `bootEpoch` | persistent flight boot epoch |
 | 5 | 1 | `transferId` | transfer number within the epoch |
@@ -133,8 +141,8 @@ current ground-owned window.
   smaller.
 - `transferId` allocation is `1..255` with no reuse in one epoch. Before a
   256th transfer is accepted, flight must atomically advance `bootEpoch` or
-  inhibit N3; it must never silently wrap the transfer ID.
-- `bootEpoch` is compared only for equality. N3 is inhibited before an epoch
+  inhibit C3M-DL v2; it must never silently wrap the transfer ID.
+- `bootEpoch` is compared only for equality. C3M-DL v2 is inhibited before an epoch
   value would be reused unless an approved namespace-rotation policy or wider
   field has been deployed.
 - `requestId`, `confirmId`, and `leaseId` are nonzero. They are not reused while
@@ -144,7 +152,7 @@ current ground-owned window.
 ### Durable flight checkpoint
 
 Flight restart recovery requires more than a persistent epoch counter. Before
-the first N3 packet of an accepted product, flight atomically checkpoints:
+the first C3M-DL v2 packet of an accepted product, flight atomically checkpoints:
 
 - schema version and complete identity
 - source descriptor, transfer-owned immutable source identity, canonical source
@@ -207,8 +215,9 @@ crc16 U16
 duplicate packet with identical bytes is counted and ignored. A duplicate with
 different bytes is a session error and must not overwrite persisted data.
 
-The 33-byte payload is two bytes smaller than N2 because N3 adds `bootEpoch`.
-A 38,480-byte C3M product therefore uses 1,167 data packets rather than 1,100.
+The 33-byte payload is two bytes smaller than N2 because C3M-DL v2 adds
+`bootEpoch`. A 38,480-byte C3M product therefore uses 1,167 data packets rather
+than 1,100.
 
 #### `TRANSMIT_STATUS` — 27 bytes
 
@@ -548,9 +557,9 @@ clock/implementation guard. All timers use local monotonic clocks; peers do not
 compare deadlines. A fresh request is retransmitted with bounded backoff until
 the peer has also returned to `CONTROL` and grants it.
 
-Each bridge validates the full N3 `PHASE_CONTROL` layout and packet CRC before
-changing phase; other N3 interpretation remains above the bridge. Each peer
-independently returns its local policy and channel 1 to `CONTROL`/held after a
+Each bridge validates the full C3M-DL v2 `PHASE_CONTROL` layout and packet CRC
+before changing phase; other C3M-DL v2 interpretation remains above the bridge.
+Each peer independently returns its local policy and channel 1 to `CONTROL`/held after a
 lease expiry, conflict, or illegal transition. The protective hold and bounded
 request retry prevent an earlier local timeout from granting application-data
 ownership while the peer may still be transmitting. A valid fresh
@@ -584,12 +593,12 @@ ground in `CRC_VALID_ACK_PENDING` or `COMPLETE` grants the matching lease.
 
 `PayloadDownlinkApp` remains active, and its `run` port remains `async ... drop`.
 The rate group only enqueues that tick; the component's active thread is the
-sole N3 state owner and executes at most one bounded burst directly in the run
+sole C3M-DL v2 state owner and executes at most one bounded burst directly in the run
 handler. It does not enqueue a second work item onto its own queue. The handler
 stops scheduling at 15 frames or 650 ms and must return before the one-second
 tick period in target-Pi qualification.
 
-Synchronous receive callbacks do not mutate N3 state. They validate only the
+Synchronous receive callbacks do not mutate C3M-DL v2 state. They validate only the
 outer size needed for safe copying, copy complete control packets into a fixed,
 mutex-protected mailbox, and return promptly. The active thread drains that
 mailbox and performs identity, page, phase, and state transitions. Mailbox
@@ -617,7 +626,7 @@ is:
 
 The pinned `ByteStreamDriverModel` SDD is internally inconsistent: its
 synchronous prose says ownership returns to the caller, while its status table
-says `OP_OK` and `OTHER_ERROR` transfer ownership to the driver. N3 adopts the
+says `OP_OK` and `OTHER_ERROR` transfer ownership to the driver. C3M-DL v2 adopts the
 stricter table until the pinned contract is clarified. The current
 `LinuxUartDriver` performs one synchronous `write()` and does not retain or
 deallocate the send pointer, but that implementation detail does not make a
@@ -627,7 +636,7 @@ implement the corresponding return/deallocation lifecycle.
 
 The copy-before-return rule resolves the `PayloadDownlinkApp` to
 `UartChannelMux` boundary only. The mux's wrapped-buffer handoff to the Linux
-UART driver must be separately made ownership-correct. Before N3 can be
+UART driver must be separately made ownership-correct. Before C3M-DL v2 can be
 enabled, approval must select and test either a project-local synchronous
 copy/write adapter with an explicit caller-ownership contract, or pool-owned
 wrapped buffers with an audited deallocation path. Qualification must prove no
@@ -636,51 +645,51 @@ leak, stale pointer, or reuse-before-write under every result.
 `LOCAL_ERROR` is delivery-indeterminate: Linux `write()` may emit a strict
 prefix before returning an error. It never retires a nominal cursor or repair
 bit. The UART path must recover and resynchronize before retransmitting the
-complete packet; N3 duplicate handling makes that full retransmission safe.
+complete packet; C3M-DL v2 duplicate handling makes that full retransmission safe.
 
 Proposed ownership:
 
 | Owner | Responsibility |
 | --- | --- |
-| `PayloadDownlinkApp` | N3 state, identity, CRC-32, burst cursor, repair bitset, timeouts, confirmation |
+| `PayloadDownlinkApp` | C3M-DL v2 state, identity, CRC-32, burst cursor, repair bitset, timeouts, confirmation |
 | `CommsApp` | duplicate/conflict admission and mission completion only after ground verification |
 | channel-1 output/UART adapter | synchronous copy-before-return and explicit local-accepted/busy/failure result |
-| `UartChannelMux` | channel framing and bounded forwarding; no reinterpretation of N3 identity |
-| ground receiver/web app | dual N2/N3 decode, durable bitmap/bytes, repair/status/confirm, honest artifacts |
+| `UartChannelMux` | channel framing and bounded forwarding; no reinterpretation of C3M-DL v2 identity |
+| ground receiver/web app | dual N2/C3M-DL v2 decode, durable bitmap/bytes, repair/status/confirm, honest artifacts |
 | ground and satellite Teensy bridges | RF frame priority, phase lease, turnaround guard, counters |
 
 ## Compatibility and Migration
 
-N3 is not silently compatible with N2. Compatibility is explicit:
+C3M-DL v2 is not silently compatible with N2. Compatibility is explicit:
 
-- `N2` remains `0x4E 0x32`; `N3` is `0x4E 0x33`.
-- Ground selects the decoder by magic and never combines N2 and N3 packets.
+- `N2` remains `0x4E 0x32`; C3M-DL v2 uses `C2` (`0x43 0x32`).
+- Ground selects the decoder by magic and never combines N2 and C3M-DL v2 packets.
 - An N2 CRC-valid product is labeled `LEGACY_UNVERIFIED_COMPLETE` because N2
   has no final ground-confirmation/ACK contract.
-- The 44-byte segment maximum is unchanged, so N3 does not require additional
+- The 44-byte segment maximum is unchanged, so C3M-DL v2 does not require additional
   RF fragmentation.
 - CRC-32 metadata must be computed end to end; the current `U32 sourceCrc`
-  carrying a CRC-16 value cannot be treated as an N3 CRC-32 without migration.
+  carrying a CRC-16 value cannot be treated as a C3M-DL v2 CRC-32 without migration.
 
 Proposed rollout order:
 
 1. Land the duplicate-start guard and move payload work out of the blocking
    rate-group path without changing the wire protocol.
-2. Add N2/N3 dual decode and durable N3 identity storage to the ground receiver
-   first; keep N2 as the transmitted default.
+2. Add N2/C3M-DL v2 dual decode and durable C3M-DL v2 identity storage to the
+   ground receiver first; keep N2 as the transmitted default.
 3. Add the expanded flight states; change `CommsApp` to clear only verified
    completion.
 4. Add the explicit copy-and-status output contract, fixed additive repair
-   bitset, N3 codec, and CRC-32 behind a disabled feature flag.
-5. Pass all deterministic local N2 regressions and N3 failure tests, then
-   enable N3 only in local emulation.
+   bitset, C3M-DL v2 codec, and CRC-32 behind a disabled feature flag.
+5. Pass all deterministic local N2 regressions and C3M-DL v2 failure tests, then
+   enable C3M-DL v2 only in local emulation.
 6. Implement and validate the phase lease on the ground bridge first, then the
    satellite bridge. Do not change RF PHY or pacing in the same patch.
 7. Only after local gates pass, proceed through the focused indoor HIL matrix;
    outdoor qualification remains a later gate.
 
 Rollback is the feature flag back to N2, with the UI explicitly showing legacy
-unverified semantics. Rollback must not reinterpret an N3 partial as N2.
+unverified semantics. Rollback must not reinterpret a C3M-DL v2 partial as N2.
 
 ## Required Telemetry and Durable Evidence
 
@@ -718,7 +727,7 @@ run artifact.
 
 ## Deterministic Local Test Gates
 
-No build or happy-path-only run approves N3. Before any flash, local tests must
+No build or happy-path-only run approves C3M-DL v2. Before any flash, local tests must
 cover:
 
 | Area | Required cases |
@@ -742,19 +751,19 @@ products require CRC-32 equality, and no failure path emits verified complete.
 
 Nothing below is approved merely because it is written here:
 
-1. Freeze the `N3` magic, all ten packet type values/layouts, little-endian
+1. Freeze the `C2` magic, all ten packet type values/layouts, little-endian
    encoding, and 33-byte data capacity.
 2. Approve `PHASE_CONTROL`, flight-only initiation from `CONTROL`, provisional
    initial ground identity, lease-ID chain rules, same-owner and owner-changing
    request/grant/yield transitions, link-layer ACK exception, and the bridge's
-   limited N3 validation responsibility.
+   limited C3M-DL v2 validation responsibility.
 3. Approve canonical paged repair snapshots: 30-byte page bitmap, page
    indexing/count, 61,200-packet single-snapshot cap, lease-expiry behavior,
    request-ID retransmission/allocation, and additive handling of incomplete or
    reordered snapshots.
 4. Select durable `bootEpoch` storage and approve epoch/transfer/request/
    confirm/lease ID exhaustion, inhibition, namespace rotation, and corruption
-   policy. N3 must remain inhibited whenever safe non-reuse cannot be proven.
+   policy. C3M-DL v2 must remain inhibited whenever safe non-reuse cannot be proven.
 5. Approve the durable flight checkpoint schema, immutable source retention and
    fingerprint, atomic update/recovery behavior, verified ACK-service
    tombstone, and fail-closed local-only outcome when an old identity or time or

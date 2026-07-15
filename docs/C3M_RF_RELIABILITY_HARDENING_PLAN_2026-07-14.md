@@ -29,23 +29,26 @@ package complete from a build or happy-path run alone.
 | Ground bridge fail-safe behavior | In progress | Local bounded RF TX and honest USB-write behavior implemented; HIL proof remains |
 | Receiver persistence and reconnect | In progress | Local restart/re-enumeration recovery implemented; HIL proof remains |
 | Flight transfer completion contract | In progress | N2 admission, repair, and local-delivery hardening implemented; ground verification remains |
-| Downlink goodput and channel-0 policy | Planned | Remove redundant progress events and reduce routine telemetry without retiming the scheduler |
-| Explicit half-duplex operation | Design drafted | N3 phase/lease proposal requires review and implementation |
+| Downlink goodput and channel-0 policy | In progress | Automatic progress events removed locally; routine telemetry policy and HIL measurement remain |
+| Explicit half-duplex operation | Design drafted | C3M-DL v2 phase/lease proposal requires review and implementation |
 | Controlled failure matrix | In progress | Local fault cases pass; physical HIL cases remain |
 | Outdoor qualification | Not started | Three consecutive qualified transfers at each geometry |
 
 ### Protocol Naming In Plain English
 
-- **N2** is the payload wire protocol implemented today. Its packets begin with
-  the bytes `N2`; it provides indexed data, a whole-product CRC-16, and
-  selective repair. It remains tomorrow's executable protocol.
-- **N3** is only the proposed third revision of this project's payload wire
-  protocol. It is not F Prime, CCSDS, RadioHead, a board, or a separate radio.
+- **N1 is not a payload wire protocol in this repository.** `N1Legacy` names a
+  legacy Neutron-1 payload hardware driver/adapter.
+- **N2** is the first custom channel-1 payload wire protocol found in repository
+  history. Its packets begin with `N2`, apparently because it was introduced
+  for the Neutron-2 project, not because a prior `N1` packet protocol existed.
+  It provides indexed data, a whole-product CRC-16, and selective repair, and
+  remains the executable protocol.
+- **C3M Downlink Protocol v2 (C3M-DL v2)** is the renamed July 14 design
+  proposal for an incompatible successor to the deployed `N2` magic. It uses
+  proposed `C2` wire magic. It is not F Prime, CCSDS, RadioHead, a board, a
+  Neutron-3 mission, or a third implemented generation.
   The proposal adds restart-aware identity, ground-proven completion, CRC-32,
   durable repair state, and explicit half-duplex ownership windows.
-- N3 is deliberately a different wire version because those guarantees cannot
-  be added honestly while pretending old N2 receivers understand them. It is
-  design-only and must not distract from measuring and hardening N2 first.
 
 ### Live Bench At Plan Start
 
@@ -533,21 +536,19 @@ Acceptance:
 ### WP3-A — Downlink goodput and channel-0 load policy
 
 The separate channel-1 payload receiver GUI is now the primary per-packet and
-percentage-progress display. The current flight component still emits a
-channel-0 `PayloadDownlinkProgress` activity event at each nominal 10-percent
-boundary, replays 100-percent completion events, and writes progress/status
-telemetry every five 1 Hz ticks while downlinking. Those events were useful
-when GDS was the only progress display, but they now duplicate the receiver's
-better ground-truth view and compete for the same half-duplex RF path.
+percentage-progress display. The automatic channel-0 progress events were
+useful when GDS was the only progress display, but they duplicated the
+receiver's better ground-truth view and competed for the same half-duplex RF
+path.
 
 Decision for the next implementation pass:
 
-- [ ] Remove automatic 10-percent `PayloadDownlinkProgress` events and the
+- [x] Remove automatic 10-percent `PayloadDownlinkProgress` events and the
       repeated 100-percent completion summaries from the normal RF profile.
 - [ ] Keep sparse authoritative lifecycle events: start, state transition,
       warning/failure, repair requested, locally transmitted, ground verified
       when supported, abort, and expiry.
-- [ ] Keep `GET_PAYLOAD_STATUS` as an explicit operator query and retain
+- [x] Keep `GET_PAYLOAD_STATUS` as an explicit operator query and retain
       low-rate state/error/transfer telemetry as a fallback when the channel-1
       GUI is unavailable.
 - [ ] During bulk downlink, reduce routine payload telemetry to start, a slow
@@ -588,9 +589,9 @@ Goodput optimization order:
 4. Tune the current 18-frame per-run ceiling only after HIL confirms queue,
    cycle-slip, retry, and command-latency behavior.
 5. Evaluate wire-efficiency changes only after the reliability gates pass.
-   N2 carries 35 data bytes per payload packet; the N3 draft carries 33 because
-   it spends two bytes on restart-safe identity, so N3 is a reliability design,
-   not automatically a raw-throughput improvement.
+   N2 carries 35 data bytes per payload packet; the C3M-DL v2 draft carries 33
+   because it spends two bytes on restart-safe identity, so C3M-DL v2 is a
+   reliability design, not automatically a raw-throughput improvement.
 
 Removing the progress events alone will probably provide a modest improvement,
 not the full outdoor fix. The larger reliability gain comes from explicit
@@ -608,8 +609,8 @@ second including retries—not just raw transmitted packet rate.
       last transition reason.
 - [ ] Define bounded recovery if either side misses a phase transition.
 
-The design-only [N3 reliable payload protocol
-proposal](C3M_RELIABLE_PAYLOAD_PROTOCOL_N3.md), committed as `87eca99`, defines
+The design-only [C3M-DL v2 reliable payload protocol
+proposal](C3M_DOWNLINK_PROTOCOL_V2.md), committed as `87eca99`, defines
 provisional initial identity, request/grant/yield leases, same-owner and
 owner-changing transitions, turnaround quiet time, reserved metadata/yield
 slots, additive repair snapshots, final CRC confirmation/ACK recovery, durable
@@ -785,19 +786,20 @@ Add entries after work begins. Keep them short and link the durable artifact.
 | 2026-07-14 19:35 | WP3 bounded payload runs | PASS local | Commit `a1133a7`; one-second work is capped at 18 frames; F Prime and both Teensy workspaces built. Target-Pi timing remains open. |
 | 2026-07-14 19:57 | WP2/WP3 integration | PASS local | Commit `382ea51`; 52 Python/emulation tests, native build, 6/6 sanitized suites, 14/10/2 focused component cases, both Teensy builds, and exact real-sample Lepton local round trip passed. |
 | 2026-07-14 20:02 | ARMv6 cross-build | PASS local | Commit `9b163b2` fixed the cross-only FPP dependency defect. Local-only Pi build verified ARMv6KZ, VFPv2, `/lib/ld-linux-armhf.so.3`; binary SHA-256 `2f6f9206be30ec3aefb8fcabb3865f89b19247de598dba6d2166b13ad6a9d57e`. |
-| 2026-07-14 20:02 | N3 protocol design | Design only | Commit `87eca99`; audited verified-completion, restart identity, additive repair, and half-duplex lease proposal. Not implemented or approved. |
-| 2026-07-14 | Downlink goodput review | Design only | Current 10-percent progress events, five-second payload telemetry, shared 1 Hz scheduling, `Svc::TlmChan`, and optional `Svc::TlmPacketizer` runtime controls reviewed. KISS policy added; no code changed. |
+| 2026-07-14 20:02 | C3M-DL v2 protocol design | Design only | Commit `87eca99`; audited verified-completion, restart identity, additive repair, and half-duplex lease proposal. Not implemented or approved. |
+| 2026-07-14 | Downlink goodput review | Complete | Ten-percent progress events, five-second payload telemetry, shared 1 Hz scheduling, `Svc::TlmChan`, and optional `Svc::TlmPacketizer` runtime controls reviewed. KISS policy adopted. |
+| 2026-07-14 20:28 | WP3-A progress traffic | PASS local | Commit `d195d19`; automatic 10-percent and repeated completion-summary events removed, progress telemetry and explicit `GET_PAYLOAD_STATUS` fallback retained. All 14 focused tests, 52 Python/emulation tests, native build, 6/6 sanitized suites, and exact Lepton round trip passed. HIL goodput and command-latency measurement remain open. |
 
 ## Start Here Tomorrow
 
-Home-only work ended 2026-07-14 20:02 HST. No hardware was queried, flashed,
+Home-only work ended 2026-07-14 20:28 HST. No hardware was queried, flashed,
 deployed, or assumed connected from home. The last bench identities and runtime
 state above are historical and must be verified live tomorrow.
 
 Local source and artifacts:
 
-- Branch: `codex/c3m-rf-reliability-hardening`; implementation/design commits
-  are through `9b163b2` before this documentation update.
+- Branch: `codex/c3m-rf-reliability-hardening`; implementation commits are
+  through `d195d19`; this documentation update renames the design protocol.
 - Ground HEX SHA-256:
   `7728412b83e7b9c55bf7106018b13d6e81bf528e96d108e21f743d3b91cd0017`.
 - Satellite HEX SHA-256:
@@ -807,8 +809,9 @@ Local source and artifacts:
 - Local validation: 52 Python/emulation tests, native build, 6/6 sanitized
   suites, both Teensy builds, exact sample Lepton round trip, and ARMv6KZ/VFPv2
   cross-build all pass.
-- N3 is a reviewed design proposal only. Tomorrow's executable remains N2 and
-  must not be described as ground-verified completion or explicit half-duplex.
+- C3M-DL v2 is a reviewed design proposal only. Tomorrow's executable remains
+  N2 and must not be described as ground-verified completion or explicit
+  half-duplex.
 
 Resume in this order:
 
@@ -844,5 +847,5 @@ Resume in this order:
 10. Preserve the full proof bundle and update this document after each case.
 
 Do not claim HIL-10/HIL-11, ground-verified completion, or explicit half-duplex
-qualification until an approved N3 implementation exists. Outdoor/Yagi testing
+qualification until an approved C3M-DL v2 implementation exists. Outdoor/Yagi testing
 remains after the controlled indoor matrix, not before it.
