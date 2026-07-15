@@ -136,17 +136,17 @@ for this demo. Its mission-grade details remain in Git history at `87eca99` and
 
 | Area | Local status | HIL status |
 | --- | --- | --- |
-| Nominal single capture/downlink/decode | Passed | Passed with current artifacts: product/transfer 1, 38,480 bytes, 1,100/1,100, exact source/ground SHA-256, 64.8 s |
-| Bounded Teensy RF TX timeout/retry/recovery | Passed host tests and builds | Needs bench injection |
-| Honest ground USB writes and independent queues | Passed host tests and build | Current firmware flashed; channel-0 queue/drop/backpressure counters stayed flat after GDS opened; focused stop/restart remains |
-| Persistent/re-enumerating ground receiver | Passed focused tests | Needs unplug/process-restart proof |
-| Duplicate start and bounded F Prime payload work | Passed component tests | Needs target timing proof |
+| Nominal single capture/downlink/decode | Passed | Passed before and after the bridge fix; current post-fix product/transfer 1 was 38,480 bytes, 1,100/1,100, exact source/ground SHA-256, 65.1 s |
+| Bounded Teensy RF TX timeout/retry/recovery | Passed host tests and builds | Focused injected policy passed; direct physical `waitPacketSent()` fault injection is N/A without an MVP-only firmware hook |
+| Honest ground USB writes and independent queues | Passed host tests and build | Six-second channel-0 reader stop/restart passed with counted backpressure/recovery, no new discard, and recovered PING; full USB reconnect remains |
+| Persistent/re-enumerating ground receiver | Passed focused tests | Process restart passed from a 253/1,100 checkpoint; physical USB reconnect remains |
+| Duplicate start and bounded F Prime payload work | Passed component tests | Passed on target: duplicate preserved active product/progress, one start event, CRC complete, no F Prime restart |
 | Additive N2 repair | Passed component tests | Passed one natural one-round repair in the 3/3 nominal run; focused fade remains |
 | Automatic progress-event removal | Passed component/full local validation | Passed observation: zero automatic progress events; five PING responses delivered during four bulk transfers |
 | Ground-side local reconstruction | Passed: real receiver PTY/CRC/decode path | Passed physical channel-1 proof with four exact source/ground files and complete decode artifacts |
 | Repeated capture/downlink cycles | Passed: three cycles, one uninterrupted session | Passed: three new products/transfers, 3/3 CRC-valid, 64.7-65.2 s, no process/hardware restart |
 | Deterministic packet-loss repair | Passed: dropped DATA 100, retry/repair/CRC | Needs brief-RF-fade proof |
-| Permanent loss then clean next cycle | Passed: honest 1,099/1,100 partial, next transfer exact | Needs sustained-fade proof |
+| Permanent loss then clean next cycle | Passed: honest 1,099/1,100 partial, next transfer exact | Local proof retained; a sustained physical fade is not a separate current MVP matrix gate |
 | Outdoor/Yagi behavior | Not locally provable | Deferred until bench passes |
 
 ## What Existing Evidence Proved
@@ -372,7 +372,7 @@ Re-query live USB identities before every future flash.
 | 2026-07-14 21:01 | Three-cycle ground-copy proof | PASS local | `tools/logs/c3m_local_demo_20260714_205808`; products/transfers 1-3, three 38,480-byte/1,100-packet receiver files, exact source/ground SHA-256 pairs, 160x120 decode |
 | 2026-07-14 21:05 | Deterministic DATA loss and N2 repair | PASS local | `tools/logs/c3m_local_demo_20260714_210435`; dropped index 100 once, receiver retry `start=100 count=1`, repair completed, CRC/content/hash/decode passed |
 | 2026-07-14 21:10 | Complete post-integration local gate | PASS local | 67 Python/bridge tests; fresh native build; 6/6 F Prime suites; `tools/logs/c3m_local_demo_20260714_210708` three-cycle ground-copy proof; both Teensy builds passed |
-| 2026-07-14 21:11 | Pi Zero W target build | PASS local | ARMv6KZ, VFPv2, `/lib/ld-linux-armhf.so.3`; binary SHA-256 `e0176a21...ff814b`; deployment/HIL still pending |
+| 2026-07-14 21:11 | Pi Zero W target build | PASS local | ARMv6KZ, VFPv2, `/lib/ld-linux-armhf.so.3`; binary SHA-256 `e0176a21...ff814b`; subsequently deployed and verified in the July 15 HIL campaign |
 | 2026-07-14 21:15 | Mid-transfer receiver process restart | PASS local | `tools/logs/c3m_local_demo_20260714_211416`; replacement resumed 55/1,100, retried two handoff gaps, completed CRC/decode, source/ground SHA-256 `55392fb9...ec63ac` |
 | 2026-07-14 21:27 | Permanent loss then clean next capture | PASS local | `tools/logs/c3m_local_demo_20260714_212447`; transfer 1 saved 1,099/1,100 partial with missing index 100 after bounded retries; transfer 2 completed 1,100/1,100 and exact source/ground SHA-256 `a0f7be74...a2bbad2` without process restart |
 | 2026-07-15 10:15 | HIL-MVP-1 startup | PASS HIL | Ground `usb:100000`, satellite `usb:2100000`; direct UVC frame nonblank; GDS PING 4245 and SOH visible; Pi PID 706 / zero restarts |
