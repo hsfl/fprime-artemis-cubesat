@@ -38,6 +38,9 @@ class CommsApp final : public CommsAppComponentBase {
     void REQUEST_LINK_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void PING_LINK_RSSI_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void requestDriverStatus();
+    bool pendingRequestMatchesActive() const;
+    void clearActiveDownlink();
+    void emitDownlinkTelemetry();
 
     U32 m_linkState;
     I32 m_rssiDbm;
@@ -50,6 +53,12 @@ class CommsApp final : public CommsAppComponentBase {
     U32 m_pendingSourceCrc;
     U32 m_linkPollCount;
     U32 m_activeDownlinkBytes;
+    U32 m_activeProductId;
+    Components::ScienceProductSource m_activeSourceKind;
+    Fw::String m_activeSourcePath;
+    U32 m_activeSourceCrc;
+    U32 m_activeTransferId;
+    U32 m_downlinkRequestDisposition;
     U32 m_lastPayloadDownlinkState;
     bool m_downlinkActive;
 };

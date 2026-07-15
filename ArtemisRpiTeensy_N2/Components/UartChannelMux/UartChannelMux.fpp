@@ -6,7 +6,7 @@ module Components {
         guarded input port ccsdsSendIn: Drv.ByteStreamSend
 
         @ Payload packets from PayloadDownlinkApp, wrapped as channel 1.
-        guarded input port payloadSendIn: Fw.BufferSend
+        guarded input port payloadSendIn: Components.PayloadPacketSend
 
         @ Local Teensy subsystem RPC packets, wrapped as channel 2.
         guarded input port localSendIn: Fw.BufferSend

@@ -5,6 +5,7 @@ namespace Components {
 UartChannelMuxTester::UartChannelMuxTester()
     : UartChannelMuxGTestBase("UartChannelMuxTester", MAX_HISTORY_SIZE),
       component("UartChannelMux"),
+      m_drvSendStatus(Drv::ByteStreamStatus::OP_OK),
       m_txFrames(),
       m_ccsdsFrames(),
       m_payloadFrames(),
@@ -25,7 +26,7 @@ Drv::ByteStreamStatus UartChannelMuxTester::from_drvSendOut_handler(
     const U8* data = fwBuffer.getData();
     this->m_txFrames.push_back(std::vector<U8>(data, data + fwBuffer.getSize()));
     this->pushFromPortEntry_drvSendOut(fwBuffer);
-    return Drv::ByteStreamStatus::OP_OK;
+    return this->m_drvSendStatus;
 }
 
 void UartChannelMuxTester::from_ccsdsRecvOut_handler(
@@ -127,6 +128,31 @@ void UartChannelMuxTester::testWrapsAndRoutesChannelFrames() {
     for (FwSizeType i = 0; i < sizeof(payloadBytes); ++i) {
         EXPECT_EQ(this->m_payloadFrames[0][i], payloadBytes[i]);
     }
+}
+
+void UartChannelMuxTester::testPropagatesPayloadLocalAcceptanceStatus() {
+    U8 payloadBytes[] = {0x4E, 0x32, 0x02, 0x01};
+    const U8 originalFirstByte = payloadBytes[0];
+    Fw::Buffer payloadBuffer(payloadBytes, sizeof(payloadBytes));
+
+    this->m_drvSendStatus = Drv::ByteStreamStatus::OP_OK;
+    EXPECT_EQ(this->invoke_to_payloadSendIn(0, payloadBuffer),
+              Components::PayloadSendStatus::LOCAL_ACCEPTED);
+    payloadBytes[0] = 0U;
+    ASSERT_EQ(this->m_txFrames.size(), 1U);
+    EXPECT_EQ(this->m_txFrames[0][5], originalFirstByte);
+
+    this->m_drvSendStatus = Drv::ByteStreamStatus::SEND_RETRY;
+    EXPECT_EQ(this->invoke_to_payloadSendIn(0, payloadBuffer),
+              Components::PayloadSendStatus::LOCAL_RETRY);
+
+    this->m_drvSendStatus = Drv::ByteStreamStatus::OTHER_ERROR;
+    EXPECT_EQ(this->invoke_to_payloadSendIn(0, payloadBuffer),
+              Components::PayloadSendStatus::LOCAL_ERROR);
+    ASSERT_EVENTS_FrameDropped_SIZE(2);
+    ASSERT_TLM_FrameDrops(1, 2);
+    ASSERT_TLM_FramesTx_SIZE(1);
+    ASSERT_TLM_FramesTx(0, 1);
 }
 
 std::vector<U8> UartChannelMuxTester::makeFrame(U8 channel, const U8* payload, FwSizeType size) {

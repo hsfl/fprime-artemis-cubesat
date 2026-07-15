@@ -17,6 +17,7 @@ class UartChannelMuxTester final : public UartChannelMuxGTestBase {
     ~UartChannelMuxTester();
 
     void testWrapsAndRoutesChannelFrames();
+    void testPropagatesPayloadLocalAcceptanceStatus();
 
   private:
     void connectPorts();
@@ -34,6 +35,7 @@ class UartChannelMuxTester final : public UartChannelMuxGTestBase {
     static U16 crc16Ccitt(const U8* data, FwSizeType size);
 
     UartChannelMux component;
+    Drv::ByteStreamStatus m_drvSendStatus;
     std::vector<std::vector<U8> > m_txFrames;
     std::vector<std::vector<U8> > m_ccsdsFrames;
     std::vector<std::vector<U8> > m_payloadFrames;

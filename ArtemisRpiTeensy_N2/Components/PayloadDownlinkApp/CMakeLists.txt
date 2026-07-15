@@ -8,6 +8,7 @@ register_fprime_library(
     DEPENDS
         Components_LinkCfg
         Components_Types
+        Os
 )
 
 set(UT_SOURCE_FILES
@@ -19,6 +20,7 @@ set(UT_SOURCE_FILES
 set(UT_MOD_DEPS
     Components_LinkCfg
     Components_Types
+    Os
     STest
 )
 

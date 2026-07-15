@@ -17,10 +17,14 @@ class CommsAppTester final : public CommsAppGTestBase {
 
     void testRejectsDownlinkWithoutScience();
     void testRequestsScienceDownlinkAndCompletionClearsState();
+    void testDuplicateAndConflictingActiveRequestsAreGuarded();
+    void testNewPendingProductStartsAfterActiveTerminalStatus();
+    void testStaleOrUncorrelatedStatusCannotEndActiveTransfer();
     void testDownlinkFailureReturnsBase();
     void testIgnoresPayloadStatusWhenInactive();
     void testDriverStatusPollingAndRssiPing();
     void testRunPublishesHealthFromLinkState();
+    void testInitializationFailureAndInvalidReissueDoNotWedge();
 
   private:
     void connectPorts();

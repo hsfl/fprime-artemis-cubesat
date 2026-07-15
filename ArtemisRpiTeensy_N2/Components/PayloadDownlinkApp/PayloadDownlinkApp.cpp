@@ -101,6 +101,7 @@ PayloadDownlinkApp::PayloadDownlinkApp(const char* const compName)
       m_retryRound(0),
       m_packetsMissing(0),
       m_lastError(0),
+      m_requestDisposition(REQUEST_ACCEPTED),
       m_nextProgressPercent(10),
       m_completionSummaryEventsRemaining(0),
       m_blobCrc(0),
@@ -109,11 +110,24 @@ PayloadDownlinkApp::PayloadDownlinkApp(const char* const compName)
       m_sourceReady(false),
       m_sourceBytes(0),
       m_sourcePath(),
+      m_requestedSourceKind(Components::ScienceProductSource::UNKNOWN),
+      m_requestedSourcePath(),
+      m_expectedSourceCrc(0),
       m_runTicks(0),
       m_lastTelemetryTick(0),
       m_retryPackets{},
       m_retryCount(0),
-      m_retryCursor(0) {
+      m_retryCursor(0),
+      m_controlMailboxMutex(),
+      m_controlMailbox{},
+      m_controlMailboxHead(0),
+      m_controlMailboxTail(0),
+      m_controlMailboxCount(0),
+      m_controlMailboxDrops(0),
+      m_controlPacketsInvalid(0),
+      m_controlMailboxHighWater(0),
+      m_reportedControlMailboxDrops(0),
+      m_reportedControlPacketsInvalid(0) {
     std::memset(this->m_packet, 0, sizeof(this->m_packet));
 }
 
@@ -128,27 +142,40 @@ void PayloadDownlinkApp::run_handler(FwIndexType portNum, U32 context) {
     static_cast<void>(portNum);
     static_cast<void>(context);
     this->m_runTicks += 1;
+    this->drainControlMailbox();
 
     const U32 packetsPerRun = LinkCfg::PAYLOAD_PACKETS_PER_RUN;
     const U32 retryPacketsPerRun = LinkCfg::PAYLOAD_RETRY_PACKETS_PER_RUN;
     const U32 totalPacketsPerRun = (packetsPerRun > retryPacketsPerRun) ? packetsPerRun : retryPacketsPerRun;
+    const U32 retryBudget =
+        (this->m_state == STATE_DOWNLINKING && retryPacketsPerRun >= totalPacketsPerRun)
+            ? (totalPacketsPerRun / 2U)
+            : retryPacketsPerRun;
     U32 packetsSentThisRun = 0;
     U32 retrySentThisRun = 0;
     while (packetsSentThisRun < totalPacketsPerRun &&
-           retrySentThisRun < retryPacketsPerRun &&
+           retrySentThisRun < retryBudget &&
            this->m_retryCursor < this->m_retryCount) {
-        if (!this->sendDataPacket(this->m_retryPackets[this->m_retryCursor])) {
+        const Components::PayloadSendStatus status =
+            this->sendDataPacket(this->m_retryPackets[this->m_retryCursor]);
+        if (status == Components::PayloadSendStatus::LOCAL_RETRY) {
+            this->emitTelemetry();
+            return;
+        }
+        if (status != Components::PayloadSendStatus::LOCAL_ACCEPTED) {
             this->failTransfer(6U, this->m_lastError);
             this->emitTelemetry();
             return;
         }
         this->m_retryCursor++;
+        this->m_packetsMissing = this->m_retryCount - this->m_retryCursor;
         retrySentThisRun++;
         packetsSentThisRun++;
     }
     if (this->m_retryCursor >= this->m_retryCount) {
         this->m_retryCount = 0;
         this->m_retryCursor = 0;
+        this->m_packetsMissing = 0;
     }
 
     if (this->m_state == STATE_DONE) {
@@ -164,7 +191,12 @@ void PayloadDownlinkApp::run_handler(FwIndexType portNum, U32 context) {
             const U32 headerPacketsToSend =
                 (requestedHeaders < availableSlots) ? requestedHeaders : availableSlots;
             for (U32 headerCount = 0; headerCount < headerPacketsToSend; ++headerCount) {
-                if (!this->sendHeaderPacket()) {
+                const Components::PayloadSendStatus status = this->sendHeaderPacket();
+                if (status == Components::PayloadSendStatus::LOCAL_RETRY) {
+                    this->emitTelemetry();
+                    return;
+                }
+                if (status != Components::PayloadSendStatus::LOCAL_ACCEPTED) {
                     this->failTransfer(3U, this->m_lastError);
                     this->emitTelemetry();
                     return;
@@ -180,7 +212,12 @@ void PayloadDownlinkApp::run_handler(FwIndexType portNum, U32 context) {
         while (packetsSentThisRun < totalPacketsPerRun &&
                dataSentThisRun < packetsPerRun &&
                this->m_nextPacketIndex < this->m_totalPackets) {
-            if (!this->sendDataPacket(this->m_nextPacketIndex)) {
+            const Components::PayloadSendStatus status = this->sendDataPacket(this->m_nextPacketIndex);
+            if (status == Components::PayloadSendStatus::LOCAL_RETRY) {
+                this->emitTelemetry();
+                return;
+            }
+            if (status != Components::PayloadSendStatus::LOCAL_ACCEPTED) {
                 this->failTransfer(6U, this->m_lastError);
                 break;
             }
@@ -192,7 +229,12 @@ void PayloadDownlinkApp::run_handler(FwIndexType portNum, U32 context) {
 
         if ((this->m_state == STATE_DOWNLINKING) && this->m_nextPacketIndex >= this->m_totalPackets &&
             !this->m_sentEnd && packetsSentThisRun < totalPacketsPerRun) {
-            if (!this->sendEndPacket()) {
+            const Components::PayloadSendStatus status = this->sendEndPacket();
+            if (status == Components::PayloadSendStatus::LOCAL_RETRY) {
+                this->emitTelemetry();
+                return;
+            }
+            if (status != Components::PayloadSendStatus::LOCAL_ACCEPTED) {
                 this->failTransfer(3U, this->m_lastError);
                 this->emitTelemetry();
                 return;
@@ -211,11 +253,26 @@ void PayloadDownlinkApp::run_handler(FwIndexType portNum, U32 context) {
 
 void PayloadDownlinkApp::packetIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) {
     static_cast<void>(portNum);
-    if (!fwBuffer.isValid()) {
-        this->m_lastError = 1;
+    const FwSizeType size = fwBuffer.getSize();
+    if (!fwBuffer.isValid() || (size == 0U) || (size > LinkCfg::PAYLOAD_PACKET_MAX_BYTES)) {
+        Os::ScopeLock lock(this->m_controlMailboxMutex);
+        this->m_controlPacketsInvalid++;
         return;
     }
-    this->handleRetryRequest(fwBuffer.getData(), fwBuffer.getSize());
+
+    Os::ScopeLock lock(this->m_controlMailboxMutex);
+    if (this->m_controlMailboxCount >= CONTROL_MAILBOX_CAPACITY) {
+        this->m_controlMailboxDrops++;
+        return;
+    }
+    ControlPacket& slot = this->m_controlMailbox[this->m_controlMailboxTail];
+    slot.size = size;
+    std::memcpy(slot.data, fwBuffer.getData(), size);
+    this->m_controlMailboxTail = (this->m_controlMailboxTail + 1U) % CONTROL_MAILBOX_CAPACITY;
+    this->m_controlMailboxCount++;
+    if (this->m_controlMailboxCount > this->m_controlMailboxHighWater) {
+        this->m_controlMailboxHighWater = this->m_controlMailboxCount;
+    }
 }
 
 void PayloadDownlinkApp::downlinkRequestIn_handler(FwIndexType portNum,
@@ -225,20 +282,20 @@ void PayloadDownlinkApp::downlinkRequestIn_handler(FwIndexType portNum,
                                                        const Fw::StringBase& sourcePath,
                                                        U32 sourceCrc) {
     static_cast<void>(portNum);
-    static_cast<void>(sourceKind);
-    if (productBytes == 0U) {
-        this->failTransfer(8U, 0U);
+    const std::string requestedSourcePath(sourcePath.toChar());
+    if (this->m_state == STATE_DOWNLINKING) {
+        if (this->activeRequestMatches(productId, productBytes, sourceKind, requestedSourcePath, sourceCrc)) {
+            this->reportDuplicateRequest();
+        } else {
+            this->reportConflictingRequest(productId);
+        }
         return;
     }
-    if (productBytes > MAX_BLOB_BYTES) {
-        this->failTransfer(2U, productBytes);
-        return;
-    }
-    if (!this->resetTransfer(productId, productBytes, sourcePath.toChar(), sourceCrc)) {
+    if (!this->resetTransfer(productId, productBytes, sourceKind, requestedSourcePath, sourceCrc)) {
         return;
     }
     this->log_ACTIVITY_HI_PayloadDownlinkStarted(this->m_productId, this->m_totalBytes, this->m_totalPackets);
-    this->emitStatus();
+    this->emitTelemetry(true);
 }
 
 void PayloadDownlinkApp::START_PAYLOAD_DOWNLINK_cmdHandler(FwOpcodeType opCode,
@@ -246,28 +303,34 @@ void PayloadDownlinkApp::START_PAYLOAD_DOWNLINK_cmdHandler(FwOpcodeType opCode,
                                                                U32 productId,
                                                                U32 byteCount) {
     U32 normalizedBytes = byteCount;
-    if (normalizedBytes == 0) {
-        this->failTransfer(8U, 0U);
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+    const Components::ScienceProductSource sourceKind = Components::ScienceProductSource::UNKNOWN;
+    const std::string requestedSourcePath;
+    if (this->m_state == STATE_DOWNLINKING) {
+        if (this->activeRequestMatches(productId, normalizedBytes, sourceKind, requestedSourcePath, 0U)) {
+            this->reportDuplicateRequest();
+            this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+        } else {
+            this->reportConflictingRequest(productId);
+            this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::BUSY);
+        }
         return;
     }
-    if (normalizedBytes > MAX_BLOB_BYTES) {
-        this->failTransfer(2U, normalizedBytes);
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
-        return;
-    }
-
-    if (!this->resetTransfer(productId, normalizedBytes, std::string(), 0U)) {
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
+    if (!this->resetTransfer(productId, normalizedBytes, sourceKind, requestedSourcePath, 0U)) {
+        const bool invalidSize = (normalizedBytes == 0U) || (normalizedBytes > MAX_BLOB_BYTES);
+        this->cmdResponse_out(
+            opCode,
+            cmdSeq,
+            invalidSize ? Fw::CmdResponse::VALIDATION_ERROR : Fw::CmdResponse::EXECUTION_ERROR);
         return;
     }
     this->log_ACTIVITY_HI_PayloadDownlinkStarted(this->m_productId, this->m_totalBytes, this->m_totalPackets);
-    this->emitStatus();
+    this->emitTelemetry(true);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
 void PayloadDownlinkApp::ABORT_PAYLOAD_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     this->m_state = STATE_ABORTED;
+    this->clearRepairWork();
     this->emitStatus();
     this->emitTelemetry(true);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
@@ -281,10 +344,141 @@ void PayloadDownlinkApp::GET_PAYLOAD_STATUS_cmdHandler(FwOpcodeType opCode, U32 
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
+bool PayloadDownlinkApp::activeRequestMatches(U32 productId,
+                                              U32 byteCount,
+                                              const Components::ScienceProductSource& sourceKind,
+                                              const std::string& requestedSourcePath,
+                                              U32 expectedSourceCrc) const {
+    return (productId == this->m_productId) && (byteCount == this->m_totalBytes) &&
+           (sourceKind == this->m_requestedSourceKind) &&
+           (requestedSourcePath == this->m_requestedSourcePath) &&
+           (expectedSourceCrc == this->m_expectedSourceCrc);
+}
+
+void PayloadDownlinkApp::reportDuplicateRequest() {
+    this->m_requestDisposition = REQUEST_DUPLICATE;
+    this->log_ACTIVITY_LO_PayloadDownlinkRequestDuplicate(
+        this->m_transferId, this->m_productId, this->m_nextPacketIndex);
+    this->emitStatus();
+    this->emitTelemetry(true);
+}
+
+void PayloadDownlinkApp::reportConflictingRequest(U32 requestedProductId) {
+    this->m_requestDisposition = REQUEST_CONFLICT;
+    this->log_WARNING_LO_PayloadDownlinkRequestConflict(
+        this->m_transferId, this->m_productId, requestedProductId);
+    this->emitStatus();
+    this->emitTelemetry(true);
+}
+
+void PayloadDownlinkApp::drainControlMailbox() {
+    ControlPacket pending[CONTROL_MAILBOX_CAPACITY] = {};
+    U32 pendingCount = 0U;
+    U32 dropped = 0U;
+    U32 invalid = 0U;
+    U32 highWater = 0U;
+    {
+        Os::ScopeLock lock(this->m_controlMailboxMutex);
+        pendingCount = this->m_controlMailboxCount;
+        for (U32 i = 0U; i < pendingCount; ++i) {
+            pending[i] = this->m_controlMailbox[this->m_controlMailboxHead];
+            this->m_controlMailboxHead = (this->m_controlMailboxHead + 1U) % CONTROL_MAILBOX_CAPACITY;
+        }
+        this->m_controlMailboxCount = 0U;
+        dropped = this->m_controlMailboxDrops;
+        invalid = this->m_controlPacketsInvalid;
+        highWater = this->m_controlMailboxHighWater;
+    }
+
+    if (dropped != this->m_reportedControlMailboxDrops) {
+        this->log_WARNING_HI_PayloadControlPacketRejected(2U, dropped);
+        this->m_reportedControlMailboxDrops = dropped;
+    }
+    if (invalid != this->m_reportedControlPacketsInvalid) {
+        this->log_WARNING_HI_PayloadControlPacketRejected(1U, invalid);
+        this->m_reportedControlPacketsInvalid = invalid;
+    }
+    this->tlmWrite_ControlMailboxDrops(dropped);
+    this->tlmWrite_ControlPacketsInvalid(invalid);
+    this->tlmWrite_ControlMailboxHighWater(highWater);
+    for (U32 i = 0U; i < pendingCount; ++i) {
+        this->handleRetryRequest(pending[i].data, pending[i].size);
+        if ((this->m_state == STATE_ABORTED) || (this->m_state == STATE_ERROR)) {
+            break;
+        }
+    }
+}
+
+void PayloadDownlinkApp::clearRepairWork() {
+    this->m_retryCount = 0U;
+    this->m_retryCursor = 0U;
+    this->m_packetsMissing = 0U;
+
+    Os::ScopeLock lock(this->m_controlMailboxMutex);
+    this->m_controlMailboxHead = 0U;
+    this->m_controlMailboxTail = 0U;
+    this->m_controlMailboxCount = 0U;
+}
+
+void PayloadDownlinkApp::rejectControlPacket(U32 reason) {
+    U32 rejectedTotal = 0U;
+    {
+        Os::ScopeLock lock(this->m_controlMailboxMutex);
+        this->m_controlPacketsInvalid++;
+        rejectedTotal = this->m_controlPacketsInvalid;
+    }
+    this->m_reportedControlPacketsInvalid = rejectedTotal;
+    this->log_WARNING_HI_PayloadControlPacketRejected(reason, rejectedTotal);
+    this->tlmWrite_ControlPacketsInvalid(rejectedTotal);
+}
+
 bool PayloadDownlinkApp::resetTransfer(U32 productId,
-                                           U32 byteCount,
-                                           const std::string& preferredSourcePath,
-                                           U32 expectedSourceCrc) {
+                                       U32 byteCount,
+                                       const Components::ScienceProductSource& sourceKind,
+                                       const std::string& preferredSourcePath,
+                                       U32 expectedSourceCrc) {
+    // Reserve the transfer identity and publish an active status before any
+    // fallible source validation. Comms can then correlate a following ERROR
+    // status instead of remaining wedged on an unlatchable terminal-first
+    // report.
+    this->m_state = STATE_DOWNLINKING;
+    this->m_transferId++;
+    if (this->m_transferId == 0U) {
+        this->m_transferId = 1U;
+    }
+    this->m_productId = productId;
+    this->m_totalBytes = byteCount;
+    this->m_totalPackets = (byteCount / LinkCfg::PAYLOAD_PACKET_DATA_BYTES) +
+                           ((byteCount % LinkCfg::PAYLOAD_PACKET_DATA_BYTES) != 0U ? 1U : 0U);
+    this->m_nextPacketIndex = 0U;
+    this->m_packetsSent = 0U;
+    this->m_progressPercent = 0U;
+    this->m_retryRound = 0U;
+    this->m_packetsMissing = 0U;
+    this->m_lastError = 0U;
+    this->m_requestDisposition = REQUEST_ACCEPTED;
+    this->m_nextProgressPercent = 10U;
+    this->m_completionSummaryEventsRemaining = 0U;
+    this->m_blobCrc = 0U;
+    this->m_sentHeader = false;
+    this->m_sentEnd = false;
+    this->m_sourceReady = false;
+    this->m_sourceBytes = 0U;
+    this->m_sourcePath.clear();
+    this->m_requestedSourceKind = sourceKind;
+    this->m_requestedSourcePath = preferredSourcePath;
+    this->m_expectedSourceCrc = expectedSourceCrc;
+    this->clearRepairWork();
+    this->emitStatus();
+
+    if (byteCount == 0U) {
+        this->failTransfer(8U, 0U);
+        return false;
+    }
+    if (byteCount > MAX_BLOB_BYTES) {
+        this->failTransfer(2U, byteCount);
+        return false;
+    }
     if (!this->prepareSource(byteCount, preferredSourcePath)) {
         const U32 reason = (this->m_lastError != 0U) ? this->m_lastError : 7U;
         this->failTransfer(reason, byteCount);
@@ -300,28 +494,7 @@ bool PayloadDownlinkApp::resetTransfer(U32 productId,
         return false;
     }
 
-    this->m_state = STATE_DOWNLINKING;
-    this->m_transferId++;
-    if (this->m_transferId == 0) {
-        this->m_transferId = 1;
-    }
-    this->m_productId = productId;
-    this->m_totalBytes = byteCount;
-    this->m_totalPackets =
-        (byteCount + LinkCfg::PAYLOAD_PACKET_DATA_BYTES - 1U) / LinkCfg::PAYLOAD_PACKET_DATA_BYTES;
-    this->m_nextPacketIndex = 0;
-    this->m_packetsSent = 0;
-    this->m_progressPercent = 0;
-    this->m_retryRound = 0;
-    this->m_packetsMissing = 0;
-    this->m_lastError = 0;
-    this->m_nextProgressPercent = 10U;
-    this->m_completionSummaryEventsRemaining = 0;
     this->m_blobCrc = sourceCrc;
-    this->m_sentHeader = false;
-    this->m_sentEnd = false;
-    this->m_retryCount = 0;
-    this->m_retryCursor = 0;
     return true;
 }
 
@@ -382,6 +555,7 @@ void PayloadDownlinkApp::emitTelemetry(bool force) {
     this->tlmWrite_RetryRound(this->m_retryRound);
     this->tlmWrite_PacketsMissing(this->m_packetsMissing);
     this->tlmWrite_LastError(this->m_lastError);
+    this->tlmWrite_RequestDisposition(this->m_requestDisposition);
     this->m_lastTelemetryTick = this->m_runTicks;
 }
 
@@ -414,7 +588,7 @@ void PayloadDownlinkApp::emitCompletionSummaryIfDue() {
     this->m_completionSummaryEventsRemaining--;
 }
 
-bool PayloadDownlinkApp::sendHeaderPacket() {
+Components::PayloadSendStatus PayloadDownlinkApp::sendHeaderPacket() {
     std::memset(this->m_packet, 0, sizeof(this->m_packet));
     this->m_packet[0] = LinkCfg::PAYLOAD_MAGIC_0;
     this->m_packet[1] = LinkCfg::PAYLOAD_MAGIC_1;
@@ -428,7 +602,7 @@ bool PayloadDownlinkApp::sendHeaderPacket() {
     return this->sendPacket(this->m_packet, 17);
 }
 
-bool PayloadDownlinkApp::sendDataPacket(U32 packetIndex) {
+Components::PayloadSendStatus PayloadDownlinkApp::sendDataPacket(U32 packetIndex) {
     const U32 offset = packetIndex * LinkCfg::PAYLOAD_PACKET_DATA_BYTES;
     U32 remaining = (offset < this->m_totalBytes) ? (this->m_totalBytes - offset) : 0;
     if (remaining > LinkCfg::PAYLOAD_PACKET_DATA_BYTES) {
@@ -444,19 +618,20 @@ bool PayloadDownlinkApp::sendDataPacket(U32 packetIndex) {
     this->m_packet[6] = static_cast<U8>(remaining);
     if (!this->readSourceBytes(offset, &this->m_packet[7], remaining)) {
         this->m_lastError = 7U;
-        return false;
+        return Components::PayloadSendStatus::LOCAL_ERROR;
     }
     const FwSizeType crcOffset = 7 + remaining;
     const U16 crc = this->crc16Ccitt(this->m_packet, crcOffset);
     this->putU16(this->m_packet, crcOffset, crc);
-    if (!this->sendPacket(this->m_packet, crcOffset + 2)) {
-        return false;
+    const Components::PayloadSendStatus status = this->sendPacket(this->m_packet, crcOffset + 2);
+    if (status != Components::PayloadSendStatus::LOCAL_ACCEPTED) {
+        return status;
     }
     this->m_packetsSent++;
-    return true;
+    return Components::PayloadSendStatus::LOCAL_ACCEPTED;
 }
 
-bool PayloadDownlinkApp::sendEndPacket() {
+Components::PayloadSendStatus PayloadDownlinkApp::sendEndPacket() {
     std::memset(this->m_packet, 0, sizeof(this->m_packet));
     this->m_packet[0] = LinkCfg::PAYLOAD_MAGIC_0;
     this->m_packet[1] = LinkCfg::PAYLOAD_MAGIC_1;
@@ -467,18 +642,25 @@ bool PayloadDownlinkApp::sendEndPacket() {
     return this->sendPacket(this->m_packet, 8);
 }
 
-bool PayloadDownlinkApp::sendPacket(const U8* data, FwSizeType size) {
+Components::PayloadSendStatus PayloadDownlinkApp::sendPacket(const U8* data, FwSizeType size) {
     if (!this->isConnected_packetOut_OutputPort(0)) {
         this->m_lastError = 3;
-        return false;
+        return Components::PayloadSendStatus::LOCAL_ERROR;
     }
     if (data == nullptr || size == 0 || size > LinkCfg::PAYLOAD_PACKET_MAX_BYTES) {
         this->m_lastError = 6;
-        return false;
+        return Components::PayloadSendStatus::LOCAL_ERROR;
     }
     Fw::Buffer packet(const_cast<U8*>(data), size);
-    this->packetOut_out(0, packet);
-    return true;
+    const Components::PayloadSendStatus status = this->packetOut_out(0, packet);
+    if (status == Components::PayloadSendStatus::LOCAL_RETRY) {
+        this->m_lastError = 12U;
+    } else if (status == Components::PayloadSendStatus::LOCAL_ERROR) {
+        this->m_lastError = 13U;
+    } else if (this->m_lastError == 12U) {
+        this->m_lastError = 0U;
+    }
+    return status;
 }
 
 void PayloadDownlinkApp::emitProgressIfDue() {
@@ -506,22 +688,34 @@ void PayloadDownlinkApp::emitProgressIfDue() {
 }
 
 void PayloadDownlinkApp::handleRetryRequest(const U8* data, FwSizeType size) {
+    if ((this->m_state != STATE_DOWNLINKING) && (this->m_state != STATE_DONE)) {
+        this->rejectControlPacket(3U);
+        return;
+    }
     if (size < 7 || data[0] != LinkCfg::PAYLOAD_MAGIC_0 || data[1] != LinkCfg::PAYLOAD_MAGIC_1 ||
         data[2] != PACKET_RETRY_REQUEST || data[3] != this->m_transferId) {
-        this->m_lastError = 4;
+        this->rejectControlPacket(4U);
         return;
     }
 
     const U16 startIndex = this->getU16(data, 4);
     const U8 bitmapBytes = data[6];
     if (static_cast<FwSizeType>(7 + bitmapBytes) > size) {
-        this->m_lastError = 5;
+        this->rejectControlPacket(5U);
         return;
     }
 
-    U32 missing = 0;
+    U32 requestedMissing = 0U;
     this->m_retryRound++;
-    this->m_retryCount = 0;
+
+    // Retain only work that has not already been sent, then add newly requested
+    // packet indices. This makes separate and overlapping ground requests
+    // additive and idempotent without replaying duplicate entries.
+    U32 pendingCount = 0U;
+    for (U32 i = this->m_retryCursor; i < this->m_retryCount; ++i) {
+        this->m_retryPackets[pendingCount++] = this->m_retryPackets[i];
+    }
+    this->m_retryCount = pendingCount;
     this->m_retryCursor = 0;
     for (U8 byteIndex = 0; byteIndex < bitmapBytes; byteIndex++) {
         const U8 bits = data[7 + byteIndex];
@@ -531,23 +725,35 @@ void PayloadDownlinkApp::handleRetryRequest(const U8* data, FwSizeType size) {
             }
             const U32 packetIndex = static_cast<U32>(startIndex) + static_cast<U32>(byteIndex) * 8U + bit;
             if (packetIndex < this->m_totalPackets) {
-                if (this->m_retryCount < MAX_RETRY_PACKETS) {
-                    this->m_retryPackets[this->m_retryCount] = packetIndex;
-                    this->m_retryCount++;
-                    missing++;
-                } else {
+                requestedMissing++;
+                bool alreadyPending = false;
+                for (U32 retryIndex = 0U; retryIndex < this->m_retryCount; ++retryIndex) {
+                    if (this->m_retryPackets[retryIndex] == packetIndex) {
+                        alreadyPending = true;
+                        break;
+                    }
+                }
+                if (alreadyPending) {
+                    continue;
+                }
+                if (this->m_retryCount >= MAX_RETRY_PACKETS) {
                     this->m_lastError = 10U;
                     this->failTransfer(6U, this->m_lastError);
                     break;
                 }
+                this->m_retryPackets[this->m_retryCount] = packetIndex;
+                this->m_retryCount++;
             }
         }
         if (this->m_state == STATE_ERROR) {
             break;
         }
     }
-    this->m_packetsMissing = missing;
-    this->log_ACTIVITY_LO_PayloadRetryRequested(startIndex, missing);
+    if (this->m_state == STATE_ERROR) {
+        return;
+    }
+    this->m_packetsMissing = this->m_retryCount;
+    this->log_ACTIVITY_LO_PayloadRetryRequested(startIndex, requestedMissing);
     this->emitStatus();
 }
 
@@ -631,6 +837,7 @@ U16 PayloadDownlinkApp::getU16(const U8* data, FwSizeType offset) const {
 void PayloadDownlinkApp::failTransfer(U32 reason, U32 detail) {
     this->m_lastError = reason;
     this->m_state = STATE_ERROR;
+    this->clearRepairWork();
     this->log_WARNING_LO_PayloadDownlinkFailed(reason, detail);
     this->emitStatus();
     this->emitTelemetry(true);

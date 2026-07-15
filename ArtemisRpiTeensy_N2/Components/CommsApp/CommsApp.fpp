@@ -59,6 +59,18 @@ module Components {
         @ Number of explicit link polls
         telemetry LinkPollCount: U32
 
+        @ Whether a science downlink request is currently active.
+        telemetry DownlinkActive: U32 update on change
+
+        @ Product identifier owned by the active science downlink.
+        telemetry ActiveDownlinkProductId: U32 update on change
+
+        @ Payload transfer identifier latched from active-transfer status.
+        telemetry ActiveDownlinkTransferId: U32 update on change
+
+        @ Latest request disposition: 0=accepted/none, 1=idempotent duplicate, 2=conflict rejected.
+        telemetry DownlinkRequestDisposition: U32 update on change
+
         @ Latest RF link RSSI in dBm
         telemetry RssiDbm: I32 update on change \
             low { yellow -100, orange -110, red -120 }
@@ -68,6 +80,18 @@ module Components {
 
         @ Downlink completion event for the current synchronous/demo downlink path
         event DownlinkFinished(bytes: U32) severity activity high format "Downlink finished for {} bytes"
+
+        @ Repeated command for the exact active product was accepted idempotently without new fan-out.
+        event DownlinkRequestDuplicate(productId: U32, activeBytes: U32) severity activity low \
+            format "Downlink request duplicate product={} activeBytes={}"
+
+        @ Request conflicts with a different active product descriptor.
+        event DownlinkRequestConflict(activeProductId: U32, requestedProductId: U32) severity warning low \
+            format "Downlink request conflict activeProduct={} requestedProduct={}"
+
+        @ Payload status did not identify the transfer currently owned by communications.
+        event PayloadDownlinkStatusIgnored(activeTransferId: U32, receivedTransferId: U32, productId: U32) \
+            severity warning low format "Payload status ignored activeTransfer={} receivedTransfer={} product={}" throttle 5
 
         @ Operator command rejected by validation guard
         event CommsCommandRejected(reason: U32, value: U32) severity warning low format "Comms command rejected reason={} value={}"

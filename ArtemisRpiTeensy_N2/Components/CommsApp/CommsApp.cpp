@@ -15,6 +15,12 @@ CommsApp::CommsApp(const char* const compName)
       m_pendingSourceCrc(0),
       m_linkPollCount(0),
       m_activeDownlinkBytes(0),
+      m_activeProductId(0),
+      m_activeSourceKind(Components::ScienceProductSource::UNKNOWN),
+      m_activeSourcePath(""),
+      m_activeSourceCrc(0),
+      m_activeTransferId(0),
+      m_downlinkRequestDisposition(0),
       m_lastPayloadDownlinkState(0),
       m_downlinkActive(false) {}
 
@@ -46,6 +52,7 @@ void CommsApp::run_handler(FwIndexType portNum, U32 context) {
     this->tlmWrite_PendingScienceBytes(this->m_pendingScienceBytes);
     this->tlmWrite_LinkPollCount(this->m_linkPollCount);
     this->tlmWrite_RssiDbm(this->m_rssiDbm);
+    this->emitDownlinkTelemetry();
 }
 
 void CommsApp::linkStatusIn_handler(FwIndexType portNum, U32 key) {
@@ -99,39 +106,72 @@ void CommsApp::payloadDownlinkStatusIn_handler(FwIndexType portNum,
                                                    U32 totalPackets,
                                                    U32 lastError) {
     static_cast<void>(portNum);
-    static_cast<void>(transferId);
-    static_cast<void>(productId);
     static_cast<void>(packetsSent);
     static_cast<void>(totalPackets);
 
-    this->m_lastPayloadDownlinkState = state;
     if (!this->m_downlinkActive) {
         return;
     }
+
+    if ((state < 1U) || (state > 4U) || (transferId == 0U) ||
+        (productId != this->m_activeProductId) || (totalBytes != this->m_activeDownlinkBytes)) {
+        this->log_WARNING_LO_PayloadDownlinkStatusIgnored(this->m_activeTransferId, transferId, productId);
+        return;
+    }
+    if (this->m_activeTransferId == 0U) {
+        // A terminal packet cannot establish ownership of a transfer. It may be
+        // delayed status from an earlier transfer that reused the product ID.
+        if (state != 1U) {
+            this->log_WARNING_LO_PayloadDownlinkStatusIgnored(this->m_activeTransferId, transferId, productId);
+            return;
+        }
+        this->m_activeTransferId = transferId;
+    } else if (transferId != this->m_activeTransferId) {
+        this->log_WARNING_LO_PayloadDownlinkStatusIgnored(this->m_activeTransferId, transferId, productId);
+        return;
+    }
+    this->m_lastPayloadDownlinkState = state;
 
     if (state == 2U) {
         this->log_ACTIVITY_HI_DownlinkFinished(totalBytes);
         if (this->isConnected_missionModeOut_OutputPort(0)) {
             this->missionModeOut_out(0, Components::MissionMode::BASE, totalBytes);
         }
-        this->m_pendingScienceBytes = 0;
-        this->m_pendingProductId = 0;
-        this->m_pendingSourceKind = Components::ScienceProductSource::UNKNOWN;
-        this->m_pendingSourcePath = "";
-        this->m_pendingSourceCrc = 0;
-        this->m_activeDownlinkBytes = 0;
-        this->m_downlinkActive = false;
+        if (this->pendingRequestMatchesActive()) {
+            this->m_pendingScienceBytes = 0;
+            this->m_pendingProductId = 0;
+            this->m_pendingSourceKind = Components::ScienceProductSource::UNKNOWN;
+            this->m_pendingSourcePath = "";
+            this->m_pendingSourceCrc = 0;
+        }
+        this->clearActiveDownlink();
     } else if ((state == 3U) || (state == 4U)) {
         this->log_WARNING_LO_DownlinkFailed(state, lastError);
         if (this->isConnected_missionModeOut_OutputPort(0)) {
             this->missionModeOut_out(0, Components::MissionMode::BASE, lastError);
         }
-        this->m_activeDownlinkBytes = 0;
-        this->m_downlinkActive = false;
+        this->clearActiveDownlink();
     }
+    this->emitDownlinkTelemetry();
 }
 
 void CommsApp::REQUEST_SCIENCE_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    if (this->m_downlinkActive) {
+        if (this->pendingRequestMatchesActive()) {
+            this->m_downlinkRequestDisposition = 1U;
+            this->log_ACTIVITY_LO_DownlinkRequestDuplicate(this->m_activeProductId, this->m_activeDownlinkBytes);
+            this->emitDownlinkTelemetry();
+            this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+            return;
+        }
+        this->m_downlinkRequestDisposition = 2U;
+        this->log_WARNING_LO_DownlinkRequestConflict(this->m_activeProductId, this->m_pendingProductId);
+        this->log_WARNING_LO_CommsCommandRejected(2U, this->m_pendingProductId);
+        this->emitDownlinkTelemetry();
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::BUSY);
+        return;
+    }
+
     if (this->m_pendingScienceBytes == 0U) {
         this->log_WARNING_LO_CommsCommandRejected(1U, 0U);
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
@@ -140,6 +180,12 @@ void CommsApp::REQUEST_SCIENCE_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdS
 
     this->log_ACTIVITY_HI_DownlinkRequested(this->m_pendingScienceBytes);
     this->m_activeDownlinkBytes = this->m_pendingScienceBytes;
+    this->m_activeProductId = this->m_pendingProductId;
+    this->m_activeSourceKind = this->m_pendingSourceKind;
+    this->m_activeSourcePath = this->m_pendingSourcePath;
+    this->m_activeSourceCrc = this->m_pendingSourceCrc;
+    this->m_activeTransferId = 0U;
+    this->m_downlinkRequestDisposition = 0U;
     this->m_downlinkActive = true;
     if (this->isConnected_missionModeOut_OutputPort(0)) {
         this->missionModeOut_out(0, Components::MissionMode::DOWNLINKING, this->m_pendingScienceBytes);
@@ -160,6 +206,7 @@ void CommsApp::REQUEST_SCIENCE_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdS
                                             this->m_pendingSourcePath,
                                             this->m_pendingSourceCrc);
     }
+    this->emitDownlinkTelemetry();
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
@@ -183,6 +230,31 @@ void CommsApp::requestDriverStatus() {
         // Driver poll key contract: 1=down, 2=acquiring, 3=locked, 4=degraded
         this->driverRequestOut_out(0, normalizedLink + 1U);
     }
+}
+
+bool CommsApp::pendingRequestMatchesActive() const {
+    return (this->m_pendingProductId == this->m_activeProductId) &&
+           (this->m_pendingScienceBytes == this->m_activeDownlinkBytes) &&
+           (this->m_pendingSourceKind == this->m_activeSourceKind) &&
+           (this->m_pendingSourcePath == this->m_activeSourcePath) &&
+           (this->m_pendingSourceCrc == this->m_activeSourceCrc);
+}
+
+void CommsApp::clearActiveDownlink() {
+    this->m_activeDownlinkBytes = 0U;
+    this->m_activeProductId = 0U;
+    this->m_activeSourceKind = Components::ScienceProductSource::UNKNOWN;
+    this->m_activeSourcePath = "";
+    this->m_activeSourceCrc = 0U;
+    this->m_activeTransferId = 0U;
+    this->m_downlinkActive = false;
+}
+
+void CommsApp::emitDownlinkTelemetry() {
+    this->tlmWrite_DownlinkActive(this->m_downlinkActive ? 1U : 0U);
+    this->tlmWrite_ActiveDownlinkProductId(this->m_activeProductId);
+    this->tlmWrite_ActiveDownlinkTransferId(this->m_activeTransferId);
+    this->tlmWrite_DownlinkRequestDisposition(this->m_downlinkRequestDisposition);
 }
 
 }  // namespace Components

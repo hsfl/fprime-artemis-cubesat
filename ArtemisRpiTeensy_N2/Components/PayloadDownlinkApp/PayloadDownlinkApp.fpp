@@ -9,7 +9,7 @@ module Components {
         output port pingOut: Svc.Ping
 
         @ Rate group scheduling input
-        sync input port run: Svc.Sched
+        async input port run: Svc.Sched drop
 
         @ Retry/control packets from the ground payload receiver.
         sync input port packetIn: Fw.BufferSend
@@ -18,7 +18,7 @@ module Components {
         async input port downlinkRequestIn: Components.ScienceDownlinkRequest
 
         @ Payload protocol packets to the UART channel mux.
-        output port packetOut: Fw.BufferSend
+        output port packetOut: Components.PayloadPacketSend
 
         @ Payload transfer status to mission communications manager.
         output port statusOut: Components.PayloadDownlinkStatus
@@ -68,6 +68,18 @@ module Components {
         @ Last error code.
         telemetry LastError: U32 update on change
 
+        @ Latest start-request disposition: 0=accepted/none, 1=idempotent duplicate, 2=conflict rejected.
+        telemetry RequestDisposition: U32 update on change
+
+        @ Retry/control packets dropped before the component task could copy them.
+        telemetry ControlMailboxDrops: U32 update on change
+
+        @ Invalid or oversized retry/control packets rejected before enqueue.
+        telemetry ControlPacketsInvalid: U32 update on change
+
+        @ Highest observed occupancy of the bounded retry/control mailbox.
+        telemetry ControlMailboxHighWater: U32 update on change
+
         @ Payload downlink started.
         event PayloadDownlinkStarted(productId: U32, byteCount: U32, totalPackets: U32) \
             severity activity high format "Payload downlink started product={} bytes={} packets={}"
@@ -75,6 +87,20 @@ module Components {
         @ Payload downlink completed.
         event PayloadDownlinkComplete(transferId: U32, packetsSent: U32) \
             severity activity high format "Payload downlink complete transfer={} packetsSent={}"
+
+        @ Exact repeated start request accepted idempotently without resetting active progress.
+        event PayloadDownlinkRequestDuplicate(transferId: U32, productId: U32, packetsComplete: U32) \
+            severity activity low format "Payload downlink duplicate transfer={} product={} packetsComplete={}"
+
+        @ Start request rejected because a different descriptor is already active.
+        event PayloadDownlinkRequestConflict(activeTransferId: U32, activeProductId: U32, requestedProductId: U32) \
+            severity warning low format "Payload downlink conflict transfer={} activeProduct={} requestedProduct={}"
+
+        @ The bounded retry/control mailbox rejected one or more packets.
+        @ Reasons: 1=invalid size/buffer, 2=mailbox full, 3=invalid state,
+        @ 4=malformed/stale identity, 5=truncated bitmap.
+        event PayloadControlPacketRejected(reason: U32, total: U32) severity warning high \
+            format "Payload control packet rejected reason={} total={}" throttle 5
 
         @ Payload downlink progress, throttled to nominal 10 percent increments with short 100 percent replay after completion.
         event PayloadDownlinkProgress(transferId: U32, percentComplete: U32, packetsSent: U32, totalPackets: U32) \

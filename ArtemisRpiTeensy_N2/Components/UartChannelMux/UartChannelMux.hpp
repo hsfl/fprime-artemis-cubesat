@@ -26,7 +26,7 @@ class UartChannelMux final : public UartChannelMuxComponentBase {
     };
 
     Drv::ByteStreamStatus ccsdsSendIn_handler(FwIndexType portNum, Fw::Buffer& sendBuffer) override;
-    void payloadSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
+    Components::PayloadSendStatus payloadSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
     void localSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
     void rfLocalSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
     void drvReceiveIn_handler(FwIndexType portNum,

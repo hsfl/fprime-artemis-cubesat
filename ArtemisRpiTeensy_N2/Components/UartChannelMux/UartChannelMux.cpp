@@ -36,7 +36,7 @@ Drv::ByteStreamStatus UartChannelMux::ccsdsSendIn_handler(FwIndexType portNum, F
     return this->sendWrapped(LinkCfg::CHANNEL_CCSDS, sendBuffer.getData(), sendBuffer.getSize());
 }
 
-void UartChannelMux::payloadSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) {
+Components::PayloadSendStatus UartChannelMux::payloadSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) {
     static_cast<void>(portNum);
     const Drv::ByteStreamStatus status =
         this->sendWrapped(LinkCfg::CHANNEL_PAYLOAD, fwBuffer.getData(), fwBuffer.getSize());
@@ -45,6 +45,13 @@ void UartChannelMux::payloadSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBu
         this->tlmWrite_FrameDrops(this->m_frameDrops);
         this->log_WARNING_LO_FrameDropped(10);
     }
+    if (status == Drv::ByteStreamStatus::OP_OK) {
+        return Components::PayloadSendStatus::LOCAL_ACCEPTED;
+    }
+    if (status == Drv::ByteStreamStatus::SEND_RETRY) {
+        return Components::PayloadSendStatus::LOCAL_RETRY;
+    }
+    return Components::PayloadSendStatus::LOCAL_ERROR;
 }
 
 void UartChannelMux::localSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) {
