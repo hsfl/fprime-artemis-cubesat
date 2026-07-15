@@ -362,16 +362,36 @@ Gate passes only when the full provenance and proof bundle is saved.
 
 ### WP1 — Ground and satellite bridge fail-safe behavior
 
-- [ ] Add a finite RF TX-completion timeout below the watchdog deadline.
+- [x] Add a finite RF TX-completion timeout below the watchdog deadline.
 - [ ] Add bounded retry followed by explicit radio/FIFO recovery.
-- [ ] Preserve a queued RF message until success or counted terminal failure.
+- [x] Preserve a queued RF message until success or counted terminal failure.
 - [ ] Track actual bytes accepted by channel-0 and channel-1 USB writes.
 - [ ] Retain unwritten data across zero/partial USB writes.
 - [ ] Add USB short-write, backpressure, timeout, and discard counters.
-- [ ] Route radio initialization and recovery diagnostics only to the debug USB
+- [x] Route radio initialization and recovery diagnostics only to the debug USB
       interface.
 - [ ] Verify that a satellite Teensy reset cannot unintentionally hard-cycle the
       Pi through unsafe `RPI_ENABLE_PIN` startup behavior.
+
+WP1-A was built, source-validated, and flashed to the exact hardware identities
+on 2026-07-14. The production satellite firmware SHA-256 is
+`61579b309ccbfbe27be40a7d1aed47f2f20eeae18388372360d05a0aba5873ee`;
+the ground firmware SHA-256 is
+`0e9d60ada118c8e430cd29fd9949b645c24844432e7f63ddc1cfdc66a7c26c8c`.
+Both bridges remained alive, accepted a control-plane ping, and exposed the new
+TX timeout/recovery/terminal-failure counters with zero nominal faults. The
+deterministic missing-TX-done injection acceptance test remains open.
+
+The first post-flash payload smoke test then supplied direct WP1-B failure
+evidence. A ground USB unplug interrupted transfer `1` after `5/1100` packets.
+After the device re-enumerated and both GDS and the payload receiver were
+restarted on the exact new endpoints, uplink bytes reached the bridge
+(`uart_rx=918`) and the retry reached the satellite. The satellite accepted it
+and transmitted return traffic, but GDS received only `16` bytes while the
+ground firmware reported `uart_tx=73067`. This proves the current counter still
+claims complete USB packets after zero/partial host writes; unplug/replug alone
+does not provide a reliable recovery contract. The partial run is retained at
+`data/c3m_20260715_022943_transfer_1/` and is evidence, not a nominal pass.
 
 Acceptance:
 
