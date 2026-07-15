@@ -44,8 +44,8 @@ static constexpr uint8_t RF_TX_ACK_REQUIRED_PAYLOAD = 0;
 static constexpr uint8_t RF_RX_ACK_REQUIRED_CCSDS = 0;
 static constexpr uint8_t RF_RX_ACK_REQUIRED_PAYLOAD = 0;
 
-static constexpr uint32_t PAYLOAD_PACKETS_PER_RUN = 22;
-static constexpr uint32_t PAYLOAD_RETRY_PACKETS_PER_RUN = 22;
+static constexpr uint32_t PAYLOAD_PACKETS_PER_RUN = 18;
+static constexpr uint32_t PAYLOAD_RETRY_PACKETS_PER_RUN = 18;
 
 static constexpr char COMMAND_PREFIX = '#';
 static constexpr size_t COMMAND_MAX_LEN = 64;

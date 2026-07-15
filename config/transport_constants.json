@@ -54,8 +54,8 @@
     "magic_0": 78,
     "magic_1": 50,
     "packet_data_bytes": 35,
-    "packets_per_run": 22,
-    "retry_packets_per_run": 22
+    "packets_per_run": 18,
+    "retry_packets_per_run": 18
   },
   "command": {
     "prefix": "#",

@@ -50,8 +50,8 @@ static constexpr U8 RF_SATELLITE_TX_ACK_REQUIRED_CCSDS = 0;
 static constexpr U8 RF_SATELLITE_TX_ACK_REQUIRED_PAYLOAD = 0;
 static constexpr FwSizeType PAYLOAD_PACKET_MAX_BYTES = RF_SEGMENT_MAX_DATA_BYTES;
 static constexpr FwSizeType PAYLOAD_PACKET_DATA_BYTES = 35;
-static constexpr U32 PAYLOAD_PACKETS_PER_RUN = 22;
-static constexpr U32 PAYLOAD_RETRY_PACKETS_PER_RUN = 22;
+static constexpr U32 PAYLOAD_PACKETS_PER_RUN = 18;
+static constexpr U32 PAYLOAD_RETRY_PACKETS_PER_RUN = 18;
 static constexpr U8 PAYLOAD_MAGIC_0 = 0x4E;  // 'N'
 static constexpr U8 PAYLOAD_MAGIC_1 = 0x32;  // '2'
 
