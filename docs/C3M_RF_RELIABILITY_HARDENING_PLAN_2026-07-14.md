@@ -138,8 +138,8 @@ for this demo. Its mission-grade details remain in Git history at `87eca99` and
 | --- | --- | --- |
 | Nominal single capture/downlink/decode | Passed | Passed before and after the bridge fix; current post-fix product/transfer 1 was 38,480 bytes, 1,100/1,100, exact source/ground SHA-256, 65.1 s |
 | Bounded Teensy RF TX timeout/retry/recovery | Passed host tests and builds | Focused injected policy passed; direct physical `waitPacketSent()` fault injection is N/A without an MVP-only firmware hook |
-| Honest ground USB writes and independent queues | Passed host tests and build | Six-second channel-0 reader stop/restart passed with counted backpressure/recovery, no new discard, and recovered PING; full USB reconnect remains |
-| Persistent/re-enumerating ground receiver | Passed focused tests | Process restart passed from a 253/1,100 checkpoint; physical USB reconnect remains |
+| Honest ground USB writes and independent queues | Passed host tests and build | Passed six-second channel-0 reader stop and full ground USB reconnect; backpressure/recovery remained honest, GDS reconnected, and PING returned |
+| Persistent/re-enumerating ground receiver | Passed focused tests | Passed process restart from 253/1,100 and physical ground USB reconnect from 423/1,100; both completed by repair with CRC-valid files |
 | Duplicate start and bounded F Prime payload work | Passed component tests | Passed on target: duplicate preserved active product/progress, one start event, CRC complete, no F Prime restart |
 | Additive N2 repair | Passed component tests | Passed one natural one-round repair in the 3/3 nominal run; focused fade remains |
 | Automatic progress-event removal | Passed component/full local validation | Passed observation: zero automatic progress events; five PING responses delivered during four bulk transfers |
@@ -306,11 +306,36 @@ hardware identities before every flash; do not assume July 14 device paths.
 | HIL-MVP-2a single nominal | Capture/downlink/display one new photo | Exact CRC/hash ground copy; 160x120 decode; all sides return ready | **PASS** — product/transfer 1, 1,100/1,100, 64.8 s, SHA-256 `d166dee7...e214` |
 | HIL-MVP-2b repeated nominal | Capture/downlink/display three new photos sequentially | Three unique CRC-valid ground images; all sides remain running/ready | **PASS** — products/transfers 2-4, 3/3 exact files, 64.7-65.2 s, PID unchanged |
 | HIL-MVP-3 duplicate command | Repeat active downlink request once | No progress reset, assertion, or F Prime restart | **PASS** — duplicate product 5 request preserved the active transfer; one start event; 1,100/1,100 and CRC complete; PID unchanged |
-| HIL-MVP-4 brief RF fade | Block/mispoint basic antennas briefly, then restore | Missing packets requested/repaired or honest partial; next cycle succeeds | Pending |
+| HIL-MVP-4 brief RF fade | Create far-field attenuation with distance/off-axis antenna geometry, then restore | Missing packets requested/repaired or honest partial; next cycle succeeds | **Pending safe retry** — the first five-second attempt caused no loss; a later aluminum-near-antenna attempt is invalid because it detuned/stressed the 1 W RF path and wedged local TX completion. Its 332/1,100 honest partial and clean post-reset 1,100/1,100 cycle are retained as fault evidence, not fade qualification |
 | HIL-MVP-5 ground receiver restart | Restart only payload receiver during transfer | State reloads and completes or remains honest partial; following cycle succeeds | **PASS** — replacement receiver resumed transfer 6 at 253/1,100; one repair round; CRC complete in 68.7 s; PID unchanged |
 | HIL-MVP-6 channel-0 backpressure | Stop/restart only GDS reader | Short write/backpressure counted; no false delivery or watchdog reset; PING recovers | **PASS** — six-second reader stop increased backpressure, then recovery count; no new discards/queue drops; PING 37606 returned; PID unchanged |
-| HIL-MVP-7 ground USB reconnect | Unplug/replug ground Teensy once | Ports rediscovered; no silent complete; current attempt resolves honestly; next cycle succeeds | Pending |
+| HIL-MVP-7 ground USB reconnect | Unplug/replug ground Teensy once | Ports rediscovered; no silent complete; current attempt resolves honestly; next cycle succeeds | **PASS** — all ground ports disappeared at 423/1,100; receiver entered `recovering`; ports, receiver, and GDS auto-reconnected; transfer completed after two repairs; PING 39008 and a zero-repair next cycle passed |
 | HIL-MVP-8 RF TX timeout injection | Exercise the bounded `waitPacketSent` failure path with a focused host-injected test; optionally remove the peer only to exercise ACK retry | Bounded retry/recovery; no 12-second watchdog reset; do not mislabel no-peer ACK loss as a TX-completion timeout | **PASS focused injection / N/A physical** — both bridges use a 500 ms completion timeout and one recovered retry; injected timeout/terminal cases pass; no MVP-only hardware hook added |
+
+### Planned Local Radio-Recovery Task — Not Implemented Yet
+
+The aluminum incident exposed a persistent local satellite RFM23BP TX-completion
+wedge, but it was not a valid RF-fade test. Preserve the current firmware for
+the remaining existing HIL cases. Plan a separate evidence-backed follow-up:
+
+1. Let the Pi boot fully and start F Prime before local radio recovery is
+   eligible.
+2. Extend the existing satellite-local channel `2` RPC boundary with bounded
+   radio-health/status and radio-reinitialize operations. Channel `2` remains
+   local to the Pi/Teensy UART and never crosses RF.
+3. Initiate recovery locally from F Prime/bridge health state after a defined
+   terminal-timeout threshold. Do not require a ground command over an already
+   wedged RF link.
+4. Reinitialize only the radio/IRQ/profile state first; do not toggle
+   `RPI_ENABLE_PIN` or reboot the whole satellite for a radio-only fault.
+5. Bound every request/result, report attempted/succeeded/failed state through
+   counters/events after the link returns, and preserve honest packet loss for
+   the existing N2 repair/partial logic.
+6. Add focused channel-2 and retry-policy tests, both Teensy builds, a nominal
+   regression, and a safe HIL recovery case before claiming the task complete.
+
+This is a planned task only. Do not implement it during the current remaining
+HIL matrix run.
 
 For every case record:
 
@@ -385,6 +410,11 @@ Re-query live USB identities before every future flash.
 | 2026-07-15 10:35 | Per-channel RF message IDs | PASS local/build | Commit `bdca6a3`; message-ID allocator is per channel on both bridges; focused 5/5 regression, 68-test local gate, native build, 6/6 component suites, and both Teensy builds passed |
 | 2026-07-15 10:42 | Post-fix one-photo HIL regression | PASS HIL | Fresh Pi epoch product/transfer 1; 38,480 bytes, 1,100/1,100, CRC 19401, 65.1 s, one repair, exact Pi/ground SHA-256 `102448ad...0227`, 160x120 decode, PING 39002, PID 256 / zero restarts; ground `rf_msg_id_gaps` changed only 1 to 3 with one real reassembly loss instead of climbing by hundreds from channel interleaving |
 | 2026-07-15 10:44 | HIL-MVP-8 TX-completion policy | PASS focused injection / N/A physical | Both bridge policies pass injected SENT, timeout-then-success, and terminal-timeout cases; live constants bound each attempt to 500 ms with one retry. Peer removal would test ACK loss, not local TX completion, so no demo-only hardware injection hook was added |
+| 2026-07-15 10:52 | HIL-MVP-4 fade attempt 1 | INCONCLUSIVE / nominal control | Product/transfer 2 completed 38,480 bytes and 1,100/1,100 with CRC 27932, zero repair rounds, 64.6 s, exact Pi/ground SHA-256 `eef83100...dcc63`, 160x120 decode, PID 256 / zero restarts. The five-second basic-antenna shield/mispoint produced no observable impairment, so it is not an RF-fade pass; retry only with safe far-field distance/off-axis antenna geometry |
+| 2026-07-15 11:03 | Aluminum-near-antenna attempt | INVALID FADE / HARDWARE-STRESS INCIDENT | Conductive aluminum about five feet from the close-range 50-ohm monopole setup likely changed the near-field load/VSWR rather than creating a clean far-field fade. Receiver saved an honest partial at 332/1,100 with 768 missing after 17 repair rounds and a 90 s stall timeout, while satellite debug showed repeated local TX-completion timeouts/terminal failures and required a hard reset. Never repeat this method or count it as HIL-MVP-4 qualification |
+| 2026-07-15 11:21 | Post-incident clean cycle | PASS HIL | After a clean satellite-stack reset, PING 39007 returned and a fresh product completed 38,480 bytes, 1,100/1,100, CRC 58576, 64.8 s, exact Pi/ground SHA-256 `a0ef606c...15d4f5`, 160x120 decode, zero repair rounds, zero satellite TX timeouts, PID 255 / zero restarts. Old partial state did not contaminate the reboot-reused product/transfer 1 identity |
+| 2026-07-15 11:27 | HIL-MVP-7 ground USB reconnect | PASS HIL | Ground triple USB was removed during product/transfer 2 at 423/1,100. Receiver entered explicit `recovering` with no false completion. After replug, all ports re-enumerated, receiver and GDS auto-reconnected, and the same transfer completed 1,100/1,100 after two repair rounds in 94.3 s with CRC 15298 and exact Pi/ground SHA-256 `05171691...d8c6d`. PING 39008 returned; PID 255 / zero restarts |
+| 2026-07-15 11:29 | HIL-MVP-7 clean next cycle | PASS HIL | Product/transfer 3 completed 38,480 bytes, 1,100/1,100, CRC 41214, 64.8 s, zero repairs, exact Pi/ground SHA-256 `b7448a77...70299`, 160x120 decode; satellite TX timeout/drop counters remained zero and PID 255 remained at zero restarts |
 
 The hashes above were verified against the live Pi and the exact locally built
 HEX artifacts uploaded by physical Teensy IDs during this bench session.

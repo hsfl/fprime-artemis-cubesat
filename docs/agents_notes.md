@@ -1168,3 +1168,27 @@ Driver tier, formerly repo "Adapter":
   and passed focused injected timeout/recovery cases on both bridges. Simply
   removing the peer does not trigger this local completion timeout, so the HIL
   plan does not claim peer-offline ACK loss as proof of `waitPacketSent()`.
+- The first operator-cued five-second basic-antenna fade attempt did not
+  measurably impair the link: product/transfer 2 completed 1,100/1,100 with
+  zero repair rounds and exact source/ground SHA-256. It remains an
+  inconclusive nominal control, not HIL-MVP-4 qualification.
+- Do not use aluminum or another conductor close to the 1 W monopole setup to
+  force loss. The later aluminum attempt detuned/stressed the RF path, produced
+  an honest 332/1,100 partial, and coincided with persistent satellite-local TX
+  completion timeouts that required a hard reset. Treat it as an invalid fade
+  and hardware-stress incident; retry MVP-4 only with safe far-field distance
+  or off-axis antenna geometry.
+- The clean post-reset cycle passed 1,100/1,100 with exact source/ground SHA,
+  zero repairs, zero satellite TX timeouts, and no stale partial contamination.
+- Planned only, not implemented: after Pi/F Prime boot, add bounded
+  satellite-local channel-2 radio health/reinitialization RPC so local health
+  logic can recover a wedged radio without depending on the dead RF link or
+  toggling `RPI_ENABLE_PIN`. Preserve this as a separate follow-up after the
+  existing HIL matrix.
+- HIL-MVP-7 ground USB reconnect passed. Removing the ground Teensy during
+  product/transfer 2 made all three ports disappear at 423/1,100 and put the
+  receiver into explicit recovery. Replug auto-restored the ports, payload
+  receiver, and GDS; the transfer completed after two repair rounds with exact
+  source/ground SHA, PING 39008 returned, and the next fresh transfer completed
+  1,100/1,100 with zero repairs. Pi PID 255 stayed at zero restarts and the
+  satellite reported zero TX timeouts/drops.
