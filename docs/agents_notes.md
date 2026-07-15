@@ -1121,8 +1121,9 @@ Driver tier, formerly repo "Adapter":
   shifting valid data.
 - `./tools/validate_local.sh --skip-demo` passes after the change, including
   Python tests, native F Prime build, and 6/6 component UT executables.
-- HIL packet-loss qualification remains open; local replay does not prove RF
-  timing or retry behavior.
+- HIL packet-loss qualification passed with the portable-GDS eighth-floor
+  walkaround: 24 missing packets recovered in four selective-repair rounds,
+  followed by a zero-repair clean cycle at restored inside-lab geometry.
 
 ## RF Mission Traffic Isolation (2026-07-10)
 
@@ -1161,9 +1162,10 @@ Driver tier, formerly repo "Adapter":
   gap counter changed only 1 to 3 alongside one real reassembly loss/repair,
   rather than climbing by hundreds from ordinary channel interleaving.
 - Focused HIL recovery gates also passed: duplicate active request, receiver
-  restart from a 253/1,100 checkpoint, and a six-second GDS-reader stop with
-  subsequent PING recovery. Physical RF fade and full ground-USB reconnect are
-  still pending.
+  restart from a 253/1,100 checkpoint, a six-second GDS-reader stop with
+  subsequent PING recovery, and a full ground-USB unplug/replug with automatic
+  receiver/GDS reconnection and a clean next cycle. Physical RF-fade
+  qualification also passed with the later portable eighth-floor walkaround.
 - The bounded RF TX-completion policy remains 500 ms per attempt with one retry
   and passed focused injected timeout/recovery cases on both bridges. Simply
   removing the peer does not trigger this local completion timeout, so the HIL
@@ -1192,3 +1194,19 @@ Driver tier, formerly repo "Adapter":
   source/ground SHA, PING 39008 returned, and the next fresh transfer completed
   1,100/1,100 with zero repairs. Pi PID 255 stayed at zero restarts and the
   satellite reported zero TX timeouts/drops.
+- Portable/battery HIL also passed as a nominal control: only the ground Teensy
+  was USB-connected to the Mac, the satellite ran from battery, and both ends
+  used normal monopoles. PING 39009 passed after the new satellite boot, then
+  three fresh 38,480-byte products completed with exact Pi/ground hashes and
+  160x120 decode; PINGs 39010-39012 passed and Pi PID 254 stayed at zero
+  restarts. Initial short distance/orientation fade windows caused no
+  observable loss and remain nominal controls rather than qualification.
+- HIL-MVP-4 subsequently passed using real building distance/attenuation with
+  no antenna manipulation: the portable GDS was carried outside the lab and
+  around the eighth floor while both ends retained normal monopoles and the
+  satellite remained battery-powered. Product/transfer 4 accumulated 24
+  missing packets, recovered all of them in four selective-repair rounds, and
+  completed exact in 70.3 s; PING 39013 returned. Back inside, fresh
+  product/transfer 5 completed exact in 64.6 s with zero repairs and PING
+  39014. Both decoded 160x120, Pi PID 254 stayed at zero restarts, and their
+  exact SHA-256 values are recorded in the core reliability plan.
