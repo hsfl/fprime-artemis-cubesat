@@ -47,6 +47,7 @@ check_shared_teensy_drift() {
   local shared_pairs=(
     "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/artemis_rf23bp.hpp|GDS_Teensy/firmware/gds_teensy/src/artemis_rf23bp.hpp"
     "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/link_counters.hpp|GDS_Teensy/firmware/gds_teensy/src/link_counters.hpp"
+    "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/rf_tx_retry.hpp|GDS_Teensy/firmware/gds_teensy/src/rf_tx_retry.hpp"
     "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/wdt_guard.hpp|GDS_Teensy/firmware/gds_teensy/src/wdt_guard.hpp"
   )
 
@@ -106,6 +107,7 @@ python3 -m unittest \
   ArtemisRpiTeensy_N2/tools/tests/test_payload_receiver.py \
   ArtemisRpiTeensy_N2/tools/tests/test_c3m_payload_receiver_ui.py \
   ArtemisRpiTeensy_N2/tools/tests/test_rf_network_identity.py \
+  GDS_Teensy/tools/tests/test_rf_tx_retry.py \
   GDS_Teensy/tools/tests/test_usb_tx_progress.py
 
 # shellcheck disable=SC1090

@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "link_protocol.hpp"
+#include "rf_tx_retry.hpp"
 #include "wdt_guard.hpp"
 
 RelayUartRf::RelayUartRf(Stream& linkIo,
@@ -421,20 +422,26 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
 }
 
 bool RelayUartRf::sendRfPacket(const uint8_t* packet, uint8_t packetLen) {
-  switch (m_rf.send(packet, packetLen)) {
-    case Rf23SendResult::SENT:
-      return true;
-    case Rf23SendResult::TX_TIMEOUT:
-      m_counters.rfTxTimeouts += 1;
-      m_counters.rfRecoveries += 1;
-      m_counters.rfTxTerminalFailures += 1;
-      return false;
-    case Rf23SendResult::START_FAILED:
-      m_counters.rfTxTerminalFailures += 1;
-      return false;
+  const rf_tx_retry::Outcome outcome = rf_tx_retry::sendWithBoundedTimeoutRetry([&]() {
+    wdt_guard::feed();
+    const Rf23SendResult result = m_rf.send(packet, packetLen);
+    wdt_guard::feed();
+    switch (result) {
+      case Rf23SendResult::SENT:
+        return rf_tx_retry::AttemptResult::SENT;
+      case Rf23SendResult::TX_TIMEOUT:
+        return rf_tx_retry::AttemptResult::TX_TIMEOUT;
+      case Rf23SendResult::START_FAILED:
+        return rf_tx_retry::AttemptResult::START_FAILED;
+    }
+    return rf_tx_retry::AttemptResult::START_FAILED;
+  });
+  m_counters.rfTxTimeouts += outcome.timeouts;
+  m_counters.rfRecoveries += outcome.recoveries;
+  if (outcome.terminalFailure) {
+    m_counters.rfTxTerminalFailures += 1;
   }
-  m_counters.rfTxTerminalFailures += 1;
-  return false;
+  return outcome.sent;
 }
 
 bool RelayUartRf::sendRfPacketWithAck(const uint8_t* packet,
