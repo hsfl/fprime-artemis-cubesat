@@ -26,11 +26,11 @@ package complete from a build or happy-path run alone.
 | Investigation and code comparison | Complete | July 14 logs and current/legacy source reviewed |
 | Reliability plan documented | Complete | This document |
 | Exact indoor bench baseline | Complete | Provenance bundle plus one clean full transfer |
-| Ground bridge fail-safe behavior | Not started | Bounded RF TX and honest USB-write behavior under HIL |
-| Receiver persistence and reconnect | Not started | Interrupted transfer resumes after process/USB loss |
-| Flight transfer completion contract | Not started | Ground CRC confirmation controls final completion |
-| Explicit half-duplex operation | Not started | Deterministic payload, turnaround, repair, and control windows |
-| Controlled failure matrix | Not started | All required cases have artifacts and explicit outcomes |
+| Ground bridge fail-safe behavior | In progress | Local bounded RF TX and honest USB-write behavior implemented; HIL proof remains |
+| Receiver persistence and reconnect | In progress | Local restart/re-enumeration recovery implemented; HIL proof remains |
+| Flight transfer completion contract | In progress | N2 admission, repair, and local-delivery hardening implemented; ground verification remains |
+| Explicit half-duplex operation | Design drafted | N3 phase/lease proposal requires review and implementation |
+| Controlled failure matrix | In progress | Local fault cases pass; physical HIL cases remain |
 | Outdoor qualification | Not started | Three consecutive qualified transfers at each geometry |
 
 ### Live Bench At Plan Start
@@ -363,7 +363,7 @@ Gate passes only when the full provenance and proof bundle is saved.
 ### WP1 — Ground and satellite bridge fail-safe behavior
 
 - [x] Add a finite RF TX-completion timeout below the watchdog deadline.
-- [ ] Add bounded retry followed by explicit radio/FIFO recovery.
+- [x] Add bounded retry followed by explicit radio/FIFO recovery.
 - [x] Preserve a queued RF message until success or counted terminal failure.
 - [x] Track actual bytes accepted by channel-0 and channel-1 USB writes.
 - [x] Retain unwritten data across zero/partial USB writes.
@@ -407,6 +407,21 @@ the shared Teensy drift check passed, and the ground firmware built with
 SHA-256 `7d2fdbf8431ea5fb979304196339a1380b6214c5edfac2e7ee7bf87a852085b9`.
 This image has not yet been flashed; HIL-01/HIL-02 acceptance remains open.
 
+WP1-A retry follow-up is committed as `c62d0af`. After a low-level
+TX-completion timeout clears both FIFOs and restores RX, each bridge makes one
+bounded retry. A start failure is terminal immediately, while a second timeout
+ends in one counted terminal failure. The shared host-side policy test forces
+success, timeout/recovery/success, repeated timeout, start failure, and retry
+exhaustion without hardware. Both satellite and ground Teensy workspaces build
+successfully. The missing-TX-done HIL acceptance case remains open.
+
+The final home build artifacts after all July 14 local changes are satellite
+SHA-256 `1fa47ea1ab3a042249c27a2c14724228065ce7cce1e899f18872cf3d9b234921`
+and ground SHA-256
+`7728412b83e7b9c55bf7106018b13d6e81bf528e96d108e21f743d3b91cd0017`.
+They are build evidence only; neither hash is claimed as the live hardware
+image until the exact boards are queried and flashed tomorrow.
+
 Acceptance:
 
 - A missing TX-done condition returns through `TX_TIMEOUT`/`RADIO_RECOVERY`
@@ -417,15 +432,28 @@ Acceptance:
 
 ### WP2 — Persistent and resumable ground receiver
 
-- [ ] Persist transfer header and product identity when first accepted.
-- [ ] Persist the received-packet bitmap and packet bytes incrementally.
-- [ ] Reopen a re-enumerated port by stable device identity.
-- [ ] Resume the same transfer after receiver/web-app restart.
+- [x] Persist transfer header and product identity when first accepted.
+- [x] Persist the received-packet bitmap and packet bytes incrementally.
+- [x] Reopen a re-enumerated port by stable device identity.
+- [x] Resume the same transfer after receiver/web-app restart.
 - [ ] Preserve partial state when GDS remains alive but channel 1 disconnects.
-- [ ] Save `.fdp.partial`, missing-packet map, and explicit failure reason when
+- [x] Save `.fdp.partial`, missing-packet map, and explicit failure reason when
       retention expires.
-- [ ] Keep the CLI receiver as an engineering fallback while making the web app
+- [x] Keep the CLI receiver as an engineering fallback while making the web app
       the normal operator surface.
+
+WP2 local implementation is committed as `96d1e55`. The receiver checkpoints
+the exact product identity, bytes, and packet bitmap; uses atomic manifest
+replacement and data sync; quarantines conflicting or unsafe state; resolves a
+stable serial identity after re-enumeration; resumes the web-app worker; and
+finalizes complete or position-preserving partial artifacts honestly. The 38
+focused tests cover restart at 25%, 50%, and 90%, process restart, serial
+re-enumeration, permanent loss, collision handling, stale state, and CRC
+outcomes. Per-packet sync measured about 116 packets/s for a 1,100-packet local
+replay, so Pi/USB HIL timing remains a qualification item. Multiple concurrent
+web-app processes are not protected by an inter-process lock, and direct CLI
+checkpoint persistence remains an explicit operator option rather than the
+default. HIL-03, HIL-05, and HIL-06 remain open.
 
 Acceptance:
 
@@ -436,7 +464,7 @@ Acceptance:
 
 ### WP3 — Flight completion and repair contract
 
-- [ ] Reject or idempotently reconcile a duplicate downlink start while a
+- [x] Reject or idempotently reconcile a duplicate downlink start while a
       transfer is active.
 - [ ] Separate local `TRANSMIT_COMPLETE` from ground
       `VERIFIED_COMPLETE` events and telemetry.
@@ -444,8 +472,8 @@ Acceptance:
 - [ ] Add an explicit ground final-CRC confirmation message.
 - [ ] Define confirmation timeout, repetition, expiry, and operator-visible
       failure behavior.
-- [ ] Merge duplicate/overlapping repair requests idempotently.
-- [ ] Pace retry requests according to actual repair throughput so a new
+- [x] Merge duplicate/overlapping repair requests idempotently.
+- [x] Pace retry requests according to actual repair throughput so a new
       request cannot overwrite unfinished repair work.
 - [ ] Repeat header and END/status metadata during recovery windows.
 - [ ] Define behavior for flight restart and stale transfer IDs.
@@ -461,6 +489,25 @@ F Prime queue: `ActiveRateGroupComponentAc.cpp:686` asserted with queue status
 `8`, the process aborted with `SIGABRT`, and `artemis-fprime.service` restarted
 from PID `256` to PID `675` (`NRestarts=1`) while the Pi boot ID remained
 unchanged. This is a deterministic software failure, not a Pi power cycle.
+
+N2 hardening is committed as `a1133a7`, `382ea51`, and `9b163b2`. Payload work
+is now an asynchronous drop-handler with an 18-frame per-run ceiling. Active
+duplicate descriptors are idempotent and conflicts return busy. Control input
+uses a bounded copy-only mailbox; repair work merges and deduplicates while
+reserving nominal progress. Header, nominal, repair, and END cursors advance
+only after the local UART boundary returns `LOCAL_ACCEPTED`; retry and error
+results preserve the cursor. Source-initialization failure now emits a
+correlated active identity before terminal error so `CommsApp` cannot remain
+wedged. The custom buffer port lives in a dedicated FPP module so both native
+and ARMv6 generation resolve its dependency correctly.
+
+Focused tests pass: 14 `PayloadDownlinkApp`, 10 `CommsApp`, and 2
+`UartChannelMux` cases. These cover duplicate/conflicting starts, source-init
+failure, stale status, mailbox overflow/copying, additive/overlapping repair,
+anti-starvation, abort cleanup, and local retry/error without cursor advance.
+This is still N2: `DONE` means local END acceptance, a U8 transfer ID has no
+restart epoch, and local UART acceptance proves neither Teensy/RF delivery nor
+ground CRC. Physical queue/pacing behavior remains an HIL gate.
 
 Acceptance:
 
@@ -478,6 +525,15 @@ Acceptance:
 - [ ] Add telemetry for current link phase, phase age, owner, pending work, and
       last transition reason.
 - [ ] Define bounded recovery if either side misses a phase transition.
+
+The design-only [N3 reliable payload protocol
+proposal](C3M_RELIABLE_PAYLOAD_PROTOCOL_N3.md), committed as `87eca99`, defines
+provisional initial identity, request/grant/yield leases, same-owner and
+owner-changing transitions, turnaround quiet time, reserved metadata/yield
+slots, additive repair snapshots, final CRC confirmation/ACK recovery, durable
+restart identity, and honest terminal outcomes. It is not approved,
+implemented, deployed, or HIL-qualified; the WP4 implementation checkboxes
+remain open.
 
 Acceptance:
 
@@ -506,16 +562,18 @@ Acceptance:
 
 ### WP6 — Deterministic local and component tests
 
-- [ ] Preserve the current successful local C3M flow.
+- [x] Preserve the current successful local C3M flow.
 - [x] Add tests for USB zero writes, partial writes, delayed writes, and terminal
       write failure.
-- [ ] Add tests for TX timeout and radio recovery.
-- [ ] Add tests for persistent receiver restart/resume.
+- [x] Add tests for TX timeout and radio recovery.
+- [x] Add tests for persistent receiver restart/resume.
 - [ ] Add loss cases for `1`, `10`, `100`, `300`, and approximately `550`
       payload packets.
 - [ ] Add tests for lost header, lost END, lost final confirmation, duplicate
       repair, overlapping repair, and stale transfer identity.
 - [ ] Add state-machine tests for every timeout and terminal state.
+- [x] Add N2 tests for duplicate/conflicting starts, additive/overlapping
+      repair, mailbox overflow, stale status, and local send retry/error.
 
 Acceptance:
 
@@ -639,48 +697,68 @@ Add entries after work begins. Keep them short and link the durable artifact.
 | 2026-07-14 16:31 | WP3 duplicate start | ABORTED | Duplicate downlink reset transfer 1 into transfer 2; rate-group queue asserted and F Prime restarted, PID `256` to `675`, `NRestarts=1` |
 | 2026-07-14 16:43 | WP1-B local verification | PASS | Commit `d6c14ed`; shared drift check, 35 standard tests, focused USB state-machine test, and ground build passed; not flashed |
 | 2026-07-14 16:47 | Daily safe stop | Complete | GDS and payload receiver stopped; all serial ports free; Pi boot `6bcd0ad7-4ced-4024-ab06-a735d7cb395d`, service active PID `675`, `NRestarts=1` |
+| 2026-07-14 18:59 | Home local baseline | PASS | No hardware accessed. `./tools/validate_local.sh` passed: 35 Python/emulation tests, native generate/build, 6/6 sanitized component suites, and a fresh simulated Lepton capture/downlink/decode with exact CSV match. Integration must be rerun after the in-progress WP2/WP3 patches settle. |
+| 2026-07-14 19:10 | WP1-A bounded retry | PASS local | Commit `c62d0af`; deterministic timeout/recovery/retry policy tests passed and both Teensy firmware workspaces built. No upload or HIL performed. |
+| 2026-07-14 19:30 | WP2 persistent receiver | PASS local | Commit `96d1e55`; 38 focused restart/re-enumeration/partial-state tests passed, including resume at 25%, 50%, and 90%. HIL-03/05/06 remain open. |
+| 2026-07-14 19:35 | WP3 bounded payload runs | PASS local | Commit `a1133a7`; one-second work is capped at 18 frames; F Prime and both Teensy workspaces built. Target-Pi timing remains open. |
+| 2026-07-14 19:57 | WP2/WP3 integration | PASS local | Commit `382ea51`; 52 Python/emulation tests, native build, 6/6 sanitized suites, 14/10/2 focused component cases, both Teensy builds, and exact real-sample Lepton local round trip passed. |
+| 2026-07-14 20:02 | ARMv6 cross-build | PASS local | Commit `9b163b2` fixed the cross-only FPP dependency defect. Local-only Pi build verified ARMv6KZ, VFPv2, `/lib/ld-linux-armhf.so.3`; binary SHA-256 `2f6f9206be30ec3aefb8fcabb3865f89b19247de598dba6d2166b13ad6a9d57e`. |
+| 2026-07-14 20:02 | N3 protocol design | Design only | Commit `87eca99`; audited verified-completion, restart identity, additive repair, and half-duplex lease proposal. Not implemented or approved. |
 
 ## Start Here Tomorrow
 
-State at the 2026-07-14 16:47 HST stop:
+Home-only work ended 2026-07-14 20:02 HST. No hardware was queried, flashed,
+deployed, or assumed connected from home. The last bench identities and runtime
+state above are historical and must be verified live tomorrow.
 
-- Branch `codex/c3m-rf-reliability-hardening` is committed through `d6c14ed`
-  before this documentation update.
-- Ground and satellite Teensys remain connected as ground `usb:1100000`
-  (`11555330`, ports `...301/...303/...305`) and satellite `usb:2100000`
-  (`11556500`, port `...001`). No host process owns the ground data or payload
-  ports.
-- The ground hardware still runs the prior WP1-A image. The newly built WP1-B
-  ground HEX is
-  `7d2fdbf8431ea5fb979304196339a1380b6214c5edfac2e7ee7bf87a852085b9`
-  and has not been flashed.
-- The satellite production artifact remains
-  `61579b309ccbfbe27be40a7d1aed47f2f20eeae18388372360d05a0aba5873ee`.
-- The Pi did not reboot during the duplicate-start failure, but F Prime did.
-  StorageManager state was therefore reset; capture a fresh product before the
-  next nominal downlink.
+Local source and artifacts:
+
+- Branch: `codex/c3m-rf-reliability-hardening`; implementation/design commits
+  are through `9b163b2` before this documentation update.
+- Ground HEX SHA-256:
+  `7728412b83e7b9c55bf7106018b13d6e81bf528e96d108e21f743d3b91cd0017`.
+- Satellite HEX SHA-256:
+  `1fa47ea1ab3a042249c27a2c14724228065ce7cce1e899f18872cf3d9b234921`.
+- ARMv6 Pi binary SHA-256:
+  `2f6f9206be30ec3aefb8fcabb3865f89b19247de598dba6d2166b13ad6a9d57e`.
+- Local validation: 52 Python/emulation tests, native build, 6/6 sanitized
+  suites, both Teensy builds, exact sample Lepton round trip, and ARMv6KZ/VFPv2
+  cross-build all pass.
+- N3 is a reviewed design proposal only. Tomorrow's executable remains N2 and
+  must not be described as ground-verified completion or explicit half-duplex.
 
 Resume in this order:
 
-1. Keep the Mac awake/lid open; run repository/submodule preflight and verify
-   both live `usb:*` identities again.
-2. Flash **ground only** from committed WP1-B to `usb:1100000`. Do not flash the
-   satellite yet; its unsafe `RPI_ENABLE_PIN` reset behavior remains open.
-3. Reopen GDS on `...301`, payload receiver on `...305`, and debug on `...303`.
-   Prove a fresh `MissionApp.PING` and confirm all new `usb0_*`/`usb1_*`
-   counters start at zero.
-4. Run HIL-01 with a fresh two-second Lepton capture. Require `1100/1100`, final
-   CRC and Pi/ground SHA equality, no ground reset, and no additional F Prime
-   service restart. Do not issue a second downlink command while one is active.
-5. Run HIL-02 without unplugging USB: stop only the GDS reader while normal
-   channel-0 telemetry is arriving. Require counted `usb0_backpressure`, no
-   false full-write growth, no watchdog/reset/re-enumeration, then restart GDS
-   and require `usb0_recoveries` plus a successful PING. Preserve the debug log.
-6. Update this plan with the new artifact paths and firmware/upload evidence.
-   Only then begin the duplicate-start guard and move bulk payload emission out
-   of timing-critical rate-group execution with component tests.
+1. Keep the Mac awake with the lid open. Run `git status --short --branch`,
+   `git submodule status --recursive`, enumerate USB devices, verify the ground
+   and satellite `usb:*` upload IDs, and verify no unexpected serial owner.
+2. Verify the Pi identity, boot ID, service PID/restart count, deployed binary
+   hash, `/dev/serial0`, Lepton backend, and current StorageManager product.
+3. Inspect and resolve the satellite `RPI_ENABLE_PIN` startup gate before any
+   satellite flash. Flash the ground artifact to its exact verified `usb:*`
+   identity. Flash the satellite only after that safety gate passes. Record the
+   post-flash firmware hashes and reset causes.
+4. Deploy the verified ARMv6 binary and matching dictionary to the Pi using the
+   normal release procedure, then require the service to stay active with no
+   unexpected restart before opening RF traffic.
+5. Start GDS on channel 0, the web payload receiver on channel 1, and ground and
+   satellite debug capture. Require a clean `MissionApp.PING` and record all
+   initial RF/USB/queue counters.
+6. Run HIL-01 with a fresh Lepton capture. During the active transfer, issue an
+   exact duplicate downlink request and require idempotent acceptance without
+   resetting progress; issue a conflicting descriptor only if the operator
+   command path can construct one safely and require `BUSY`. Require final N2
+   CRC/hash equality, no bridge reset, and no F Prime restart.
+7. Run HIL-02 by stopping only the channel-0 reader, then restoring it. Require
+   counted backpressure/short-write behavior, no false complete-write growth,
+   no watchdog reset, and a successful post-recovery PING.
+8. Run WP2 HIL-03, HIL-05, and HIL-06 at 25%, 50%, and 90%. Require the same
+   durable transfer to reload after reader/process/USB loss and either complete
+   with the correct CRC or save an honest position-preserving partial.
+9. Run HIL-07 with the dedicated missing-TX-done injection. Require one bounded
+   recovery/retry, then explicit terminal failure without a watchdog reset.
+10. Preserve the full proof bundle and update this document after each case.
 
-Do not begin the channel-1 unplug/restart matrix until WP2 persistence exists;
-today's partial run proved the current receiver cannot resume it safely. The
-dedicated missing-TX-done HIL design is ready for later implementation, but its
-test images were not created or flashed today.
+Do not claim HIL-10/HIL-11, ground-verified completion, or explicit half-duplex
+qualification until an approved N3 implementation exists. Outdoor/Yagi testing
+remains after the controlled indoor matrix, not before it.
