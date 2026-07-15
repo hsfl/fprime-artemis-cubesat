@@ -74,8 +74,7 @@ void PayloadDownlinkAppTester::testHeaderRetransmitBehavior() {
 
     this->invoke_to_run(0, 0);
     this->component.doDispatch();
-    ASSERT_EVENTS_PayloadDownlinkProgress_SIZE(1);
-    ASSERT_EVENTS_PayloadDownlinkProgress(0, 1, 90, 1, 1);
+    ASSERT_EVENTS_PayloadDownlinkProgress_SIZE(0);
     ASSERT_EVENTS_PayloadDownlinkComplete_SIZE(1);
     ASSERT_from_packetOut_SIZE(5);
     ASSERT_EQ(this->m_packets.size(), 5U);
@@ -136,7 +135,7 @@ void PayloadDownlinkAppTester::testBurstCountSendsGeneratedPayloadPacketsPerRun(
     EXPECT_EQ(this->m_packets[headerPackets + LinkCfg::PAYLOAD_PACKETS_PER_RUN + 2U][2], 3U);
 }
 
-void PayloadDownlinkAppTester::testProgressEventsEveryTenPercent() {
+void PayloadDownlinkAppTester::testProgressTelemetryAndExplicitStatus() {
     U8 payload[LinkCfg::PAYLOAD_PACKET_DATA_BYTES * 10U] = {};
     for (FwSizeType i = 0; i < sizeof(payload); ++i) {
         payload[i] = static_cast<U8>(i & 0xFFU);
@@ -152,17 +151,14 @@ void PayloadDownlinkAppTester::testProgressEventsEveryTenPercent() {
 
     this->invoke_to_run(0, 0);
     this->component.doDispatch();
-    ASSERT_EVENTS_PayloadDownlinkProgress_SIZE(9);
-    for (U32 expectedPercent = 10; expectedPercent < 100; expectedPercent += 10) {
-        const U32 sampleIndex = (expectedPercent / 10U) - 1U;
-        ASSERT_EVENTS_PayloadDownlinkProgress(
-            sampleIndex,
-            1,
-            expectedPercent,
-            expectedPercent / 10U,
-            10);
-    }
+    ASSERT_EVENTS_PayloadDownlinkProgress_SIZE(0);
     ASSERT_EVENTS_PayloadDownlinkComplete_SIZE(1);
+
+    for (U32 tick = 0; tick < 3U; ++tick) {
+        this->invoke_to_run(0, 0);
+        this->component.doDispatch();
+    }
+    ASSERT_EVENTS_PayloadDownlinkProgress_SIZE(0);
 
     this->clearHistory();
     this->sendCmd_GET_PAYLOAD_STATUS(0, 0);

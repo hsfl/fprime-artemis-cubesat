@@ -12,7 +12,6 @@ namespace {
 constexpr U32 MAX_BLOB_BYTES = 1024U * 1024U;
 constexpr U32 HEADER_RETRANSMIT_COUNT = 3U;
 constexpr U32 HEADER_REFRESH_COUNT = 1U;
-constexpr U32 COMPLETION_SUMMARY_EVENT_REPEATS = 3;
 constexpr const char* PAYLOAD_SOURCE_ENV = "NEUTRON_PAYLOAD_DOWNLINK_FILE";
 constexpr const char* DEFAULT_PAYLOAD_SOURCE = "/tmp/neutron_payload_captures/latest_payload.bin";
 constexpr const char* CAPTURE_DIR = "/tmp/neutron_payload_captures";
@@ -103,7 +102,6 @@ PayloadDownlinkApp::PayloadDownlinkApp(const char* const compName)
       m_lastError(0),
       m_requestDisposition(REQUEST_ACCEPTED),
       m_nextProgressPercent(10),
-      m_completionSummaryEventsRemaining(0),
       m_blobCrc(0),
       m_sentHeader(false),
       m_sentEnd(false),
@@ -179,7 +177,6 @@ void PayloadDownlinkApp::run_handler(FwIndexType portNum, U32 context) {
     }
 
     if (this->m_state == STATE_DONE) {
-        this->emitCompletionSummaryIfDue();
         this->emitTelemetry();
         return;
     }
@@ -222,7 +219,7 @@ void PayloadDownlinkApp::run_handler(FwIndexType portNum, U32 context) {
                 break;
             }
             this->m_nextPacketIndex++;
-            this->emitProgressIfDue();
+            this->updateProgressIfDue();
             dataSentThisRun++;
             packetsSentThisRun++;
         }
@@ -242,9 +239,9 @@ void PayloadDownlinkApp::run_handler(FwIndexType portNum, U32 context) {
             this->m_sentEnd = true;
             this->m_state = STATE_DONE;
             this->m_progressPercent = 100U;
-            this->m_completionSummaryEventsRemaining = COMPLETION_SUMMARY_EVENT_REPEATS;
             this->log_ACTIVITY_HI_PayloadDownlinkComplete(this->m_transferId, this->m_packetsSent);
             this->emitStatus();
+            this->emitTelemetry(true);
         }
     }
 
@@ -458,7 +455,6 @@ bool PayloadDownlinkApp::resetTransfer(U32 productId,
     this->m_lastError = 0U;
     this->m_requestDisposition = REQUEST_ACCEPTED;
     this->m_nextProgressPercent = 10U;
-    this->m_completionSummaryEventsRemaining = 0U;
     this->m_blobCrc = 0U;
     this->m_sentHeader = false;
     this->m_sentEnd = false;
@@ -579,15 +575,6 @@ void PayloadDownlinkApp::writeProgressTelemetry() {
     this->tlmWrite_ProgressTotalPackets(this->m_totalPackets);
 }
 
-void PayloadDownlinkApp::emitCompletionSummaryIfDue() {
-    if (this->m_completionSummaryEventsRemaining == 0U) {
-        return;
-    }
-    this->log_ACTIVITY_HI_PayloadDownlinkProgress(
-        this->m_transferId, 100U, this->m_nextPacketIndex, this->m_totalPackets);
-    this->m_completionSummaryEventsRemaining--;
-}
-
 Components::PayloadSendStatus PayloadDownlinkApp::sendHeaderPacket() {
     std::memset(this->m_packet, 0, sizeof(this->m_packet));
     this->m_packet[0] = LinkCfg::PAYLOAD_MAGIC_0;
@@ -663,7 +650,7 @@ Components::PayloadSendStatus PayloadDownlinkApp::sendPacket(const U8* data, FwS
     return status;
 }
 
-void PayloadDownlinkApp::emitProgressIfDue() {
+void PayloadDownlinkApp::updateProgressIfDue() {
     if (this->m_totalPackets == 0U || this->m_nextProgressPercent >= 100U) {
         return;
     }
@@ -681,8 +668,6 @@ void PayloadDownlinkApp::emitProgressIfDue() {
             reportedPercent = this->m_nextProgressPercent;
         }
         this->m_progressPercent = reportedPercent;
-        this->log_ACTIVITY_HI_PayloadDownlinkProgress(
-            this->m_transferId, reportedPercent, this->m_nextPacketIndex, this->m_totalPackets);
         this->m_nextProgressPercent = reportedPercent + 10U;
     }
 }

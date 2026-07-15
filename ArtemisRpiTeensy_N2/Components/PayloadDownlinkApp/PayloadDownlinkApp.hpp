@@ -68,12 +68,11 @@ class PayloadDownlinkApp final : public PayloadDownlinkAppComponentBase {
     void emitTelemetry(bool force = false);
     void emitStatus();
     void writeProgressTelemetry();
-    void emitCompletionSummaryIfDue();
     Components::PayloadSendStatus sendHeaderPacket();
     Components::PayloadSendStatus sendDataPacket(U32 packetIndex);
     Components::PayloadSendStatus sendEndPacket();
     Components::PayloadSendStatus sendPacket(const U8* data, FwSizeType size);
-    void emitProgressIfDue();
+    void updateProgressIfDue();
     void handleRetryRequest(const U8* data, FwSizeType size);
     bool readSourceBytes(U32 offset, U8* output, U32 length) const;
     bool computeSourceCrc(U32 byteCount, U16& crcOut) const;
@@ -104,7 +103,6 @@ class PayloadDownlinkApp final : public PayloadDownlinkAppComponentBase {
     U32 m_lastError;
     RequestDisposition m_requestDisposition;
     U32 m_nextProgressPercent;
-    U32 m_completionSummaryEventsRemaining;
     U16 m_blobCrc;
     bool m_sentHeader;
     bool m_sentEnd;

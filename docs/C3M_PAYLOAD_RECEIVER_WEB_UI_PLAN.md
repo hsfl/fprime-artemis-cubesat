@@ -25,8 +25,9 @@ telemetry authority.
 
 ## Why GDS Alone Is Not Enough
 
-GDS shows flight-side evidence such as `PayloadDownlinkProgress` and
-`DownlinkFinished`. It does not prove that the ground node:
+GDS shows sparse flight-side lifecycle evidence such as `DownlinkFinished`;
+`GET_PAYLOAD_STATUS` provides an explicit progress fallback. GDS does not prove
+that the ground node:
 
 - received every channel-1 packet.
 - requested and received any required repairs.

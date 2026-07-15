@@ -19,7 +19,7 @@ class PayloadDownlinkAppTester final : public PayloadDownlinkAppGTestBase {
 
     void testHeaderRetransmitBehavior();
     void testBurstCountSendsGeneratedPayloadPacketsPerRun();
-    void testProgressEventsEveryTenPercent();
+    void testProgressTelemetryAndExplicitStatus();
     void testRetryBurstCountSendsGeneratedRetryPacketsPerRun();
     void testActiveRequestGuardPreservesTransferAndProgress();
     void testControlMailboxCopiesInputAndReportsOverflow();

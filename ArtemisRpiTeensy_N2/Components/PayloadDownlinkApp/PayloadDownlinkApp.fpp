@@ -102,7 +102,7 @@ module Components {
         event PayloadControlPacketRejected(reason: U32, total: U32) severity warning high \
             format "Payload control packet rejected reason={} total={}" throttle 5
 
-        @ Payload downlink progress, throttled to nominal 10 percent increments with short 100 percent replay after completion.
+        @ On-demand progress summary emitted only by GET_PAYLOAD_STATUS.
         event PayloadDownlinkProgress(transferId: U32, percentComplete: U32, packetsSent: U32, totalPackets: U32) \
             severity activity high format "Payload downlink progress transfer={} percent={} packets={}/{}"
 

@@ -288,7 +288,7 @@ Current channel-1 packet design includes:
 - `ProgressPercent`
 - `RetryRound`
 - `PacketsMissing`
-- `PayloadDownlinkProgress`
+- `PayloadDownlinkProgress` (explicit `GET_PAYLOAD_STATUS` query only)
 - `PayloadRetryRequested`
 - `PayloadDownlinkComplete`
 

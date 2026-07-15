@@ -10,9 +10,9 @@ TEST(Nominal, BurstCountSendsGeneratedPayloadPacketsPerRun) {
     tester.testBurstCountSendsGeneratedPayloadPacketsPerRun();
 }
 
-TEST(Nominal, ProgressEventsEveryTenPercent) {
+TEST(Nominal, ProgressTelemetryAndExplicitStatus) {
     Components::PayloadDownlinkAppTester tester;
-    tester.testProgressEventsEveryTenPercent();
+    tester.testProgressTelemetryAndExplicitStatus();
 }
 
 TEST(Nominal, RetryBurstCountSendsGeneratedRetryPacketsPerRun) {

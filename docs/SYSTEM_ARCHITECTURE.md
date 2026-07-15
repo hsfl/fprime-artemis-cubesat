@@ -446,12 +446,17 @@ Runtime ownership is:
   board driver produces mission-specific payload bytes.
 - `StorageManager` tracks the latest science product.
 - `CommsApp.REQUEST_SCIENCE_DOWNLINK` requests downlink of the latest stored product.
-- `PayloadDownlinkApp` packetizes the product, sends channel 1 packets, and emits progress events.
+- `PayloadDownlinkApp` packetizes the product, sends channel 1 packets, and maintains progress telemetry.
 - `tools/payload_receiver.py` reconstructs bytes, requests retries for missing packets, verifies CRC, and writes the output file.
 - The mission payload viewer opens the reconstructed file: Neutron 2 uses the
   neutron CSV viewer, while C3M uses the Lepton `.fdp` viewer.
 
-`PayloadDownlinkApp.PayloadDownlinkProgress` emits nominal `10%` increments from `10` through `90`. `PayloadDownlinkComplete` and `CommsApp.DownlinkFinished` are the completion signals. For tiny payloads, several progress events may appear at the same timestamp or packet count because one payload packet can represent more than ten percent of the file.
+The channel-1 receiver GUI is the normal per-packet progress display.
+`PayloadDownlinkApp` retains `ProgressPercent`, `ProgressPacketsSent`, and
+`ProgressTotalPackets` telemetry without automatically emitting progress
+events during the transfer. `GET_PAYLOAD_STATUS` emits one explicit progress
+summary when an operator needs a channel-0 fallback. `PayloadDownlinkComplete`
+and `CommsApp.DownlinkFinished` are the lifecycle completion signals.
 
 ## Development Assumptions
 

@@ -41,7 +41,7 @@ If this passes but HIL fails, the likely issue is one of:
 | F Prime mission | mode and scheduled collection | `ModeChanged`, `CollectionScheduled` | `MissionApp`, `ScienceApp` |
 | payload manager | capture request and driver handoff | `PayloadScienceCaptureRequested`, `CaptureComplete` | `PayloadManager`, `PayloadDriver_NeutronSim` |
 | storage | latest science product | `ScienceStored`, `LatestDataset` | `StorageManager` |
-| comms/downlink | science downlink request and progress | `DownlinkRequested`, `PayloadDownlinkProgress` | `CommsApp`, `PayloadDownlinkApp` |
+| comms/downlink | science downlink request and completion | `DownlinkRequested`, `PayloadDownlinkComplete` | `CommsApp`, `PayloadDownlinkApp` |
 | UART mux | Pi to satellite Teensy virtual channels | `FramesTx`/`FramesRx` move, `FrameDrops` stays low | `UartChannelMux`, generated `LinkCfg.hpp` |
 | RF bridge | channel 0/1 RF movement | Teensy `#LINK_STATUS` counters move | `relay_uart_rf.*`, RF debug serial |
 | EPS/PDU | satellite-local channel 2 RPC | `PduRequestQueued`, then handled or timed out | `EpsManager`, `EpsDriver_Artemis`, `pdu_proxy.cpp` |
@@ -66,7 +66,6 @@ LatestDataset
 DownlinkPrepared
 DownlinkRequested
 PayloadDownlinkStarted
-PayloadDownlinkProgress
 PayloadDownlinkComplete
 DownlinkFinished
 ```
@@ -210,8 +209,9 @@ If receiver is incomplete:
 
 - rerun the receiver before retrying downlink
 - increase timeout, for example `--timeout 240`
-- check `PayloadDownlinkProgress`, `PayloadRetryRequested`, and
-  `PayloadDownlinkFailed` in GDS Events
+- check the receiver GUI plus `ProgressPercent` telemetry; use
+  `GET_PAYLOAD_STATUS` for an explicit fallback, and check
+  `PayloadRetryRequested` and `PayloadDownlinkFailed` in GDS Events
 - check ground and satellite RF counters before reflashing
 
 Manual status command:
