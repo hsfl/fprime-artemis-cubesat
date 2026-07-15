@@ -12,7 +12,7 @@ The ground Teensy does not handle channel 2. Channel 2 is the satellite-local Te
 Each RF packet carries one segment:
 
 1. `seg_magic` (1 byte): `0xA5` for channel 0, `0xA6` for channel 1
-2. `msg_id` (1 byte): rolling message identifier
+2. `msg_id` (1 byte): rolling message identifier allocated independently per channel
 3. `seg_idx` (1 byte): zero-based segment index
 4. `seg_count` (1 byte): total segment count in message
 5. `chunk_len` (1 byte): payload bytes in this segment (`1..44`)

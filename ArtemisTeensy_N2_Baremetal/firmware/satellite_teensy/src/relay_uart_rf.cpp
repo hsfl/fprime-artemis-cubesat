@@ -27,7 +27,6 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
       m_inCommandMode(false),
       m_commandIndex(0),
       m_lastFrameByteMs(0),
-      m_nextMsgId(0),
       m_rawUartLen(0),
       m_lastRawUartByteMs(0),
       m_payloadUartLen(0),
@@ -40,6 +39,7 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
       m_downlinkCount(0) {
   memset(m_framePayload, 0, sizeof(m_framePayload));
   memset(m_commandBuffer, 0, sizeof(m_commandBuffer));
+  memset(m_nextMsgId, 0, sizeof(m_nextMsgId));
   memset(m_reassembly, 0, sizeof(m_reassembly));
   memset(m_rawUartBuf, 0, sizeof(m_rawUartBuf));
   memset(m_payloadUartBuf, 0, sizeof(m_payloadUartBuf));
@@ -393,7 +393,10 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
   }
 
   const uint8_t segCount = static_cast<uint8_t>(segCountU16);
-  const uint8_t msgId = m_nextMsgId++;
+  // Receive-side continuity is tracked per RF channel, so allocate message
+  // identifiers per channel as well. A single global sequence makes normal
+  // channel-0/channel-1 interleaving look like packet loss.
+  const uint8_t msgId = m_nextMsgId[channel]++;
 
   uint16_t sent = 0;
   for (uint8_t segIdx = 0; segIdx < segCount; segIdx++) {

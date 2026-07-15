@@ -94,7 +94,7 @@ Channel 2 response payload:
 Only channels 0 and 1 are RF forwarded. Each RF packet has:
 
 1. `seg_magic` (1 byte): `0xA5` for channel 0, `0xA6` for channel 1
-2. `msg_id` (1 byte): rolling message ID
+2. `msg_id` (1 byte): rolling message ID allocated independently per channel
 3. `seg_idx` (1 byte): segment index
 4. `seg_count` (1 byte): total segments in message
 5. `chunk_len` (1 byte): payload bytes in this RF packet (`1..44`)

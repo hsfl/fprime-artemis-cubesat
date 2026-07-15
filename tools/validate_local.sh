@@ -109,6 +109,7 @@ python3 -m unittest \
   ArtemisRpiTeensy_N2/tools/tests/test_c3m_payload_receiver_ui.py \
   ArtemisRpiTeensy_N2/tools/tests/test_rf_network_identity.py \
   GDS_Teensy/tools/tests/test_rf_tx_retry.py \
+  GDS_Teensy/tools/tests/test_rf_msg_id_sequence.py \
   GDS_Teensy/tools/tests/test_usb_tx_progress.py
 
 # shellcheck disable=SC1090

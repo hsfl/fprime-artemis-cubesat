@@ -119,7 +119,7 @@ class RelayUartRf {
   size_t m_commandIndex;
   uint32_t m_lastFrameByteMs;
 
-  uint8_t m_nextMsgId;
+  uint8_t m_nextMsgId[link_protocol::CHANNEL_COUNT];
   ReassemblyState m_reassembly[link_protocol::CHANNEL_COUNT];
 
   uint8_t m_rawUartBuf[link_protocol::FRAME_MAX_PAYLOAD];
