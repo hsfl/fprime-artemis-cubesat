@@ -59,6 +59,16 @@ class C3mLocalDemoScriptTest(unittest.TestCase):
             result.stderr,
         )
 
+    def test_abandon_first_cycle_requires_a_following_capture(self) -> None:
+        result = self.run_script(
+            "--captures", "1", "--abandon-first-cycle", "--exit-after-sequence"
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "--abandon-first-cycle requires --captures 2 or greater",
+            result.stderr,
+        )
+
     def test_c3m_sequence_omits_unneeded_conops_commands(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertNotIn('send_command "payloadDriverLepton.ENABLE"', source)
@@ -70,6 +80,8 @@ class C3mLocalDemoScriptTest(unittest.TestCase):
         self.assertIn('tools/payload_receiver.py', source)
         self.assertIn('--drop-payload-data-index', source)
         self.assertIn('--checkpoint-dir', source)
+        self.assertIn('--blackhole-payload-data-index-first-transfer', source)
+        self.assertIn('PARTIAL_EXPECTED', source)
 
 
 if __name__ == "__main__":

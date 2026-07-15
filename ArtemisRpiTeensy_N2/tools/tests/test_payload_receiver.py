@@ -451,9 +451,35 @@ class PayloadReceiverTests(unittest.TestCase):
             debug=False,
             checkpoint_dir=None,
             checkpoint_max_age_s=payload_receiver.DEFAULT_CHECKPOINT_MAX_AGE_S,
+            transfer_timeout_s=None,
+            absolute_transfer_timeout_s=None,
+            save_partial_on_timeout=False,
         )
         receiver.run.assert_called_once_with()
         receiver.run_directory.assert_not_called()
+
+    def test_main_exposes_bounded_partial_timeout_mode(self) -> None:
+        with mock.patch.object(payload_receiver, "PayloadReceiver") as receiver_class:
+            receiver_class.return_value.run_directory.return_value = 0
+            result = payload_receiver.main(
+                [
+                    "--port",
+                    "test-port",
+                    "--output-dir",
+                    "/tmp/payloads",
+                    "--transfer-timeout",
+                    "2",
+                    "--absolute-transfer-timeout",
+                    "10",
+                    "--save-partial-on-timeout",
+                ]
+            )
+
+        self.assertEqual(result, 0)
+        kwargs = receiver_class.call_args.kwargs
+        self.assertEqual(kwargs["transfer_timeout_s"], 2.0)
+        self.assertEqual(kwargs["absolute_transfer_timeout_s"], 10.0)
+        self.assertTrue(kwargs["save_partial_on_timeout"])
 
     def test_partial_reconstruction_preserves_packet_positions(self) -> None:
         blob = bytes(range(105))

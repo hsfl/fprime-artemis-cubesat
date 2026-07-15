@@ -146,6 +146,7 @@ for this demo. Its mission-grade details remain in Git history at `87eca99` and
 | Ground-side local reconstruction | Passed: real receiver PTY/CRC/decode path | Needs physical channel-1 receiver proof |
 | Repeated capture/downlink cycles | Passed: three cycles, one uninterrupted session | Not yet tested |
 | Deterministic packet-loss repair | Passed: dropped DATA 100, retry/repair/CRC | Needs brief-RF-fade proof |
+| Permanent loss then clean next cycle | Passed: honest 1,099/1,100 partial, next transfer exact | Needs sustained-fade proof |
 | Outdoor/Yagi behavior | Not locally provable | Deferred until bench passes |
 
 ## What Existing Evidence Proved
@@ -209,7 +210,8 @@ an entirely new flight protocol for a different future radio.
   than the middle of the nominal three-cycle evidence run.
 - [x] Restart the receiver during a full emulated transfer, reload its
   checkpoint, repair packets lost during the handoff, and complete CRC-valid.
-- [ ] Abandon/fail one transfer, then complete a fresh capture/downlink.
+- [x] Permanently lose one packet, save an honest positional partial with its
+  missing map, then complete a fresh capture/downlink in the same session.
 - [x] Reject stale/conflicting packets in focused tests and prove three nominal
   transfers do not mix products.
 - [x] Exercise transfer-ID progression within a bounded session; do not claim
@@ -225,7 +227,8 @@ an entirely new flight protocol for a different future radio.
 - [x] Send ground retry only after `END`/receive quiet; enforce a simple
   turnaround quiet time in receiver behavior.
 - [x] Strictly validate retry bitmap length and index bounds.
-- [ ] Bound repair rounds/total time, then report partial/error and return ready.
+- [x] Bound receiver repair time with inactivity/absolute deadlines, then save
+  partial/error state and return ready for a new transfer.
 - [ ] Batch receiver checkpoints enough to avoid avoidable disk-sync slowdown
   while retaining restart value.
 
@@ -263,7 +266,7 @@ All local tests run without claiming physical-radio proof:
 | --- | --- |
 | One nominal cycle | Receiver-generated ground artifact has exact CRC/content and displays |
 | Three sequential cycles | Three unique products/artifacts; no process restart or mixed state |
-| Loss during middle cycle | Retry repairs missing indexes; repeated END; valid final CRC |
+| Focused recoverable loss | Retry repairs missing indexes; repeated END; valid final CRC |
 | Duplicate active request | Idempotent; active cursor does not reset |
 | Conflicting active request | Busy/rejected; active product remains unchanged |
 | Receiver process restart | Same transfer reloads and completes or stays honestly partial |
@@ -332,7 +335,7 @@ These are home/local build artifacts, not proof of what is presently flashed:
   `1fa47ea1ab3a042249c27a2c14724228065ce7cce1e899f18872cf3d9b234921`.
 - ARMv6 Pi binary SHA-256:
   `e0176a21b21b40f5b4e0fba469f2d643c6dd9194de4963267867e86cc8ff814b`.
-- Post-integration local suite: 64 Python/emulation/bridge tests, fresh native
+- Post-integration local suite: 67 Python/emulation/bridge tests, fresh native
   build, 6/6 F Prime component suites, both Teensy builds, two independent
   three-cycle exact ground-copy runs, deterministic loss/repair, and the
   ARMv6KZ/VFPv2 cross-build passed.
@@ -355,9 +358,10 @@ the live boards and Pi tomorrow before calling any artifact deployed.
 | 2026-07-14 | Protocol rescope | ACTIVE | N2 retained; mission-grade v2 mechanisms deferred; repeated-cycle MVP is current target |
 | 2026-07-14 21:01 | Three-cycle ground-copy proof | PASS local | `tools/logs/c3m_local_demo_20260714_205808`; products/transfers 1-3, three 38,480-byte/1,100-packet receiver files, exact source/ground SHA-256 pairs, 160x120 decode |
 | 2026-07-14 21:05 | Deterministic DATA loss and N2 repair | PASS local | `tools/logs/c3m_local_demo_20260714_210435`; dropped index 100 once, receiver retry `start=100 count=1`, repair completed, CRC/content/hash/decode passed |
-| 2026-07-14 21:10 | Complete post-integration local gate | PASS local | 64 Python/bridge tests; fresh native build; 6/6 F Prime suites; `tools/logs/c3m_local_demo_20260714_210708` three-cycle ground-copy proof; both Teensy builds passed |
+| 2026-07-14 21:10 | Complete post-integration local gate | PASS local | 67 Python/bridge tests; fresh native build; 6/6 F Prime suites; `tools/logs/c3m_local_demo_20260714_210708` three-cycle ground-copy proof; both Teensy builds passed |
 | 2026-07-14 21:11 | Pi Zero W target build | PASS local | ARMv6KZ, VFPv2, `/lib/ld-linux-armhf.so.3`; binary SHA-256 `e0176a21...ff814b`; deployment/HIL still pending |
 | 2026-07-14 21:15 | Mid-transfer receiver process restart | PASS local | `tools/logs/c3m_local_demo_20260714_211416`; replacement resumed 55/1,100, retried two handoff gaps, completed CRC/decode, source/ground SHA-256 `55392fb9...ec63ac` |
+| 2026-07-14 21:27 | Permanent loss then clean next capture | PASS local | `tools/logs/c3m_local_demo_20260714_212447`; transfer 1 saved 1,099/1,100 partial with missing index 100 after bounded retries; transfer 2 completed 1,100/1,100 and exact source/ground SHA-256 `a0f7be74...a2bbad2` without process restart |
 
 The current artifacts above are build outputs only. Confirm the actual flashed
 firmware and deployed Pi binary tomorrow before treating those hashes as live.

@@ -432,6 +432,7 @@ class EmulationLoop:
         uplink_flush_ms: int,
         link_mode: str,
         drop_payload_data_index: Optional[int] = None,
+        blackhole_payload_data_index_first_transfer: Optional[int] = None,
     ) -> None:
         self.app_cmd = app_cmd
         self.gds_cmd = gds_cmd
@@ -443,6 +444,16 @@ class EmulationLoop:
             raise ValueError("payload DATA packet index out of range")
         self.drop_payload_data_index = drop_payload_data_index
         self._payload_data_drop_injected = False
+        if blackhole_payload_data_index_first_transfer is not None and not (
+            0 <= blackhole_payload_data_index_first_transfer <= N2_MAX_DATA_INDEX
+        ):
+            raise ValueError("blackholed payload DATA packet index out of range")
+        if drop_payload_data_index is not None and blackhole_payload_data_index_first_transfer is not None:
+            raise ValueError("payload DATA one-shot drop and first-transfer blackhole are mutually exclusive")
+        self.blackhole_payload_data_index_first_transfer = blackhole_payload_data_index_first_transfer
+        self._blackhole_payload_transfer_id: Optional[int] = None
+        self._blackhole_payload_finished = False
+        self._payload_drop_mode = ""
 
         self.stop_requested = False
         self.exit_code = 0
@@ -607,18 +618,23 @@ class EmulationLoop:
                             payload[N2_DATA_INDEX_OFFSET : N2_DATA_INDEX_OFFSET + 2],
                             byteorder="little",
                         )
-                        print(
-                            "[emulation] injected payload DATA drop: "
-                            f"packet_index={packet_index}",
-                            flush=True,
-                        )
+                        if self._payload_drop_mode == "blackhole":
+                            print(
+                                "[emulation] blackholed first-transfer payload DATA: "
+                                f"transfer_id={payload[3]} packet_index={packet_index}",
+                                flush=True,
+                            )
+                        else:
+                            print(
+                                "[emulation] injected payload DATA drop: "
+                                f"packet_index={packet_index}",
+                                flush=True,
+                            )
                         continue
                     self.stats.payload_bytes_out += len(payload)
                     self._queue_write(self.payload_master_fd, payload)  # type: ignore[arg-type]
 
     def _should_drop_payload_data(self, payload: bytes) -> bool:
-        if self.drop_payload_data_index is None or self._payload_data_drop_injected:
-            return False
         if (
             len(payload) < N2_DATA_MIN_BYTES
             or payload[:2] != N2_MAGIC
@@ -629,9 +645,26 @@ class EmulationLoop:
             payload[N2_DATA_INDEX_OFFSET : N2_DATA_INDEX_OFFSET + 2],
             byteorder="little",
         )
-        if packet_index != self.drop_payload_data_index:
+        if self.drop_payload_data_index is not None and not self._payload_data_drop_injected:
+            if packet_index == self.drop_payload_data_index:
+                self._payload_data_drop_injected = True
+                self._payload_drop_mode = "one-shot"
+                return True
+
+        if (
+            self.blackhole_payload_data_index_first_transfer is None
+            or self._blackhole_payload_finished
+        ):
             return False
-        self._payload_data_drop_injected = True
+        transfer_id = payload[3]
+        if self._blackhole_payload_transfer_id is None:
+            self._blackhole_payload_transfer_id = transfer_id
+        elif transfer_id != self._blackhole_payload_transfer_id:
+            self._blackhole_payload_finished = True
+            return False
+        if packet_index != self.blackhole_payload_data_index_first_transfer:
+            return False
+        self._payload_drop_mode = "blackhole"
         return True
 
     def _process_ground_message_to_app(self, channel: int, message: bytes, now: float) -> None:
@@ -937,7 +970,8 @@ def parse_args() -> argparse.Namespace:
             'compatibility alias for channelized (default: channelized)'
         ),
     )
-    parser.add_argument(
+    payload_loss_group = parser.add_mutually_exclusive_group()
+    payload_loss_group.add_argument(
         "--drop-payload-data-index",
         type=int,
         choices=range(N2_MAX_DATA_INDEX + 1),
@@ -946,6 +980,17 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Drop the first channel-1 N2 DATA packet whose encoded packet index "
             "matches INDEX; retransmissions pass (default: disabled)"
+        ),
+    )
+    payload_loss_group.add_argument(
+        "--blackhole-payload-data-index-first-transfer",
+        type=int,
+        choices=range(N2_MAX_DATA_INDEX + 1),
+        default=None,
+        metavar="INDEX",
+        help=(
+            "Drop every copy of matching N2 DATA INDEX for only the first "
+            "transfer; later transfer IDs pass (default: disabled)"
         ),
     )
     parser.add_argument(
@@ -1044,6 +1089,7 @@ def main() -> int:
         uplink_flush_ms=args.uplink_flush_ms,
         link_mode=args.link_mode,
         drop_payload_data_index=args.drop_payload_data_index,
+        blackhole_payload_data_index_first_transfer=args.blackhole_payload_data_index_first_transfer,
     )
 
     print("[emulation] topology:")

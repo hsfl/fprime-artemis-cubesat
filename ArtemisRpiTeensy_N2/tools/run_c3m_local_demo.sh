@@ -21,6 +21,8 @@ LEPTON_CAMERA_BACKEND="${LEPTON_CAMERA_BACKEND:-sample}"
 PAYLOAD_RECEIVER_TIMEOUT_SECONDS="${PAYLOAD_RECEIVER_TIMEOUT_SECONDS:-180}"
 DROP_PAYLOAD_DATA_INDEX=""
 RESTART_RECEIVER_CYCLE=""
+ABANDON_FIRST_CYCLE="false"
+PARTIAL_TRANSFER_TIMEOUT_SECONDS="${PARTIAL_TRANSFER_TIMEOUT_SECONDS:-2}"
 
 usage() {
   cat <<'EOF'
@@ -39,6 +41,8 @@ Options:
                              drop one N2 DATA packet once; its repair must pass
   --restart-receiver-cycle <cycle>
                              restart/checkpoint-resume receiver during this cycle
+  --abandon-first-cycle     permanently lose DATA 100 in cycle 1, save an
+                             honest partial, then require later cycles to pass
   --app-binary <path>        deployment binary path (default: host-platform artifact)
   --dictionary <path>        topology dictionary path (default: latest generated dict)
   --build-cache <path>       local build cache (default: ArtemisRpiTeensy_N2/build-c3m-local)
@@ -90,6 +94,10 @@ while [[ $# -gt 0 ]]; do
     --restart-receiver-cycle)
       RESTART_RECEIVER_CYCLE="${2:-}"
       shift 2
+      ;;
+    --abandon-first-cycle)
+      ABANDON_FIRST_CYCLE="true"
+      shift
       ;;
     --app-binary)
       APP_BINARY_PATH="${2:-}"
@@ -149,6 +157,11 @@ if [[ -n "$RESTART_RECEIVER_CYCLE" ]]; then
   [[ "$RESTART_RECEIVER_CYCLE" =~ ^[0-9]+$ ]] && \
     (( RESTART_RECEIVER_CYCLE >= 1 && RESTART_RECEIVER_CYCLE <= CAPTURES )) || \
     fail "--restart-receiver-cycle must identify one requested capture cycle"
+fi
+if [[ "$ABANDON_FIRST_CYCLE" == "true" ]]; then
+  (( CAPTURES >= 2 )) || fail "--abandon-first-cycle requires --captures 2 or greater"
+  [[ -z "$DROP_PAYLOAD_DATA_INDEX" && -z "$RESTART_RECEIVER_CYCLE" ]] || \
+    fail "--abandon-first-cycle cannot be combined with another receiver fault"
 fi
 
 [[ -f "$VENV_ACTIVATE" ]] || fail "Missing venv: $VENV_ACTIVATE"
@@ -375,6 +388,10 @@ count_ground_products() {
   find "$GROUND_RECEIVED_DIR" -maxdepth 1 -type f -name '*.fdp' | wc -l | tr -d ' '
 }
 
+count_partial_products() {
+  find "$GROUND_RECEIVED_DIR" -maxdepth 1 -type f -name '*.fdp.partial' | wc -l | tr -d ' '
+}
+
 ground_product_at() {
   local index="$1"
   python3 - "$GROUND_RECEIVED_DIR" "$index" <<'PY'
@@ -384,6 +401,21 @@ import sys
 root = Path(sys.argv[1])
 index = int(sys.argv[2])
 products = sorted(root.glob("*.fdp"), key=lambda path: (path.stat().st_mtime_ns, path.name))
+if len(products) <= index:
+    raise SystemExit(1)
+print(products[index])
+PY
+}
+
+partial_product_at() {
+  local index="$1"
+  python3 - "$GROUND_RECEIVED_DIR" "$index" <<'PY'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+index = int(sys.argv[2])
+products = sorted(root.glob("*.fdp.partial"), key=lambda path: (path.stat().st_mtime_ns, path.name))
 if len(products) <= index:
     raise SystemExit(1)
 print(products[index])
@@ -404,6 +436,24 @@ wait_for_ground_product_count() {
       return 0
     fi
     sleep 0.5
+  done
+  return 1
+}
+
+wait_for_partial_product_count() {
+  local expected_count="$1"
+  local deadline
+  deadline=$((SECONDS + 30))
+  while (( SECONDS < deadline )); do
+    if [[ -n "$RECEIVER_PID" ]] && ! kill -0 "$RECEIVER_PID" >/dev/null 2>&1; then
+      return 1
+    fi
+    local actual_count
+    actual_count="$(count_partial_products)"
+    if (( actual_count >= expected_count )); then
+      return 0
+    fi
+    sleep 0.25
   done
   return 1
 }
@@ -442,6 +492,13 @@ start_payload_receiver() {
   )
   if [[ -n "$RESTART_RECEIVER_CYCLE" ]]; then
     receiver_args+=(--checkpoint-dir "$RECEIVER_CHECKPOINT_DIR")
+  fi
+  if [[ "$ABANDON_FIRST_CYCLE" == "true" ]]; then
+    receiver_args+=(
+      --transfer-timeout "$PARTIAL_TRANSFER_TIMEOUT_SECONDS"
+      --absolute-transfer-timeout 150
+      --save-partial-on-timeout
+    )
   fi
   PYTHONUNBUFFERED=1 python3 "$ROOT_DIR/tools/payload_receiver.py" \
     "${receiver_args[@]}" >>"$LOG_DIR/payload_receiver.log" 2>&1 &
@@ -554,6 +611,9 @@ fi
 if [[ -n "$RESTART_RECEIVER_CYCLE" ]]; then
   log "receiver checkpoint/restart cycle: $RESTART_RECEIVER_CYCLE"
 fi
+if [[ "$ABANDON_FIRST_CYCLE" == "true" ]]; then
+  log "cycle 1 expected result: honest partial after permanent DATA loss"
+fi
 log "logs: $LOG_DIR"
 
 EMULATOR_ARGS=(
@@ -564,6 +624,9 @@ EMULATOR_ARGS=(
 )
 if [[ -n "$DROP_PAYLOAD_DATA_INDEX" ]]; then
   EMULATOR_ARGS+=(--drop-payload-data-index "$DROP_PAYLOAD_DATA_INDEX")
+fi
+if [[ "$ABANDON_FIRST_CYCLE" == "true" ]]; then
+  EMULATOR_ARGS+=(--blackhole-payload-data-index-first-transfer 100)
 fi
 
 (
@@ -586,8 +649,10 @@ send_command "sohApp.EMIT_SOH_SNAPSHOT" || fail "Command failed: sohApp.EMIT_SOH
 
 SOURCE_PRODUCT_COUNT="$(find "$ROOT_DIR/DpCat" -maxdepth 1 -type f -name 'Dp_*.fdp' | wc -l | tr -d ' ')"
 GROUND_PRODUCT_BASELINE="$(count_ground_products)"
+PARTIAL_PRODUCT_BASELINE="$(count_partial_products)"
+COMPLETED_GROUND_PRODUCTS=0
 HISTORY_FILE="$LOG_DIR/cycle_history.tsv"
-printf 'cycle\tsatellite_product\tground_product\tdecode_summary\n' >"$HISTORY_FILE"
+printf 'cycle\tresult\tsatellite_product\tground_product\tdecode_summary\n' >"$HISTORY_FILE"
 LAST_PNG=""
 
 for ((cycle = 1; cycle <= CAPTURES; cycle++)); do
@@ -623,15 +688,31 @@ for ((cycle = 1; cycle <= CAPTURES; cycle++)); do
   wait_for_log_count "DownlinkFinished" "$cycle" "cycle $cycle comms completion" || \
     fail "Cycle $cycle comms downlink did not complete"
 
-  EXPECTED_GROUND_COUNT=$((GROUND_PRODUCT_BASELINE + cycle))
+  if [[ "$ABANDON_FIRST_CYCLE" == "true" && "$cycle" == "1" ]]; then
+    EXPECTED_PARTIAL_COUNT=$((PARTIAL_PRODUCT_BASELINE + 1))
+    wait_for_partial_product_count "$EXPECTED_PARTIAL_COUNT" || \
+      fail "Cycle 1 did not terminate as an honest partial"
+    PARTIAL_FDP_FILE="$(partial_product_at "$((EXPECTED_PARTIAL_COUNT - 1))")" || \
+      fail "Cycle 1 partial artifact could not be selected"
+    [[ "$(count_ground_products)" == "$GROUND_PRODUCT_BASELINE" ]] || \
+      fail "Cycle 1 incorrectly produced a complete ground artifact"
+    log "cycle 1 expected partial product: $PARTIAL_FDP_FILE"
+    printf '%s\t%s\t%s\t%s\t%s\n' \
+      "$cycle" "PARTIAL_EXPECTED" "$FDP_FILE" "$PARTIAL_FDP_FILE" "" \
+      >>"$HISTORY_FILE"
+    continue
+  fi
+
+  COMPLETED_GROUND_PRODUCTS=$((COMPLETED_GROUND_PRODUCTS + 1))
+  EXPECTED_GROUND_COUNT=$((GROUND_PRODUCT_BASELINE + COMPLETED_GROUND_PRODUCTS))
   wait_for_ground_product_count "$EXPECTED_GROUND_COUNT" || \
     fail "Cycle $cycle produced no CRC-valid ground-received artifact; see $LOG_DIR/payload_receiver.log"
   GROUND_FDP_FILE="$(ground_product_at "$((EXPECTED_GROUND_COUNT - 1))")" || \
     fail "Cycle $cycle ground artifact could not be selected"
   log "cycle $cycle ground product: $GROUND_FDP_FILE"
   decode_ground_product "$cycle" "$GROUND_FDP_FILE"
-  printf '%s\t%s\t%s\t%s\n' \
-    "$cycle" "$FDP_FILE" "$GROUND_FDP_FILE" "$LOG_DIR/lepton_summary_cycle_$cycle.json" \
+  printf '%s\t%s\t%s\t%s\t%s\n' \
+    "$cycle" "COMPLETE" "$FDP_FILE" "$GROUND_FDP_FILE" "$LOG_DIR/lepton_summary_cycle_$cycle.json" \
     >>"$HISTORY_FILE"
 done
 
@@ -639,7 +720,11 @@ if [[ -n "$LAST_PNG" && "$OPEN_PNG" == "true" ]]; then
   log "opening final decoded Lepton PNG"
   open_png_viewer "$LAST_PNG"
 fi
-log "PASS: completed $CAPTURES consecutive C3M capture/downlink/decode cycles from ground-received artifacts"
+if [[ "$ABANDON_FIRST_CYCLE" == "true" ]]; then
+  log "PASS: cycle 1 failed honestly and $COMPLETED_GROUND_PRODUCTS later capture(s) completed cleanly"
+else
+  log "PASS: completed $CAPTURES consecutive C3M capture/downlink/decode cycles from ground-received artifacts"
+fi
 log "cycle history: $HISTORY_FILE"
 
 if [[ "$HOLD_AFTER_SEQUENCE" == "true" ]]; then

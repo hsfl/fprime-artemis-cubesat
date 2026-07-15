@@ -64,13 +64,18 @@ class UartFrameParserTests(unittest.TestCase):
 
 
 class EmulationLoopPayloadPtyTests(unittest.TestCase):
-    def make_emulator(self, drop_payload_data_index: int | None = None) -> loop.EmulationLoop:
+    def make_emulator(
+        self,
+        drop_payload_data_index: int | None = None,
+        blackhole_payload_data_index_first_transfer: int | None = None,
+    ) -> loop.EmulationLoop:
         emulator = loop.EmulationLoop(
             app_cmd=None,
             gds_cmd=None,
             uplink_flush_ms=loop.DEFAULT_UPLINK_FLUSH_MS,
             link_mode="channelized",
             drop_payload_data_index=drop_payload_data_index,
+            blackhole_payload_data_index_first_transfer=blackhole_payload_data_index_first_transfer,
         )
         emulator.app_master_fd = 10
         emulator.gds_master_fd = 11
@@ -139,6 +144,30 @@ class EmulationLoopPayloadPtyTests(unittest.TestCase):
             ["local_emulation_loop.py", "--drop-payload-data-index", "7"],
         ):
             self.assertEqual(loop.parse_args().drop_payload_data_index, 7)
+
+    def test_first_transfer_blackhole_drops_repairs_but_not_next_transfer(self) -> None:
+        emulator = self.make_emulator(blackhole_payload_data_index_first_transfer=7)
+        writes: list[tuple[int, bytes]] = []
+
+        def record_write(fd: int, data: bytes | bytearray) -> int:
+            writes.append((fd, bytes(data)))
+            return len(data)
+
+        def data_packet(transfer_id: int, packet_index: int) -> bytes:
+            return b"N2" + bytes([loop.N2_TYPE_DATA, transfer_id]) + packet_index.to_bytes(2, "little")
+
+        first = data_packet(1, 7)
+        second = data_packet(2, 7)
+        app_bytes = (
+            loop.build_uart_frame(loop.CHANNEL_PAYLOAD, first)
+            + loop.build_uart_frame(loop.CHANNEL_PAYLOAD, first)
+            + loop.build_uart_frame(loop.CHANNEL_PAYLOAD, second)
+        )
+        with mock.patch.object(loop.os, "write", side_effect=record_write):
+            emulator._process_app_to_gds(app_bytes, 0.0)
+
+        self.assertEqual(writes, [(12, second)])
+        self.assertEqual(emulator.stats.payload_data_packets_dropped, 2)
 
     def test_payload_uplink_returns_channel_one_without_affecting_channel_zero(self) -> None:
         emulator = self.make_emulator()

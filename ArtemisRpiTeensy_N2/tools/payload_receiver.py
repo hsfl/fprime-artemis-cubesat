@@ -1046,6 +1046,23 @@ def main(argv: list[str]) -> int:
     )
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument(
+        "--transfer-timeout",
+        type=float,
+        default=None,
+        help="Save/fail a live transfer after this many seconds without packet progress",
+    )
+    parser.add_argument(
+        "--absolute-transfer-timeout",
+        type=float,
+        default=None,
+        help="Save/fail a live transfer after this total elapsed time regardless of progress",
+    )
+    parser.add_argument(
+        "--save-partial-on-timeout",
+        action="store_true",
+        help="In --output-dir mode, save positional .partial data and continue listening",
+    )
+    parser.add_argument(
         "--checkpoint-dir",
         type=pathlib.Path,
         default=None,
@@ -1079,6 +1096,9 @@ def main(argv: list[str]) -> int:
         debug=args.debug,
         checkpoint_dir=args.checkpoint_dir,
         checkpoint_max_age_s=args.checkpoint_max_age,
+        transfer_timeout_s=args.transfer_timeout,
+        absolute_transfer_timeout_s=args.absolute_transfer_timeout,
+        save_partial_on_timeout=args.save_partial_on_timeout,
     )
     if args.output_dir is not None:
         return receiver.run_directory(args.idle_timeout)

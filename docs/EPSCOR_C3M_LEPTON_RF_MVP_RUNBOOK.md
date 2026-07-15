@@ -108,6 +108,16 @@ To prove receiver checkpoint/resume across a real process replacement:
   --exit-after-sequence --no-open
 ```
 
+To prove that an unrecoverable transfer terminates honestly and cannot poison
+the next picture, run two cycles. Cycle 1 permanently loses DATA index 100 and
+saves `.fdp.partial` plus `.missing.json`; cycle 2 must complete and decode:
+
+```bash
+./tools/run_c3m_local_demo.sh \
+  --delay 2 --captures 2 --abandon-first-cycle \
+  --exit-after-sequence --no-open
+```
+
 The manual demo writes JSON, CSV, and PNG outputs under the run log directory
 and opens the decoded Lepton PNG after the downlink and decode checks pass. Use
 `--no-open` when running headless or inside automated validation.
