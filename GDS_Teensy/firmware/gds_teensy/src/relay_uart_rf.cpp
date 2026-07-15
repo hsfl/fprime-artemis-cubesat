@@ -31,10 +31,7 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
       m_lastPayloadUartByteMs(0),
       m_uplinkHead(0),
       m_uplinkTail(0),
-      m_uplinkCount(0),
-      m_downlinkHead(0),
-      m_downlinkTail(0),
-      m_downlinkCount(0) {
+      m_uplinkCount(0) {
   memset(m_framePayload, 0, sizeof(m_framePayload));
   memset(m_commandBuffer, 0, sizeof(m_commandBuffer));
   memset(m_reassembly, 0, sizeof(m_reassembly));
@@ -42,6 +39,9 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
   memset(m_payloadUartBuf, 0, sizeof(m_payloadUartBuf));
   memset(m_uplinkQueue, 0, sizeof(m_uplinkQueue));
   memset(m_downlinkQueue, 0, sizeof(m_downlinkQueue));
+  memset(m_downlinkHead, 0, sizeof(m_downlinkHead));
+  memset(m_downlinkTail, 0, sizeof(m_downlinkTail));
+  memset(m_downlinkCount, 0, sizeof(m_downlinkCount));
 
   if (m_config.uplinkQueueDepth == 0 || m_config.uplinkQueueDepth > MAX_QUEUE_DEPTH) {
     m_config.uplinkQueueDepth = 16;
@@ -59,6 +59,10 @@ void RelayUartRf::begin() {
   for (uint8_t channel = 0; channel < link_protocol::CHANNEL_COUNT; channel++) {
     resetReassembly(channel, false, false);
   }
+}
+
+const usb_tx::ChannelCounters* RelayUartRf::usbTxCounters(uint8_t channel) const {
+  return m_usbDownlink.forChannel(channel);
 }
 
 void RelayUartRf::poll() {
@@ -182,15 +186,18 @@ void RelayUartRf::processCommandByte(uint8_t b) {
 
     if (strcmp(m_commandBuffer, link_protocol::CMD_PING) == 0) {
       const size_t n = strlen(link_protocol::RESP_PONG);
-      m_linkIo.write(reinterpret_cast<const uint8_t*>(link_protocol::RESP_PONG), n);
-      m_counters.uartTxBytes += static_cast<uint32_t>(n);
+      const size_t written =
+          m_linkIo.write(reinterpret_cast<const uint8_t*>(link_protocol::RESP_PONG), n);
+      m_counters.uartTxBytes += static_cast<uint32_t>(written);
     } else if (strcmp(m_commandBuffer, link_protocol::CMD_LINK_STATUS) == 0) {
       emitLinkStatus();
     } else if (strcmp(m_commandBuffer, link_protocol::CMD_RESET_COUNTERS) == 0) {
       m_counters.reset();
+      m_usbDownlink.reset();
       const size_t n = strlen(link_protocol::RESP_RESET_OK);
-      m_linkIo.write(reinterpret_cast<const uint8_t*>(link_protocol::RESP_RESET_OK), n);
-      m_counters.uartTxBytes += static_cast<uint32_t>(n);
+      const size_t written =
+          m_linkIo.write(reinterpret_cast<const uint8_t*>(link_protocol::RESP_RESET_OK), n);
+      m_counters.uartTxBytes += static_cast<uint32_t>(written);
     }
     return;
   }
@@ -315,40 +322,25 @@ void RelayUartRf::handleCompletedFrame() {
   enqueueUplinkMessage(m_frameChannel, m_framePayload, m_frameLength);
 }
 
-bool RelayUartRf::sendUartFrame(uint8_t channel, const uint8_t* payload, uint16_t length) {
-  if (length == 0 || length > link_protocol::FRAME_MAX_PAYLOAD) {
-    m_counters.framingDrops += 1;
-    return false;
+uint16_t RelayUartRf::encodeUartFrame(uint8_t channel,
+                                      const uint8_t* payload,
+                                      uint16_t length,
+                                      uint8_t* encoded) {
+  if (payload == nullptr || encoded == nullptr || length == 0 ||
+      length > link_protocol::FRAME_MAX_PAYLOAD ||
+      !link_protocol::isValidChannel(channel)) {
+    return 0;
   }
-  if (!link_protocol::isValidChannel(channel)) {
-    m_counters.framingDrops += 1;
-    return false;
-  }
-
   const uint16_t crc = crc16Ccitt(payload, length);
-
-  m_linkIo.write(link_protocol::FRAME_MAGIC_0);
-  m_linkIo.write(link_protocol::FRAME_MAGIC_1);
-  m_linkIo.write(channel);
-  m_linkIo.write(static_cast<uint8_t>(length & 0xFF));
-  m_linkIo.write(static_cast<uint8_t>((length >> 8) & 0xFF));
-  m_linkIo.write(payload, length);
-  m_linkIo.write(static_cast<uint8_t>(crc & 0xFF));
-  m_linkIo.write(static_cast<uint8_t>((crc >> 8) & 0xFF));
-
-  m_counters.uartTxBytes += static_cast<uint32_t>(length + 7);
-  return true;
-}
-
-bool RelayUartRf::sendRawToUart(const uint8_t* payload, uint16_t length) {
-  if (length == 0 || length > link_protocol::FRAME_MAX_PAYLOAD) {
-    m_counters.framingDrops += 1;
-    return false;
-  }
-
-  m_linkIo.write(payload, length);
-  m_counters.uartTxBytes += static_cast<uint32_t>(length);
-  return true;
+  encoded[0] = link_protocol::FRAME_MAGIC_0;
+  encoded[1] = link_protocol::FRAME_MAGIC_1;
+  encoded[2] = channel;
+  encoded[3] = static_cast<uint8_t>(length & 0xFF);
+  encoded[4] = static_cast<uint8_t>((length >> 8) & 0xFF);
+  memcpy(encoded + 5, payload, length);
+  encoded[length + 5] = static_cast<uint8_t>(crc & 0xFF);
+  encoded[length + 6] = static_cast<uint8_t>((crc >> 8) & 0xFF);
+  return static_cast<uint16_t>(length + 7);
 }
 
 bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uint16_t length) {
@@ -682,11 +674,19 @@ uint16_t RelayUartRf::crc16Ccitt(const uint8_t* data, uint16_t len) const {
 }
 
 void RelayUartRf::emitLinkStatus() {
-  char statusLine[640] = {0};
+  const usb_tx::ChannelCounters* usb0 =
+      m_usbDownlink.forChannel(link_protocol::CHANNEL_CCSDS);
+  const usb_tx::ChannelCounters* usb1 =
+      m_usbDownlink.forChannel(link_protocol::CHANNEL_PAYLOAD);
+  if (usb0 == nullptr || usb1 == nullptr) {
+    return;
+  }
+
+  char statusLine[1280] = {0};
   const int n =
       snprintf(statusLine,
                sizeof(statusLine),
-               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu rf_tx_timeouts=%lu rf_recoveries=%lu rf_tx_terminal_failures=%lu rf_msg_id_gaps=%lu rf_ack_rx=%lu rf_ack_tx=%lu rf_retries=%lu rf_ack_timeouts=%lu rf_wrong_network=%lu rf_wrong_address=%lu rf_wrong_version=%lu up_q_drops=%lu down_q_drops=%lu\\n",
+               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu rf_tx_timeouts=%lu rf_recoveries=%lu rf_tx_terminal_failures=%lu rf_msg_id_gaps=%lu rf_ack_rx=%lu rf_ack_tx=%lu rf_retries=%lu rf_ack_timeouts=%lu rf_wrong_network=%lu rf_wrong_address=%lu rf_wrong_version=%lu up_q_drops=%lu down_q_drops=%lu usb0_zero=%lu usb0_partial=%lu usb0_backpressure=%lu usb0_recoveries=%lu usb0_high_water=%lu usb0_discards=%lu usb1_zero=%lu usb1_partial=%lu usb1_backpressure=%lu usb1_recoveries=%lu usb1_high_water=%lu usb1_discards=%lu\\n",
                static_cast<unsigned long>(m_counters.uartRxBytes),
                static_cast<unsigned long>(m_counters.uartTxBytes),
                static_cast<unsigned long>(m_counters.rfRxPackets),
@@ -714,13 +714,26 @@ void RelayUartRf::emitLinkStatus() {
                static_cast<unsigned long>(m_counters.rfWrongAddressDrops),
                static_cast<unsigned long>(m_counters.rfVersionDrops),
                static_cast<unsigned long>(m_counters.uplinkQueueDrops),
-               static_cast<unsigned long>(m_counters.downlinkQueueDrops));
+               static_cast<unsigned long>(m_counters.downlinkQueueDrops),
+               static_cast<unsigned long>(usb0->zeroWrites),
+               static_cast<unsigned long>(usb0->partialWrites),
+               static_cast<unsigned long>(usb0->backpressureEvents),
+               static_cast<unsigned long>(usb0->recoveries),
+               static_cast<unsigned long>(usb0->queueHighWater),
+               static_cast<unsigned long>(usb0->explicitDiscards),
+               static_cast<unsigned long>(usb1->zeroWrites),
+               static_cast<unsigned long>(usb1->partialWrites),
+               static_cast<unsigned long>(usb1->backpressureEvents),
+               static_cast<unsigned long>(usb1->recoveries),
+               static_cast<unsigned long>(usb1->queueHighWater),
+               static_cast<unsigned long>(usb1->explicitDiscards));
 
   if (n > 0) {
     const size_t writeLen =
         static_cast<size_t>(n) < sizeof(statusLine) ? static_cast<size_t>(n) : sizeof(statusLine) - 1U;
-    m_linkIo.write(reinterpret_cast<const uint8_t*>(statusLine), writeLen);
-    m_counters.uartTxBytes += static_cast<uint32_t>(writeLen);
+    const size_t written =
+        m_linkIo.write(reinterpret_cast<const uint8_t*>(statusLine), writeLen);
+    m_counters.uartTxBytes += static_cast<uint32_t>(written);
   }
 }
 
@@ -742,6 +755,8 @@ bool RelayUartRf::enqueueUplinkMessage(uint8_t channel, const uint8_t* payload, 
   QueueEntry& entry = m_uplinkQueue[m_uplinkHead];
   entry.channel = channel;
   entry.length = length;
+  entry.writeOffset = 0;
+  entry.deliveryImpeded = false;
   memcpy(entry.payload, payload, length);
   m_uplinkHead = static_cast<uint8_t>((m_uplinkHead + 1) % m_config.uplinkQueueDepth);
   m_uplinkCount = static_cast<uint8_t>(m_uplinkCount + 1);
@@ -757,18 +772,26 @@ bool RelayUartRf::enqueueDownlinkMessage(uint8_t channel, const uint8_t* payload
     m_counters.framingDrops += 1;
     return false;
   }
-
-  if (m_downlinkCount >= m_config.downlinkQueueDepth) {
+  if (channel >= usb_tx::CHANNEL_COUNT) {
     m_counters.downlinkQueueDrops += 1;
     return false;
   }
 
-  QueueEntry& entry = m_downlinkQueue[m_downlinkHead];
+  if (!m_usbDownlink.admit(
+          channel, m_downlinkCount[channel], m_config.downlinkQueueDepth)) {
+    m_counters.downlinkQueueDrops += 1;
+    return false;
+  }
+
+  QueueEntry& entry = m_downlinkQueue[channel][m_downlinkHead[channel]];
   entry.channel = channel;
   entry.length = length;
+  entry.writeOffset = 0;
+  entry.deliveryImpeded = false;
   memcpy(entry.payload, payload, length);
-  m_downlinkHead = static_cast<uint8_t>((m_downlinkHead + 1) % m_config.downlinkQueueDepth);
-  m_downlinkCount = static_cast<uint8_t>(m_downlinkCount + 1);
+  m_downlinkHead[channel] =
+      static_cast<uint8_t>((m_downlinkHead[channel] + 1) % m_config.downlinkQueueDepth);
+  m_downlinkCount[channel] = static_cast<uint8_t>(m_downlinkCount[channel] + 1);
   return true;
 }
 
@@ -784,22 +807,63 @@ void RelayUartRf::serviceUplinkQueue() {
 }
 
 void RelayUartRf::serviceDownlinkQueue() {
-  if (m_downlinkCount == 0) {
+  serviceDownlinkChannel(link_protocol::CHANNEL_CCSDS);
+  serviceDownlinkChannel(link_protocol::CHANNEL_PAYLOAD);
+}
+
+void RelayUartRf::popDownlinkEntry(uint8_t channel) {
+  if (channel >= usb_tx::CHANNEL_COUNT || m_downlinkCount[channel] == 0) {
+    return;
+  }
+  m_downlinkTail[channel] =
+      static_cast<uint8_t>((m_downlinkTail[channel] + 1) % m_config.downlinkQueueDepth);
+  m_downlinkCount[channel] = static_cast<uint8_t>(m_downlinkCount[channel] - 1);
+}
+
+void RelayUartRf::serviceDownlinkChannel(uint8_t channel) {
+  if (channel >= usb_tx::CHANNEL_COUNT || m_downlinkCount[channel] == 0) {
     return;
   }
 
-  QueueEntry& entry = m_downlinkQueue[m_downlinkTail];
-  if (entry.channel == link_protocol::CHANNEL_PAYLOAD && m_payloadIo != nullptr) {
-    const size_t written = m_payloadIo->write(entry.payload, entry.length);
-    m_payloadIo->flush();
-    m_counters.uartTxBytes += static_cast<uint32_t>(written);
-    m_counters.payloadUartTxBytes += static_cast<uint32_t>(written);
-  } else if (m_config.uartOutputFramed) {
-    sendUartFrame(entry.channel, entry.payload, entry.length);
-  } else {
-    sendRawToUart(entry.payload, entry.length);
+  QueueEntry& entry = m_downlinkQueue[channel][m_downlinkTail[channel]];
+  Stream* output = nullptr;
+  const uint8_t* bytes = entry.payload;
+  uint16_t totalLength = entry.length;
+  uint8_t encoded[link_protocol::FRAME_MAX_PAYLOAD + 7] = {0};
+
+  if (channel == link_protocol::CHANNEL_PAYLOAD) {
+    output = m_payloadIo;
+  } else if (channel == link_protocol::CHANNEL_CCSDS) {
+    output = &m_linkIo;
+    if (m_config.uartOutputFramed) {
+      totalLength = encodeUartFrame(channel, entry.payload, entry.length, encoded);
+      bytes = encoded;
+    }
   }
 
-  m_downlinkTail = static_cast<uint8_t>((m_downlinkTail + 1) % m_config.downlinkQueueDepth);
-  m_downlinkCount = static_cast<uint8_t>(m_downlinkCount - 1);
+  if (output == nullptr || totalLength == 0) {
+    m_counters.downlinkQueueDrops += 1;
+    m_usbDownlink.discard(channel);
+    popDownlinkEntry(channel);
+    return;
+  }
+
+  usb_tx::ChannelCounters* channelCounters = m_usbDownlink.forChannel(channel);
+  if (channelCounters == nullptr) {
+    m_counters.downlinkQueueDrops += 1;
+    popDownlinkEntry(channel);
+    return;
+  }
+
+  const usb_tx::WriteAttempt attempt =
+      usb_tx::writeAvailable(*output, bytes, totalLength, entry.writeOffset);
+  usb_tx::observeWrite(*channelCounters, attempt, entry.deliveryImpeded);
+  m_counters.uartTxBytes += attempt.written;
+  if (channel == link_protocol::CHANNEL_PAYLOAD) {
+    m_counters.payloadUartTxBytes += attempt.written;
+  }
+
+  if (attempt.result == usb_tx::WriteResult::COMPLETE) {
+    popDownlinkEntry(channel);
+  }
 }

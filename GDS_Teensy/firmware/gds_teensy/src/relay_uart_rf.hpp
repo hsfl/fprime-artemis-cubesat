@@ -6,6 +6,7 @@
 #include "link_counters.hpp"
 #include "link_protocol.hpp"
 #include "rf23_driver.hpp"
+#include "usb_tx_progress.hpp"
 
 struct RelayConfig {
   bool enableUartToRf = true;
@@ -29,6 +30,7 @@ class RelayUartRf {
 
   void begin();
   void poll();
+  const usb_tx::ChannelCounters* usbTxCounters(uint8_t channel) const;
 
  private:
   enum class ParseState {
@@ -52,8 +54,10 @@ class RelayUartRf {
 
   void resetFrameParser(bool timeoutReset);
   void handleCompletedFrame();
-  bool sendUartFrame(uint8_t channel, const uint8_t* payload, uint16_t length);
-  bool sendRawToUart(const uint8_t* payload, uint16_t length);
+  uint16_t encodeUartFrame(uint8_t channel,
+                           const uint8_t* payload,
+                           uint16_t length,
+                           uint8_t* encoded);
 
   bool sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uint16_t length);
   bool sendRfPacket(const uint8_t* packet, uint8_t packetLen);
@@ -71,12 +75,16 @@ class RelayUartRf {
   bool enqueueDownlinkMessage(uint8_t channel, const uint8_t* payload, uint16_t length);
   void serviceUplinkQueue();
   void serviceDownlinkQueue();
+  void serviceDownlinkChannel(uint8_t channel);
+  void popDownlinkEntry(uint8_t channel);
 
   static constexpr uint8_t MAX_QUEUE_DEPTH = 32;
 
   struct QueueEntry {
     uint8_t channel;
     uint16_t length;
+    uint16_t writeOffset;
+    bool deliveryImpeded;
     uint8_t payload[link_protocol::FRAME_MAX_PAYLOAD];
   };
 
@@ -96,6 +104,7 @@ class RelayUartRf {
   Stream* m_payloadIo;
   Rf23Driver& m_rf;
   LinkCounters& m_counters;
+  usb_tx::QueueAccounting m_usbDownlink;
   RelayConfig m_config;
 
   ParseState m_state;
@@ -125,10 +134,10 @@ class RelayUartRf {
   uint8_t m_uplinkTail;
   uint8_t m_uplinkCount;
 
-  QueueEntry m_downlinkQueue[MAX_QUEUE_DEPTH];
-  uint8_t m_downlinkHead;
-  uint8_t m_downlinkTail;
-  uint8_t m_downlinkCount;
+  QueueEntry m_downlinkQueue[usb_tx::CHANNEL_COUNT][MAX_QUEUE_DEPTH];
+  uint8_t m_downlinkHead[usb_tx::CHANNEL_COUNT];
+  uint8_t m_downlinkTail[usb_tx::CHANNEL_COUNT];
+  uint8_t m_downlinkCount[usb_tx::CHANNEL_COUNT];
 };
 
 #endif

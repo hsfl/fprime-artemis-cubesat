@@ -96,6 +96,10 @@ void updateRadioTrafficLed(uint32_t now) {
 
 void debugPrintCounters(const char* prefix) {
 #if ARTEMIS_HAS_DEBUG_USB
+  const usb_tx::ChannelCounters* usb0 =
+      g_relay.usbTxCounters(link_protocol::CHANNEL_CCSDS);
+  const usb_tx::ChannelCounters* usb1 =
+      g_relay.usbTxCounters(link_protocol::CHANNEL_PAYLOAD);
   SerialUSB1.print(prefix);
   SerialUSB1.print(" uart_rx=");
   SerialUSB1.print(g_linkCounters.uartRxBytes);
@@ -160,7 +164,34 @@ void debugPrintCounters(const char* prefix) {
   SerialUSB1.print(" up_q_drops=");
   SerialUSB1.print(g_linkCounters.uplinkQueueDrops);
   SerialUSB1.print(" down_q_drops=");
-  SerialUSB1.println(g_linkCounters.downlinkQueueDrops);
+  SerialUSB1.print(g_linkCounters.downlinkQueueDrops);
+  if (usb0 != nullptr && usb1 != nullptr) {
+    SerialUSB1.print(" usb0_zero=");
+    SerialUSB1.print(usb0->zeroWrites);
+    SerialUSB1.print(" usb0_partial=");
+    SerialUSB1.print(usb0->partialWrites);
+    SerialUSB1.print(" usb0_backpressure=");
+    SerialUSB1.print(usb0->backpressureEvents);
+    SerialUSB1.print(" usb0_recoveries=");
+    SerialUSB1.print(usb0->recoveries);
+    SerialUSB1.print(" usb0_high_water=");
+    SerialUSB1.print(usb0->queueHighWater);
+    SerialUSB1.print(" usb0_discards=");
+    SerialUSB1.print(usb0->explicitDiscards);
+    SerialUSB1.print(" usb1_zero=");
+    SerialUSB1.print(usb1->zeroWrites);
+    SerialUSB1.print(" usb1_partial=");
+    SerialUSB1.print(usb1->partialWrites);
+    SerialUSB1.print(" usb1_backpressure=");
+    SerialUSB1.print(usb1->backpressureEvents);
+    SerialUSB1.print(" usb1_recoveries=");
+    SerialUSB1.print(usb1->recoveries);
+    SerialUSB1.print(" usb1_high_water=");
+    SerialUSB1.print(usb1->queueHighWater);
+    SerialUSB1.print(" usb1_discards=");
+    SerialUSB1.print(usb1->explicitDiscards);
+  }
+  SerialUSB1.println();
 #else
   (void)prefix;
 #endif
