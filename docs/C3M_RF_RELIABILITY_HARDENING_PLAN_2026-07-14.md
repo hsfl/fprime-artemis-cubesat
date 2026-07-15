@@ -365,9 +365,10 @@ Gate passes only when the full provenance and proof bundle is saved.
 - [x] Add a finite RF TX-completion timeout below the watchdog deadline.
 - [ ] Add bounded retry followed by explicit radio/FIFO recovery.
 - [x] Preserve a queued RF message until success or counted terminal failure.
-- [ ] Track actual bytes accepted by channel-0 and channel-1 USB writes.
-- [ ] Retain unwritten data across zero/partial USB writes.
-- [ ] Add USB short-write, backpressure, timeout, and discard counters.
+- [x] Track actual bytes accepted by channel-0 and channel-1 USB writes.
+- [x] Retain unwritten data across zero/partial USB writes.
+- [x] Add USB short-write, backpressure, recovery, high-water, and explicit
+      discard counters.
 - [x] Route radio initialization and recovery diagnostics only to the debug USB
       interface.
 - [ ] Verify that a satellite Teensy reset cannot unintentionally hard-cycle the
@@ -392,6 +393,19 @@ ground firmware reported `uart_tx=73067`. This proves the current counter still
 claims complete USB packets after zero/partial host writes; unplug/replug alone
 does not provide a reliable recovery contract. The partial run is retained at
 `data/c3m_20260715_022943_transfer_1/` and is evidence, not a nominal pass.
+
+WP1-B implementation is committed as `d6c14ed`. Ground channel 0 and payload
+channel 1 now use independent 32-entry USB-output FIFOs, so a blocked reader on
+one interface cannot head-of-line block the other. Each entry retains its exact
+write offset; the firmware asks `availableForWrite()`, counts the actual return
+from `write()`, and removes the entry only after complete acceptance. The
+focused fake-writer tests cover zero capacity, a zero return despite advertised
+capacity, partial writes, suffix completion, recovery, queue-full discard, and
+both directions of channel independence. The test is part of
+`tools/validate_local.sh`. Standard no-build validation passed all `35` tests,
+the shared Teensy drift check passed, and the ground firmware built with
+SHA-256 `7d2fdbf8431ea5fb979304196339a1380b6214c5edfac2e7ee7bf87a852085b9`.
+This image has not yet been flashed; HIL-01/HIL-02 acceptance remains open.
 
 Acceptance:
 
@@ -493,7 +507,7 @@ Acceptance:
 ### WP6 — Deterministic local and component tests
 
 - [ ] Preserve the current successful local C3M flow.
-- [ ] Add tests for USB zero writes, partial writes, delayed writes, and terminal
+- [x] Add tests for USB zero writes, partial writes, delayed writes, and terminal
       write failure.
 - [ ] Add tests for TX timeout and radio recovery.
 - [ ] Add tests for persistent receiver restart/resume.
@@ -620,3 +634,53 @@ Add entries after work begins. Keep them short and link the durable artifact.
 | 2026-07-14 16:01 | HIL recovery defect | Reproduced | Ground loop/debug and channel 0 remained frozen for more than 20 seconds; test PING did not reach satellite |
 | 2026-07-14 16:06 | Physical provenance recovery | Complete | Restored satellite on `usb:2100000`, ground on `usb:1100000`; verified one versus three serial interfaces |
 | 2026-07-14 16:13 | Gate 0 nominal HIL | PASS | Product 1, `1,100/1,100`, CRC `33720`, Pi/ground SHA match, 58.336 s, one successful mid-transfer PING, no restart |
+| 2026-07-14 16:29 | WP1 post-flash smoke | PARTIAL | Ground unplug interrupted transfer 1 at `5/1100`; partial artifact retained at `data/c3m_20260715_022943_transfer_1/` |
+| 2026-07-14 16:31 | WP1-B USB recovery | FAIL reproduced | After replug and process restart, ground saw `uart_rx=918` and claimed `uart_tx=73067`, but GDS received only `16` bytes |
+| 2026-07-14 16:31 | WP3 duplicate start | ABORTED | Duplicate downlink reset transfer 1 into transfer 2; rate-group queue asserted and F Prime restarted, PID `256` to `675`, `NRestarts=1` |
+| 2026-07-14 16:43 | WP1-B local verification | PASS | Commit `d6c14ed`; shared drift check, 35 standard tests, focused USB state-machine test, and ground build passed; not flashed |
+| 2026-07-14 16:47 | Daily safe stop | Complete | GDS and payload receiver stopped; all serial ports free; Pi boot `6bcd0ad7-4ced-4024-ab06-a735d7cb395d`, service active PID `675`, `NRestarts=1` |
+
+## Start Here Tomorrow
+
+State at the 2026-07-14 16:47 HST stop:
+
+- Branch `codex/c3m-rf-reliability-hardening` is committed through `d6c14ed`
+  before this documentation update.
+- Ground and satellite Teensys remain connected as ground `usb:1100000`
+  (`11555330`, ports `...301/...303/...305`) and satellite `usb:2100000`
+  (`11556500`, port `...001`). No host process owns the ground data or payload
+  ports.
+- The ground hardware still runs the prior WP1-A image. The newly built WP1-B
+  ground HEX is
+  `7d2fdbf8431ea5fb979304196339a1380b6214c5edfac2e7ee7bf87a852085b9`
+  and has not been flashed.
+- The satellite production artifact remains
+  `61579b309ccbfbe27be40a7d1aed47f2f20eeae18388372360d05a0aba5873ee`.
+- The Pi did not reboot during the duplicate-start failure, but F Prime did.
+  StorageManager state was therefore reset; capture a fresh product before the
+  next nominal downlink.
+
+Resume in this order:
+
+1. Keep the Mac awake/lid open; run repository/submodule preflight and verify
+   both live `usb:*` identities again.
+2. Flash **ground only** from committed WP1-B to `usb:1100000`. Do not flash the
+   satellite yet; its unsafe `RPI_ENABLE_PIN` reset behavior remains open.
+3. Reopen GDS on `...301`, payload receiver on `...305`, and debug on `...303`.
+   Prove a fresh `MissionApp.PING` and confirm all new `usb0_*`/`usb1_*`
+   counters start at zero.
+4. Run HIL-01 with a fresh two-second Lepton capture. Require `1100/1100`, final
+   CRC and Pi/ground SHA equality, no ground reset, and no additional F Prime
+   service restart. Do not issue a second downlink command while one is active.
+5. Run HIL-02 without unplugging USB: stop only the GDS reader while normal
+   channel-0 telemetry is arriving. Require counted `usb0_backpressure`, no
+   false full-write growth, no watchdog/reset/re-enumeration, then restart GDS
+   and require `usb0_recoveries` plus a successful PING. Preserve the debug log.
+6. Update this plan with the new artifact paths and firmware/upload evidence.
+   Only then begin the duplicate-start guard and move bulk payload emission out
+   of timing-critical rate-group execution with component tests.
+
+Do not begin the channel-1 unplug/restart matrix until WP2 persistence exists;
+today's partial run proved the current receiver cannot resume it safely. The
+dedicated missing-TX-done HIL design is ready for later implementation, but its
+test images were not created or flashed today.
