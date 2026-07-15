@@ -25,7 +25,7 @@ package complete from a build or happy-path run alone.
 | --- | --- | --- |
 | Investigation and code comparison | Complete | July 14 logs and current/legacy source reviewed |
 | Reliability plan documented | Complete | This document |
-| Exact indoor bench baseline | In progress | Provenance bundle plus one clean full transfer |
+| Exact indoor bench baseline | Complete | Provenance bundle plus one clean full transfer |
 | Ground bridge fail-safe behavior | Not started | Bounded RF TX and honest USB-write behavior under HIL |
 | Receiver persistence and reconnect | Not started | Interrupted transfer resumes after process/USB loss |
 | Flight transfer completion contract | Not started | Ground CRC confirmation controls final completion |
@@ -54,11 +54,45 @@ Recorded 2026-07-14 15:52 HST before hardening code changes:
 | Deployed Pi release | `/home/pi/artemis/releases/c3m-hil-20260710T013058Z-4bf43c6` |
 | Deployed Pi binary SHA-256 | `3be1a1af54c7a1f61aaf42385a603f0425794745807174cb8488a2e0212f9003` |
 
-The Pi is still running the July 9 `4bf43c6` release, not current baseline HEAD
-`7848022`. The checked-out Teensy build artifacts also cannot prove which exact
-bytes are currently flashed. Gate 0 therefore remains open until current
-baseline HEAD is clean-built, flashed/deployed with recorded hashes, and one
-nominal full transfer passes.
+The deployed Pi release still reports the July 9 `4bf43c6-dirty` version string,
+but the clean ARMv6 cross-build from baseline HEAD produced the exact same
+binary SHA-256 as the deployed release. Changes between those revisions did not
+alter the Pi executable. Keep the stale embedded version string recorded as a
+provenance defect; do not imply that it identifies the current source checkout.
+
+### Gate 0 Verified Baseline
+
+Completed 2026-07-14 16:13 HST before hardening code changes:
+
+| Item | Verified value |
+| --- | --- |
+| Local validation | `./tools/validate_local.sh --skip-demo` passed, including all six component UT executables |
+| ARMv6 cross-build | Passed; ELF ARMv6KZ/VFPv2 with interpreter `/lib/ld-linux-armhf.so.3` |
+| Pi build/deployed SHA-256 | `3be1a1af54c7a1f61aaf42385a603f0425794745807174cb8488a2e0212f9003` on both sides |
+| Ground firmware SHA-256 | `b630a0f4e157bd890d601d55c3ace2bee0dc324e34cce2e82da115793df14c1a` |
+| Satellite firmware SHA-256 | `6f124c50ebec7431c442c66422da0980469a807d6798f1fb25ae03b7fbbde69d` |
+| Verified upload IDs | ground `usb:1100000`; satellite `usb:2100000` |
+| Pi boot ID after final satellite flash | `e50bc7ac-d07a-415d-9bbb-d814a52744d4` |
+| Pi service after final flash | `artemis-fprime.service` active, PID `256`, `NRestarts=0` |
+| Product | product/transfer `1`, `38,480` bytes, `1,100/1,100` packets |
+| Transfer outcome | complete in `58.336` seconds, zero missing packets, zero repair rounds |
+| CRC | expected/actual `33720`, match |
+| Pi/ground product SHA-256 | `2a9cb9c3ccca62537a8ef36a26d9fb6e48732267e19f80600ab591fa4a04d949`, match |
+| Decode | `160x120`, `19,200` pixels; JSON, CSV, and PNG written |
+| Mid-transfer control proof | `MissionApp pong token=37002 count=1` |
+| Ground post-run counters | `rf_tx_drops=0`, `crc_drops=0`, `framing_drops=0`, `up_q_drops=0`, `down_q_drops=0`; one ACK timeout/retry |
+| Satellite post-run counters | all listed drop/timeout/retry/queue counters zero |
+| Host continuity | no GDS serial exception and no macOS USB/sleep event during the clean run window |
+| Payload artifact | `data/c3m_20260715_021212_transfer_1/run.json` |
+| GDS evidence | `ArtemisRpiTeensy_N2/logs/2026_07_14-16_07_18/` |
+
+The baseline also reproduced two failures that this plan must fix. Before the
+clean run, the ground bridge stopped loop/debug progress and channel 0 froze
+until reset; its next banner reported `watchdog reset detected`. The old
+payload receiver exited on USB re-enumeration with `Errno 6: Device not
+configured` and required a process restart. The nominal downlink also emitted
+five rate-group cycle-slip warnings while sending payload data. These are
+baseline evidence for WP1, WP2, and WP3, not Gate 0 pass criteria.
 
 ## User Intent
 
@@ -106,6 +140,7 @@ See:
 - [C3M demo hardening baseline](C3M_DEMO_HARDENING_PLAN_2026-07-09.md)
 - [HIL bench handoff](HIL_BENCH_HANDOFF_2026-07-09.md)
 - [C3M RF MVP runbook](EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md)
+- [Legacy baremetal vs F Prime robustness rationale](LEGACY_BAREMETAL_VS_FPRIME_ROBUSTNESS_2026-07-14.md)
 
 ### Outdoor failure evidence
 
@@ -306,21 +341,21 @@ Rules:
 
 ### Gate 0 — Freeze and record the indoor baseline
 
-- [ ] Keep the Mac awake with the lid open for all qualification runs.
-- [ ] Re-enumerate both Teensys and record all serial roles.
-- [ ] Record ground upload ID `usb:100000` and satellite upload ID
+- [x] Keep the Mac awake with the lid open for all qualification runs.
+- [x] Re-enumerate both Teensys and record all serial roles.
+- [x] Record ground upload ID `usb:1100000` and satellite upload ID
       `usb:2100000`; verify them live rather than assuming the old mapping.
-- [ ] Record repository branch/HEAD, submodule SHAs, F Prime version, both
+- [x] Record repository branch/HEAD, submodule SHAs, F Prime version, both
       Teensy firmware provenance, deployed Pi version, binary SHA-256, Pi boot
       ID, and service restart count.
-- [ ] Confirm the C3M Pi through `artemis-pi-c3m`/`c3m-pi`, `uname -m`, and the
+- [x] Confirm the C3M Pi through `artemis-pi-c3m`/`c3m-pi`, `uname -m`, and the
       active `/dev/serial0` service process.
-- [ ] Capture ground data, ground debug, ground payload, satellite debug,
-      payload-receiver logs, Pi journal, and macOS USB events into one run
-      directory.
-- [ ] Reset/replug the currently wedged ground Teensy, restart GDS cleanly, and
+- [x] Capture ground data, ground debug, ground payload, satellite debug,
+      payload-receiver logs, Pi journal, and macOS USB events; identify their
+      durable artifact paths in the verified baseline table.
+- [x] Reset/replug the currently wedged ground Teensy, restart GDS cleanly, and
       prove that channel 0 moves again.
-- [ ] Run one full basic-antenna transfer and require `1,100/1,100`, final CRC,
+- [x] Run one full basic-antenna transfer and require `1,100/1,100`, final CRC,
       source/ground SHA-256 equality, and no unexplained restart.
 
 Gate passes only when the full provenance and proof bundle is saved.
@@ -549,3 +584,6 @@ Add entries after work begins. Keep them short and link the durable artifact.
 | 2026-07-14 | Investigation | Complete | Indoor nominal runs, outdoor GDS/USB logs, current-versus-legacy code comparison |
 | 2026-07-14 | Planning | Complete | Reliability state model and phased work plan captured in this document |
 | 2026-07-14 15:52 | Gate 0 provenance | In progress | Live USB identities, Pi identity/service, deployed release, binary hash, and version mismatch recorded |
+| 2026-07-14 16:01 | HIL recovery defect | Reproduced | Ground loop/debug and channel 0 remained frozen for more than 20 seconds; test PING did not reach satellite |
+| 2026-07-14 16:06 | Physical provenance recovery | Complete | Restored satellite on `usb:2100000`, ground on `usb:1100000`; verified one versus three serial interfaces |
+| 2026-07-14 16:13 | Gate 0 nominal HIL | PASS | Product 1, `1,100/1,100`, CRC `33720`, Pi/ground SHA match, 58.336 s, one successful mid-transfer PING, no restart |
