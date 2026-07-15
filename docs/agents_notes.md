@@ -1210,3 +1210,13 @@ Driver tier, formerly repo "Adapter":
   product/transfer 5 completed exact in 64.6 s with zero repairs and PING
   39014. Both decoded 160x120, Pi PID 254 stayed at zero restarts, and their
   exact SHA-256 values are recorded in the core reliability plan.
+- A separate handheld Yagi comparison passed indoors at about 15-20 ft. The
+  operator stood in one location but waved and mispointed the ground Yagi
+  during the transfer; the battery-powered satellite retained a normal
+  monopole. PINGs 39015 and 39016 returned, and fresh product/transfer 6
+  completed exact in 64.7 s with zero repairs and 160x120 decode. Pi PID 254
+  remained at zero restarts. After the ground USB power cycle used for the
+  antenna swap, the payload UI temporarily presented completed product 5 as
+  `receiving` despite 1,100/1,100 and `crc_ok=true`; product 6 replaced the
+  stale presentation cleanly. Treat that label reconciliation as a ground-UI
+  follow-up, not evidence of RF corruption.
