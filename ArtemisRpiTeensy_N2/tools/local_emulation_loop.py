@@ -2,10 +2,11 @@
 """Local closed-loop emulator for ArtemisRpiTeensy_N2.
 
 This script emulates the RPi <-> satellite Teensy <-> RF <-> ground Teensy link
-on a single host. It creates two pseudo UART devices:
+on a single host. It creates three pseudo UART devices:
 
 - app UART: passed to ArtemisRpiTeensyDeployment (-d ...)
 - gds UART: passed to fprime-gds (--uart-device ...)
+- payload UART: passed to the ground payload receiver (--port ...)
 
 Supported link modes:
 - channelized: current UART channel mux plus RF segment/reassemble emulation
@@ -27,6 +28,7 @@ import subprocess
 import shutil
 import sys
 import time
+import tty
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -58,6 +60,12 @@ DICT_BASENAME = f"{DEPLOYMENT_NAME}TopologyDictionary.json"
 TIMESTAMP_DIR_RE = re.compile(
     r"^\d{4}(?:[-_])\d{2}(?:[-_])\d{2}(?:T|-)\d{2}(?:[:_])\d{2}(?:[:_])\d{2}(?:\.\d+)?$"
 )
+
+N2_MAGIC = b"N2"
+N2_TYPE_DATA = 2
+N2_DATA_MIN_BYTES = 6
+N2_DATA_INDEX_OFFSET = 4
+N2_MAX_DATA_INDEX = 0xFFFF
 
 
 def crc16_ccitt(payload: bytes) -> int:
@@ -383,13 +391,18 @@ class BurstAggregator:
 class LoopStats:
     app_uart_bytes_in: int = 0
     gds_uart_bytes_in: int = 0
+    payload_uart_bytes_in: int = 0
     app_frames_in: int = 0
     gds_messages_in: int = 0
+    payload_messages_in: int = 0
     rf_packets_app_to_gds: int = 0
     rf_packets_gds_to_app: int = 0
+    rf_packets_payload_to_app: int = 0
     gds_bytes_out: int = 0
+    payload_bytes_out: int = 0
     app_bytes_out: int = 0
     payload_bytes_observed: int = 0
+    payload_data_packets_dropped: int = 0
     local_frames_observed: int = 0
 
 
@@ -418,11 +431,18 @@ class EmulationLoop:
         gds_cmd: Optional[list[str]],
         uplink_flush_ms: int,
         link_mode: str,
+        drop_payload_data_index: Optional[int] = None,
     ) -> None:
         self.app_cmd = app_cmd
         self.gds_cmd = gds_cmd
         self.uplink_flush_s = uplink_flush_ms / 1000.0
         self.link_mode = link_mode
+        if drop_payload_data_index is not None and not (
+            0 <= drop_payload_data_index <= N2_MAX_DATA_INDEX
+        ):
+            raise ValueError("payload DATA packet index out of range")
+        self.drop_payload_data_index = drop_payload_data_index
+        self._payload_data_drop_injected = False
 
         self.stop_requested = False
         self.exit_code = 0
@@ -434,9 +454,12 @@ class EmulationLoop:
         self.app_slave_fd: Optional[int] = None
         self.gds_master_fd: Optional[int] = None
         self.gds_slave_fd: Optional[int] = None
+        self.payload_master_fd: Optional[int] = None
+        self.payload_slave_fd: Optional[int] = None
 
         self.app_uart_device = ""
         self.gds_uart_device = ""
+        self.payload_uart_device = ""
 
         self.pending_writes: dict[int, bytearray] = {}
 
@@ -445,6 +468,7 @@ class EmulationLoop:
         self.ground_reassembler = RfReassembler()
 
         self.gds_burst_aggregator = BurstAggregator(self.uplink_flush_s)
+        self.payload_burst_aggregator = BurstAggregator(self.uplink_flush_s)
         self.ground_to_sat_segmenter = RfSegmenter()
         self.sat_reassembler = RfReassembler()
 
@@ -469,15 +493,38 @@ class EmulationLoop:
     def setup(self) -> None:
         self.app_master_fd, self.app_slave_fd, self.app_uart_device = self._spawn_pty()
         self.gds_master_fd, self.gds_slave_fd, self.gds_uart_device = self._spawn_pty()
+        self.payload_master_fd, self.payload_slave_fd, self.payload_uart_device = self._spawn_pty()
+        # The receiver is launched after discovering the marker below. Disable
+        # PTY echo immediately so downlink bytes cannot loop back as uplink
+        # during that brief startup gap.
+        tty.setraw(self.payload_slave_fd)
 
         print(f"[emulation] app UART device: {self.app_uart_device}")
         print(f"[emulation] gds UART device: {self.gds_uart_device}")
+        print(f"[emulation] payload UART device: {self.payload_uart_device}")
+        # Machine-readable contract used by local-demo orchestration. Flush so
+        # a receiver can be launched promptly even when stdout is redirected.
+        print(f"PAYLOAD_UART_DEVICE={self.payload_uart_device}", flush=True)
 
         if self.app_cmd is not None:
-            cmd = [item.format(app_uart=self.app_uart_device, gds_uart=self.gds_uart_device) for item in self.app_cmd]
+            cmd = [
+                item.format(
+                    app_uart=self.app_uart_device,
+                    gds_uart=self.gds_uart_device,
+                    payload_uart=self.payload_uart_device,
+                )
+                for item in self.app_cmd
+            ]
             self._launch_child(cmd, "flight app")
         if self.gds_cmd is not None:
-            cmd = [item.format(app_uart=self.app_uart_device, gds_uart=self.gds_uart_device) for item in self.gds_cmd]
+            cmd = [
+                item.format(
+                    app_uart=self.app_uart_device,
+                    gds_uart=self.gds_uart_device,
+                    payload_uart=self.payload_uart_device,
+                )
+                for item in self.gds_cmd
+            ]
             self._launch_child(cmd, "gds")
 
         signal.signal(signal.SIGINT, self._handle_signal)
@@ -554,11 +601,49 @@ class EmulationLoop:
                     self._queue_write(self.gds_master_fd, payload)  # type: ignore[arg-type]
                 elif out_channel == CHANNEL_PAYLOAD:
                     self.stats.payload_bytes_observed += len(payload)
+                    if self._should_drop_payload_data(payload):
+                        self.stats.payload_data_packets_dropped += 1
+                        packet_index = int.from_bytes(
+                            payload[N2_DATA_INDEX_OFFSET : N2_DATA_INDEX_OFFSET + 2],
+                            byteorder="little",
+                        )
+                        print(
+                            "[emulation] injected payload DATA drop: "
+                            f"packet_index={packet_index}",
+                            flush=True,
+                        )
+                        continue
+                    self.stats.payload_bytes_out += len(payload)
+                    self._queue_write(self.payload_master_fd, payload)  # type: ignore[arg-type]
 
-    def _process_gds_message_to_app(self, message: bytes, now: float) -> None:
-        self.stats.gds_messages_in += 1
-        rf_packets = self.ground_to_sat_segmenter.segment(CHANNEL_CCSDS, message)
-        self.stats.rf_packets_gds_to_app += len(rf_packets)
+    def _should_drop_payload_data(self, payload: bytes) -> bool:
+        if self.drop_payload_data_index is None or self._payload_data_drop_injected:
+            return False
+        if (
+            len(payload) < N2_DATA_MIN_BYTES
+            or payload[:2] != N2_MAGIC
+            or payload[2] != N2_TYPE_DATA
+        ):
+            return False
+        packet_index = int.from_bytes(
+            payload[N2_DATA_INDEX_OFFSET : N2_DATA_INDEX_OFFSET + 2],
+            byteorder="little",
+        )
+        if packet_index != self.drop_payload_data_index:
+            return False
+        self._payload_data_drop_injected = True
+        return True
+
+    def _process_ground_message_to_app(self, channel: int, message: bytes, now: float) -> None:
+        if channel == CHANNEL_CCSDS:
+            self.stats.gds_messages_in += 1
+        elif channel == CHANNEL_PAYLOAD:
+            self.stats.payload_messages_in += 1
+        rf_packets = self.ground_to_sat_segmenter.segment(channel, message)
+        if channel == CHANNEL_CCSDS:
+            self.stats.rf_packets_gds_to_app += len(rf_packets)
+        elif channel == CHANNEL_PAYLOAD:
+            self.stats.rf_packets_payload_to_app += len(rf_packets)
         for packet in rf_packets:
             reassembled = self.sat_reassembler.feed(packet, now)
             if reassembled is not None:
@@ -566,6 +651,12 @@ class EmulationLoop:
                 framed = build_uart_frame(channel, payload)
                 self.stats.app_bytes_out += len(framed)
                 self._queue_write(self.app_master_fd, framed)  # type: ignore[arg-type]
+
+    def _process_gds_message_to_app(self, message: bytes, now: float) -> None:
+        self._process_ground_message_to_app(CHANNEL_CCSDS, message, now)
+
+    def _process_payload_message_to_app(self, message: bytes, now: float) -> None:
+        self._process_ground_message_to_app(CHANNEL_PAYLOAD, message, now)
 
     def _process_gds_to_app(self, data: bytes, now: float) -> None:
         self.stats.gds_uart_bytes_in += len(data)
@@ -578,6 +669,15 @@ class EmulationLoop:
         messages = self.gds_burst_aggregator.feed(data, now)
         for message in messages:
             self._process_gds_message_to_app(message, now)
+
+    def _process_payload_to_app(self, data: bytes, now: float) -> None:
+        self.stats.payload_uart_bytes_in += len(data)
+        if self.link_mode == "direct":
+            return
+
+        messages = self.payload_burst_aggregator.feed(data, now)
+        for message in messages:
+            self._process_payload_message_to_app(message, now)
 
     def _poll_children(self) -> None:
         for proc in self.children:
@@ -607,11 +707,16 @@ class EmulationLoop:
                         self._process_app_to_gds(data, now)
                     elif fd == self.gds_master_fd:
                         self._process_gds_to_app(data, now)
+                    elif fd == self.payload_master_fd:
+                        self._process_payload_to_app(data, now)
 
                 if self.link_mode != "direct":
                     uplink_msg = self.gds_burst_aggregator.poll(now)
                     if uplink_msg is not None:
                         self._process_gds_message_to_app(uplink_msg, now)
+                    payload_uplink_msg = self.payload_burst_aggregator.poll(now)
+                    if payload_uplink_msg is not None:
+                        self._process_payload_message_to_app(payload_uplink_msg, now)
 
                     self.app_uart_parser.poll_timeout(now)
                     self.ground_reassembler.poll_timeout(now)
@@ -653,7 +758,14 @@ class EmulationLoop:
                 except Exception:
                     pass
 
-        for fd in (self.app_master_fd, self.gds_master_fd, self.app_slave_fd, self.gds_slave_fd):
+        for fd in (
+            self.app_master_fd,
+            self.gds_master_fd,
+            self.payload_master_fd,
+            self.app_slave_fd,
+            self.gds_slave_fd,
+            self.payload_slave_fd,
+        ):
             if fd is None:
                 continue
             try:
@@ -673,8 +785,13 @@ class EmulationLoop:
         print(f"  gds_uart_bytes_in={self.stats.gds_uart_bytes_in}")
         print(f"  gds_messages_in={self.stats.gds_messages_in}")
         print(f"  rf_packets_gds_to_app={self.stats.rf_packets_gds_to_app}")
+        print(f"  payload_uart_bytes_in={self.stats.payload_uart_bytes_in}")
+        print(f"  payload_messages_in={self.stats.payload_messages_in}")
+        print(f"  rf_packets_payload_to_app={self.stats.rf_packets_payload_to_app}")
         print(f"  app_bytes_out={self.stats.app_bytes_out}")
         print(f"  payload_bytes_observed={self.stats.payload_bytes_observed}")
+        print(f"  payload_bytes_out={self.stats.payload_bytes_out}")
+        print(f"  payload_data_packets_dropped={self.stats.payload_data_packets_dropped}")
         print(f"  local_frames_observed={self.stats.local_frames_observed}")
         print(
             "  uart_parser: "
@@ -821,6 +938,17 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--drop-payload-data-index",
+        type=int,
+        choices=range(N2_MAX_DATA_INDEX + 1),
+        default=None,
+        metavar="INDEX",
+        help=(
+            "Drop the first channel-1 N2 DATA packet whose encoded packet index "
+            "matches INDEX; retransmissions pass (default: disabled)"
+        ),
+    )
+    parser.add_argument(
         "--no-app",
         action="store_true",
         help="Do not launch the flight app (emulator still creates app UART PTY)",
@@ -915,6 +1043,7 @@ def main() -> int:
         gds_cmd=gds_cmd,
         uplink_flush_ms=args.uplink_flush_ms,
         link_mode=args.link_mode,
+        drop_payload_data_index=args.drop_payload_data_index,
     )
 
     print("[emulation] topology:")
@@ -922,9 +1051,10 @@ def main() -> int:
         print("  app raw bytes <-> gds raw bytes (direct local bridge)")
     else:
         print("  app channel 0 wrapper -> RF segment/reassemble -> gds raw bytes")
-        print("  app channel 1 wrapper -> RF segment/reassemble -> payload stream observed locally")
+        print("  app channel 1 wrapper -> RF segment/reassemble -> payload receiver raw bytes")
         print("  app channel 2 wrapper -> satellite-local RPC observed locally, not forwarded")
         print("  gds raw bytes -> burst packetization -> RF channel 0 -> channel wrapper -> app")
+        print("  payload receiver raw bytes -> burst packetization -> RF channel 1 -> channel wrapper -> app")
     if not args.no_gds:
         print(f"[emulation] open GDS at http://127.0.0.1:{args.gui_port}")
     rc = loop.run()

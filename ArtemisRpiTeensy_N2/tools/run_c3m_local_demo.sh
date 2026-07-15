@@ -8,7 +8,7 @@ DEPLOYMENT_NAME="ArtemisRpiTeensyDeployment"
 DICT_BASENAME="${DEPLOYMENT_NAME}TopologyDictionary.json"
 GUI_PORT="${GUI_PORT:-5050}"
 DELAY_SECONDS="${DELAY_SECONDS:-10}"
-CAPTURE_SECONDS="${CAPTURE_SECONDS:-10}"
+CAPTURES="${CAPTURES:-3}"
 HOLD_AFTER_SEQUENCE="true"
 DICT_PATH="${DICT_PATH:-}"
 APP_BINARY_PATH="${APP_BINARY_PATH:-}"
@@ -18,6 +18,8 @@ GENERATE_PNG="true"
 OPEN_PNG="true"
 LEPTON_SAMPLE_CSV="${C3M_LEPTON_SAMPLE_CSV:-$REPO_ROOT/ground-station/c3m-lepton-test-data/data/Dp_20260707_120740.csv}"
 LEPTON_CAMERA_BACKEND="${LEPTON_CAMERA_BACKEND:-sample}"
+PAYLOAD_RECEIVER_TIMEOUT_SECONDS="${PAYLOAD_RECEIVER_TIMEOUT_SECONDS:-180}"
+DROP_PAYLOAD_DATA_INDEX=""
 
 usage() {
   cat <<'EOF'
@@ -31,7 +33,9 @@ Runs the EPSCoR C3M laptop-only demo:
 Options:
   --gui-port <port>          fprime-gds GUI port (default: 5050)
   --delay <seconds>          scheduled collection delay (default: 10)
-  --capture-seconds <secs>   accepted by the shared science flow; Lepton captures one frame (default: 10)
+  --captures <count>         consecutive capture/downlink/view cycles (default: 3)
+  --drop-payload-data-index <index>
+                             drop one N2 DATA packet once; its repair must pass
   --app-binary <path>        deployment binary path (default: host-platform artifact)
   --dictionary <path>        topology dictionary path (default: latest generated dict)
   --build-cache <path>       local build cache (default: ArtemisRpiTeensy_N2/build-c3m-local)
@@ -45,10 +49,11 @@ Options:
 
 Pass criteria:
   - GDS command path accepts the demo commands
-  - scheduled collection writes a new ./DpCat/Dp_*.fdp
-  - F Prime payload downlink completes over channel 1
-  - Lepton viewer decodes the .fdp and verifies a 160x120 thermal frame
-  - interactive runs open the decoded PNG image
+  - every scheduled collection writes a distinct ./DpCat/Dp_*.fdp
+  - every F Prime payload downlink completes over emulated channel 1
+  - the real ground payload receiver reconstructs one distinct .fdp per cycle
+  - the Lepton viewer decodes each ground-received .fdp and verifies a 160x120 thermal frame
+  - interactive runs open the final decoded PNG image
 EOF
 }
 
@@ -71,8 +76,12 @@ while [[ $# -gt 0 ]]; do
       DELAY_SECONDS="${2:-}"
       shift 2
       ;;
-    --capture-seconds)
-      CAPTURE_SECONDS="${2:-}"
+    --captures)
+      CAPTURES="${2:-}"
+      shift 2
+      ;;
+    --drop-payload-data-index)
+      DROP_PAYLOAD_DATA_INDEX="${2:-}"
       shift 2
       ;;
     --app-binary)
@@ -121,6 +130,14 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+[[ "$CAPTURES" =~ ^[0-9]+$ ]] && (( CAPTURES > 0 )) || fail "--captures must be a positive integer"
+[[ "$DELAY_SECONDS" =~ ^[0-9]+$ ]] && (( DELAY_SECONDS >= 1 && DELAY_SECONDS <= 300 )) || \
+  fail "--delay must be an integer from 1 through 300"
+if [[ -n "$DROP_PAYLOAD_DATA_INDEX" ]]; then
+  [[ "$DROP_PAYLOAD_DATA_INDEX" =~ ^[0-9]+$ ]] && (( DROP_PAYLOAD_DATA_INDEX <= 65535 )) || \
+    fail "--drop-payload-data-index must be an integer from 0 through 65535"
+fi
 
 [[ -f "$VENV_ACTIVATE" ]] || fail "Missing venv: $VENV_ACTIVATE"
 [[ -x "$ROOT_DIR/tools/run_local_emulation.sh" ]] || fail "Missing local emulator launcher"
@@ -183,12 +200,18 @@ mkdir -p "$ROOT_DIR/tools/logs" "$ROOT_DIR/DpCat"
 RUN_ID="$(date +%Y%m%d_%H%M%S)"
 LOG_DIR="$ROOT_DIR/tools/logs/c3m_local_demo_$RUN_ID"
 DECODE_DIR="$LOG_DIR/lepton_decode"
-mkdir -p "$LOG_DIR" "$DECODE_DIR"
+GROUND_RECEIVED_DIR="$LOG_DIR/ground_received"
+mkdir -p "$LOG_DIR" "$DECODE_DIR" "$GROUND_RECEIVED_DIR"
 
 EMU_PID=""
+RECEIVER_PID=""
 
 cleanup() {
   local code=$?
+  if [[ -n "$RECEIVER_PID" ]] && kill -0 "$RECEIVER_PID" >/dev/null 2>&1; then
+    kill "$RECEIVER_PID" >/dev/null 2>&1 || true
+    wait "$RECEIVER_PID" >/dev/null 2>&1 || true
+  fi
   if [[ -n "$EMU_PID" ]] && kill -0 "$EMU_PID" >/dev/null 2>&1; then
     kill "$EMU_PID" >/dev/null 2>&1 || true
     wait "$EMU_PID" >/dev/null 2>&1 || true
@@ -228,13 +251,16 @@ raise SystemExit(1)
 PY
 }
 
-wait_for_log_pattern() {
+wait_for_log_count() {
   local pattern="$1"
-  local label="$2"
+  local expected_count="$2"
+  local label="$3"
   local deadline
-  deadline=$((SECONDS + 90))
+  deadline=$((SECONDS + 150))
   while (( SECONDS < deadline )); do
-    if grep -q "$pattern" "$LOG_DIR/emulation.log"; then
+    local actual_count
+    actual_count="$(grep -c "$pattern" "$LOG_DIR/emulation.log" 2>/dev/null || true)"
+    if (( actual_count >= expected_count )); then
       return 0
     fi
     if grep -Eq "ImageCaptureFailed|PayloadDownlinkFailed|DownlinkFailed" "$LOG_DIR/emulation.log"; then
@@ -243,6 +269,39 @@ wait_for_log_pattern() {
     sleep 0.5
   done
   printf '[c3m-demo] timed out waiting for %s\n' "$label" >&2
+  return 1
+}
+
+wait_for_payload_uart() {
+  local deadline
+  deadline=$((SECONDS + 45))
+  while (( SECONDS < deadline )); do
+    local payload_uart
+    payload_uart="$(sed -n 's/^PAYLOAD_UART_DEVICE=//p' "$LOG_DIR/emulation.log" 2>/dev/null | tail -n 1)"
+    if [[ -n "$payload_uart" && -e "$payload_uart" ]]; then
+      printf '%s\n' "$payload_uart"
+      return 0
+    fi
+    if ! kill -0 "$EMU_PID" >/dev/null 2>&1; then
+      return 1
+    fi
+    sleep 0.25
+  done
+  return 1
+}
+
+wait_for_receiver_ready() {
+  local deadline
+  deadline=$((SECONDS + 15))
+  while (( SECONDS < deadline )); do
+    if grep -q '^listening on ' "$LOG_DIR/payload_receiver.log" 2>/dev/null; then
+      return 0
+    fi
+    if ! kill -0 "$RECEIVER_PID" >/dev/null 2>&1; then
+      return 1
+    fi
+    sleep 0.25
+  done
   return 1
 }
 
@@ -271,6 +330,43 @@ wait_for_fdp_after() {
   deadline=$((SECONDS + 35))
   while (( SECONDS < deadline )); do
     if latest_fdp_after "$epoch"; then
+      return 0
+    fi
+    sleep 0.5
+  done
+  return 1
+}
+
+count_ground_products() {
+  find "$GROUND_RECEIVED_DIR" -maxdepth 1 -type f -name '*.fdp' | wc -l | tr -d ' '
+}
+
+ground_product_at() {
+  local index="$1"
+  python3 - "$GROUND_RECEIVED_DIR" "$index" <<'PY'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+index = int(sys.argv[2])
+products = sorted(root.glob("*.fdp"), key=lambda path: (path.stat().st_mtime_ns, path.name))
+if len(products) <= index:
+    raise SystemExit(1)
+print(products[index])
+PY
+}
+
+wait_for_ground_product_count() {
+  local expected_count="$1"
+  local deadline
+  deadline=$((SECONDS + PAYLOAD_RECEIVER_TIMEOUT_SECONDS))
+  while (( SECONDS < deadline )); do
+    if [[ -n "$RECEIVER_PID" ]] && ! kill -0 "$RECEIVER_PID" >/dev/null 2>&1; then
+      return 1
+    fi
+    local actual_count
+    actual_count="$(count_ground_products)"
+    if (( actual_count >= expected_count )); then
       return 0
     fi
     sleep 0.5
@@ -327,56 +423,21 @@ open_png_viewer() {
   esac
 }
 
-log "app binary: $APP_BINARY_PATH"
-log "dictionary: $DICT_PATH"
-log "data products: $ROOT_DIR/DpCat"
-log "real Lepton sample CSV: $LEPTON_SAMPLE_CSV"
-log "Lepton camera backend: $LEPTON_CAMERA_BACKEND"
-log "logs: $LOG_DIR"
+decode_ground_product() {
+  local cycle="$1"
+  local fdp_file="$2"
+  local cycle_decode_dir="$DECODE_DIR/cycle_$cycle"
+  local summary_file="$LOG_DIR/lepton_summary_cycle_$cycle.json"
+  local viewer_args=(--dictionary "$DICT_PATH" --outdir "$cycle_decode_dir" --summary --no-show)
+  mkdir -p "$cycle_decode_dir"
+  if [[ "$GENERATE_PNG" != "true" ]]; then
+    viewer_args+=(--no-png)
+  fi
 
-(
-  cd "$ROOT_DIR"
-  exec ./tools/run_local_emulation.sh \
-    --app-binary "$APP_BINARY_PATH" \
-    --dictionary "$DICT_PATH" \
-    --gui-port "$GUI_PORT" \
-    --link-mode channelized
-) >"$LOG_DIR/emulation.log" 2>&1 &
-EMU_PID="$!"
-log "started local emulator pid=$EMU_PID; GDS: http://127.0.0.1:$GUI_PORT"
+  python3 "$REPO_ROOT/ground-station/lepton-dp-viewer/lepton_dp_viewer.py" "$fdp_file" "${viewer_args[@]}" \
+    > "$summary_file"
 
-wait_for_port "$GUI_PORT" "fprime-gds"
-
-START_EPOCH="$(python3 -c 'import time; print(time.time())')"
-
-log "sending C3M command sequence"
-send_command "missionApp.ENTER_BASE_MODE" || fail "Command failed: missionApp.ENTER_BASE_MODE"
-send_command "sohApp.EMIT_SOH_SNAPSHOT" || fail "Command failed: sohApp.EMIT_SOH_SNAPSHOT"
-send_command "payloadDriverLepton.ENABLE" || fail "Command failed: payloadDriverLepton.ENABLE"
-send_command "scienceApp.CONFIGURE_CAPTURE_DURATION" "$CAPTURE_SECONDS" || fail "Command failed: scienceApp.CONFIGURE_CAPTURE_DURATION"
-send_command "missionApp.SCHEDULE_COLLECTION" "$DELAY_SECONDS" || fail "Command failed: missionApp.SCHEDULE_COLLECTION"
-
-WAIT_SECONDS=$((DELAY_SECONDS + 6))
-log "waiting ${WAIT_SECONDS}s for scheduled Lepton capture"
-sleep "$WAIT_SECONDS"
-
-FDP_FILE="$(wait_for_fdp_after "$START_EPOCH")" || fail "No new Lepton Dp_*.fdp found in $ROOT_DIR/DpCat"
-log "new Lepton data product: $FDP_FILE"
-
-send_command "storageManager.REPORT_LATEST_DATASET" || fail "Command failed: storageManager.REPORT_LATEST_DATASET"
-send_command "storageManager.REPORT_STORAGE_HISTORY" || fail "Command failed: storageManager.REPORT_STORAGE_HISTORY"
-send_command "commsApp.REQUEST_SCIENCE_DOWNLINK" || fail "Command failed: commsApp.REQUEST_SCIENCE_DOWNLINK"
-wait_for_log_pattern "PayloadDownlinkComplete" "payload downlink completion" || fail "Payload downlink did not complete"
-wait_for_log_pattern "DownlinkFinished" "comms downlink completion" || fail "Comms downlink did not complete"
-
-VIEWER_ARGS=(--dictionary "$DICT_PATH" --outdir "$DECODE_DIR" --summary --no-show)
-if [[ "$GENERATE_PNG" != "true" ]]; then
-  VIEWER_ARGS+=(--no-png)
-fi
-python3 "$REPO_ROOT/ground-station/lepton-dp-viewer/lepton_dp_viewer.py" "$FDP_FILE" "${VIEWER_ARGS[@]}" \
-  > "$LOG_DIR/lepton_summary.json"
-
-PNG_FILE="$(python3 - "$LOG_DIR/lepton_summary.json" "$GENERATE_PNG" "$LEPTON_SAMPLE_CSV" <<'PY'
+  LAST_PNG="$(python3 - "$summary_file" "$GENERATE_PNG" "$LEPTON_SAMPLE_CSV" <<'PY'
 import json
 import sys
 
@@ -420,16 +481,107 @@ if png:
 PY
 )"
 
-log "viewer summary written: $LOG_DIR/lepton_summary.json"
-log "decoded Lepton CSV matches real sample data"
-if [[ -n "$PNG_FILE" ]]; then
-  log "viewer PNG written: $PNG_FILE"
-  if [[ "$OPEN_PNG" == "true" ]]; then
-    log "opening decoded Lepton PNG"
-    open_png_viewer "$PNG_FILE"
+  log "cycle $cycle viewer summary: $summary_file"
+  log "cycle $cycle decoded ground Lepton CSV matches real sample data"
+  if [[ -n "$LAST_PNG" ]]; then
+    log "cycle $cycle viewer PNG: $LAST_PNG"
   fi
+}
+
+log "app binary: $APP_BINARY_PATH"
+log "dictionary: $DICT_PATH"
+log "data products: $ROOT_DIR/DpCat"
+log "real Lepton sample CSV: $LEPTON_SAMPLE_CSV"
+log "Lepton camera backend: $LEPTON_CAMERA_BACKEND"
+log "capture/downlink cycles: $CAPTURES"
+if [[ -n "$DROP_PAYLOAD_DATA_INDEX" ]]; then
+  log "one-shot payload DATA drop index: $DROP_PAYLOAD_DATA_INDEX"
 fi
-log "PASS: local EPSCoR C3M demo produced, downlinked, and decoded a Lepton .fdp"
+log "logs: $LOG_DIR"
+
+EMULATOR_ARGS=(
+  --app-binary "$APP_BINARY_PATH"
+  --dictionary "$DICT_PATH"
+  --gui-port "$GUI_PORT"
+  --link-mode channelized
+)
+if [[ -n "$DROP_PAYLOAD_DATA_INDEX" ]]; then
+  EMULATOR_ARGS+=(--drop-payload-data-index "$DROP_PAYLOAD_DATA_INDEX")
+fi
+
+(
+  cd "$ROOT_DIR"
+  exec ./tools/run_local_emulation.sh "${EMULATOR_ARGS[@]}"
+) >"$LOG_DIR/emulation.log" 2>&1 &
+EMU_PID="$!"
+log "started local emulator pid=$EMU_PID; GDS: http://127.0.0.1:$GUI_PORT"
+
+PAYLOAD_UART_DEVICE="$(wait_for_payload_uart)" || fail "Local emulator did not publish a payload UART device"
+log "payload UART: $PAYLOAD_UART_DEVICE"
+
+PYTHONUNBUFFERED=1 python3 "$ROOT_DIR/tools/payload_receiver.py" \
+  --port "$PAYLOAD_UART_DEVICE" \
+  --output-dir "$GROUND_RECEIVED_DIR" \
+  --ext .fdp \
+  --timeout "$PAYLOAD_RECEIVER_TIMEOUT_SECONDS" \
+  >"$LOG_DIR/payload_receiver.log" 2>&1 &
+RECEIVER_PID="$!"
+log "started ground payload receiver pid=$RECEIVER_PID"
+wait_for_receiver_ready || fail "Ground payload receiver did not become ready; see $LOG_DIR/payload_receiver.log"
+
+wait_for_port "$GUI_PORT" "fprime-gds"
+
+log "sending one-time C3M startup commands"
+send_command "missionApp.ENTER_BASE_MODE" || fail "Command failed: missionApp.ENTER_BASE_MODE"
+send_command "sohApp.EMIT_SOH_SNAPSHOT" || fail "Command failed: sohApp.EMIT_SOH_SNAPSHOT"
+
+SOURCE_PRODUCT_COUNT="$(find "$ROOT_DIR/DpCat" -maxdepth 1 -type f -name 'Dp_*.fdp' | wc -l | tr -d ' ')"
+GROUND_PRODUCT_BASELINE="$(count_ground_products)"
+HISTORY_FILE="$LOG_DIR/cycle_history.tsv"
+printf 'cycle\tsatellite_product\tground_product\tdecode_summary\n' >"$HISTORY_FILE"
+LAST_PNG=""
+
+for ((cycle = 1; cycle <= CAPTURES; cycle++)); do
+  START_EPOCH="$(python3 -c 'import time; print(time.time())')"
+  log "cycle $cycle/$CAPTURES: scheduling Lepton capture after ${DELAY_SECONDS}s"
+  send_command "missionApp.SCHEDULE_COLLECTION" "$DELAY_SECONDS" || \
+    fail "Cycle $cycle command failed: missionApp.SCHEDULE_COLLECTION"
+
+  wait_for_log_count "ScienceStored" "$cycle" "cycle $cycle ScienceStored" || \
+    fail "Cycle $cycle did not reach ScienceStored"
+  FDP_FILE="$(wait_for_fdp_after "$START_EPOCH")" || \
+    fail "Cycle $cycle produced no new Lepton Dp_*.fdp in $ROOT_DIR/DpCat"
+  CURRENT_SOURCE_COUNT="$(find "$ROOT_DIR/DpCat" -maxdepth 1 -type f -name 'Dp_*.fdp' | wc -l | tr -d ' ')"
+  (( CURRENT_SOURCE_COUNT > SOURCE_PRODUCT_COUNT )) || \
+    fail "Cycle $cycle did not create a distinct satellite-side data product"
+  SOURCE_PRODUCT_COUNT="$CURRENT_SOURCE_COUNT"
+  log "cycle $cycle satellite product: $FDP_FILE"
+
+  send_command "commsApp.REQUEST_SCIENCE_DOWNLINK" || \
+    fail "Cycle $cycle command failed: commsApp.REQUEST_SCIENCE_DOWNLINK"
+  wait_for_log_count "PayloadDownlinkComplete" "$cycle" "cycle $cycle payload completion" || \
+    fail "Cycle $cycle payload downlink did not complete"
+  wait_for_log_count "DownlinkFinished" "$cycle" "cycle $cycle comms completion" || \
+    fail "Cycle $cycle comms downlink did not complete"
+
+  EXPECTED_GROUND_COUNT=$((GROUND_PRODUCT_BASELINE + cycle))
+  wait_for_ground_product_count "$EXPECTED_GROUND_COUNT" || \
+    fail "Cycle $cycle produced no CRC-valid ground-received artifact; see $LOG_DIR/payload_receiver.log"
+  GROUND_FDP_FILE="$(ground_product_at "$((EXPECTED_GROUND_COUNT - 1))")" || \
+    fail "Cycle $cycle ground artifact could not be selected"
+  log "cycle $cycle ground product: $GROUND_FDP_FILE"
+  decode_ground_product "$cycle" "$GROUND_FDP_FILE"
+  printf '%s\t%s\t%s\t%s\n' \
+    "$cycle" "$FDP_FILE" "$GROUND_FDP_FILE" "$LOG_DIR/lepton_summary_cycle_$cycle.json" \
+    >>"$HISTORY_FILE"
+done
+
+if [[ -n "$LAST_PNG" && "$OPEN_PNG" == "true" ]]; then
+  log "opening final decoded Lepton PNG"
+  open_png_viewer "$LAST_PNG"
+fi
+log "PASS: completed $CAPTURES consecutive C3M capture/downlink/decode cycles from ground-received artifacts"
+log "cycle history: $HISTORY_FILE"
 
 if [[ "$HOLD_AFTER_SEQUENCE" == "true" ]]; then
   log "GDS: http://127.0.0.1:$GUI_PORT"
