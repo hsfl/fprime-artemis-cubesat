@@ -146,6 +146,54 @@ def device_sort_key(device: str) -> tuple[str, int]:
     return (match.group(1), int(match.group(2))) if match else (device, -1)
 
 
+def stable_port_identity(
+    device: str, rows: list[dict[str, str | bool | None]]
+) -> dict[str, object] | None:
+    selected = next((row for row in rows if str(row.get("device")) == device), None)
+    if selected is None:
+        return None
+    serial_number = str(selected.get("serial_number") or "")
+    location = str(selected.get("location") or "")
+    if serial_number:
+        group = [row for row in rows if str(row.get("serial_number") or "") == serial_number]
+        key = {"serial_number": serial_number}
+    elif location:
+        group = [row for row in rows if str(row.get("location") or "") == location]
+        key = {"location": location}
+    else:
+        return None
+    ordered = sorted((str(row["device"]) for row in group), key=device_sort_key)
+    if device not in ordered:
+        return None
+    return {**key, "interface_ordinal": ordered.index(device), "interface_count": len(ordered)}
+
+
+def resolve_stable_port(
+    identity: dict[str, object] | None,
+    rows: list[dict[str, str | bool | None]],
+) -> str | None:
+    if not identity:
+        return None
+    if identity.get("serial_number"):
+        group = [
+            row
+            for row in rows
+            if str(row.get("serial_number") or "") == str(identity["serial_number"])
+        ]
+    elif identity.get("location"):
+        group = [
+            row for row in rows if str(row.get("location") or "") == str(identity["location"])
+        ]
+    else:
+        return None
+    ordered = sorted((str(row["device"]) for row in group), key=device_sort_key)
+    ordinal = int(identity.get("interface_ordinal", -1))
+    expected_count = int(identity.get("interface_count", 0))
+    if expected_count > 0 and len(ordered) != expected_count:
+        return None
+    return ordered[ordinal] if 0 <= ordinal < len(ordered) else None
+
+
 def build_channel1_stream(
     blob: bytes,
     *,
@@ -264,6 +312,8 @@ class ReceiverController:
         decode_fn: Callable[[Path, Path, Path | None], dict[str, Any]] | None = None,
         partial_decode_fn: Callable[[Path, Path, list[int], int], dict[str, Any]] | None = None,
         transfer_timeout_s: float = 90.0,
+        port_rows_fn: Callable[[], list[dict[str, str | bool | None]]] = serial_port_rows,
+        serial_factory: Callable[..., object] | None = None,
     ) -> None:
         self.data_dir = data_dir.resolve()
         self.incoming_dir = self.data_dir / ".incoming"
@@ -272,6 +322,8 @@ class ReceiverController:
         self.decode_fn = decode_fn or self._decode_lepton
         self.partial_decode_fn = partial_decode_fn or self._decode_partial_lepton
         self.transfer_timeout_s = transfer_timeout_s
+        self.port_rows_fn = port_rows_fn
+        self.serial_factory = serial_factory
         self.lock = threading.RLock()
         self.worker_lock = threading.RLock()
         self.current = default_current_state()
@@ -282,6 +334,7 @@ class ReceiverController:
         self.worker_generation = 0
         self.transfer_sequence = 0
         self.finalize_lock = threading.Lock()
+        self.port_identity: dict[str, object] | None = None
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
     def _decode_lepton(self, fdp_path: Path, outdir: Path, dictionary: Path | None) -> dict[str, Any]:
@@ -341,6 +394,7 @@ class ReceiverController:
             }:
                 return
             self.last_replay = None
+            self.port_identity = stable_port_identity(port, self.port_rows_fn())
         self._start_worker(port=port, replay=None)
 
     def connect_replay(
@@ -363,6 +417,19 @@ class ReceiverController:
                 replay[0], delay_s=replay[1], expected_crc=replay[2], omit_packet_indices=replay[3]
             )
         elif isinstance(port, str) and port:
+            if self.port_identity:
+                resolved = resolve_stable_port(self.port_identity, self.port_rows_fn())
+                if resolved is None:
+                    with self.lock:
+                        self.current.update(
+                            {
+                                "status": "recovering",
+                                "connected": False,
+                                "message": "Waiting for the selected ground Teensy to reappear",
+                            }
+                        )
+                    return
+                port = resolved
             self._start_worker(port=port, replay=None)
         else:
             self.set_port_required()
@@ -429,6 +496,13 @@ class ReceiverController:
             replay_serial = ReplaySerial(raw, delay_s=replay[1])
             serial_factory = lambda *_args, **_kwargs: replay_serial
             idle_timeout = 0.5
+        else:
+            serial_factory = self.serial_factory
+
+        source_identity = dict(self.port_identity or {})
+        port_resolver = None
+        if replay is None and source_identity:
+            port_resolver = lambda: resolve_stable_port(source_identity, self.port_rows_fn())
 
         worker_incoming_dir = self.incoming_dir / f"worker_{generation}"
         receiver = payload_receiver.PayloadReceiver(
@@ -443,7 +517,18 @@ class ReceiverController:
             serial_factory=serial_factory,
             stop_requested=stop_event.is_set,
             transfer_timeout_s=self.transfer_timeout_s,
+            absolute_transfer_timeout_s=30.0 * 60.0,
             save_partial_on_timeout=True,
+            checkpoint_dir=(
+                self.incoming_dir / "active_transfer_checkpoint"
+                if replay is None
+                else None
+            ),
+            source_identity=source_identity,
+            port_resolver=port_resolver,
+            reconnect_timeout_s=self.transfer_timeout_s if port_resolver is not None else 0.0,
+            save_partial_on_disconnect=port_resolver is not None,
+            retain_checkpoint_after_complete=replay is None,
         )
         try:
             receiver.run_directory(idle_timeout_s=idle_timeout)
@@ -473,6 +558,7 @@ class ReceiverController:
             self.current["port"] = event.port
             if event.kind in {
                 "transfer_started",
+                "transfer_resumed",
                 "progress",
                 "retry_requested",
                 "crc_checked",
@@ -495,23 +581,24 @@ class ReceiverController:
                 )
 
             if event.kind == "ready":
+                active_transfer = self.current.get("transfer_id") is not None
                 self.current.update(
                     {
-                        "status": "ready",
+                        "status": "receiving" if active_transfer else "ready",
                         "connected": True,
-                        "message": "Ready — awaiting downlink",
+                        "message": "Resumed payload transfer" if active_transfer else "Ready — awaiting downlink",
                         "failure_reason": None,
                     }
                 )
-            elif event.kind == "transfer_started":
+            elif event.kind in {"transfer_started", "transfer_resumed"}:
                 self.transfer_sequence += 1
                 self.current.update(
                     {
                         "status": "receiving",
                         "connected": True,
-                        "message": "Receiving payload",
+                        "message": "Resumed payload transfer" if event.kind == "transfer_resumed" else "Receiving payload",
                         "failure_reason": None,
-                        "started_at_s": event.timestamp_s,
+                        "started_at_s": event.transfer_started_at_s or event.timestamp_s,
                         "completed_at_s": None,
                         "elapsed_seconds": 0.0,
                         "estimated_remaining_seconds": None,
@@ -586,6 +673,25 @@ class ReceiverController:
                     }
                 )
                 self._append_log(event.error or event.message, event.timestamp_s, level="error")
+            elif event.kind == "recovering":
+                self.current.update(
+                    {
+                        "status": "recovering",
+                        "connected": False,
+                        "message": "Recovering payload serial connection",
+                        "failure_reason": event.error or event.message,
+                    }
+                )
+                self._append_log(event.message, event.timestamp_s, level="warning")
+            elif event.kind == "checkpoint_rejected":
+                self.current.update(
+                    {
+                        "status": "warning",
+                        "message": "Saved payload checkpoint was rejected",
+                        "failure_reason": event.error or event.message,
+                    }
+                )
+                self._append_log(event.error or event.message, event.timestamp_s, level="warning")
             elif event.kind == "idle_timeout":
                 self.current["connected"] = False
                 if self.current["status"] not in {"complete", "partial", "failed"}:
@@ -668,6 +774,13 @@ class ReceiverController:
             "payload.fdp.partial" if partial else ("payload.fdp" if crc_ok else "payload.fdp.badcrc")
         )
         shutil.move(str(source), str(target))
+        missing_map_target: Path | None = None
+        missing_map_source_value = event.get("missing_map_path")
+        if partial and missing_map_source_value:
+            missing_map_source = Path(str(missing_map_source_value)).resolve()
+            if missing_map_source.is_file():
+                missing_map_target = run_dir / "missing_packets.json"
+                shutil.move(str(missing_map_source), str(missing_map_target))
         digest = sha256_file(target)
         with self.lock:
             if self._is_current_transfer(generation, transfer_sequence):
@@ -716,6 +829,8 @@ class ReceiverController:
 
         completed_at = time.time()
         output_paths: dict[str, str] = {"fdp": target.name}
+        if missing_map_target is not None:
+            output_paths["missing_map"] = missing_map_target.name
         if summary is not None:
             for key in ("json", "csv", "png"):
                 value = summary.get(key)
@@ -749,9 +864,11 @@ class ReceiverController:
             "outputs": output_paths,
             "decode": summary,
         }
-        temporary = run_dir / "run.json.tmp"
-        temporary.write_text(json.dumps(run_info, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        temporary.replace(run_dir / "run.json")
+        payload_receiver.PayloadReceiver._atomic_write(
+            run_dir / "run.json",
+            (json.dumps(run_info, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        )
+        self._acknowledge_finalized_checkpoint(event)
 
         output_urls = {key: safe_relative_url(run_dir.name, value) for key, value in output_paths.items()}
         with self.lock:
@@ -783,6 +900,26 @@ class ReceiverController:
                 self._append_log("Best-effort decode complete; missing pixels are shown in white", completed_at, level="warning")
             elif failure_reason:
                 self._append_log(failure_reason, completed_at, level="error")
+
+    def _acknowledge_finalized_checkpoint(self, event: dict[str, Any]) -> None:
+        checkpoint = self.incoming_dir / "active_transfer_checkpoint"
+        owner = checkpoint / payload_receiver.CHECKPOINT_OWNER_FILENAME
+        manifest_path = checkpoint / "manifest.json"
+        try:
+            if owner.read_text(encoding="utf-8") != payload_receiver.CHECKPOINT_OWNER_VALUE:
+                return
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            transfer = manifest["transfer"]
+            if (
+                int(transfer["transfer_id"]) != int(event.get("transfer_id"))
+                or int(transfer["product_id"]) != int(event.get("product_id"))
+                or int(transfer["total_bytes"]) != int(event.get("total_bytes"))
+                or int(transfer["file_crc"]) != int(event.get("expected_crc"))
+            ):
+                return
+            shutil.rmtree(checkpoint)
+        except (KeyError, TypeError, ValueError, OSError, json.JSONDecodeError):
+            return
 
     def history(self) -> list[dict[str, Any]]:
         runs: list[dict[str, Any]] = []

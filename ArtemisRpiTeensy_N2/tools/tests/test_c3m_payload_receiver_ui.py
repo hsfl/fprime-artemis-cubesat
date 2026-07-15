@@ -149,6 +149,144 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
         self.assertEqual(ui.detect_payload_port(rows), "/dev/cu.usbmodem115553305")
         self.assertIsNone(ui.detect_payload_port(rows[:2]))
 
+    def test_stable_payload_identity_resolves_after_device_renumbering(self) -> None:
+        before = [
+            {
+                "device": f"/dev/cu.usbmodem11555330{suffix}",
+                "description": "Triple Serial",
+                "serial_number": "11555330",
+                "location": "0-1",
+                "likely_payload": False,
+            }
+            for suffix in (1, 3, 5)
+        ]
+        identity = ui.stable_port_identity("/dev/cu.usbmodem115553305", before)
+        self.assertEqual(identity["interface_ordinal"], 2)
+        after = [
+            {
+                **row,
+                "device": f"/dev/cu.usbmodem998877{suffix}",
+            }
+            for row, suffix in zip(before, (1, 3, 5), strict=True)
+        ]
+        self.assertEqual(
+            ui.resolve_stable_port(identity, after),
+            "/dev/cu.usbmodem9988775",
+        )
+        self.assertIsNone(ui.resolve_stable_port(identity, after[:2]))
+
+    def test_reconnect_never_falls_back_to_stale_path_for_stable_identity(self) -> None:
+        rows = [
+            {
+                "device": f"/dev/cu.usbmodem11555330{suffix}",
+                "description": "Triple Serial",
+                "serial_number": "11555330",
+                "location": "0-1",
+                "likely_payload": suffix == 5,
+            }
+            for suffix in (1, 3, 5)
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = ui.ReceiverController(pathlib.Path(tmp), port_rows_fn=lambda: [])
+            controller.port_identity = ui.stable_port_identity(
+                "/dev/cu.usbmodem115553305", rows
+            )
+            controller.current.update(
+                {"port": "/dev/cu.usbmodem115553305", "status": "disconnected"}
+            )
+            with mock.patch.object(controller, "_start_worker") as start_worker:
+                controller.reconnect()
+            start_worker.assert_not_called()
+            self.assertEqual(controller.current["status"], "recovering")
+            self.assertFalse(controller.current["connected"])
+
+    def test_checkpoint_rejection_is_operator_visible(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = ui.ReceiverController(pathlib.Path(tmp))
+            event = ui.payload_receiver.ReceiverEvent(
+                kind="checkpoint_rejected",
+                timestamp_s=time.time(),
+                message="checkpoint rejected: stale",
+                port="test-channel-1",
+                product_id=0,
+                transfer_id=None,
+                total_bytes=0,
+                received_bytes=0,
+                total_packets=0,
+                received_packets=0,
+                missing_packets=0,
+                retry_rounds=0,
+                expected_crc=None,
+                error_phase="checkpoint",
+                error="checkpoint rejected: stale",
+            )
+            controller.on_receiver_event(event)
+            snapshot = controller.snapshot()
+            self.assertEqual(snapshot["current"]["status"], "warning")
+            self.assertEqual(
+                snapshot["current"]["failure_reason"], "checkpoint rejected: stale"
+            )
+            self.assertEqual(snapshot["logs"][-1]["level"], "warning")
+
+    def test_ui_restart_loads_checkpoint_and_finishes_same_transfer(self) -> None:
+        blob = bytes(index % 251 for index in range(ui.payload_receiver.DATA_BYTES * 20))
+        rows = [
+            {
+                "device": f"/dev/cu.usbmodem998877{suffix}",
+                "description": "Triple Serial",
+                "serial_number": "11555330",
+                "location": "0-1",
+                "likely_payload": suffix == 5,
+            }
+            for suffix in (1, 3, 5)
+        ]
+        payload_port = "/dev/cu.usbmodem9988775"
+        identity = ui.stable_port_identity(payload_port, rows)
+        raw = ui.build_channel1_stream(blob, product_id=777, transfer_id=66)
+        parser = ui.payload_receiver.PayloadReceiver(
+            "parser", 115200, pathlib.Path("/tmp/unused"), 1.0
+        )
+        parser.rx_buffer += raw
+        packets: list[bytes] = []
+        while packet := parser.try_extract_packet():
+            packets.append(packet)
+        self.assertEqual(len(packets), 22)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            checkpoint = root / ".incoming" / "active_transfer_checkpoint"
+            first = ui.payload_receiver.PayloadReceiver(
+                payload_port,
+                115200,
+                root / "unused.fdp",
+                1.0,
+                checkpoint_dir=checkpoint,
+                source_identity=identity,
+            )
+            first.handle_header(packets[0])
+            for packet in packets[1:6]:
+                first.handle_data(packet)
+
+            resumed_serial = ui.ReplaySerial(b"".join(packets[6:]), chunk_size=37)
+            controller = ui.ReceiverController(
+                root,
+                decode_fn=fake_decode,
+                port_rows_fn=lambda: rows,
+                serial_factory=lambda *_args, **_kwargs: resumed_serial,
+            )
+            try:
+                controller.connect(payload_port)
+                snapshot = wait_for_status(controller, "complete", timeout_s=5.0)
+            finally:
+                controller.stop()
+
+            self.assertEqual(snapshot["current"]["product_id"], 777)
+            self.assertEqual(snapshot["current"]["transfer_id"], 66)
+            self.assertEqual(snapshot["current"]["received_packets"], 20)
+            self.assertTrue(snapshot["current"]["crc_ok"])
+            self.assertEqual(snapshot["history"][0]["result"], "complete")
+            self.assertFalse(checkpoint.exists())
+
     def test_replay_completes_and_creates_history_run(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             controller = ui.ReceiverController(pathlib.Path(tmp), decode_fn=fake_decode)
@@ -311,6 +449,7 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
             self.assertFalse(run["crc_ok"])
             self.assertEqual(run["missing_packet_indices"], [100])
             self.assertTrue(run["outputs"]["fdp"].endswith(".fdp.partial"))
+            self.assertEqual(run["outputs"]["missing_map"], "missing_packets.json")
 
 
 if __name__ == "__main__":
