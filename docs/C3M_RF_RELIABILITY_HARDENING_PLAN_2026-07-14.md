@@ -136,15 +136,15 @@ for this demo. Its mission-grade details remain in Git history at `87eca99` and
 
 | Area | Local status | HIL status |
 | --- | --- | --- |
-| Nominal single capture/downlink/decode | Passed | Passed indoors before latest hardening |
+| Nominal single capture/downlink/decode | Passed | Passed with current artifacts: product/transfer 1, 38,480 bytes, 1,100/1,100, exact source/ground SHA-256, 64.8 s |
 | Bounded Teensy RF TX timeout/retry/recovery | Passed host tests and builds | Needs bench injection |
-| Honest ground USB writes and independent queues | Passed host tests and build | Needs flash/bench proof |
+| Honest ground USB writes and independent queues | Passed host tests and build | Current firmware flashed; channel-0 queue/drop/backpressure counters stayed flat after GDS opened; focused stop/restart remains |
 | Persistent/re-enumerating ground receiver | Passed focused tests | Needs unplug/process-restart proof |
 | Duplicate start and bounded F Prime payload work | Passed component tests | Needs target timing proof |
-| Additive N2 repair | Passed component tests | Needs packet-loss proof |
-| Automatic progress-event removal | Passed component/full local validation | Needs command-latency observation |
-| Ground-side local reconstruction | Passed: real receiver PTY/CRC/decode path | Needs physical channel-1 receiver proof |
-| Repeated capture/downlink cycles | Passed: three cycles, one uninterrupted session | Not yet tested |
+| Additive N2 repair | Passed component tests | Passed one natural one-round repair in the 3/3 nominal run; focused fade remains |
+| Automatic progress-event removal | Passed component/full local validation | Passed observation: zero automatic progress events; five PING responses delivered during four bulk transfers |
+| Ground-side local reconstruction | Passed: real receiver PTY/CRC/decode path | Passed physical channel-1 proof with four exact source/ground files and complete decode artifacts |
+| Repeated capture/downlink cycles | Passed: three cycles, one uninterrupted session | Passed: three new products/transfers, 3/3 CRC-valid, 64.7-65.2 s, no process/hardware restart |
 | Deterministic packet-loss repair | Passed: dropped DATA 100, retry/repair/CRC | Needs brief-RF-fade proof |
 | Permanent loss then clean next cycle | Passed: honest 1,099/1,100 partial, next transfer exact | Needs sustained-fade proof |
 | Outdoor/Yagi behavior | Not locally provable | Deferred until bench passes |
@@ -277,7 +277,7 @@ Local proof covers deterministic software behavior. It does **not** prove
 RFM23BP turnaround, USB device recovery, watchdog behavior, real antenna
 geometry, Pi scheduling, or measured goodput.
 
-## Tomorrow: Start Here
+## Today's HIL Execution
 
 1. Use basic antennas, keep the Mac awake with the lid open, and connect the
    ground Teensy before launching GDS.
@@ -289,26 +289,28 @@ geometry, Pi scheduling, or measured goodput.
 4. Connect/boot the satellite and wait about 90 seconds before SSH/service
    inspection. Verify the Pi boot ID, service PID/restart count, binary hash,
    `/dev/serial0`, and both bridge debug counter streams.
-5. Run HIL-MVP-1 startup, then HIL-MVP-2 three-cycle nominal. Do not begin
-   induced fades, process restarts, or USB reconnects until both pass.
+5. Run HIL-MVP-1 startup, HIL-MVP-2a one complete cycle, then HIL-MVP-2b
+   three-cycle nominal. Do not begin induced fades, process restarts, or USB
+   reconnects until all three pass.
 6. Continue HIL-MVP-3 through HIL-MVP-8 one fault at a time. After every
    induced fault, require an honest terminal result and a clean next capture.
 
-## Tomorrow's Practical Indoor HIL Matrix
+## Practical Indoor HIL Matrix
 
 Use basic antennas on the bench. Keep the Mac awake and lid open. Verify live
 hardware identities before every flash; do not assume July 14 device paths.
 
-| HIL case | Action | Pass condition |
-| --- | --- | --- |
-| HIL-MVP-1 startup | Boot both sides, start GDS/receiver, request SOH/PING | Correct ports, SOH visible, no reset/restart, counters captured |
-| HIL-MVP-2 repeated nominal | Capture/downlink/display three new photos sequentially | Three unique CRC-valid ground images; all sides remain running/ready |
-| HIL-MVP-3 duplicate command | Repeat active downlink request once | No progress reset, assertion, or F Prime restart |
-| HIL-MVP-4 brief RF fade | Block/mispoint basic antennas briefly, then restore | Missing packets requested/repaired or honest partial; next cycle succeeds |
-| HIL-MVP-5 ground receiver restart | Restart only payload receiver during transfer | State reloads and completes or remains honest partial; following cycle succeeds |
-| HIL-MVP-6 channel-0 backpressure | Stop/restart only GDS reader | Short write/backpressure counted; no false delivery or watchdog reset; PING recovers |
-| HIL-MVP-7 ground USB reconnect | Unplug/replug ground Teensy once | Ports rediscovered; no silent complete; current attempt resolves honestly; next cycle succeeds |
-| HIL-MVP-8 RF TX timeout injection | Make peer unavailable for the focused test | Bounded retry/recovery; no 12-second watchdog reset |
+| HIL case | Action | Pass condition | 2026-07-15 result |
+| --- | --- | --- | --- |
+| HIL-MVP-1 startup | Boot both sides, start GDS/receiver, request SOH/PING | Correct ports, SOH visible, no reset/restart, counters captured | **PASS** — PING 4245, SOH snapshot, direct UVC frame, PID 706 / zero restarts |
+| HIL-MVP-2a single nominal | Capture/downlink/display one new photo | Exact CRC/hash ground copy; 160x120 decode; all sides return ready | **PASS** — product/transfer 1, 1,100/1,100, 64.8 s, SHA-256 `d166dee7...e214` |
+| HIL-MVP-2b repeated nominal | Capture/downlink/display three new photos sequentially | Three unique CRC-valid ground images; all sides remain running/ready | **PASS** — products/transfers 2-4, 3/3 exact files, 64.7-65.2 s, PID unchanged |
+| HIL-MVP-3 duplicate command | Repeat active downlink request once | No progress reset, assertion, or F Prime restart | Pending |
+| HIL-MVP-4 brief RF fade | Block/mispoint basic antennas briefly, then restore | Missing packets requested/repaired or honest partial; next cycle succeeds | Pending |
+| HIL-MVP-5 ground receiver restart | Restart only payload receiver during transfer | State reloads and completes or remains honest partial; following cycle succeeds | Pending |
+| HIL-MVP-6 channel-0 backpressure | Stop/restart only GDS reader | Short write/backpressure counted; no false delivery or watchdog reset; PING recovers | Pending |
+| HIL-MVP-7 ground USB reconnect | Unplug/replug ground Teensy once | Ports rediscovered; no silent complete; current attempt resolves honestly; next cycle succeeds | Pending |
+| HIL-MVP-8 RF TX timeout injection | Make peer unavailable for the focused test | Bounded retry/recovery; no 12-second watchdog reset | Pending |
 
 For every case record:
 
@@ -324,24 +326,28 @@ Stop the matrix if the failure signature changes unexpectedly. Outdoor/Yagi
 testing starts only after the basic-antenna repeated-cycle and focused recovery
 cases pass.
 
-## Current Artifacts For Tomorrow
+## Verified Live Artifacts
 
-These are home/local build artifacts, not proof of what is presently flashed:
+Verified on the live basic-antenna bench on 2026-07-15:
 
-- Branch: `codex/c3m-rf-reliability-hardening`.
-- Ground HEX SHA-256:
+- Branch/HEAD: `codex/c3m-rf-reliability-hardening` at `4e7de4045672b1a50c3ea2eb88197371a1bbbb07`.
+- Ground Teensy: `usb:100000`, triple serial `11555330`, HEX SHA-256
   `7728412b83e7b9c55bf7106018b13d6e81bf528e96d108e21f743d3b91cd0017`.
-- Satellite HEX SHA-256:
+- Satellite Teensy: `usb:2100000`, serial `11556500`, HEX SHA-256
   `1fa47ea1ab3a042249c27a2c14724228065ce7cce1e899f18872cf3d9b234921`.
+- C3M Pi: boot ID `e85f55e7-f734-4d30-be91-b6c41b440ef1`, service PID
+  `706`, restart count `0`, `/dev/serial0 -> /dev/ttyS0`.
 - ARMv6 Pi binary SHA-256:
   `e0176a21b21b40f5b4e0fba469f2d643c6dd9194de4963267867e86cc8ff814b`.
+- GDS dictionary SHA-256:
+  `e39e0c48023d180016ff17ca11011b14d36ef7e7c75b97e23134007a99fd508f`.
 - Post-integration local suite: 67 Python/emulation/bridge tests, fresh native
   build, 6/6 F Prime component suites, both Teensy builds, two independent
   three-cycle exact ground-copy runs, deterministic loss/repair, and the
   ARMv6KZ/VFPv2 cross-build passed.
 
-Recompute hashes and rerun the complete local gate after implementation. Query
-the live boards and Pi tomorrow before calling any artifact deployed.
+Recompute hashes and rerun the complete local gate after any implementation.
+Re-query live USB identities before every future flash.
 
 ## Evidence Log
 
@@ -362,9 +368,13 @@ the live boards and Pi tomorrow before calling any artifact deployed.
 | 2026-07-14 21:11 | Pi Zero W target build | PASS local | ARMv6KZ, VFPv2, `/lib/ld-linux-armhf.so.3`; binary SHA-256 `e0176a21...ff814b`; deployment/HIL still pending |
 | 2026-07-14 21:15 | Mid-transfer receiver process restart | PASS local | `tools/logs/c3m_local_demo_20260714_211416`; replacement resumed 55/1,100, retried two handoff gaps, completed CRC/decode, source/ground SHA-256 `55392fb9...ec63ac` |
 | 2026-07-14 21:27 | Permanent loss then clean next capture | PASS local | `tools/logs/c3m_local_demo_20260714_212447`; transfer 1 saved 1,099/1,100 partial with missing index 100 after bounded retries; transfer 2 completed 1,100/1,100 and exact source/ground SHA-256 `a0f7be74...a2bbad2` without process restart |
+| 2026-07-15 10:15 | HIL-MVP-1 startup | PASS HIL | Ground `usb:100000`, satellite `usb:2100000`; direct UVC frame nonblank; GDS PING 4245 and SOH visible; Pi PID 706 / zero restarts |
+| 2026-07-15 10:17 | HIL-MVP-2a single nominal | PASS HIL | Product/transfer 1, 38,480 bytes, 1,100/1,100, CRC 25776, 64.8 s, exact source/ground SHA-256 `d166dee7...e214`, 160x120 decode |
+| 2026-07-15 10:23 | HIL-MVP-2b repeated nominal | PASS HIL | Products/transfers 2-4; 3/3 CRC-valid exact source/ground files; 64.7-65.2 s; one successful repair round; zero progress events; PING each cycle; PID 706 / zero restarts |
+| 2026-07-15 10:24 | RF message-gap diagnostic audit | BUG FOUND | One global TX message ID is checked per-channel on RX, so normal channel interleaving produces false `rf_msg_id_gaps`; use payload missing map/CRC, reassembly, queue, ACK, and PING evidence until fixed |
 
-The current artifacts above are build outputs only. Confirm the actual flashed
-firmware and deployed Pi binary tomorrow before treating those hashes as live.
+The hashes above were verified against the live Pi and the exact locally built
+HEX artifacts uploaded by physical Teensy IDs during this bench session.
 
 ## Completion Definition
 

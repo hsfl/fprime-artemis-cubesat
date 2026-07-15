@@ -1141,3 +1141,19 @@ Driver tier, formerly repo "Adapter":
   intentional spoofing, encryption, or authentication.
 - Local generator/isolation tests and both Teensy builds pass. No firmware was
   flashed; same-mission and cross-mission HIL qualification remains deferred.
+
+## C3M RF Reliability HIL (2026-07-15)
+
+- Active evidence and remaining fault cases live in
+  `docs/C3M_RF_RELIABILITY_HARDENING_PLAN_2026-07-14.md`.
+- Current ground/satellite HEX and ARMv6 Pi binary hashes were verified live;
+  the Pi remained on PID `706` with zero systemd restarts.
+- HIL-MVP-1 startup, the separate one-capture gate, and the independent 3/3
+  repeated-capture gate passed on basic antennas. All four new 38,480-byte
+  ground files matched their Pi sources, CRC-checked, and decoded as 160x120.
+- Current downlink timing was 64.7-65.2 seconds. One repeat cycle completed a
+  one-round selective repair; the other three transfers required none.
+- `rf_msg_id_gaps` is not a valid mixed-channel loss metric in the current
+  bridge: one global TX message ID is checked against per-channel RX history,
+  so normal channel interleaving creates false gaps. Queue, CRC, missing-map,
+  reassembly, ACK, and actual PING evidence remain authoritative until fixed.

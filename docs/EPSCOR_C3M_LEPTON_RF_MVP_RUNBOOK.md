@@ -6,10 +6,12 @@ web app for channel 1; the raw receiver and decoder CLIs are engineering
 fallbacks. The 2026-07-09 HIL run proved real UVC capture and a byte-identical
 full-resolution RF downlink in `58.557 s`.
 
-The active hardening scope is defined in
-[`C3M_DEMO_HARDENING_PLAN_2026-07-09.md`](C3M_DEMO_HARDENING_PLAN_2026-07-09.md).
-Do not change any HIL-validated transport-constant values while refining the
-operator workflow.
+The active hardening scope and live HIL matrix are defined in
+[`C3M_RF_RELIABILITY_HARDENING_PLAN_2026-07-14.md`](C3M_RF_RELIABILITY_HARDENING_PLAN_2026-07-14.md).
+Do not change transport constants during a timed HIL run. The July 9 validated
+baseline below used `22` payload/retry messages per tick; the current July 15
+hardening artifacts deliberately use `18`. Treat the July 9 section as
+historical evidence, not the active generated contract.
 
 ## Scope
 
