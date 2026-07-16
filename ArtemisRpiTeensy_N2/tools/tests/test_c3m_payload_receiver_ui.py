@@ -12,6 +12,8 @@ from unittest import mock
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 UI_PATH = REPO_ROOT / "ground-station" / "c3m-payload-receiver-ui" / "c3m_payload_receiver_ui.py"
+APP_JS_PATH = REPO_ROOT / "ground-station" / "c3m-payload-receiver-ui" / "static" / "app.js"
+STYLES_PATH = REPO_ROOT / "ground-station" / "c3m-payload-receiver-ui" / "static" / "styles.css"
 
 
 class DummySerialException(Exception):
@@ -125,6 +127,97 @@ def receiver_event(
 
 
 class C3mPayloadReceiverUiTests(unittest.TestCase):
+    def test_ready_after_complete_preserves_terminal_state_until_new_transfer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = ui.ReceiverController(pathlib.Path(tmp), decode_fn=fake_decode)
+            controller.current.update(
+                {
+                    "status": "complete",
+                    "connected": False,
+                    "message": "Payload complete",
+                    "product_id": 5,
+                    "transfer_id": 5,
+                    "total_bytes": 38480,
+                    "received_bytes": 38480,
+                    "total_packets": 1100,
+                    "received_packets": 1100,
+                    "missing_packets": 0,
+                    "crc_ok": True,
+                    "run_id": "c3m_completed_transfer_5",
+                }
+            )
+
+            controller.on_receiver_event(receiver_event("ready", product_id=0, transfer_id=0))
+            reconnected = controller.snapshot()["current"]
+
+            self.assertEqual(reconnected["status"], "complete")
+            self.assertTrue(reconnected["connected"])
+            self.assertEqual(reconnected["message"], "Ready — last payload complete")
+            self.assertEqual(reconnected["transfer_id"], 5)
+            self.assertTrue(reconnected["crc_ok"])
+
+            controller.on_receiver_event(receiver_event("transfer_started", product_id=6, transfer_id=6))
+            next_transfer = controller.snapshot()["current"]
+            self.assertEqual(next_transfer["status"], "receiving")
+            self.assertEqual(next_transfer["product_id"], 6)
+            self.assertEqual(next_transfer["transfer_id"], 6)
+            self.assertIsNone(next_transfer["crc_ok"])
+
+    def test_ready_preserves_other_terminal_states_but_resumes_incomplete_transfer(self) -> None:
+        cases = (
+            ({"partial": True, "crc_ok": False}, "partial", "Ready — last payload remains partial"),
+            ({"partial": False, "crc_ok": False}, "failed", "Ready — last payload failed"),
+        )
+        for terminal_fields, expected_status, expected_message in cases:
+            with self.subTest(expected_status=expected_status), tempfile.TemporaryDirectory() as tmp:
+                controller = ui.ReceiverController(pathlib.Path(tmp), decode_fn=fake_decode)
+                controller.current.update(
+                    {
+                        "status": "recovering",
+                        "product_id": 5,
+                        "transfer_id": 5,
+                        "total_packets": 1100,
+                        "received_packets": 1099 if terminal_fields["partial"] else 1100,
+                        "run_id": f"c3m_{expected_status}_transfer_5",
+                        **terminal_fields,
+                    }
+                )
+                controller.on_receiver_event(receiver_event("ready", product_id=0, transfer_id=0))
+                current = controller.snapshot()["current"]
+                self.assertEqual(current["status"], expected_status)
+                self.assertEqual(current["message"], expected_message)
+                self.assertTrue(current["connected"])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = ui.ReceiverController(pathlib.Path(tmp), decode_fn=fake_decode)
+            controller.current.update(
+                {
+                    "status": "recovering",
+                    "product_id": 6,
+                    "transfer_id": 6,
+                    "total_packets": 1100,
+                    "received_packets": 423,
+                    "run_id": None,
+                    "crc_ok": None,
+                }
+            )
+            controller.on_receiver_event(receiver_event("ready", product_id=0, transfer_id=0))
+            current = controller.snapshot()["current"]
+            self.assertEqual(current["status"], "receiving")
+            self.assertEqual(current["message"], "Resumed payload transfer")
+
+    def test_archived_history_wires_csv_to_temperature_overlay(self) -> None:
+        app_js = APP_JS_PATH.read_text(encoding="utf-8")
+        styles = STYLES_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('id="archivedThermalImage"', app_js)
+        self.assertIn('id="archivedThermalHover"', app_js)
+        self.assertIn('csvUrl: selected.output_urls?.csv', app_js)
+        self.assertIn('imageId: "archivedThermalImage"', app_js)
+        self.assertIn('outputId: "archivedThermalHover"', app_js)
+        self.assertIn("thermal-tooltip", app_js)
+        self.assertIn(".thermal-tooltip", styles)
+
     def test_detects_third_triple_serial_port_only_when_unambiguous(self) -> None:
         rows = [
             {

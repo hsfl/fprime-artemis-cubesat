@@ -222,7 +222,13 @@ function renderPreview(current) {
         <span>Mean <strong>${decode.mean_c ?? "—"}°C</strong></span>
         <span>Range <strong>${decode.min_c ?? "—"}–${decode.max_c ?? "—"}°C</strong></span>
       </div>`;
-    attachThermalInspection(current.outputs?.csv, decode.width || 160, decode.height || 120);
+    attachThermalInspection({
+      csvUrl: current.outputs?.csv,
+      width: decode.width || 160,
+      height: decode.height || 120,
+      imageId: "thermalImage",
+      outputId: "thermalHover",
+    });
   } else {
     let message = "Available after CRC verification";
     if (current.crc_ok === false) message = "Thermal preview unavailable because integrity verification failed.";
@@ -238,19 +244,24 @@ function renderPreview(current) {
   openFolderButton.dataset.runId = current.run_id || "";
 }
 
-async function attachThermalInspection(csvUrl, width, height) {
-  const image = document.getElementById("thermalImage");
-  const hover = document.getElementById("thermalHover");
+async function attachThermalInspection({ csvUrl, width, height, imageId, outputId, overlay = false }) {
+  const image = document.getElementById(imageId);
+  const hover = document.getElementById(outputId);
   if (!image || !hover || !csvUrl) return;
   let grid;
   try {
     const response = await fetch(csvUrl, { cache: "no-store" });
+    if (!response.ok) throw new Error(`Temperature CSV unavailable: ${response.status}`);
     const text = await response.text();
     grid = text.split(/\r?\n/)
       .filter((line) => line && !line.startsWith("#"))
-      .map((line) => line.split(",").map((value) => value === "NaN" ? null : Number(value)));
+      .map((line) => line.split(",").map((value) => {
+        const normalized = value.trim();
+        return normalized === "" || normalized === "NaN" ? null : Number(normalized);
+      }));
   } catch (_error) {
     hover.textContent = "Temperature data unavailable";
+    if (overlay) hover.classList.add("is-visible");
     return;
   }
   image.addEventListener("mousemove", (event) => {
@@ -261,9 +272,11 @@ async function attachThermalInspection(csvUrl, width, height) {
     hover.textContent = value === null || !Number.isFinite(value)
       ? `Column ${column}, row ${row} · No data`
       : `Column ${column}, row ${row} · ${value.toFixed(2)}°C`;
+    if (overlay) hover.classList.add("is-visible");
   });
   image.addEventListener("mouseleave", () => {
     hover.textContent = "Move over image to inspect temperature";
+    if (overlay) hover.classList.remove("is-visible");
   });
 }
 
@@ -351,8 +364,22 @@ function renderHistory(history) {
       <div><span>Retries</span><strong>${formatNumber(selected.retry_rounds)}</strong></div>
       <div><span>Integrity</span><strong class="${selected.partial ? "is-warning" : (selected.crc_ok ? "crc-pass" : "crc-fail")}">${selected.partial ? "Partial · no CRC" : (selected.crc_ok ? "CRC passed" : "CRC failed")}</strong></div>
     </div>
-    ${png ? `<img src="${escapeHtml(png)}" alt="Archived Lepton thermal image for product ${escapeHtml(selected.product_id)}, transfer ${escapeHtml(selected.transfer_id)}">` : ""}
+    ${png ? `
+      <div class="thermal-inspector archived-thermal-inspector">
+        <img id="archivedThermalImage" src="${escapeHtml(png)}" alt="Archived Lepton thermal image for product ${escapeHtml(selected.product_id)}, transfer ${escapeHtml(selected.transfer_id)}">
+        <output id="archivedThermalHover" class="thermal-tooltip" aria-live="polite">Move over image to inspect temperature</output>
+      </div>` : ""}
     <p>${links || "No output files available."}</p>`;
+  if (png && selected.output_urls?.csv) {
+    attachThermalInspection({
+      csvUrl: selected.output_urls?.csv,
+      width: selected.decode?.width || 160,
+      height: selected.decode?.height || 120,
+      imageId: "archivedThermalImage",
+      outputId: "archivedThermalHover",
+      overlay: true,
+    });
+  }
 }
 
 function render(data) {

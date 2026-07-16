@@ -447,6 +447,28 @@ progress::-moz-progress-bar { background: var(--primary); border-radius: 8px; }
   color: var(--muted, #536273);
   font-size: 0.82rem;
 }
+.thermal-tooltip {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 1;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  padding: 8px 10px;
+  color: #ffffff;
+  background: rgba(8, 20, 61, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 5px;
+  box-shadow: 0 4px 14px rgba(8, 20, 61, 0.24);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+.thermal-tooltip.is-visible { opacity: 1; }
+.archived-thermal-inspector { margin: 18px 0; }
+.archived-content .archived-thermal-inspector img { margin: 0; }
 .thermal-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

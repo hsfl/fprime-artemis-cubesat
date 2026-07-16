@@ -302,6 +302,25 @@ def default_current_state() -> dict[str, Any]:
     }
 
 
+def ready_presentation(current: dict[str, Any]) -> tuple[str, str]:
+    """Return transfer presentation without confusing serial readiness with transfer state."""
+    if current.get("run_id"):
+        if current.get("partial") is True:
+            return "partial", "Ready — last payload remains partial"
+        if current.get("crc_ok") is True:
+            return "complete", "Ready — last payload complete"
+        if current.get("crc_ok") is False or current.get("status") == "failed":
+            return "failed", "Ready — last payload failed"
+
+    total_packets = int(current.get("total_packets") or 0)
+    received_packets = int(current.get("received_packets") or 0)
+    if current.get("transfer_id") is not None and total_packets > received_packets:
+        return "receiving", "Resumed payload transfer"
+    if current.get("status") in {"verifying", "decoding"}:
+        return str(current["status"]), str(current.get("message") or "Finalizing payload")
+    return "ready", "Ready — awaiting downlink"
+
+
 class ReceiverController:
     def __init__(
         self,
@@ -581,13 +600,15 @@ class ReceiverController:
                 )
 
             if event.kind == "ready":
-                active_transfer = self.current.get("transfer_id") is not None
+                ready_status, ready_message = ready_presentation(self.current)
                 self.current.update(
                     {
-                        "status": "receiving" if active_transfer else "ready",
+                        "status": ready_status,
                         "connected": True,
-                        "message": "Resumed payload transfer" if active_transfer else "Ready — awaiting downlink",
-                        "failure_reason": None,
+                        "message": ready_message,
+                        "failure_reason": (
+                            self.current.get("failure_reason") if ready_status == "failed" else None
+                        ),
                     }
                 )
             elif event.kind in {"transfer_started", "transfer_resumed"}:
