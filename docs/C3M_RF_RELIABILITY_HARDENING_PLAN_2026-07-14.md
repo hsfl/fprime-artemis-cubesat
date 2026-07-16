@@ -375,6 +375,8 @@ group. Use a boot-only or otherwise explicitly paced coordinator.
 
 #### Follow-up 2 — Reconcile Receiver Status After USB Reconnect
 
+**Status (2026-07-16): Implemented and passed local regression/emulation.**
+
 **Context:** After the powered-off ground antenna swap and USB reconnect, the
 payload receiver UI temporarily labeled completed product/transfer 5 as
 `receiving` while still displaying `1,100/1,100`, zero missing packets, and
@@ -398,7 +400,16 @@ Acceptance: a reconnect never presents a CRC-complete transfer as actively
 receiving, and the next fresh product still replaces the prior presentation
 without restarting the UI.
 
+Result: `ready` now derives the display state from durable run evidence instead
+of a retained transfer ID. Complete, partial, and failed runs remain terminal;
+only a genuinely incomplete checkpoint resumes as receiving. Focused tests
+cover all terminal states, incomplete resume, and fresh-transfer replacement.
+The receiver-restart local emulation completed capture, checkpoint recovery,
+CRC verification, decode, and exact CSV comparison.
+
 #### Follow-up 3 — Temperature Hover Overlay for Archived History Images
+
+**Status (2026-07-16): Implemented and passed local browser verification.**
 
 **Context:** The live thermal preview already loads its CSV and reports the
 pixel temperature under the pointer. The selected history detail currently
@@ -418,6 +429,12 @@ Plan:
 Acceptance: hovering a selected archived image displays the value from that
 run's CSV at the correct pixel without affecting history selection or mobile
 layout.
+
+Result: the live and archived full-size previews now share one configurable
+CSV/grid coordinate helper. Only the selected archived image is interactive;
+the history thumbnails remain passive. Browser verification against a retained
+HIL artifact displayed `Column 79, row 59 · 19.54°C` as an overlay on the image
+with no browser warnings or errors.
 
 #### Follow-up 4 — Boot Link Acquisition and GDS RSSI Visibility
 
@@ -567,6 +584,8 @@ Re-query live USB identities before every future flash.
 | 2026-07-15 11:50 | HIL-MVP-4 restored-geometry clean cycle | PASS HIL | Back inside the lab at normal monopole geometry, fresh product/transfer 5 completed 38,480 bytes, 1,100/1,100, zero repairs, CRC 49037, and 64.6 s. Pi/ground SHA-256 matched exactly at `3abec65a...7d10c`, decode was 160x120, PING 39014 returned, and PID 254 remained at zero restarts |
 | 2026-07-15 11:55 | Ground antenna swap / receiver reconnect | PASS transport / UI observation | Ground Teensy was powered down before replacing its monopole with the 50-ohm Yagi, then all three USB ports, GDS, and the payload receiver auto-reconnected. The receiver temporarily labeled completed product/transfer 5 as `receiving` even though it still showed 1,100/1,100, zero missing, and `crc_ok=true`; fresh product/transfer 6 replaced that stale presentation cleanly. Track reconnect-state reconciliation as a ground-UI follow-up, not RF data corruption |
 | 2026-07-15 11:57 | Fixed-position handheld Yagi movement, 15-20 ft | PASS HIL | The operator remained about 15-20 ft from the battery-powered satellite but waved and mispointed the handheld ground Yagi during the transfer; the satellite retained its normal monopole. PING 39015 passed before capture; fresh product/transfer 6 completed 38,480 bytes, 1,100/1,100, zero repairs, CRC 32905, and 64.7 s. Pi/ground SHA-256 matched exactly at `15a5f0ff...43ecea`, decode was 160x120, PING 39016 returned, and PID 254 remained at zero restarts |
+| 2026-07-16 07:29 | Receiver reconnect-state reconciliation | PASS local | Terminal complete/partial/failed states now survive a subsequent `ready`; incomplete checkpoints alone resume as receiving. Focused 16-test UI suite, broader 71-test transport/receiver suite, a receiver-restart capture/downlink/decode cycle, and the standard three-cycle exact-decode demo passed; evidence: `tools/logs/c3m_local_demo_20260716_072820` and `tools/logs/c3m_local_demo_20260716_073027` |
+| 2026-07-16 07:31 | Archived thermal hover inspection | PASS local/browser | Selected History image reused its archived CSV and displayed `Column 79, row 59 · 19.54°C` as an on-image overlay; thumbnails remained passive and browser console had no warnings/errors |
 
 The hashes above were verified against the live Pi and the exact locally built
 HEX artifacts uploaded by physical Teensy IDs during this bench session.
