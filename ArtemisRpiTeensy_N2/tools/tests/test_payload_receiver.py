@@ -500,6 +500,113 @@ class PayloadReceiverTests(unittest.TestCase):
         self.assertEqual(partial[35:70], b"\x00" * 35)
         self.assertEqual(partial[70:], blob[70:])
 
+    def test_operator_cancel_saves_partial_quarantines_tail_and_accepts_next_transfer(self) -> None:
+        first_blob = bytes(range(105))
+        second_blob = b"fresh-transfer"
+        first_transfer = 41
+        second_transfer = 42
+        stream = (
+            make_header(401, first_transfer, first_blob)
+            + make_data(first_transfer, 0, first_blob[:35])
+            + make_data(first_transfer, 1, first_blob[35:70])
+            + make_header(401, first_transfer, first_blob)
+            + make_data(first_transfer, 2, first_blob[70:])
+            + make_end(first_transfer, 3, first_blob)
+            + make_header(402, second_transfer, second_blob)
+            + make_data(second_transfer, 0, second_blob)
+            + make_end(second_transfer, 1, second_blob)
+        )
+        events: list[payload_receiver.ReceiverEvent] = []
+        serial = ScriptedSerial(stream)
+        cancel_consumed = False
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = pathlib.Path(tmp)
+            receiver: payload_receiver.PayloadReceiver
+
+            def consume_cancel() -> bool:
+                nonlocal cancel_consumed
+                if (
+                    not cancel_consumed
+                    and receiver.transfer_id == first_transfer
+                    and len(receiver.packets) == 1
+                ):
+                    cancel_consumed = True
+                    return True
+                return False
+
+            receiver = payload_receiver.PayloadReceiver(
+                "test-port",
+                115200,
+                output_dir / "unused.bin",
+                1.0,
+                output_dir=output_dir,
+                ext=".fdp",
+                on_event=events.append,
+                serial_factory=lambda *args, **kwargs: serial,
+                stop_requested=lambda: receiver.received_count >= 2,
+                consume_cancel_requested=consume_cancel,
+            )
+
+            self.assertEqual(receiver.run_directory(), 0)
+            partial_path = next(output_dir.glob("*.fdp.partial"))
+            complete_path = next(output_dir.glob("*.fdp"))
+            self.assertEqual(
+                partial_path.read_bytes(),
+                first_blob[:35] + (b"\x00" * 70),
+            )
+            self.assertEqual(complete_path.read_bytes(), second_blob)
+
+        partial_event = next(event for event in events if event.kind == "partial_saved")
+        self.assertEqual(partial_event.completion_reason, "operator_cancelled")
+        self.assertEqual(partial_event.received_packets, 1)
+        self.assertEqual(partial_event.missing_packet_indices, (1, 2))
+        self.assertIn("satellite transmission was not interrupted", partial_event.timeout_reason or "")
+        self.assertEqual(serial.writes, [])
+        self.assertEqual(
+            [event.transfer_id for event in events if event.kind == "transfer_started"],
+            [first_transfer, second_transfer],
+        )
+
+    def test_operator_cancel_after_header_saves_all_missing_partial(self) -> None:
+        blob = bytes(range(70))
+        transfer_id = 43
+        serial = ScriptedSerial(make_header(403, transfer_id, blob))
+        cancel_consumed = False
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = pathlib.Path(tmp)
+            receiver: payload_receiver.PayloadReceiver
+
+            def consume_cancel() -> bool:
+                nonlocal cancel_consumed
+                if not cancel_consumed and receiver.transfer_id == transfer_id:
+                    cancel_consumed = True
+                    return True
+                return False
+
+            receiver = payload_receiver.PayloadReceiver(
+                "test-port",
+                115200,
+                output_dir / "unused.bin",
+                1.0,
+                output_dir=output_dir,
+                ext=".fdp",
+                serial_factory=lambda *args, **kwargs: serial,
+                stop_requested=lambda: receiver.received_count >= 1,
+                consume_cancel_requested=consume_cancel,
+            )
+
+            self.assertEqual(receiver.run_directory(), 0)
+            partial_path = next(output_dir.glob("*.fdp.partial"))
+            missing_map = json.loads(
+                pathlib.Path(f"{partial_path}.missing.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(partial_path.read_bytes(), b"\x00" * len(blob))
+            self.assertEqual(missing_map["missing_packet_indices"], [0, 1])
+            self.assertEqual(missing_map["completion_reason"], "operator_cancelled")
+            self.assertEqual(serial.writes, [])
+
     def test_directory_deadline_saves_partial_with_missing_map(self) -> None:
         blob = bytes(range(105))
         stream = (
@@ -537,6 +644,7 @@ class PayloadReceiverTests(unittest.TestCase):
         self.assertTrue(event.partial)
         self.assertEqual(event.missing_packet_indices, (1,))
         self.assertFalse(event.crc_ok)
+        self.assertEqual(event.completion_reason, "timeout")
         self.assertIn("stalled", event.timeout_reason or "")
 
     def test_checkpoint_restart_resumes_at_25_50_and_90_percent_with_exact_crc(self) -> None:

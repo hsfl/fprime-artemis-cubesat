@@ -70,6 +70,7 @@ class ReceiverEvent:
     partial: bool = False
     missing_packet_indices: tuple[int, ...] = ()
     timeout_reason: str | None = None
+    completion_reason: str | None = None
     packet_data_bytes: int = DATA_BYTES
     missing_map_path: str | None = None
     transfer_started_at_s: float | None = None
@@ -100,6 +101,7 @@ class PayloadReceiver:
         on_event: Callable[[ReceiverEvent], None] | None = None,
         serial_factory: Callable[..., object] | None = None,
         stop_requested: Callable[[], bool] | None = None,
+        consume_cancel_requested: Callable[[], bool] | None = None,
         transfer_timeout_s: float | None = None,
         absolute_transfer_timeout_s: float | None = None,
         save_partial_on_timeout: bool = False,
@@ -121,6 +123,7 @@ class PayloadReceiver:
         self.on_event = on_event
         self.serial_factory = serial_factory or serial.Serial
         self.stop_requested = stop_requested or (lambda: False)
+        self.consume_cancel_requested = consume_cancel_requested or (lambda: False)
         self.transfer_timeout_s = transfer_timeout_s
         self.absolute_transfer_timeout_s = absolute_transfer_timeout_s
         self.save_partial_on_timeout = save_partial_on_timeout
@@ -165,6 +168,7 @@ class PayloadReceiver:
         self.last_packet_wall_s = 0.0
         self.next_retry_request_wall_s = 0.0
         self.checkpoint_rejection_reason: str | None = None
+        self.ignored_transfer_id: int | None = None
 
     @property
     def received_bytes(self) -> int:
@@ -418,6 +422,7 @@ class PayloadReceiver:
         partial: bool = False,
         missing_packet_indices: tuple[int, ...] = (),
         timeout_reason: str | None = None,
+        completion_reason: str | None = None,
         missing_map_path: pathlib.Path | None = None,
     ) -> None:
         if self.on_event is None:
@@ -449,6 +454,7 @@ class PayloadReceiver:
                 partial=partial,
                 missing_packet_indices=missing_packet_indices,
                 timeout_reason=timeout_reason,
+                completion_reason=completion_reason,
                 packet_data_bytes=self.packet_data_bytes,
                 missing_map_path=str(missing_map_path) if missing_map_path is not None else None,
                 transfer_started_at_s=(
@@ -638,8 +644,6 @@ class PayloadReceiver:
             self.end_seen = True
             self.last_end_s = time.monotonic()
             self.persist_checkpoint(reason="end packet accepted")
-            if not self.complete:
-                self.request_retries_if_due(ser, force=True)
 
     def request_retries_if_due(self, ser: serial.Serial, force: bool = False) -> None:
         now = time.monotonic()
@@ -674,6 +678,10 @@ class PayloadReceiver:
             return
         if total_packets != (total_bytes + packet_data_bytes - 1) // packet_data_bytes:
             return
+        if self.ignored_transfer_id is not None:
+            if transfer_id == self.ignored_transfer_id:
+                return
+            self.ignored_transfer_id = None
         same_transfer = (
             self.transfer_id == transfer_id
             and self.product_id == product_id
@@ -851,7 +859,12 @@ class PayloadReceiver:
             output_path=target,
         )
 
-    def finalize_partial_to_dir(self, timeout_reason: str) -> None:
+    def finalize_partial_to_dir(
+        self,
+        timeout_reason: str,
+        *,
+        completion_reason: str = "timeout",
+    ) -> None:
         """Save an incomplete positional blob for format-aware recovery."""
 
         assert self.output_dir is not None
@@ -878,6 +891,7 @@ class PayloadReceiver:
             "packet_data_bytes": self.packet_data_bytes,
             "expected_crc": self.file_crc,
             "failure_reason": timeout_reason,
+            "completion_reason": completion_reason,
         }
         self._atomic_write(
             missing_map,
@@ -897,8 +911,30 @@ class PayloadReceiver:
             partial=True,
             missing_packet_indices=missing,
             timeout_reason=timeout_reason,
+            completion_reason=completion_reason,
             missing_map_path=missing_map,
         )
+
+    def finalize_operator_cancel_if_requested(self) -> bool:
+        """Finalize an active transfer locally without stopping the serial worker."""
+
+        if not self.consume_cancel_requested():
+            return False
+        if self.transfer_id is None or self.total_packets <= 0:
+            return False
+        if self.complete:
+            self.finalize_to_dir()
+            self.reset_transfer(clear_checkpoint=not self.retain_checkpoint_after_complete)
+            return True
+
+        canceled_transfer_id = self.transfer_id
+        self.finalize_partial_to_dir(
+            "stopped by operator on ground; satellite transmission was not interrupted",
+            completion_reason="operator_cancelled",
+        )
+        self.reset_transfer()
+        self.ignored_transfer_id = canceled_transfer_id
+        return True
 
     def run_directory(self, idle_timeout_s: float = 0.0) -> int:
         assert self.output_dir is not None
@@ -919,20 +955,26 @@ class PayloadReceiver:
                         opened = True
                         self.emit("ready", f"listening on {self.port}")
                         while not self.stop_requested():
+                            if self.finalize_operator_cancel_if_requested():
+                                last_activity = time.monotonic()
+                                continue
                             packet = self.read_packet(ser)
+                            force_retry = False
                             if packet:
                                 recovery_deadline_s = None
                                 self.handle_packet(packet, ser)
+                                force_retry = packet[2] == TYPE_END
                                 last_activity = time.monotonic()
-                            self.request_retries_if_due(ser)
                             if self.complete:
                                 self.finalize_to_dir()
                                 self.reset_transfer(
                                     clear_checkpoint=not self.retain_checkpoint_after_complete
                                 )
                                 last_activity = time.monotonic()
+                            elif self.finalize_operator_cancel_if_requested():
+                                last_activity = time.monotonic()
                             elif self.save_partial_on_timeout and (reason := self.transfer_expiry_reason()) is not None:
-                                self.finalize_partial_to_dir(reason)
+                                self.finalize_partial_to_dir(reason, completion_reason="timeout")
                                 self.reset_transfer()
                                 last_activity = time.monotonic()
                             elif (
@@ -943,6 +985,8 @@ class PayloadReceiver:
                                 print("idle timeout reached; exiting")
                                 self.emit("idle_timeout", "idle timeout reached; exiting")
                                 return 0
+                            else:
+                                self.request_retries_if_due(ser, force=force_retry)
                 except serial.SerialException as exc:
                     phase = "io" if opened else "open"
                     reason = f"serial {phase} failure on {self.port}: {exc}"
@@ -991,7 +1035,10 @@ class PayloadReceiver:
                         and self.transfer_id is not None
                         and self.total_packets > 0
                     ):
-                        self.finalize_partial_to_dir(expired_reason)
+                        self.finalize_partial_to_dir(
+                            expired_reason,
+                            completion_reason="disconnect",
+                        )
                         self.reset_transfer()
                         return 2
                     raise

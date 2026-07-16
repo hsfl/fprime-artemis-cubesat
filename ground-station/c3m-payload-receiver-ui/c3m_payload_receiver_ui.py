@@ -44,6 +44,8 @@ def find_repo_root(start: Path) -> Path:
 
 REPO_ROOT = find_repo_root(APP_DIR)
 DEFAULT_DATA_DIR = REPO_ROOT / "data"
+NOMINAL_TRANSFER_TARGET_S = 75.0
+LIVE_DEMO_CUTOFF_S = 120.0
 PAYLOAD_RECEIVER_PATH = REPO_ROOT / "ArtemisRpiTeensy_N2" / "tools" / "payload_receiver.py"
 LEPTON_VIEWER_PATH = REPO_ROOT / "ground-station" / "lepton-dp-viewer" / "lepton_dp_viewer.py"
 
@@ -298,6 +300,7 @@ def default_current_state() -> dict[str, Any]:
         "decode": None,
         "partial": False,
         "timeout_reason": None,
+        "completion_reason": None,
         "missing_packet_indices": [],
     }
 
@@ -330,7 +333,7 @@ class ReceiverController:
         dictionary: Path | None = None,
         decode_fn: Callable[[Path, Path, Path | None], dict[str, Any]] | None = None,
         partial_decode_fn: Callable[[Path, Path, list[int], int], dict[str, Any]] | None = None,
-        transfer_timeout_s: float = 90.0,
+        transfer_timeout_s: float = LIVE_DEMO_CUTOFF_S,
         port_rows_fn: Callable[[], list[dict[str, str | bool | None]]] = serial_port_rows,
         serial_factory: Callable[..., object] | None = None,
     ) -> None:
@@ -349,6 +352,7 @@ class ReceiverController:
         self.logs: deque[dict[str, Any]] = deque(maxlen=160)
         self.thread: threading.Thread | None = None
         self.stop_event = threading.Event()
+        self.cancel_event = threading.Event()
         self.last_replay: tuple[bytes, float, int | None, set[int]] | None = None
         self.worker_generation = 0
         self.transfer_sequence = 0
@@ -453,10 +457,36 @@ class ReceiverController:
         else:
             self.set_port_required()
 
+    def cancel_current_transfer(self) -> bool:
+        """Ask the ground receiver to save its current progress as partial data."""
+
+        with self.worker_lock:
+            with self.lock:
+                if self.cancel_event.is_set() or self.current.get("status") == "cancelling":
+                    return False
+                if self.current.get("status") not in {"receiving", "retrying"}:
+                    raise ValueError("no active payload transfer can be stopped")
+                if self.current.get("transfer_id") is None or int(self.current.get("total_packets") or 0) <= 0:
+                    raise ValueError("wait for a valid payload header before stopping the transfer")
+                self.cancel_event.set()
+                self.current.update(
+                    {
+                        "status": "cancelling",
+                        "message": "Saving received packets as a partial payload",
+                        "completion_reason": "operator_cancelled",
+                    }
+                )
+                self._append_log(
+                    "Operator stopped ground reception; satellite transmission continues",
+                    level="warning",
+                )
+                return True
+
     def _start_worker(self, port: str, replay: tuple[bytes, float, int | None, set[int]] | None) -> None:
         with self.worker_lock:
             self.stop()
             self.stop_event = threading.Event()
+            self.cancel_event = threading.Event()
             with self.lock:
                 self.worker_generation += 1
                 generation = self.worker_generation
@@ -472,7 +502,7 @@ class ReceiverController:
                 self._append_log(f"Opening payload receiver on {port}")
             self.thread = threading.Thread(
                 target=self._run_receiver,
-                args=(port, replay, self.stop_event, generation),
+                args=(port, replay, self.stop_event, self.cancel_event, generation),
                 name="c3m-payload-receiver",
                 daemon=True,
             )
@@ -504,6 +534,7 @@ class ReceiverController:
         port: str,
         replay: tuple[bytes, float, int | None, set[int]] | None,
         stop_event: threading.Event,
+        cancel_event: threading.Event,
         generation: int,
     ) -> None:
         serial_factory: Callable[..., object] | None = None
@@ -524,6 +555,13 @@ class ReceiverController:
             port_resolver = lambda: resolve_stable_port(source_identity, self.port_rows_fn())
 
         worker_incoming_dir = self.incoming_dir / f"worker_{generation}"
+
+        def consume_cancel_requested() -> bool:
+            if not cancel_event.is_set():
+                return False
+            cancel_event.clear()
+            return True
+
         receiver = payload_receiver.PayloadReceiver(
             port,
             self.baud,
@@ -535,6 +573,7 @@ class ReceiverController:
             on_event=lambda event: self.on_receiver_event(event, generation),
             serial_factory=serial_factory,
             stop_requested=stop_event.is_set,
+            consume_cancel_requested=consume_cancel_requested,
             transfer_timeout_s=self.transfer_timeout_s,
             absolute_transfer_timeout_s=30.0 * 60.0,
             save_partial_on_timeout=True,
@@ -630,24 +669,27 @@ class ReceiverController:
                         "decode": None,
                         "partial": False,
                         "timeout_reason": None,
+                        "completion_reason": None,
                         "missing_packet_indices": [],
                     }
                 )
                 self._append_log(event.message, event.timestamp_s)
             elif event.kind == "progress":
-                self.current.update({"status": "receiving", "message": "Receiving payload"})
+                if self.current.get("status") != "cancelling":
+                    self.current.update({"status": "receiving", "message": "Receiving payload"})
                 if event.received_packets % 50 == 0 or event.received_packets == event.total_packets:
                     self._append_log(
                         f"Progress: {event.received_packets}/{event.total_packets} packets",
                         event.timestamp_s,
                     )
             elif event.kind == "retry_requested":
-                self.current.update(
-                    {
-                        "status": "retrying",
-                        "message": "Retrying missing packets",
-                    }
-                )
+                if self.current.get("status") != "cancelling":
+                    self.current.update(
+                        {
+                            "status": "retrying",
+                            "message": "Retrying missing packets",
+                        }
+                    )
                 self._append_log(event.message, event.timestamp_s, level="warning")
             elif event.kind == "crc_checked":
                 self.current.update(
@@ -679,6 +721,7 @@ class ReceiverController:
                         "crc_ok": False,
                         "partial": True,
                         "timeout_reason": event.timeout_reason,
+                        "completion_reason": event.completion_reason,
                         "missing_packet_indices": list(event.missing_packet_indices),
                         "failure_reason": None,
                     }
@@ -880,6 +923,7 @@ class ReceiverController:
             "crc_ok": crc_ok,
             "partial": partial,
             "timeout_reason": event.get("timeout_reason"),
+            "completion_reason": event.get("completion_reason"),
             "missing_packet_indices": event.get("missing_packet_indices") or [],
             "sha256": digest,
             "outputs": output_paths,
@@ -898,7 +942,11 @@ class ReceiverController:
             if result == "complete":
                 message = "Payload complete"
             elif result == "partial":
-                message = "Partial — viewable with missing data"
+                message = (
+                    "Partial — stopped by operator"
+                    if event.get("completion_reason") == "operator_cancelled"
+                    else "Partial — viewable with missing data"
+                )
             elif result == "crc_failed":
                 message = "CRC failed"
             else:
@@ -913,12 +961,18 @@ class ReceiverController:
                     "run_id": run_dir.name,
                     "outputs": output_urls,
                     "decode": summary,
+                    "completion_reason": event.get("completion_reason"),
                 }
             )
             if result == "complete":
                 self._append_log("Decode complete", completed_at)
             elif result == "partial":
-                self._append_log("Best-effort decode complete; missing pixels are shown in white", completed_at, level="warning")
+                partial_message = (
+                    "Operator-stopped partial saved; missing pixels are shown in white"
+                    if event.get("completion_reason") == "operator_cancelled"
+                    else "Best-effort decode complete; missing pixels are shown in white"
+                )
+                self._append_log(partial_message, completed_at, level="warning")
             elif failure_reason:
                 self._append_log(failure_reason, completed_at, level="error")
 
@@ -977,9 +1031,9 @@ class ReceiverController:
                 current["estimated_remaining_seconds"] = round((total - received) / rate, 1) if rate > 0 else None
             else:
                 current["estimated_remaining_seconds"] = None
-            if elapsed > 120:
+            if elapsed >= LIVE_DEMO_CUTOFF_S:
                 current["timing_band"] = "delayed"
-            elif elapsed > 60:
+            elif elapsed > NOMINAL_TRANSFER_TARGET_S:
                 current["timing_band"] = "degraded"
             else:
                 current["timing_band"] = "nominal"
@@ -1066,6 +1120,9 @@ class ReceiverHandler(BaseHTTPRequestHandler):
             elif parsed.path == "/api/reconnect":
                 self.server.controller.reconnect()
                 self.send_json({"ok": True})
+            elif parsed.path == "/api/transfer/cancel":
+                accepted = self.server.controller.cancel_current_transfer()
+                self.send_json({"ok": True, "accepted": accepted})
             elif parsed.path == "/api/open-folder":
                 if self.client_address[0] not in {"127.0.0.1", "::1"}:
                     raise ValueError("open-folder is localhost only")
@@ -1152,7 +1209,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--transfer-timeout",
         type=float,
-        default=90.0,
+        default=LIVE_DEMO_CUTOFF_S,
         help="Seconds before finalizing an incomplete transfer as best-effort partial data",
     )
     return parser

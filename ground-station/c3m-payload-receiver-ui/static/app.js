@@ -23,6 +23,8 @@ const elapsedValue = document.getElementById("elapsedValue");
 const etaValue = document.getElementById("etaValue");
 const retryValue = document.getElementById("retryValue");
 const integrityValue = document.getElementById("integrityValue");
+const transferActions = document.getElementById("transferActions");
+const cancelTransferButton = document.getElementById("cancelTransferButton");
 const liveLog = document.getElementById("liveLog");
 const clearLogButton = document.getElementById("clearLogButton");
 const previewContent = document.getElementById("previewContent");
@@ -88,6 +90,7 @@ function headingFor(current) {
     ready: "Ready — awaiting downlink",
     receiving: "Receiving payload",
     retrying: "Retrying missing packets",
+    cancelling: "Saving partial payload",
     verifying: "Verifying payload integrity",
     decoding: "Decoding thermal product",
     complete: "Payload complete",
@@ -101,8 +104,12 @@ function supportingFor(current) {
   if (current.status === "ready") return `Listening on ${current.port || "Channel 1"}`;
   if (current.status === "receiving") return `${formatNumber(current.received_packets)} / ${formatNumber(current.total_packets)} packets`;
   if (current.status === "retrying") return `${formatNumber(current.missing_packets)} packets missing · Retry round ${formatNumber(current.retry_rounds)}`;
+  if (current.status === "cancelling") return "Preserving received packets; satellite transmission continues";
   if (current.status === "complete") return "CRC passed · Current thermal product decoded";
-  if (current.status === "partial") return `${formatNumber(current.missing_packets)} packets missing · Unknown pixels shown in white`;
+  if (current.status === "partial") {
+    const prefix = current.completion_reason === "operator_cancelled" ? "Stopped by operator · " : "";
+    return `${prefix}${formatNumber(current.missing_packets)} packets missing · Unknown pixels shown in white`;
+  }
   if (current.status === "failed") return current.failure_reason || "The current transfer could not be completed.";
   if (current.status === "disconnected" || current.status === "select_port") return current.failure_reason || current.message;
   return current.message || "Opening the Channel 1 payload link.";
@@ -168,11 +175,13 @@ function renderTiming(current) {
   if (current.timing_band === "degraded") {
     timingBanner.hidden = false;
     timingBanner.className = "timing-banner";
-    timingBanner.textContent = "Taking longer than nominal — transfer remains within the live-demo window.";
+    timingBanner.textContent = Number(current.elapsed_seconds || 0) >= 90
+      ? "Longer than target — transfer remains inside the 120 s live-demo cutoff."
+      : "Past the 75 s nominal target — transfer remains within the live-demo window.";
   } else if (current.timing_band === "delayed") {
     timingBanner.hidden = false;
     timingBanner.className = "timing-banner is-delayed";
-    timingBanner.textContent = "Delayed — operator attention. Progress remains live; allow CRC repair to finish or reconnect if activity stops.";
+    timingBanner.textContent = "120 s cutoff reached — operator attention. The receiver will preserve best-effort partial data if CRC repair cannot finish.";
   } else {
     timingBanner.hidden = true;
   }
@@ -282,6 +291,7 @@ async function attachThermalInspection({ csvUrl, width, height, imageId, outputI
 
 function runResult(run) {
   if (run.result === "complete") return ["Complete", "run-complete"];
+  if (run.result === "partial" && run.completion_reason === "operator_cancelled") return ["Partial · stopped", "run-partial"];
   if (run.result === "partial") return ["Partial", "run-partial"];
   if (run.result === "decode_failed") return ["Decode failed", "run-failed"];
   if (run.result === "crc_failed") return ["CRC failed", "run-failed"];
@@ -327,6 +337,7 @@ function renderHistory(history) {
       run.run_id,
       run.result,
       run.crc_ok,
+      run.completion_reason,
       run.product_id,
       run.transfer_id,
       run.completed_at,
@@ -418,6 +429,14 @@ function render(data) {
     && ["receiving", "retrying", "verifying", "decoding"].includes(current.status);
   errorActions.hidden = current.status !== "disconnected" && !activeDelayed;
   reconnectButton.textContent = activeDelayed ? "Reset receiver" : "Reconnect receiver";
+  const canCancel = ["receiving", "retrying"].includes(current.status)
+    && current.transfer_id !== null
+    && Number(current.total_packets || 0) > 0;
+  transferActions.hidden = !canCancel && current.status !== "cancelling";
+  cancelTransferButton.disabled = current.status === "cancelling";
+  cancelTransferButton.textContent = current.status === "cancelling"
+    ? "Saving partial…"
+    : "Stop & save partial";
 
   renderLogs(data.logs || []);
   renderPreview(current);
@@ -483,6 +502,20 @@ reconnectButton.addEventListener("click", async () => {
   try { await postJson("/api/reconnect"); }
   catch (error) { stateSupporting.textContent = error.message; }
   finally { reconnectButton.disabled = false; }
+});
+cancelTransferButton.addEventListener("click", async () => {
+  const confirmed = window.confirm(
+    "Stop ground reception and save the packets received so far? The satellite will continue transmitting the rest of this downlink."
+  );
+  if (!confirmed) return;
+  cancelTransferButton.disabled = true;
+  cancelTransferButton.textContent = "Saving partial…";
+  try { await postJson("/api/transfer/cancel"); }
+  catch (error) {
+    stateSupporting.textContent = error.message;
+    cancelTransferButton.disabled = false;
+    cancelTransferButton.textContent = "Stop & save partial";
+  }
 });
 openFolderButton.addEventListener("click", async () => {
   try { await postJson("/api/open-folder", { run_id: openFolderButton.dataset.runId }); }

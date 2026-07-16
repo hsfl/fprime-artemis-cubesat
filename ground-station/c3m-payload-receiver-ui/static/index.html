@@ -71,6 +71,12 @@
           <div><span>Retries</span><strong id="retryValue">0</strong></div>
           <div><span>Integrity</span><strong id="integrityValue">Waiting</strong></div>
         </section>
+        <p class="timing-targets"><strong>Timing:</strong> nominal ≤75 s · longer at 90 s · cutoff 120 s</p>
+
+        <section id="transferActions" class="transfer-actions" aria-label="Current transfer actions" hidden>
+          <button id="cancelTransferButton" class="danger-button" type="button">Stop &amp; save partial</button>
+          <p>Stops ground reception only. The satellite continues its current transmission while this receiver ignores the remaining packets.</p>
+        </section>
 
         <section class="evidence-grid">
           <section class="log-panel" aria-labelledby="logHeading">

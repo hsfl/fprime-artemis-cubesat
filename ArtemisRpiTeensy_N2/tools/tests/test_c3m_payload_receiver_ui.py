@@ -14,6 +14,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 UI_PATH = REPO_ROOT / "ground-station" / "c3m-payload-receiver-ui" / "c3m_payload_receiver_ui.py"
 APP_JS_PATH = REPO_ROOT / "ground-station" / "c3m-payload-receiver-ui" / "static" / "app.js"
 STYLES_PATH = REPO_ROOT / "ground-station" / "c3m-payload-receiver-ui" / "static" / "styles.css"
+INDEX_PATH = REPO_ROOT / "ground-station" / "c3m-payload-receiver-ui" / "static" / "index.html"
 
 
 class DummySerialException(Exception):
@@ -127,6 +128,39 @@ def receiver_event(
 
 
 class C3mPayloadReceiverUiTests(unittest.TestCase):
+    def test_timing_targets_use_75_90_120_second_operator_bands(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = ui.ReceiverController(pathlib.Path(tmp))
+            self.assertEqual(controller.transfer_timeout_s, 120.0)
+            controller.current.update(
+                {
+                    "status": "receiving",
+                    "started_at_s": 1000.0,
+                    "total_packets": 1100,
+                    "received_packets": 500,
+                }
+            )
+            for elapsed, expected in (
+                (75.0, "nominal"),
+                (75.1, "degraded"),
+                (90.0, "degraded"),
+                (119.9, "degraded"),
+                (120.0, "delayed"),
+            ):
+                with self.subTest(elapsed=elapsed), mock.patch.object(
+                    ui.time, "time", return_value=1000.0 + elapsed
+                ):
+                    self.assertEqual(
+                        controller.snapshot()["current"]["timing_band"], expected
+                    )
+
+        app_js = APP_JS_PATH.read_text(encoding="utf-8")
+        index_html = INDEX_PATH.read_text(encoding="utf-8")
+        self.assertIn("Past the 75 s nominal target", app_js)
+        self.assertIn("Longer than target", app_js)
+        self.assertIn("120 s cutoff reached", app_js)
+        self.assertIn("nominal ≤75 s · longer at 90 s · cutoff 120 s", index_html)
+
     def test_ready_after_complete_preserves_terminal_state_until_new_transfer(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             controller = ui.ReceiverController(pathlib.Path(tmp), decode_fn=fake_decode)
@@ -217,6 +251,41 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
         self.assertIn('outputId: "archivedThermalHover"', app_js)
         self.assertIn("thermal-tooltip", app_js)
         self.assertIn(".thermal-tooltip", styles)
+
+    def test_operator_cancel_controls_are_ground_only_and_confirm_satellite_continues(self) -> None:
+        app_js = APP_JS_PATH.read_text(encoding="utf-8")
+        index_html = INDEX_PATH.read_text(encoding="utf-8")
+        server_source = UI_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('id="cancelTransferButton"', index_html)
+        self.assertIn("Stop &amp; save partial", index_html)
+        self.assertIn("The satellite continues its current transmission", index_html)
+        self.assertIn("window.confirm", app_js)
+        self.assertIn('postJson("/api/transfer/cancel")', app_js)
+        self.assertIn('parsed.path == "/api/transfer/cancel"', server_source)
+
+    def test_cancel_request_requires_active_header_and_is_idempotent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = ui.ReceiverController(pathlib.Path(tmp))
+            with self.assertRaisesRegex(ValueError, "no active payload transfer"):
+                controller.cancel_current_transfer()
+
+            controller.current.update(
+                {
+                    "status": "receiving",
+                    "transfer_id": 9,
+                    "total_packets": 100,
+                }
+            )
+            self.assertTrue(controller.cancel_current_transfer())
+            self.assertFalse(controller.cancel_current_transfer())
+            current = controller.snapshot()["current"]
+            self.assertEqual(current["status"], "cancelling")
+            self.assertEqual(current["completion_reason"], "operator_cancelled")
+            self.assertTrue(controller.cancel_event.is_set())
+
+            controller.on_receiver_event(receiver_event("progress", product_id=9, transfer_id=9))
+            self.assertEqual(controller.snapshot()["current"]["status"], "cancelling")
 
     def test_detects_third_triple_serial_port_only_when_unambiguous(self) -> None:
         rows = [
@@ -543,6 +612,46 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
             self.assertEqual(run["missing_packet_indices"], [100])
             self.assertTrue(run["outputs"]["fdp"].endswith(".fdp.partial"))
             self.assertEqual(run["outputs"]["missing_map"], "missing_packets.json")
+
+    def test_operator_cancel_replay_saves_partial_and_records_reason(self) -> None:
+        blob = bytes(index % 251 for index in range(ui.payload_receiver.DATA_BYTES * 100))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            controller = ui.ReceiverController(
+                root,
+                decode_fn=fake_decode,
+                partial_decode_fn=fake_partial_decode,
+            )
+            try:
+                controller.connect_replay(blob, delay_s=0.01)
+                deadline = time.monotonic() + 3.0
+                while time.monotonic() < deadline:
+                    current = controller.snapshot()["current"]
+                    if current["status"] == "receiving" and current["received_packets"] >= 3:
+                        break
+                    time.sleep(0.01)
+                else:
+                    self.fail("replay did not begin before cancel deadline")
+
+                self.assertTrue(controller.cancel_current_transfer())
+                snapshot = wait_for_status(controller, "partial", timeout_s=5.0)
+            finally:
+                controller.stop()
+
+            current = snapshot["current"]
+            self.assertEqual(current["message"], "Partial — stopped by operator")
+            self.assertEqual(current["completion_reason"], "operator_cancelled")
+            self.assertGreater(current["received_packets"], 0)
+            self.assertLess(current["received_packets"], current["total_packets"])
+            run = snapshot["history"][0]
+            self.assertEqual(run["result"], "partial")
+            self.assertEqual(run["completion_reason"], "operator_cancelled")
+            self.assertIn("satellite transmission was not interrupted", run["timeout_reason"])
+            run_json = root / run["run_id"] / "run.json"
+            self.assertEqual(
+                json.loads(run_json.read_text(encoding="utf-8"))["completion_reason"],
+                "operator_cancelled",
+            )
 
 
 if __name__ == "__main__":
