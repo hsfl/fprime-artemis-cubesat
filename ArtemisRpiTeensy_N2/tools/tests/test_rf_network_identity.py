@@ -198,6 +198,59 @@ int main() {{
         self.assertIn("initRadio(m_radio, m_radioPins, m_radioProfile, &SerialUSB1)", ground_driver)
         self.assertIn("&SerialUSB1);", ground_driver)
 
+    def test_satellite_radio_shutdown_and_pi_first_contract(self) -> None:
+        helper_paths = (
+            REPO_ROOT / "ArtemisTeensy_N2_Baremetal/firmware/libs/rf23bp/artemis_rf23bp.hpp",
+            REPO_ROOT / "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/artemis_rf23bp.hpp",
+            REPO_ROOT / "GDS_Teensy/firmware/gds_teensy/src/artemis_rf23bp.hpp",
+        )
+        helper_bytes = [path.read_bytes() for path in helper_paths]
+        self.assertEqual(helper_bytes[0], helper_bytes[1])
+        self.assertEqual(helper_bytes[0], helper_bytes[2])
+        helper = helper_bytes[0].decode()
+        self.assertIn("uint8_t sdn_pin = 37", helper)
+        self.assertIn("detachInterrupt(digitalPinToInterrupt(pins.irq_pin))", helper)
+        self.assertIn("digitalWrite(pins.sdn_pin, HIGH)", helper)
+        self.assertIn("digitalWrite(pins.sdn_pin, LOW)", helper)
+        self.assertIn("probeDeviceIdentity", helper)
+        self.assertNotIn("probeChipReady", helper)
+        self.assertNotIn("spiWrite(RH_RF22_REG_07_OPERATING_MODE1, RH_RF22_SWRES)", helper)
+
+        satellite_root = REPO_ROOT / "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy"
+        driver_header = (satellite_root / "src/rf23_driver.hpp").read_text()
+        driver = (satellite_root / "src/rf23_driver.cpp").read_text()
+        relay = (satellite_root / "src/relay_uart_rf.cpp").read_text()
+        router = (satellite_root / "src/local_teensy_router.cpp").read_text()
+        sketch = (satellite_root / "satellite_teensy.ino").read_text()
+        for contract in (
+            "beginSafeOff",
+            "setEnabled",
+            "failSafeOffLocalTx",
+            "isReady",
+            "lastAcceptedRssiAgeMs",
+        ):
+            self.assertIn(contract, driver_header)
+        self.assertIn("return isReady() && m_radio.available()", driver)
+        self.assertGreaterEqual(driver.count("if (!isReady())"), 2)
+        self.assertGreaterEqual(relay.count("if (!m_rf.isReady())"), 2)
+        self.assertIn("discardRadioWorkOnOff", relay)
+        self.assertIn("resetReassembly(channel, false, partialMessage)", relay)
+        self.assertIn("m_rf.failSafeOffLocalTx();", relay)
+        self.assertIn("TEENSY_STATUS_TARGET_ERROR", router)
+        self.assertIn("m_fault == link_protocol::TEENSY_RF_FAULT_LOCAL_TX", driver)
+        self.assertIn("isReady() && m_fault == link_protocol::TEENSY_RF_FAULT_NONE", driver)
+        self.assertIn("m_rssiValid = false;", driver)
+        self.assertNotIn("g_rfDriver.begin();", sketch)
+        self.assertIn("RADIO_SDN_PIN = 37", sketch)
+        self.assertLess(
+            sketch.index("g_rfDriver.beginSafeOff(watchdogReset)"),
+            sketch.index("digitalWrite(RPI_ENABLE_PIN, HIGH)"),
+        )
+        self.assertLess(
+            sketch.index("digitalWrite(RPI_ENABLE_PIN, HIGH)"),
+            sketch.index("Serial2.begin(UART_BAUD)"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

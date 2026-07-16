@@ -16,14 +16,16 @@ class CommsAppTester final : public CommsAppGTestBase {
     ~CommsAppTester();
 
     void testRejectsDownlinkWithoutScience();
-    void testRequestsScienceDownlinkAndCompletionClearsState();
+    void testCompletedDownlinkRemainsAvailableForRetry();
     void testDuplicateAndConflictingActiveRequestsAreGuarded();
     void testNewPendingProductStartsAfterActiveTerminalStatus();
     void testStaleOrUncorrelatedStatusCannotEndActiveTransfer();
     void testDownlinkFailureReturnsBase();
     void testIgnoresPayloadStatusWhenInactive();
     void testDriverStatusPollingAndRssiPing();
-    void testRunPublishesHealthFromLinkState();
+    void testBootReconcilesOffToReadyAndPublishesHealth();
+    void testReadyWithLocalFaultIsDegradedAndReinitialized();
+    void testRecoveryBackoffIsCappedAndStatusIsObservational();
     void testInitializationFailureAndInvalidReissueDoNotWedge();
 
   private:

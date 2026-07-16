@@ -24,6 +24,16 @@ static constexpr uint8_t TEENSY_STATUS_BUSY = 2;
 static constexpr uint8_t TEENSY_STATUS_TIMEOUT = 3;
 static constexpr uint8_t TEENSY_STATUS_TARGET_ERROR = 4;
 static constexpr uint8_t TEENSY_RF_OP_LINK_STATS = 1;
+static constexpr uint8_t TEENSY_RF_OP_STATUS = 1;
+static constexpr uint8_t TEENSY_RF_OP_SET_ENABLED = 2;
+static constexpr uint8_t TEENSY_RF_STATE_OFF = 0;
+static constexpr uint8_t TEENSY_RF_STATE_READY = 1;
+static constexpr uint8_t TEENSY_RF_FAULT_NONE = 0;
+static constexpr uint8_t TEENSY_RF_FAULT_INIT_FAILED = 1;
+static constexpr uint8_t TEENSY_RF_FAULT_WATCHDOG_RESET = 2;
+static constexpr uint8_t TEENSY_RF_FAULT_LOCAL_TX = 3;
+static constexpr uint8_t TEENSY_RF_BOOT_FLAG_WATCHDOG = 1;
+static constexpr uint32_t TEENSY_RF_RSSI_AGE_UNKNOWN_MS = 4294967295;
 
 // UART wrapper payload carries opaque bytes tagged by virtual channel.
 static constexpr uint16_t FRAME_MAX_PAYLOAD = 220;

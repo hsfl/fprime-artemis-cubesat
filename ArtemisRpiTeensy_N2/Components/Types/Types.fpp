@@ -29,6 +29,37 @@ module Components {
     SET_CHARGER_STATE = 7
   }
 
+  @ Teensy-local RFM23BP control operation.
+  enum RadioOperation : U8 {
+    STATUS = 1
+    SET_ENABLED = 2
+  }
+
+  @ Factual RFM23BP hardware state. Initialization is transient, not a state.
+  enum RadioState : U8 {
+    OFF = 0
+    READY = 1
+  }
+
+  @ Last factual local RFM23BP fault reported by the satellite Teensy.
+  enum RadioFault : U8 {
+    NONE = 0
+    INIT_FAILED = 1
+    WATCHDOG_RESET = 2
+    LOCAL_TX_FAULT = 3
+  }
+
+  @ Result of the most recent Pi-to-Teensy radio RPC.
+  enum RadioRpcResult : U8 {
+    OK = 0
+    BAD_REQUEST = 1
+    BUSY = 2
+    TIMEOUT = 3
+    TARGET_ERROR = 4
+    BAD_RESPONSE = 5
+    NOT_CONFIGURED = 6
+  }
+
   @ Mission collection request from MissionApp to ScienceApp.
   port CollectionRequest(delaySeconds: U32)
 
@@ -78,6 +109,25 @@ module Components {
 
   @ RF link-strength status in dBm.
   port RssiStatus(rssiDbm: I32)
+
+  @ Policy request from CommsApp to the Teensy/RFM23BP driver.
+  port RadioControlRequest(operation: RadioOperation, enabled: U8)
+
+  @ Correlated Teensy/RFM23BP RPC result and latest factual radio status.
+  port RadioStatus(
+    operation: RadioOperation,
+    result: RadioRpcResult,
+    radioState: RadioState,
+    radioFault: RadioFault,
+    bootFlags: U8,
+    rssiValid: U8,
+    rssiDbm: I32,
+    rssiAgeMs: U32,
+    initAttempts: U32,
+    rfRxPackets: U32,
+    rfTxPackets: U32,
+    rfTxDrops: U32
+  )
 
   @ Payload downlink transfer status from the channel-1 blob manager.
   port PayloadDownlinkStatus(

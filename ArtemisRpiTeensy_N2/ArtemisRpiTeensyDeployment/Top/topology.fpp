@@ -138,8 +138,9 @@ module ArtemisRpiTeensyDeployment {
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup1] -> rateGroup1.CycleIn
       rateGroup1.RateGroupMemberOut[0] -> CdhCore.tlmSend.Run
       rateGroup1.RateGroupMemberOut[1] -> FileHandling.fileDownlink.Run
+      # Bound the one pending Teensy-local radio RPC at one-second resolution.
+      rateGroup1.RateGroupMemberOut[2] -> commsDriverTeensyRfm23.run
       # RF MVP: keep automatic downlink volume low; command-triggered paths remain active.
-      # rateGroup1.RateGroupMemberOut[2] -> systemResources.run
       rateGroup1.RateGroupMemberOut[3] -> ComCcsds.comQueue.run
       rateGroup1.RateGroupMemberOut[4] -> ComCcsds.aggregator.timeout
       rateGroup1.RateGroupMemberOut[5] -> teensyTransportManager.run
@@ -148,13 +149,13 @@ module ArtemisRpiTeensyDeployment {
       # RF MVP: tick the scheduled science path; keep higher-volume demo status loops off.
       rateGroup1.RateGroupMemberOut[8] -> scienceApp.run
       # rateGroup1.RateGroupMemberOut[9] -> sohApp.run
-      # rateGroup1.RateGroupMemberOut[10] -> commsApp.run
 
       # Rate group 2
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup2] -> rateGroup2.CycleIn
       rateGroup2.RateGroupMemberOut[0] -> cmdSeq.schedIn
       rateGroup2.RateGroupMemberOut[1] -> epsDriverArtemis.run
-      # rateGroup2.RateGroupMemberOut[2] -> payloadManager.run
+      # Slow radio policy tick: boot reconciliation, capped backoff, and status polling.
+      rateGroup2.RateGroupMemberOut[2] -> commsApp.run
       # rateGroup2.RateGroupMemberOut[3] -> adcsManager.run
       # rateGroup2.RateGroupMemberOut[4] -> gpsManager.run
       # rateGroup2.RateGroupMemberOut[5] -> storageManager.run
@@ -214,13 +215,8 @@ module ArtemisRpiTeensyDeployment {
       commsApp.driverRequestOut -> commsDriverTeensyRfm23.requestIn
       commsDriverTeensyRfm23.teensyRequestOut -> uartChannelMux.rfLocalSendIn
       uartChannelMux.rfLocalRecvOut -> commsDriverTeensyRfm23.teensyResponseIn
-      commsDriverTeensyRfm23.rssiStatusOut -> commsApp.rssiStatusIn
-      commsDriverTeensyRfm23.statusOut[0] -> commsApp.driverStatusIn
-      commsDriverTeensyRfm23.statusOut[1] -> teensyTransportManager.driverStatusIn
-    }
-
-    connections TransportFlow {
-      teensyTransportManager.linkStatusOut -> commsApp.linkStatusIn
+      commsDriverTeensyRfm23.statusOut -> commsApp.driverStatusIn
+      commsDriverTeensyRfm23.rfRxCountOut -> teensyTransportManager.driverStatusIn
     }
 
     connections SoHInputs {
@@ -231,7 +227,9 @@ module ArtemisRpiTeensyDeployment {
       storageManager.sohStatusOut -> sohApp.statusIn[4]
       thermalManager.sohStatusOut -> sohApp.statusIn[5]
       commsApp.sohStatusOut -> sohApp.statusIn[6]
-      teensyTransportManager.sohStatusOut -> sohApp.statusIn[7]
+      # CommsApp is the authoritative radio/Teensy health owner. The legacy
+      # transport manager infers RF contact from recent uplink packet counts,
+      # so radio silence is diagnostic data, not a bus failure.
     }
 
     connections ArtemisRpiTeensyDeployment {

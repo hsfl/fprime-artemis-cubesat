@@ -30,7 +30,7 @@ void CommsAppTester::testRejectsDownlinkWithoutScience() {
     ASSERT_from_missionModeOut_SIZE(0);
 }
 
-void CommsAppTester::testRequestsScienceDownlinkAndCompletionClearsState() {
+void CommsAppTester::testCompletedDownlinkRemainsAvailableForRetry() {
     this->clearHistory();
 
     Fw::String sourcePath("/tmp/science.bin");
@@ -65,7 +65,15 @@ void CommsAppTester::testRequestsScienceDownlinkAndCompletionClearsState() {
     this->component.doDispatch();
     ASSERT_CMD_RESPONSE_SIZE(2);
     ASSERT_CMD_RESPONSE(1, CommsAppComponentBase::OPCODE_REQUEST_SCIENCE_DOWNLINK, 1,
-                        Fw::CmdResponse::VALIDATION_ERROR);
+                        Fw::CmdResponse::OK);
+    ASSERT_EVENTS_DownlinkRequested_SIZE(2);
+    ASSERT_EVENTS_DownlinkRequested(1, 128);
+    ASSERT_from_downlinkRequestOut_SIZE(2);
+    ASSERT_from_downlinkRequestOut(1, 7, 128, Components::ScienceProductSource::NEUTRON_SIM, sourcePath, 0x1234);
+    ASSERT_from_payloadDownlinkRequestOut_SIZE(2);
+    ASSERT_from_payloadDownlinkRequestOut(1, 7, 128, Components::ScienceProductSource::NEUTRON_SIM, sourcePath, 0x1234);
+    ASSERT_from_missionModeOut_SIZE(3);
+    ASSERT_from_missionModeOut(2, Components::MissionMode::DOWNLINKING, 128);
 }
 
 void CommsAppTester::testDuplicateAndConflictingActiveRequestsAreGuarded() {
@@ -225,54 +233,311 @@ void CommsAppTester::testDriverStatusPollingAndRssiPing() {
     this->component.doDispatch();
     ASSERT_CMD_RESPONSE_SIZE(1);
     ASSERT_from_driverRequestOut_SIZE(1);
-    ASSERT_from_driverRequestOut(0, 1);
+    ASSERT_from_driverRequestOut(0, Components::RadioOperation::STATUS, 0);
 
-    this->invoke_to_driverStatusIn(0, 2);
+    this->invoke_to_driverStatusIn(0,
+                                   Components::RadioOperation::STATUS,
+                                   Components::RadioRpcResult::OK,
+                                   Components::RadioState::READY,
+                                   Components::RadioFault::NONE,
+                                   0,
+                                   0,
+                                   0,
+                                   0xFFFFFFFFU,
+                                   1,
+                                   4,
+                                   3,
+                                   0);
     this->component.doDispatch();
-    ASSERT_EVENTS_LinkStateUpdated_SIZE(1);
-    ASSERT_EVENTS_LinkStateUpdated(0, 2, -120);
+    ASSERT_EVENTS_RadioStatusUpdated_SIZE(1);
+    ASSERT_EVENTS_RadioStatusUpdated(0,
+                                     Components::RadioState::READY,
+                                     Components::RadioFault::NONE,
+                                     Components::RadioRpcResult::OK);
 
-    this->invoke_to_rssiStatusIn(0, -72);
-    this->component.doDispatch();
     this->sendCmd_PING_LINK_RSSI(0, 1);
     this->component.doDispatch();
     ASSERT_CMD_RESPONSE_SIZE(2);
     ASSERT_from_driverRequestOut_SIZE(2);
-    ASSERT_from_driverRequestOut(1, 3);
+    ASSERT_from_driverRequestOut(1, Components::RadioOperation::STATUS, 0);
 
-    this->invoke_to_driverStatusIn(0, 3);
+    this->invoke_to_driverStatusIn(0,
+                                   Components::RadioOperation::STATUS,
+                                   Components::RadioRpcResult::OK,
+                                   Components::RadioState::READY,
+                                   Components::RadioFault::NONE,
+                                   0,
+                                   1,
+                                   -72,
+                                   100,
+                                   2,
+                                   5,
+                                   4,
+                                   0);
     this->component.doDispatch();
-    ASSERT_EVENTS_LinkStateUpdated_SIZE(2);
-    ASSERT_EVENTS_LinkStateUpdated(1, 3, -72);
+    ASSERT_EVENTS_RadioStatusUpdated_SIZE(2);
+    ASSERT_EVENTS_RadioStatusUpdated(1,
+                                     Components::RadioState::READY,
+                                     Components::RadioFault::NONE,
+                                     Components::RadioRpcResult::OK);
     ASSERT_EVENTS_LinkRssiPing_SIZE(1);
-    ASSERT_EVENTS_LinkRssiPing(0, 3, -72, 2);
+    ASSERT_EVENTS_LinkRssiPing(0, Components::RadioState::READY, 1, -72, 100, 2);
 }
 
-void CommsAppTester::testRunPublishesHealthFromLinkState() {
+void CommsAppTester::testBootReconcilesOffToReadyAndPublishesHealth() {
     this->clearHistory();
 
-    this->invoke_to_linkStatusIn(0, 0);
-    this->component.doDispatch();
     this->invoke_to_run(0, 0);
     this->component.doDispatch();
     ASSERT_from_sohStatusOut_SIZE(1);
-    ASSERT_from_sohStatusOut(0, Components::HealthState::FAIL, 0);
+    ASSERT_from_sohStatusOut(0, Components::HealthState::UNKNOWN, 0);
     ASSERT_from_driverRequestOut_SIZE(1);
-    ASSERT_from_driverRequestOut(0, 1);
+    ASSERT_from_driverRequestOut(0, Components::RadioOperation::STATUS, 0);
 
-    this->invoke_to_linkStatusIn(0, 1);
-    this->component.doDispatch();
-    this->invoke_to_run(0, 0);
+    this->invoke_to_driverStatusIn(0,
+                                   Components::RadioOperation::STATUS,
+                                   Components::RadioRpcResult::OK,
+                                   Components::RadioState::OFF,
+                                   Components::RadioFault::NONE,
+                                   0,
+                                   0,
+                                   0,
+                                   0xFFFFFFFFU,
+                                   1,
+                                   0,
+                                   0,
+                                   0);
     this->component.doDispatch();
     ASSERT_from_sohStatusOut_SIZE(2);
-    ASSERT_from_sohStatusOut(1, Components::HealthState::WARN, 1);
+    ASSERT_from_sohStatusOut(1, Components::HealthState::WARN, 0);
+    ASSERT_from_driverRequestOut_SIZE(2);
+    ASSERT_from_driverRequestOut(1, Components::RadioOperation::SET_ENABLED, 1);
 
-    this->invoke_to_linkStatusIn(0, 2);
-    this->component.doDispatch();
-    this->invoke_to_run(0, 0);
+    this->invoke_to_driverStatusIn(0,
+                                   Components::RadioOperation::SET_ENABLED,
+                                   Components::RadioRpcResult::OK,
+                                   Components::RadioState::READY,
+                                   Components::RadioFault::NONE,
+                                   0,
+                                   0,
+                                   0,
+                                   0xFFFFFFFFU,
+                                   2,
+                                   0,
+                                   0,
+                                   0);
     this->component.doDispatch();
     ASSERT_from_sohStatusOut_SIZE(3);
-    ASSERT_from_sohStatusOut(2, Components::HealthState::OK, 2);
+    ASSERT_from_sohStatusOut(2, Components::HealthState::OK, 0x100);
+    ASSERT_EVENTS_RadioRecoveryScheduled_SIZE(0);
+}
+
+void CommsAppTester::testReadyWithLocalFaultIsDegradedAndReinitialized() {
+    this->clearHistory();
+
+    this->invoke_to_run(0, 0);
+    this->component.doDispatch();
+    ASSERT_from_driverRequestOut_SIZE(1);
+    ASSERT_from_driverRequestOut(0, Components::RadioOperation::STATUS, 0);
+
+    this->invoke_to_driverStatusIn(0,
+                                   Components::RadioOperation::STATUS,
+                                   Components::RadioRpcResult::OK,
+                                   Components::RadioState::READY,
+                                   Components::RadioFault::LOCAL_TX_FAULT,
+                                   0,
+                                   0,
+                                   0,
+                                   0xFFFFFFFFU,
+                                   1,
+                                   0,
+                                   0,
+                                   1);
+    this->component.doDispatch();
+
+    ASSERT_from_sohStatusOut_SIZE(2);
+    ASSERT_from_sohStatusOut(1, Components::HealthState::WARN, 0x103);
+    ASSERT_from_driverRequestOut_SIZE(2);
+    ASSERT_from_driverRequestOut(1, Components::RadioOperation::SET_ENABLED, 1);
+    ASSERT_EVENTS_RadioRecoveryScheduled_SIZE(0);
+}
+
+void CommsAppTester::testRecoveryBackoffIsCappedAndStatusIsObservational() {
+    this->clearHistory();
+
+    // Boot reconciliation first observes factual OFF, then makes one immediate
+    // enable attempt. Only that failed SET attempt starts the retry ladder.
+    this->invoke_to_run(0, 0);
+    this->component.doDispatch();
+    this->invoke_to_driverStatusIn(0,
+                                   Components::RadioOperation::STATUS,
+                                   Components::RadioRpcResult::OK,
+                                   Components::RadioState::OFF,
+                                   Components::RadioFault::NONE,
+                                   0,
+                                   0,
+                                   0,
+                                   0xFFFFFFFFU,
+                                   1,
+                                   0,
+                                   0,
+                                   0);
+    this->component.doDispatch();
+    this->invoke_to_driverStatusIn(0,
+                                   Components::RadioOperation::SET_ENABLED,
+                                   Components::RadioRpcResult::TARGET_ERROR,
+                                   Components::RadioState::OFF,
+                                   Components::RadioFault::INIT_FAILED,
+                                   0,
+                                   0,
+                                   0,
+                                   0xFFFFFFFFU,
+                                   2,
+                                   0,
+                                   0,
+                                   0);
+    this->component.doDispatch();
+    ASSERT_EVENTS_RadioRecoveryScheduled_SIZE(1);
+    ASSERT_EVENTS_RadioRecoveryScheduled(0,
+                                         1,
+                                         30,
+                                         Components::RadioFault::INIT_FAILED,
+                                         Components::RadioRpcResult::TARGET_ERROR);
+    EXPECT_EQ(this->component.m_radioRecoveryFailures, 1U);
+    EXPECT_EQ(this->component.m_radioRetryTicks, 15U);
+
+    // An operator STATUS during backoff is observational: it may refresh the
+    // factual body, but it cannot advance or restart the retry schedule.
+    this->sendCmd_REQUEST_LINK_STATUS(0, 1);
+    this->component.doDispatch();
+    ASSERT_from_driverRequestOut_SIZE(3);
+    ASSERT_from_driverRequestOut(2, Components::RadioOperation::STATUS, 0);
+    this->invoke_to_driverStatusIn(0,
+                                   Components::RadioOperation::STATUS,
+                                   Components::RadioRpcResult::OK,
+                                   Components::RadioState::OFF,
+                                   Components::RadioFault::INIT_FAILED,
+                                   0,
+                                   0,
+                                   0,
+                                   0xFFFFFFFFU,
+                                   2,
+                                   0,
+                                   0,
+                                   0);
+    this->component.doDispatch();
+    ASSERT_EVENTS_RadioRecoveryScheduled_SIZE(1);
+    EXPECT_EQ(this->component.m_radioRecoveryFailures, 1U);
+    EXPECT_EQ(this->component.m_radioRetryTicks, 15U);
+
+    // The first retry proves the real 2-second policy cadence: no early SET on
+    // ticks 1-14, then the request is issued exactly on tick 15 (30 seconds).
+    for (U32 tick = 0U; tick < 14U; tick++) {
+        this->invoke_to_run(0, 0);
+        this->component.doDispatch();
+    }
+    ASSERT_from_driverRequestOut_SIZE(3);
+    EXPECT_EQ(this->component.m_radioRetryTicks, 1U);
+    this->invoke_to_run(0, 0);
+    this->component.doDispatch();
+    ASSERT_from_driverRequestOut_SIZE(4);
+    ASSERT_from_driverRequestOut(3, Components::RadioOperation::SET_ENABLED, 1);
+    this->invoke_to_driverStatusIn(0,
+                                   Components::RadioOperation::SET_ENABLED,
+                                   Components::RadioRpcResult::TARGET_ERROR,
+                                   Components::RadioState::OFF,
+                                   Components::RadioFault::INIT_FAILED,
+                                   0,
+                                   0,
+                                   0,
+                                   0xFFFFFFFFU,
+                                   3,
+                                   0,
+                                   0,
+                                   0);
+    this->component.doDispatch();
+    ASSERT_EVENTS_RadioRecoveryScheduled(1,
+                                         2,
+                                         120,
+                                         Components::RadioFault::INIT_FAILED,
+                                         Components::RadioRpcResult::TARGET_ERROR);
+    EXPECT_EQ(this->component.m_radioRetryTicks, 60U);
+
+    // Later rungs are accelerated to keep the unit test compact; their event
+    // arguments and stored tick values verify 120 seconds and 900-second cap.
+    this->component.m_radioRetryTicks = 1U;
+    this->invoke_to_run(0, 0);
+    this->component.doDispatch();
+    ASSERT_from_driverRequestOut(4, Components::RadioOperation::SET_ENABLED, 1);
+    this->invoke_to_driverStatusIn(0,
+                                   Components::RadioOperation::SET_ENABLED,
+                                   Components::RadioRpcResult::TARGET_ERROR,
+                                   Components::RadioState::OFF,
+                                   Components::RadioFault::INIT_FAILED,
+                                   0,
+                                   0,
+                                   0,
+                                   0xFFFFFFFFU,
+                                   4,
+                                   0,
+                                   0,
+                                   0);
+    this->component.doDispatch();
+    ASSERT_EVENTS_RadioRecoveryScheduled(2,
+                                         3,
+                                         900,
+                                         Components::RadioFault::INIT_FAILED,
+                                         Components::RadioRpcResult::TARGET_ERROR);
+    EXPECT_EQ(this->component.m_radioRetryTicks, 450U);
+
+    this->component.m_radioRetryTicks = 1U;
+    this->invoke_to_run(0, 0);
+    this->component.doDispatch();
+    ASSERT_from_driverRequestOut(5, Components::RadioOperation::SET_ENABLED, 1);
+    this->invoke_to_driverStatusIn(0,
+                                   Components::RadioOperation::SET_ENABLED,
+                                   Components::RadioRpcResult::TARGET_ERROR,
+                                   Components::RadioState::OFF,
+                                   Components::RadioFault::INIT_FAILED,
+                                   0,
+                                   0,
+                                   0,
+                                   0xFFFFFFFFU,
+                                   5,
+                                   0,
+                                   0,
+                                   0);
+    this->component.doDispatch();
+    ASSERT_EVENTS_RadioRecoveryScheduled(3,
+                                         4,
+                                         900,
+                                         Components::RadioFault::INIT_FAILED,
+                                         Components::RadioRpcResult::TARGET_ERROR);
+    EXPECT_EQ(this->component.m_radioRetryTicks, 450U);
+
+    this->component.m_radioRetryTicks = 1U;
+    this->invoke_to_run(0, 0);
+    this->component.doDispatch();
+    ASSERT_from_driverRequestOut(6, Components::RadioOperation::SET_ENABLED, 1);
+    this->invoke_to_driverStatusIn(0,
+                                   Components::RadioOperation::SET_ENABLED,
+                                   Components::RadioRpcResult::OK,
+                                   Components::RadioState::READY,
+                                   Components::RadioFault::NONE,
+                                   0,
+                                   0,
+                                   0,
+                                   0xFFFFFFFFU,
+                                   6,
+                                   0,
+                                   0,
+                                   0);
+    this->component.doDispatch();
+    ASSERT_EVENTS_RadioRecoveryScheduled_SIZE(4);
+    ASSERT_EVENTS_RadioRecovered_SIZE(1);
+    ASSERT_EVENTS_RadioRecovered(0, 4);
+    EXPECT_EQ(this->component.m_radioRecoveryFailures, 0U);
+    EXPECT_EQ(this->component.m_radioRetryTicks, 0U);
 }
 
 void CommsAppTester::testInitializationFailureAndInvalidReissueDoNotWedge() {

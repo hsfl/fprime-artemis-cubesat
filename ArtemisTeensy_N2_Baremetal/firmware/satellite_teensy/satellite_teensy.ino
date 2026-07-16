@@ -12,6 +12,7 @@ static constexpr int RADIO_CS = 38;
 static constexpr int RADIO_INT = 40;
 static constexpr uint8_t RADIO_RX_ON_PIN = 30;
 static constexpr uint8_t RADIO_TX_ON_PIN = 31;
+static constexpr uint8_t RADIO_SDN_PIN = 37;
 static constexpr uint8_t RPI_ENABLE_PIN = 36;
 static constexpr uint8_t TEENSY_LED_PIN = 13;
 
@@ -23,11 +24,12 @@ static constexpr uint8_t UPLINK_QUEUE_DEPTH = 32;
 static constexpr uint8_t DOWNLINK_QUEUE_DEPTH = 32;
 static constexpr uint32_t DEBUG_STATUS_PERIOD_MS = 1000;
 static constexpr uint32_t RADIO_TRAFFIC_LED_BLINK_MS = 60;
+static constexpr uint32_t RADIO_OFF_LED_HALF_PERIOD_MS = 500;
 static constexpr size_t RPI_UART_RX_BUFFER_SIZE = 4096;
 static constexpr uint16_t CCSDS_TM_FRAME_BYTES = 128;
 
 LinkCounters g_linkCounters;
-Rf23Driver g_rfDriver(RADIO_CS, RADIO_INT, RADIO_RX_ON_PIN, RADIO_TX_ON_PIN);
+Rf23Driver g_rfDriver(RADIO_CS, RADIO_INT, RADIO_RX_ON_PIN, RADIO_TX_ON_PIN, RADIO_SDN_PIN);
 PduProxy g_pduProxy(Serial1);
 LocalTeensyRouter g_localRouter(g_pduProxy, g_rfDriver, g_linkCounters);
 static uint8_t g_rpiUartRxBuffer[RPI_UART_RX_BUFFER_SIZE];
@@ -77,6 +79,12 @@ bool radioTrafficChanged(const RadioTrafficSnapshot& a, const RadioTrafficSnapsh
 }
 
 void updateRadioTrafficLed(uint32_t now) {
+  if (!g_rfDriver.isReady()) {
+    digitalWrite(TEENSY_LED_PIN,
+                 ((now / RADIO_OFF_LED_HALF_PERIOD_MS) & 1U) == 0U ? LOW : HIGH);
+    return;
+  }
+
   static RadioTrafficSnapshot lastTraffic = radioTrafficSnapshot();
   const RadioTrafficSnapshot currentTraffic = radioTrafficSnapshot();
   if (radioTrafficChanged(currentTraffic, lastTraffic)) {
@@ -126,6 +134,12 @@ void debugPrintCounters(const char* prefix) {
   Serial.print(g_linkCounters.rfRecoveries);
   Serial.print(" rf_tx_terminal_failures=");
   Serial.print(g_linkCounters.rfTxTerminalFailures);
+  Serial.print(" radio_state=");
+  Serial.print(g_rfDriver.state());
+  Serial.print(" radio_fault=");
+  Serial.print(g_rfDriver.fault());
+  Serial.print(" radio_init_attempts=");
+  Serial.print(g_rfDriver.initAttempts());
   Serial.print(" crc_drops=");
   Serial.print(g_linkCounters.crcDrops);
   Serial.print(" framing_drops=");
@@ -157,33 +171,29 @@ void debugPrintCounters(const char* prefix) {
 }
 
 void setup() {
-  Serial.begin(DEBUG_UART_BAUD);
   const bool watchdogReset = wdt_guard::consumeWatchdogResetFlag();
 
+  g_rfDriver.beginSafeOff(watchdogReset);
   pinMode(RPI_ENABLE_PIN, OUTPUT);
-  digitalWrite(RPI_ENABLE_PIN, LOW);
+  digitalWrite(RPI_ENABLE_PIN, HIGH);
   pinMode(TEENSY_LED_PIN, OUTPUT);
   digitalWrite(TEENSY_LED_PIN, HIGH);
+  Serial.begin(DEBUG_UART_BAUD);
   if (watchdogReset) {
     Serial.println("[ArtemisTeensy] watchdog reset detected");
   }
   wdt_guard::begin();
   Serial.println("[ArtemisTeensy] hardware watchdog armed (12s)");
   Serial.println("[ArtemisTeensy] LED asserted (pin 13 HIGH)");
+  Serial.println("[ArtemisTeensy] RFM23BP held OFF with SDN HIGH (pin 37)");
+  Serial.println("[ArtemisTeensy] RPI power enable asserted (pin 36 HIGH)");
 
   Serial2.addMemoryForRead(g_rpiUartRxBuffer, sizeof(g_rpiUartRxBuffer));
   Serial2.begin(UART_BAUD);
   g_pduProxy.begin(PDU_UART_BAUD);
-  const bool radioOk = g_rfDriver.begin();
-  digitalWrite(RPI_ENABLE_PIN, HIGH);
-  Serial.println("[ArtemisTeensy] RPI power enable asserted (pin 36 HIGH)");
   g_relay.begin();
 
-  if (radioOk) {
-    Serial.println("[ArtemisTeensy] Relay bridge ready (channelized UART + RF segmentation + local PDU proxy)");
-  } else {
-    Serial.println("[ArtemisTeensy] RF23 init failed; relay running without RF");
-  }
+  Serial.println("[ArtemisTeensy] Relay/channel 2 ready; F Prime owns radio enable policy");
   debugPrintCounters("[ArtemisTeensy] counters");
 }
 

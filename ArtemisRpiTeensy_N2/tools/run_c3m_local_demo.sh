@@ -23,6 +23,9 @@ DROP_PAYLOAD_DATA_INDEX=""
 RESTART_RECEIVER_CYCLE=""
 ABANDON_FIRST_CYCLE="false"
 PARTIAL_TRANSFER_TIMEOUT_SECONDS="${PARTIAL_TRANSFER_TIMEOUT_SECONDS:-2}"
+RADIO_INIT_FAILURES="${RADIO_INIT_FAILURES:-0}"
+RADIO_WATCHDOG_RESETS="${RADIO_WATCHDOG_RESETS:-0}"
+RADIO_READY_TIMEOUT_SECONDS="${RADIO_READY_TIMEOUT_SECONDS:-180}"
 
 usage() {
   cat <<'EOF'
@@ -43,6 +46,10 @@ Options:
                              restart/checkpoint-resume receiver during this cycle
   --abandon-first-cycle     permanently lose DATA 100 in cycle 1, save an
                              honest partial, then require later cycles to pass
+  --radio-init-failures <count>
+                             fail COUNT radio init attempts before recovery
+  --radio-watchdog-resets <count>
+                             drop COUNT enable replies as simulated Teensy watchdog resets
   --app-binary <path>        deployment binary path (default: host-platform artifact)
   --dictionary <path>        topology dictionary path (default: latest generated dict)
   --build-cache <path>       local build cache (default: ArtemisRpiTeensy_N2/build-c3m-local)
@@ -98,6 +105,14 @@ while [[ $# -gt 0 ]]; do
     --abandon-first-cycle)
       ABANDON_FIRST_CYCLE="true"
       shift
+      ;;
+    --radio-init-failures)
+      RADIO_INIT_FAILURES="${2:-}"
+      shift 2
+      ;;
+    --radio-watchdog-resets)
+      RADIO_WATCHDOG_RESETS="${2:-}"
+      shift 2
       ;;
     --app-binary)
       APP_BINARY_PATH="${2:-}"
@@ -162,6 +177,13 @@ if [[ "$ABANDON_FIRST_CYCLE" == "true" ]]; then
   (( CAPTURES >= 2 )) || fail "--abandon-first-cycle requires --captures 2 or greater"
   [[ -z "$DROP_PAYLOAD_DATA_INDEX" && -z "$RESTART_RECEIVER_CYCLE" ]] || \
     fail "--abandon-first-cycle cannot be combined with another receiver fault"
+fi
+[[ "$RADIO_INIT_FAILURES" =~ ^[0-9]+$ ]] || \
+  fail "--radio-init-failures must be a non-negative integer"
+[[ "$RADIO_WATCHDOG_RESETS" =~ ^[0-9]+$ ]] || \
+  fail "--radio-watchdog-resets must be a non-negative integer"
+if (( RADIO_INIT_FAILURES > 0 && RADIO_WATCHDOG_RESETS > 0 )); then
+  fail "--radio-init-failures and --radio-watchdog-resets cannot both be nonzero"
 fi
 
 [[ -f "$VENV_ACTIVATE" ]] || fail "Missing venv: $VENV_ACTIVATE"
@@ -314,6 +336,64 @@ wait_for_payload_uart() {
     sleep 0.25
   done
   return 1
+}
+
+wait_for_radio_ready() {
+  local deadline
+  deadline=$((SECONDS + RADIO_READY_TIMEOUT_SECONDS))
+  while (( SECONDS < deadline )); do
+    if grep -q '^RADIO_STATE=READY' "$LOG_DIR/emulation.log" 2>/dev/null; then
+      return 0
+    fi
+    if ! kill -0 "$EMU_PID" >/dev/null 2>&1; then
+      return 1
+    fi
+    sleep 0.25
+  done
+  return 1
+}
+
+verify_radio_recovery_evidence() {
+  local injected_failures=$((RADIO_INIT_FAILURES + RADIO_WATCHDOG_RESETS))
+  if (( injected_failures == 0 )); then
+    return 0
+  fi
+
+  wait_for_log_count "RadioRecoveryScheduled" "$injected_failures" \
+    "F Prime radio recovery scheduling" || return 1
+  wait_for_log_count "RadioRecovered" 1 "F Prime radio recovery completion" || return 1
+
+  python3 - "$LOG_DIR/emulation.log" "$injected_failures" "$RADIO_WATCHDOG_RESETS" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+log_path = Path(sys.argv[1])
+failure_count = int(sys.argv[2])
+watchdog_count = int(sys.argv[3])
+pattern = re.compile(r"^RADIO_ENABLE_ATTEMPT=(\d+) T_MONOTONIC=([0-9.]+)$")
+attempts = []
+for line in log_path.read_text(errors="replace").splitlines():
+    match = pattern.match(line)
+    if match:
+        attempts.append((int(match.group(1)), float(match.group(2))))
+
+expected = failure_count + 1
+if len(attempts) != expected:
+    raise SystemExit(f"expected exactly {expected} radio enable attempts, observed {len(attempts)}")
+if [number for number, _ in attempts] != list(range(1, expected + 1)):
+    raise SystemExit(f"radio enable attempt numbering was not contiguous: {attempts}")
+
+backoff_seconds = (30.0, 120.0, 900.0)
+watchdog_timeout_allowance = 15.0 if watchdog_count else 0.0
+for index in range(failure_count):
+    observed_gap = attempts[index + 1][1] - attempts[index][1]
+    required_gap = backoff_seconds[min(index, len(backoff_seconds) - 1)] + watchdog_timeout_allowance - 5.0
+    if observed_gap < required_gap:
+        raise SystemExit(
+            f"radio retry {index + 1} was too fast: {observed_gap:.1f}s < {required_gap:.1f}s"
+        )
+PY
 }
 
 wait_for_receiver_ready() {
@@ -614,6 +694,12 @@ fi
 if [[ "$ABANDON_FIRST_CYCLE" == "true" ]]; then
   log "cycle 1 expected result: honest partial after permanent DATA loss"
 fi
+if (( RADIO_INIT_FAILURES > 0 )); then
+  log "radio init failures before recovery: $RADIO_INIT_FAILURES"
+fi
+if (( RADIO_WATCHDOG_RESETS > 0 )); then
+  log "simulated radio watchdog resets before recovery: $RADIO_WATCHDOG_RESETS"
+fi
 log "logs: $LOG_DIR"
 
 EMULATOR_ARGS=(
@@ -627,6 +713,12 @@ if [[ -n "$DROP_PAYLOAD_DATA_INDEX" ]]; then
 fi
 if [[ "$ABANDON_FIRST_CYCLE" == "true" ]]; then
   EMULATOR_ARGS+=(--blackhole-payload-data-index-first-transfer 100)
+fi
+if (( RADIO_INIT_FAILURES > 0 )); then
+  EMULATOR_ARGS+=(--radio-init-failures "$RADIO_INIT_FAILURES")
+fi
+if (( RADIO_WATCHDOG_RESETS > 0 )); then
+  EMULATOR_ARGS+=(--radio-watchdog-resets "$RADIO_WATCHDOG_RESETS")
 fi
 
 (
@@ -642,6 +734,9 @@ log "payload UART: $PAYLOAD_UART_DEVICE"
 start_payload_receiver
 
 wait_for_port "$GUI_PORT" "fprime-gds"
+wait_for_radio_ready || fail "Radio did not reach READY within ${RADIO_READY_TIMEOUT_SECONDS}s"
+verify_radio_recovery_evidence || fail "F Prime radio recovery evidence/backoff check failed"
+log "radio reached READY"
 
 log "sending one-time C3M startup commands"
 send_command "missionApp.ENTER_BASE_MODE" || fail "Command failed: missionApp.ENTER_BASE_MODE"

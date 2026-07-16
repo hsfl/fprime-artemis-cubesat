@@ -108,6 +108,16 @@ static constexpr U8 TEENSY_STATUS_BUSY = {rpc["status_busy"]};
 static constexpr U8 TEENSY_STATUS_TIMEOUT = {rpc["status_timeout"]};
 static constexpr U8 TEENSY_STATUS_TARGET_ERROR = {rpc["status_target_error"]};
 static constexpr U8 TEENSY_RF_OP_LINK_STATS = {rpc["rf_op_link_stats"]};
+static constexpr U8 TEENSY_RF_OP_STATUS = {rpc["rf_op_status"]};
+static constexpr U8 TEENSY_RF_OP_SET_ENABLED = {rpc["rf_op_set_enabled"]};
+static constexpr U8 TEENSY_RF_STATE_OFF = {rpc["rf_state_off"]};
+static constexpr U8 TEENSY_RF_STATE_READY = {rpc["rf_state_ready"]};
+static constexpr U8 TEENSY_RF_FAULT_NONE = {rpc["rf_fault_none"]};
+static constexpr U8 TEENSY_RF_FAULT_INIT_FAILED = {rpc["rf_fault_init_failed"]};
+static constexpr U8 TEENSY_RF_FAULT_WATCHDOG_RESET = {rpc["rf_fault_watchdog_reset"]};
+static constexpr U8 TEENSY_RF_FAULT_LOCAL_TX = {rpc["rf_fault_local_tx"]};
+static constexpr U8 TEENSY_RF_BOOT_FLAG_WATCHDOG = {rpc["rf_boot_flag_watchdog"]};
+static constexpr U32 TEENSY_RF_RSSI_AGE_UNKNOWN_MS = {rpc["rf_rssi_age_unknown_ms"]};
 
 static constexpr U8 UART_FRAME_MAGIC_0 = {hex_byte(frame["magic_0"])};
 static constexpr U8 UART_FRAME_MAGIC_1 = {hex_byte(frame["magic_1"])};
@@ -191,6 +201,16 @@ static constexpr uint8_t TEENSY_STATUS_BUSY = {rpc["status_busy"]};
 static constexpr uint8_t TEENSY_STATUS_TIMEOUT = {rpc["status_timeout"]};
 static constexpr uint8_t TEENSY_STATUS_TARGET_ERROR = {rpc["status_target_error"]};
 static constexpr uint8_t TEENSY_RF_OP_LINK_STATS = {rpc["rf_op_link_stats"]};
+static constexpr uint8_t TEENSY_RF_OP_STATUS = {rpc["rf_op_status"]};
+static constexpr uint8_t TEENSY_RF_OP_SET_ENABLED = {rpc["rf_op_set_enabled"]};
+static constexpr uint8_t TEENSY_RF_STATE_OFF = {rpc["rf_state_off"]};
+static constexpr uint8_t TEENSY_RF_STATE_READY = {rpc["rf_state_ready"]};
+static constexpr uint8_t TEENSY_RF_FAULT_NONE = {rpc["rf_fault_none"]};
+static constexpr uint8_t TEENSY_RF_FAULT_INIT_FAILED = {rpc["rf_fault_init_failed"]};
+static constexpr uint8_t TEENSY_RF_FAULT_WATCHDOG_RESET = {rpc["rf_fault_watchdog_reset"]};
+static constexpr uint8_t TEENSY_RF_FAULT_LOCAL_TX = {rpc["rf_fault_local_tx"]};
+static constexpr uint8_t TEENSY_RF_BOOT_FLAG_WATCHDOG = {rpc["rf_boot_flag_watchdog"]};
+static constexpr uint32_t TEENSY_RF_RSSI_AGE_UNKNOWN_MS = {rpc["rf_rssi_age_unknown_ms"]};
 """
 
     return f"""#ifndef ARTEMIS_TEENSY_LINK_PROTOCOL_HPP

@@ -4,8 +4,24 @@ namespace Components {
 
 CommsApp::CommsApp(const char* const compName)
     : CommsAppComponentBase(compName),
-      m_linkState(0),
-      m_rssiDbm(-120),
+      m_desiredRadioEnabled(true),
+      m_radioStatusKnown(false),
+      m_driverRequestPending(false),
+      m_pendingRadioOperation(Components::RadioOperation::STATUS),
+      m_radioState(Components::RadioState::OFF),
+      m_radioFault(Components::RadioFault::NONE),
+      m_radioRpcResult(Components::RadioRpcResult::NOT_CONFIGURED),
+      m_radioBootFlags(0),
+      m_rssiValid(0),
+      m_rssiDbm(0),
+      m_rssiAgeMs(0xFFFFFFFFU),
+      m_radioInitAttempts(0),
+      m_rfRxPackets(0),
+      m_rfTxPackets(0),
+      m_rfTxDrops(0),
+      m_radioRecoveryFailures(0),
+      m_radioRetryTicks(0),
+      m_readyStatusPollTicks(0),
       m_rssiPingPending(false),
       m_linkStatusPollPending(false),
       m_pendingProductId(0),
@@ -35,32 +51,38 @@ void CommsApp::run_handler(FwIndexType portNum, U32 context) {
     static_cast<void>(portNum);
     static_cast<void>(context);
 
-    this->requestDriverStatus();
-    if (this->isConnected_sohStatusOut_OutputPort(0)) {
-        Components::HealthState health = Components::HealthState::UNKNOWN;
-        if (this->m_linkState == 2U) {
-            health = Components::HealthState::OK;
-        } else if ((this->m_linkState == 1U) || (this->m_linkState == 3U)) {
-            health = Components::HealthState::WARN;
-        } else if (this->m_linkState == 0U) {
-            health = Components::HealthState::FAIL;
-        }
-        this->sohStatusOut_out(0, health, this->m_linkState);
+    this->emitRadioHealth();
+    if (this->m_driverRequestPending) {
+        return;
     }
 
-    this->tlmWrite_LinkState(this->m_linkState);
-    this->tlmWrite_PendingScienceBytes(this->m_pendingScienceBytes);
-    this->tlmWrite_LinkPollCount(this->m_linkPollCount);
-    this->tlmWrite_RssiDbm(this->m_rssiDbm);
-    this->emitDownlinkTelemetry();
-}
+    if (this->m_radioRetryTicks > 0U) {
+        this->m_radioRetryTicks -= 1U;
+        if (this->m_radioRetryTicks == 0U) {
+            this->tlmWrite_RadioRetrySeconds(0U);
+            (void)this->requestDriver(Components::RadioOperation::SET_ENABLED, 1U);
+        } else if ((this->m_radioRetryTicks % RETRY_COUNTDOWN_TLM_TICKS) == 0U) {
+            this->tlmWrite_RadioRetrySeconds(this->m_radioRetryTicks * POLICY_TICK_SECONDS);
+        }
+        return;
+    }
 
-void CommsApp::linkStatusIn_handler(FwIndexType portNum, U32 key) {
-    static_cast<void>(portNum);
-    const U32 previousLinkState = this->m_linkState;
-    this->m_linkState = key;
-    if (this->m_linkState != previousLinkState) {
-        this->log_ACTIVITY_LO_LinkStateUpdated(this->m_linkState, this->m_rssiDbm);
+    if (!this->m_radioStatusKnown) {
+        (void)this->requestDriver(Components::RadioOperation::STATUS, 0U);
+        return;
+    }
+
+    if (this->m_desiredRadioEnabled && this->m_radioState == Components::RadioState::OFF) {
+        (void)this->requestDriver(Components::RadioOperation::SET_ENABLED, 1U);
+        return;
+    }
+
+    if (this->m_radioState == Components::RadioState::READY) {
+        this->m_readyStatusPollTicks += 1U;
+        if (this->m_readyStatusPollTicks >= READY_STATUS_POLL_TICKS) {
+            this->m_readyStatusPollTicks = 0U;
+            (void)this->requestDriver(Components::RadioOperation::STATUS, 0U);
+        }
     }
 }
 
@@ -76,25 +98,92 @@ void CommsApp::scienceReadyIn_handler(FwIndexType portNum,
     this->m_pendingSourceKind = sourceKind;
     this->m_pendingSourcePath = sourcePath;
     this->m_pendingSourceCrc = sourceCrc;
+    this->tlmWrite_PendingScienceBytes(this->m_pendingScienceBytes);
 }
 
-void CommsApp::driverStatusIn_handler(FwIndexType portNum, U32 key) {
+void CommsApp::driverStatusIn_handler(FwIndexType portNum,
+                                      const Components::RadioOperation& operation,
+                                      const Components::RadioRpcResult& result,
+                                      const Components::RadioState& state,
+                                      const Components::RadioFault& fault,
+                                      U8 bootFlags,
+                                      U8 rssiValid,
+                                      I32 rssiDbm,
+                                      U32 rssiAgeMs,
+                                      U32 initAttempts,
+                                      U32 rfRxPackets,
+                                      U32 rfTxPackets,
+                                      U32 rfTxDrops) {
     static_cast<void>(portNum);
-    const U32 previousLinkState = this->m_linkState;
-    this->m_linkState = key;
-    if ((this->m_linkState != previousLinkState) || this->m_linkStatusPollPending || this->m_rssiPingPending) {
-        this->log_ACTIVITY_LO_LinkStateUpdated(this->m_linkState, this->m_rssiDbm);
+    if (!this->m_driverRequestPending || operation != this->m_pendingRadioOperation) {
+        return;
+    }
+    this->m_driverRequestPending = false;
+
+    const bool factualStatus =
+        result == Components::RadioRpcResult::OK || result == Components::RadioRpcResult::TARGET_ERROR;
+    if (factualStatus) {
+        this->m_radioStatusKnown = true;
+        this->m_radioState = state;
+        this->m_radioFault = fault;
+        this->m_radioBootFlags = bootFlags;
+        this->m_rssiValid = rssiValid;
+        this->m_rssiDbm = rssiDbm;
+        this->m_rssiAgeMs = rssiAgeMs;
+        this->m_radioInitAttempts = initAttempts;
+        this->m_rfRxPackets = rfRxPackets;
+        this->m_rfTxPackets = rfTxPackets;
+        this->m_rfTxDrops = rfTxDrops;
+    }
+    this->m_radioRpcResult = result;
+
+    if (factualStatus || this->m_linkStatusPollPending || this->m_rssiPingPending) {
+        this->log_ACTIVITY_LO_RadioStatusUpdated(this->m_radioState, this->m_radioFault, result);
     }
     this->m_linkStatusPollPending = false;
     if (this->m_rssiPingPending) {
-        this->log_ACTIVITY_HI_LinkRssiPing(this->m_linkState, this->m_rssiDbm, this->m_linkPollCount);
+        this->log_ACTIVITY_HI_LinkRssiPing(this->m_radioState,
+                                          this->m_rssiValid,
+                                          this->m_rssiDbm,
+                                          this->m_rssiAgeMs,
+                                          this->m_linkPollCount);
         this->m_rssiPingPending = false;
     }
-}
+    this->emitRadioTelemetry();
+    this->emitRadioHealth();
 
-void CommsApp::rssiStatusIn_handler(FwIndexType portNum, I32 rssiDbm) {
-    static_cast<void>(portNum);
-    this->m_rssiDbm = rssiDbm;
+    if (!this->m_desiredRadioEnabled) {
+        return;
+    }
+    const bool healthyReady = factualStatus && this->m_radioState == Components::RadioState::READY &&
+                              this->m_radioFault == Components::RadioFault::NONE;
+    if (healthyReady) {
+        if (this->m_radioRecoveryFailures > 0U) {
+            this->log_ACTIVITY_HI_RadioRecovered(this->m_radioRecoveryFailures);
+        }
+        this->m_radioRecoveryFailures = 0U;
+        this->m_radioRetryTicks = 0U;
+        this->m_readyStatusPollTicks = 0U;
+        this->emitRadioTelemetry();
+        return;
+    }
+    if (operation == Components::RadioOperation::STATUS) {
+        // A status command issued while a retry is already scheduled is
+        // observational only. It must not advance or restart the backoff.
+        if (factualStatus &&
+            (this->m_radioState == Components::RadioState::OFF ||
+             this->m_radioFault != Components::RadioFault::NONE) &&
+            this->m_radioRecoveryFailures == 0U && this->m_radioRetryTicks == 0U) {
+            (void)this->requestDriver(Components::RadioOperation::SET_ENABLED, 1U);
+        } else if (!factualStatus && this->m_radioRecoveryFailures == 0U &&
+                   this->m_radioRetryTicks == 0U) {
+            this->scheduleRecovery();
+        }
+        return;
+    }
+    // Only a failed/non-ready SET_ENABLED attempt advances the capped retry
+    // schedule. RF silence and informational STATUS responses never do.
+    this->scheduleRecovery();
 }
 
 void CommsApp::payloadDownlinkStatusIn_handler(FwIndexType portNum,
@@ -137,13 +226,10 @@ void CommsApp::payloadDownlinkStatusIn_handler(FwIndexType portNum,
         if (this->isConnected_missionModeOut_OutputPort(0)) {
             this->missionModeOut_out(0, Components::MissionMode::BASE, totalBytes);
         }
-        if (this->pendingRequestMatchesActive()) {
-            this->m_pendingScienceBytes = 0;
-            this->m_pendingProductId = 0;
-            this->m_pendingSourceKind = Components::ScienceProductSource::UNKNOWN;
-            this->m_pendingSourcePath = "";
-            this->m_pendingSourceCrc = 0;
-        }
+        // Keep the latest science descriptor available after a successful
+        // transmission. Ground-only receiver cancellation is intentionally
+        // invisible to flight, so the operator must be able to request the
+        // same product again until a newer capture replaces this descriptor.
         this->clearActiveDownlink();
     } else if ((state == 3U) || (state == 4U)) {
         this->log_WARNING_LO_DownlinkFailed(state, lastError);
@@ -211,25 +297,86 @@ void CommsApp::REQUEST_SCIENCE_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdS
 }
 
 void CommsApp::REQUEST_LINK_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    if (this->m_driverRequestPending) {
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::BUSY);
+        return;
+    }
     this->m_linkPollCount += 1U;
     this->m_linkStatusPollPending = true;
-    this->requestDriverStatus();
-    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+    const bool requested = this->requestDriver(Components::RadioOperation::STATUS, 0U);
+    this->tlmWrite_LinkPollCount(this->m_linkPollCount);
+    this->cmdResponse_out(opCode, cmdSeq, requested ? Fw::CmdResponse::OK : Fw::CmdResponse::EXECUTION_ERROR);
 }
 
 void CommsApp::PING_LINK_RSSI_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    if (this->m_driverRequestPending) {
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::BUSY);
+        return;
+    }
     this->m_linkPollCount += 1U;
     this->m_rssiPingPending = true;
-    this->requestDriverStatus();
-    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+    const bool requested = this->requestDriver(Components::RadioOperation::STATUS, 0U);
+    this->tlmWrite_LinkPollCount(this->m_linkPollCount);
+    this->cmdResponse_out(opCode, cmdSeq, requested ? Fw::CmdResponse::OK : Fw::CmdResponse::EXECUTION_ERROR);
 }
 
-void CommsApp::requestDriverStatus() {
-    if (this->isConnected_driverRequestOut_OutputPort(0)) {
-        const U32 normalizedLink = (this->m_linkState <= 3U) ? this->m_linkState : 0U;
-        // Driver poll key contract: 1=down, 2=acquiring, 3=locked, 4=degraded
-        this->driverRequestOut_out(0, normalizedLink + 1U);
+bool CommsApp::requestDriver(const Components::RadioOperation& operation, U8 enabled) {
+    if (this->m_driverRequestPending || !this->isConnected_driverRequestOut_OutputPort(0)) {
+        return false;
     }
+    this->m_driverRequestPending = true;
+    this->m_pendingRadioOperation = operation;
+    this->driverRequestOut_out(0, operation, enabled);
+    return true;
+}
+
+void CommsApp::scheduleRecovery() {
+    static constexpr U32 RETRY_TICKS[] = {15U, 60U, 450U};
+    this->m_radioRecoveryFailures += 1U;
+    U32 retryIndex = this->m_radioRecoveryFailures - 1U;
+    if (retryIndex >= FW_NUM_ARRAY_ELEMENTS(RETRY_TICKS)) {
+        retryIndex = FW_NUM_ARRAY_ELEMENTS(RETRY_TICKS) - 1U;
+    }
+    this->m_radioRetryTicks = RETRY_TICKS[retryIndex];
+    this->m_readyStatusPollTicks = 0U;
+    const U32 retrySeconds = this->m_radioRetryTicks * POLICY_TICK_SECONDS;
+    this->log_WARNING_LO_RadioRecoveryScheduled(this->m_radioRecoveryFailures,
+                                                retrySeconds,
+                                                this->m_radioFault,
+                                                this->m_radioRpcResult);
+    this->emitRadioTelemetry();
+}
+
+void CommsApp::emitRadioTelemetry() {
+    this->tlmWrite_DesiredRadioEnabled(this->m_desiredRadioEnabled ? 1U : 0U);
+    this->tlmWrite_RadioStatusKnown(this->m_radioStatusKnown ? 1U : 0U);
+    this->tlmWrite_RadioState(this->m_radioState);
+    this->tlmWrite_RadioFault(this->m_radioFault);
+    this->tlmWrite_RadioRpcResult(this->m_radioRpcResult);
+    this->tlmWrite_RadioRecoveryFailures(this->m_radioRecoveryFailures);
+    this->tlmWrite_RadioRetrySeconds(this->m_radioRetryTicks * POLICY_TICK_SECONDS);
+    this->tlmWrite_RadioInitAttempts(this->m_radioInitAttempts);
+    this->tlmWrite_RssiValid(this->m_rssiValid);
+    this->tlmWrite_RssiDbm(this->m_rssiDbm);
+    this->tlmWrite_RssiAgeMs(this->m_rssiAgeMs);
+}
+
+void CommsApp::emitRadioHealth() {
+    if (!this->isConnected_sohStatusOut_OutputPort(0)) {
+        return;
+    }
+    Components::HealthState health = Components::HealthState::UNKNOWN;
+    if (this->m_radioStatusKnown && this->m_radioState == Components::RadioState::READY &&
+        this->m_radioFault == Components::RadioFault::NONE) {
+        health = Components::HealthState::OK;
+    } else if (this->m_radioStatusKnown || this->m_radioRecoveryFailures > 0U) {
+        // A radio-local fault degrades comms but must not imply that the Pi or
+        // the responsive F Prime component should be reset.
+        health = Components::HealthState::WARN;
+    }
+    const U32 detail = (static_cast<U32>(this->m_radioState.e) << 8U) |
+                       static_cast<U32>(this->m_radioFault.e);
+    this->sohStatusOut_out(0, health, detail);
 }
 
 bool CommsApp::pendingRequestMatchesActive() const {

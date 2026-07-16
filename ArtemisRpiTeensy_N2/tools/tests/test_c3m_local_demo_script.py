@@ -49,6 +49,26 @@ class C3mLocalDemoScriptTest(unittest.TestCase):
             result.stderr,
         )
 
+    def test_radio_fault_counts_are_non_negative_and_mutually_exclusive(self) -> None:
+        negative = self.run_script(
+            "--radio-init-failures", "-1", "--exit-after-sequence"
+        )
+        self.assertNotEqual(negative.returncode, 0)
+        self.assertIn(
+            "--radio-init-failures must be a non-negative integer",
+            negative.stderr,
+        )
+
+        simultaneous = self.run_script(
+            "--radio-init-failures",
+            "1",
+            "--radio-watchdog-resets",
+            "1",
+            "--exit-after-sequence",
+        )
+        self.assertNotEqual(simultaneous.returncode, 0)
+        self.assertIn("cannot both be nonzero", simultaneous.stderr)
+
     def test_receiver_restart_cycle_must_be_requested(self) -> None:
         result = self.run_script(
             "--captures", "2", "--restart-receiver-cycle", "3", "--exit-after-sequence"
@@ -81,6 +101,13 @@ class C3mLocalDemoScriptTest(unittest.TestCase):
         self.assertIn('--drop-payload-data-index', source)
         self.assertIn('--checkpoint-dir', source)
         self.assertIn('--blackhole-payload-data-index-first-transfer', source)
+        self.assertIn('--radio-init-failures', source)
+        self.assertIn('--radio-watchdog-resets', source)
+        self.assertIn('wait_for_radio_ready', source)
+        self.assertIn('verify_radio_recovery_evidence', source)
+        self.assertIn('RadioRecoveryScheduled', source)
+        self.assertIn('RadioRecovered', source)
+        self.assertIn('RADIO_ENABLE_ATTEMPT=', source)
         self.assertIn('PARTIAL_EXPECTED', source)
 
 

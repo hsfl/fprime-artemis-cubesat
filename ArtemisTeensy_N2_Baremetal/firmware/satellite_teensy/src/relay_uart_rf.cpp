@@ -18,6 +18,7 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
       m_rf(rfDriver),
       m_counters(counters),
       m_config(config),
+      m_lastRadioReady(rfDriver.isReady()),
       m_state(ParseState::WAIT_MAGIC_0),
       m_frameChannel(link_protocol::CHANNEL_CCSDS),
       m_frameLength(0),
@@ -59,6 +60,7 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
 
 void RelayUartRf::begin() {
   resetFrameParser(false);
+  m_lastRadioReady = m_rf.isReady();
   for (uint8_t channel = 0; channel < link_protocol::CHANNEL_COUNT; channel++) {
     resetReassembly(channel, false, false);
   }
@@ -66,6 +68,7 @@ void RelayUartRf::begin() {
 
 void RelayUartRf::poll() {
   wdt_guard::feed();
+  handleRadioStateTransition();
   if (m_config.enableUartToRf) {
     while (m_linkIo.available() > 0) {
       const uint8_t b = static_cast<uint8_t>(m_linkIo.read());
@@ -93,10 +96,39 @@ void RelayUartRf::poll() {
     flushPayloadUartIfStale();
   }
 
+  // A channel-2 SET_ENABLED request can change readiness while the UART bytes
+  // above are being dispatched. Contain pre-shutdown RF work before any queue
+  // or reassembly service runs later in this same poll.
+  handleRadioStateTransition();
   flushRfToUart();
   flushLocalResponseToUart();
   serviceUplinkQueue();
   serviceDownlinkQueue();
+}
+
+void RelayUartRf::handleRadioStateTransition() {
+  const bool ready = m_rf.isReady();
+  if (m_lastRadioReady && !ready) {
+    discardRadioWorkOnOff();
+  }
+  m_lastRadioReady = ready;
+}
+
+void RelayUartRf::discardRadioWorkOnOff() {
+  m_rawUartLen = 0;
+  m_payloadUartLen = 0;
+
+  m_counters.rfTxDrops += m_uplinkCount;
+  m_uplinkTail = m_uplinkHead;
+  m_uplinkCount = 0;
+
+  for (uint8_t channel = 0; channel < link_protocol::CHANNEL_RF_COUNT; channel++) {
+    ReassemblyState& state = m_reassembly[channel];
+    const bool partialMessage = state.active;
+    resetReassembly(channel, false, partialMessage);
+    state.seenRxMsgId = false;
+    state.lastRxMsgId = 0;
+  }
 }
 
 void RelayUartRf::processUartByte(uint8_t b) {
@@ -473,6 +505,10 @@ bool RelayUartRf::sendRfPacket(const uint8_t* packet, uint8_t packetLen) {
   m_counters.rfRecoveries += outcome.recoveries;
   if (outcome.terminalFailure) {
     m_counters.rfTxTerminalFailures += 1;
+    // A factual local transmit-completion failure after the one bounded FIFO
+    // recovery is evidence of a wedged local radio, not merely a missing peer.
+    // Force datasheet shutdown and let Pi/F Prime own the slow re-enable policy.
+    m_rf.failSafeOffLocalTx();
   }
   return outcome.sent;
 }
@@ -765,6 +801,10 @@ bool RelayUartRf::enqueueUplinkMessage(uint8_t channel, const uint8_t* payload, 
     m_counters.framingDrops += 1;
     return false;
   }
+  if (!m_rf.isReady()) {
+    m_counters.rfTxDrops += 1;
+    return false;
+  }
 
   if (m_uplinkCount >= m_config.uplinkQueueDepth) {
     m_counters.uplinkQueueDrops += 1;
@@ -806,6 +846,12 @@ bool RelayUartRf::enqueueDownlinkMessage(uint8_t channel, const uint8_t* payload
 
 void RelayUartRf::serviceUplinkQueue() {
   if (m_uplinkCount == 0) {
+    return;
+  }
+  if (!m_rf.isReady()) {
+    m_counters.rfTxDrops += m_uplinkCount;
+    m_uplinkTail = m_uplinkHead;
+    m_uplinkCount = 0;
     return;
   }
 

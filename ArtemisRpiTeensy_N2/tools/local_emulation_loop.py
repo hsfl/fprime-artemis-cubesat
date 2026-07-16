@@ -44,6 +44,24 @@ CHANNEL_COUNT = 3
 FRAME_MAX_PAYLOAD = 220
 FRAME_TIMEOUT_S = 0.250
 
+TEENSY_TARGET_RF_STATUS = 2
+TEENSY_STATUS_OK = 0
+TEENSY_STATUS_BAD_REQUEST = 1
+TEENSY_STATUS_TARGET_ERROR = 4
+TEENSY_RF_OP_STATUS = 1
+TEENSY_RF_OP_SET_ENABLED = 2
+
+RADIO_STATE_OFF = 0
+RADIO_STATE_READY = 1
+RADIO_FAULT_NONE = 0
+RADIO_FAULT_INIT_FAILED = 1
+RADIO_FAULT_WATCHDOG_RESET = 2
+RADIO_BOOT_FLAG_WATCHDOG = 0x01
+RADIO_STATUS_PAYLOAD_LEN = 33
+RADIO_SET_ENABLED_PAYLOAD_LEN = 4
+RSSI_INVALID_DBM = 0
+RSSI_INVALID_AGE_MS = 0xFFFFFFFF
+
 RF_SEGMENT_MAGIC_CCSDS = 0xA5
 RF_SEGMENT_MAGIC_PAYLOAD = 0xA6
 RF_PACKET_MAX_LEN = 49
@@ -404,6 +422,8 @@ class LoopStats:
     payload_bytes_observed: int = 0
     payload_data_packets_dropped: int = 0
     local_frames_observed: int = 0
+    local_responses_sent: int = 0
+    radio_frames_dropped_off: int = 0
 
 
 def build_uart_frame(channel: int, payload: bytes) -> bytes:
@@ -424,6 +444,191 @@ def build_uart_frame(channel: int, payload: bytes) -> bytes:
     ) + payload + bytes([crc & 0xFF, (crc >> 8) & 0xFF])
 
 
+class RadioRpcEmulator:
+    """Deterministic satellite-local model for RF target-2 RPCs.
+
+    This models the software-visible Teensy contract only. A simulated watchdog
+    reset drops the current response and returns the radio model to OFF; it does
+    not emulate USB device re-enumeration or electrical reset timing.
+    """
+
+    LOCAL_HEADER_LEN = 4
+
+    def __init__(self, init_failures: int = 0, watchdog_resets: int = 0) -> None:
+        if init_failures < 0 or watchdog_resets < 0:
+            raise ValueError("radio fault counts must be non-negative")
+        if init_failures > 0 and watchdog_resets > 0:
+            raise ValueError("radio init failures and watchdog resets are mutually exclusive")
+
+        self.remaining_init_failures = init_failures
+        self.remaining_watchdog_resets = watchdog_resets
+        self.state = RADIO_STATE_OFF
+        self.fault = RADIO_FAULT_NONE
+        self.boot_flags = 0
+        self.init_attempts = 0
+        self.total_enable_attempts = 0
+        self.enable_attempt_times: list[float] = []
+
+        self.last_rssi_dbm = RSSI_INVALID_DBM
+        self.last_rssi_ts: Optional[float] = None
+        self.rx_good = 0
+        self.rx_bad = 0
+        self.tx_good = 0
+        self.rf_rx_packets = 0
+        self.rf_tx_packets = 0
+        self.rf_tx_drops = 0
+
+    @property
+    def ready(self) -> bool:
+        return self.state == RADIO_STATE_READY
+
+    @staticmethod
+    def _response(request_id: int, status: int, payload: bytes = b"") -> bytes:
+        return bytes(
+            [
+                TEENSY_TARGET_RF_STATUS,
+                request_id & 0xFF,
+                status & 0xFF,
+                len(payload) & 0xFF,
+            ]
+        ) + payload
+
+    def _status_payload(self, now: float) -> bytes:
+        if self.last_rssi_ts is None:
+            rssi_valid = 0
+            rssi_age_ms = RSSI_INVALID_AGE_MS
+        else:
+            rssi_valid = 1
+            elapsed_ms = max(0, int((now - self.last_rssi_ts) * 1000.0))
+            rssi_age_ms = min(elapsed_ms, RSSI_INVALID_AGE_MS)
+
+        payload = bytearray(RADIO_STATUS_PAYLOAD_LEN)
+        payload[0] = TEENSY_RF_OP_STATUS
+        payload[1:3] = int(self.last_rssi_dbm).to_bytes(2, "little", signed=True)
+        payload[3:5] = int(self.rx_good & 0xFFFF).to_bytes(2, "little")
+        payload[5:7] = int(self.rx_bad & 0xFFFF).to_bytes(2, "little")
+        payload[7:9] = int(self.tx_good & 0xFFFF).to_bytes(2, "little")
+        payload[9:13] = int(self.rf_rx_packets & 0xFFFFFFFF).to_bytes(4, "little")
+        payload[13:17] = int(self.rf_tx_packets & 0xFFFFFFFF).to_bytes(4, "little")
+        payload[17:21] = int(self.rf_tx_drops & 0xFFFFFFFF).to_bytes(4, "little")
+        payload[21] = self.state
+        payload[22] = self.fault
+        payload[23] = self.boot_flags
+        payload[24] = rssi_valid
+        payload[25:29] = rssi_age_ms.to_bytes(4, "little")
+        payload[29:33] = int(self.init_attempts & 0xFFFFFFFF).to_bytes(4, "little")
+        return bytes(payload)
+
+    def _set_enabled(self, enabled: bool, now: float) -> Optional[tuple[bytes, int]]:
+        requested = 1 if enabled else 0
+        if not enabled:
+            self.state = RADIO_STATE_OFF
+            self.fault = RADIO_FAULT_NONE
+            print("RADIO_STATE=OFF reason=commanded", flush=True)
+            return (
+                bytes([TEENSY_RF_OP_SET_ENABLED, requested, self.state, self.fault]),
+                TEENSY_STATUS_OK,
+            )
+
+        if self.ready:
+            return (
+                bytes([TEENSY_RF_OP_SET_ENABLED, requested, self.state, self.fault]),
+                TEENSY_STATUS_OK,
+            )
+
+        self.total_enable_attempts += 1
+        self.enable_attempt_times.append(now)
+        print(
+            f"RADIO_ENABLE_ATTEMPT={self.total_enable_attempts} T_MONOTONIC={now:.3f}",
+            flush=True,
+        )
+        self.init_attempts += 1
+        if self.remaining_watchdog_resets > 0:
+            self.remaining_watchdog_resets -= 1
+            self.state = RADIO_STATE_OFF
+            self.fault = RADIO_FAULT_WATCHDOG_RESET
+            self.boot_flags = RADIO_BOOT_FLAG_WATCHDOG
+            # A real Teensy watchdog reboot loses volatile driver counters.
+            # Keep only the reset cause and the external fault-injection budget.
+            self.init_attempts = 0
+            self.last_rssi_dbm = RSSI_INVALID_DBM
+            self.last_rssi_ts = None
+            self.rx_good = 0
+            self.rx_bad = 0
+            self.tx_good = 0
+            self.rf_rx_packets = 0
+            self.rf_tx_packets = 0
+            self.rf_tx_drops = 0
+            print(
+                "RADIO_STATE=OFF fault=WATCHDOG_RESET simulated_reboot=1",
+                flush=True,
+            )
+            return None
+
+        if self.remaining_init_failures > 0:
+            self.remaining_init_failures -= 1
+            self.state = RADIO_STATE_OFF
+            self.fault = RADIO_FAULT_INIT_FAILED
+            print(
+                f"RADIO_STATE=OFF fault=INIT_FAILED attempt={self.init_attempts}",
+                flush=True,
+            )
+            return (
+                bytes([TEENSY_RF_OP_SET_ENABLED, requested, self.state, self.fault]),
+                TEENSY_STATUS_TARGET_ERROR,
+            )
+
+        self.state = RADIO_STATE_READY
+        self.fault = RADIO_FAULT_NONE
+        print(f"RADIO_STATE=READY attempt={self.init_attempts}", flush=True)
+        return (
+            bytes([TEENSY_RF_OP_SET_ENABLED, requested, self.state, self.fault]),
+            TEENSY_STATUS_OK,
+        )
+
+    def handle(self, request: bytes, now: float) -> Optional[bytes]:
+        if not request or request[0] != TEENSY_TARGET_RF_STATUS:
+            return None
+
+        request_id = request[1] if len(request) > 1 else 0
+        if len(request) < self.LOCAL_HEADER_LEN:
+            return self._response(request_id, TEENSY_STATUS_BAD_REQUEST)
+
+        payload_len = request[2]
+        if request[3] != 0 or len(request) != self.LOCAL_HEADER_LEN + payload_len:
+            return self._response(request_id, TEENSY_STATUS_BAD_REQUEST)
+        payload = request[self.LOCAL_HEADER_LEN :]
+
+        if payload_len == 1 and payload[0] == TEENSY_RF_OP_STATUS:
+            return self._response(request_id, TEENSY_STATUS_OK, self._status_payload(now))
+
+        if (
+            payload_len == 2
+            and payload[0] == TEENSY_RF_OP_SET_ENABLED
+            and payload[1] in (0, 1)
+        ):
+            set_result = self._set_enabled(payload[1] == 1, now)
+            if set_result is None:
+                return None
+            response_payload, response_status = set_result
+            return self._response(request_id, response_status, response_payload)
+
+        return self._response(request_id, TEENSY_STATUS_BAD_REQUEST)
+
+    def note_rf_tx_packet(self) -> None:
+        self.tx_good += 1
+        self.rf_tx_packets += 1
+
+    def note_rf_rx_packet(self, now: float) -> None:
+        self.rx_good += 1
+        self.rf_rx_packets += 1
+        self.last_rssi_dbm = -75
+        self.last_rssi_ts = now
+
+    def note_rf_tx_drop(self) -> None:
+        self.rf_tx_drops += 1
+
+
 class EmulationLoop:
     def __init__(
         self,
@@ -433,6 +638,8 @@ class EmulationLoop:
         link_mode: str,
         drop_payload_data_index: Optional[int] = None,
         blackhole_payload_data_index_first_transfer: Optional[int] = None,
+        radio_init_failures: int = 0,
+        radio_watchdog_resets: int = 0,
     ) -> None:
         self.app_cmd = app_cmd
         self.gds_cmd = gds_cmd
@@ -454,6 +661,10 @@ class EmulationLoop:
         self._blackhole_payload_transfer_id: Optional[int] = None
         self._blackhole_payload_finished = False
         self._payload_drop_mode = ""
+        self.radio = RadioRpcEmulator(
+            init_failures=radio_init_failures,
+            watchdog_resets=radio_watchdog_resets,
+        )
 
         self.stop_requested = False
         self.exit_code = 0
@@ -599,10 +810,21 @@ class EmulationLoop:
             self.stats.app_frames_in += 1
             if channel == CHANNEL_TEENSY_LOCAL:
                 self.stats.local_frames_observed += 1
+                response = self.radio.handle(frame, now)
+                if response is not None:
+                    framed = build_uart_frame(CHANNEL_TEENSY_LOCAL, response)
+                    self.stats.local_responses_sent += 1
+                    self.stats.app_bytes_out += len(framed)
+                    self._queue_write(self.app_master_fd, framed)  # type: ignore[arg-type]
+                continue
+            if not self.radio.ready:
+                self.stats.radio_frames_dropped_off += 1
+                self.radio.note_rf_tx_drop()
                 continue
             rf_packets = self.sat_to_ground_segmenter.segment(channel, frame)
             self.stats.rf_packets_app_to_gds += len(rf_packets)
             for packet in rf_packets:
+                self.radio.note_rf_tx_packet()
                 reassembled = self.ground_reassembler.feed(packet, now)
                 if reassembled is None:
                     continue
@@ -672,12 +894,16 @@ class EmulationLoop:
             self.stats.gds_messages_in += 1
         elif channel == CHANNEL_PAYLOAD:
             self.stats.payload_messages_in += 1
+        if not self.radio.ready:
+            self.stats.radio_frames_dropped_off += 1
+            return
         rf_packets = self.ground_to_sat_segmenter.segment(channel, message)
         if channel == CHANNEL_CCSDS:
             self.stats.rf_packets_gds_to_app += len(rf_packets)
         elif channel == CHANNEL_PAYLOAD:
             self.stats.rf_packets_payload_to_app += len(rf_packets)
         for packet in rf_packets:
+            self.radio.note_rf_rx_packet(now)
             reassembled = self.sat_reassembler.feed(packet, now)
             if reassembled is not None:
                 channel, payload = reassembled
@@ -826,6 +1052,9 @@ class EmulationLoop:
         print(f"  payload_bytes_out={self.stats.payload_bytes_out}")
         print(f"  payload_data_packets_dropped={self.stats.payload_data_packets_dropped}")
         print(f"  local_frames_observed={self.stats.local_frames_observed}")
+        print(f"  local_responses_sent={self.stats.local_responses_sent}")
+        print(f"  radio_frames_dropped_off={self.stats.radio_frames_dropped_off}")
+        print(f"  radio_init_attempts={self.radio.init_attempts}")
         print(
             "  uart_parser: "
             f"crc_drops={self.app_uart_parser.crc_drops} "
@@ -912,6 +1141,13 @@ def _resolve_default_dictionary(project_root: Path) -> Optional[Path]:
     )
 
 
+def _non_negative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be a non-negative integer")
+    return parsed
+
+
 def parse_args() -> argparse.Namespace:
     script_path = Path(__file__).resolve()
     default_project_root = script_path.parent.parent
@@ -994,6 +1230,26 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--radio-init-failures",
+        type=_non_negative_int,
+        default=0,
+        metavar="COUNT",
+        help=(
+            "Return OFF/INIT_FAILED for the next COUNT radio enable attempts, "
+            "then allow recovery (default: 0)"
+        ),
+    )
+    parser.add_argument(
+        "--radio-watchdog-resets",
+        type=_non_negative_int,
+        default=0,
+        metavar="COUNT",
+        help=(
+            "Drop the next COUNT enable responses and reset the radio model to "
+            "OFF/WATCHDOG_RESET, then allow recovery (default: 0)"
+        ),
+    )
+    parser.add_argument(
         "--no-app",
         action="store_true",
         help="Do not launch the flight app (emulator still creates app UART PTY)",
@@ -1017,7 +1273,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Disable automatic pruning of old timestamped log directories",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.radio_init_failures > 0 and args.radio_watchdog_resets > 0:
+        parser.error(
+            "--radio-init-failures and --radio-watchdog-resets cannot both be nonzero"
+        )
+    return args
 
 
 def main() -> int:
@@ -1090,6 +1351,8 @@ def main() -> int:
         link_mode=args.link_mode,
         drop_payload_data_index=args.drop_payload_data_index,
         blackhole_payload_data_index_first_transfer=args.blackhole_payload_data_index_first_transfer,
+        radio_init_failures=args.radio_init_failures,
+        radio_watchdog_resets=args.radio_watchdog_resets,
     )
 
     print("[emulation] topology:")
@@ -1098,7 +1361,8 @@ def main() -> int:
     else:
         print("  app channel 0 wrapper -> RF segment/reassemble -> gds raw bytes")
         print("  app channel 1 wrapper -> RF segment/reassemble -> payload receiver raw bytes")
-        print("  app channel 2 wrapper -> satellite-local RPC observed locally, not forwarded")
+        print("  app channel 2 wrapper -> deterministic satellite-local RF target-2 responder")
+        print("  RF channels 0/1 remain gated until target-2 SET_ENABLED reaches READY")
         print("  gds raw bytes -> burst packetization -> RF channel 0 -> channel wrapper -> app")
         print("  payload receiver raw bytes -> burst packetization -> RF channel 1 -> channel wrapper -> app")
     if not args.no_gds:

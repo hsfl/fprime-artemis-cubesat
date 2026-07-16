@@ -33,6 +33,7 @@ struct RadioPins {
   uint8_t irq_pin = 40;
   uint8_t rx_on_pin = 30;
   uint8_t tx_on_pin = 31;
+  uint8_t sdn_pin = 37;
   Spi1Pins spi1 = {};
 };
 
@@ -111,6 +112,19 @@ inline void setupChipSelect(const RadioPins& pins) {
   digitalWrite(pins.cs_pin, HIGH);
 }
 
+// Put the module into the RFM23BP datasheet shutdown state. This leaves VCC
+// present but removes register state and makes SPI unavailable until SDN falls.
+inline void shutdownRadio(const RadioPins& pins) {
+  detachInterrupt(digitalPinToInterrupt(pins.irq_pin));
+  setupChipSelect(pins);
+  pinMode(pins.rx_on_pin, OUTPUT);
+  pinMode(pins.tx_on_pin, OUTPUT);
+  digitalWrite(pins.rx_on_pin, LOW);
+  digitalWrite(pins.tx_on_pin, LOW);
+  pinMode(pins.sdn_pin, OUTPUT);
+  digitalWrite(pins.sdn_pin, HIGH);
+}
+
 // Put RF front-end control lines into low-power idle.
 inline void setAmpIdle(const RadioPins& pins) {
   digitalWrite(pins.rx_on_pin, LOW);
@@ -142,50 +156,42 @@ inline void setupAmpPins(const RadioPins& pins, const RadioProfile& profile) {
   }
 }
 
-// Probe the radio with a bounded ready wait so boot can degrade cleanly when
-// the RFM23BP is absent or never reaches chip-ready.
-inline bool probeChipReady(RH_RF22& radio, const RadioPins& pins, Print* log = nullptr,
-                           unsigned long timeout_ms = 100) {
+// Verify stable device identity without changing a radio register. RadioHead
+// owns the one software-reset/init sequence that follows this check.
+inline bool probeDeviceIdentity(RH_RF22& radio, const RadioPins& pins, Print* log = nullptr) {
   setupChipSelect(pins);
 
-  const uint8_t deviceType = radio.spiRead(RH_RF22_REG_00_DEVICE_TYPE);
-  if (deviceType != RH_RF22_DEVICE_TYPE_RX_TRX && deviceType != RH_RF22_DEVICE_TYPE_TX) {
+  const uint8_t first = radio.spiRead(RH_RF22_REG_00_DEVICE_TYPE);
+  delay(1);
+  const uint8_t second = radio.spiRead(RH_RF22_REG_00_DEVICE_TYPE);
+  const bool knownType =
+      first == RH_RF22_DEVICE_TYPE_RX_TRX || first == RH_RF22_DEVICE_TYPE_TX;
+  if (!knownType || first != second) {
     if (log != nullptr) {
       log->println(F("RF23BP device probe failed"));
     }
     return false;
   }
-
-  radio.spiWrite(RH_RF22_REG_07_OPERATING_MODE1, RH_RF22_SWRES);
-
-  const unsigned long deadline = millis() + timeout_ms;
-  while (static_cast<int32_t>(millis() - deadline) < 0) {
-    if ((radio.spiRead(RH_RF22_REG_04_INTERRUPT_STATUS2) & RH_RF22_ICHIPRDY) != 0) {
-      return true;
-    }
-    delay(1);
-  }
-
-  if (log != nullptr) {
-    log->println(F("RF23BP chip-ready timeout"));
-  }
-  return false;
+  return true;
 }
 
 // One-call radio init:
-// 1) amp pin setup
-// 2) SPI1 setup
-// 3) bounded radio probe
-// 4) RH_RF22 init + frequency/modem/tx power
+// 1) force safe datasheet shutdown
+// 2) release SDN and wait through the worst-case POR interval
+// 3) perform stable, non-mutating identity reads
+// 4) call RH_RF22 init exactly once + apply the proven RF profile
 // 5) enter RX or IDLE based on profile
 inline bool initRadio(RH_RF22& radio, const RadioPins& pins = RadioPins(),
                       const RadioProfile& profile = RadioProfile(),
                       Print* log = nullptr) {
-  setupAmpPins(pins, profile);
+  shutdownRadio(pins);
+  delay(50);
   setupSpi1(pins.spi1);
-  delay(10);
+  digitalWrite(pins.sdn_pin, LOW);
+  delay(50);
 
-  if (!probeChipReady(radio, pins, log)) {
+  if (!probeDeviceIdentity(radio, pins, log)) {
+    shutdownRadio(pins);
     return false;
   }
 
@@ -193,6 +199,7 @@ inline bool initRadio(RH_RF22& radio, const RadioPins& pins = RadioPins(),
     if (log != nullptr) {
       log->println(F("RF23BP init failed"));
     }
+    shutdownRadio(pins);
     return false;
   }
 
@@ -200,6 +207,7 @@ inline bool initRadio(RH_RF22& radio, const RadioPins& pins = RadioPins(),
     if (log != nullptr) {
       log->println(F("RF23BP setFrequency failed"));
     }
+    shutdownRadio(pins);
     return false;
   }
 
@@ -212,6 +220,7 @@ inline bool initRadio(RH_RF22& radio, const RadioPins& pins = RadioPins(),
   }
   radio.setTxPower(profile.tx_power);
 
+  setupAmpPins(pins, profile);
   if (profile.start_in_receive) {
     setAmpReceive(pins, profile);
     radio.setModeRx();

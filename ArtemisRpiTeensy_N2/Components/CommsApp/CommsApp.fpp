@@ -11,17 +11,11 @@ module Components {
         @ Rate group scheduling input
         async input port run: Svc.Sched
 
-        @ Link status input from transport
-        async input port linkStatusIn: Svc.Ping
-
         @ Science ready input from storage
         async input port scienceReadyIn: Components.ScienceDownlinkReady
 
-        @ Driver status input
-        async input port driverStatusIn: Svc.Ping
-
-        @ Driver RSSI input
-        async input port rssiStatusIn: Components.RssiStatus
+        @ Correlated radio RPC result and factual radio status
+        async input port driverStatusIn: Components.RadioStatus
 
         @ Payload downlink transfer status input
         async input port payloadDownlinkStatusIn: Components.PayloadDownlinkStatus
@@ -32,8 +26,8 @@ module Components {
         @ Generic payload downlink request output
         output port payloadDownlinkRequestOut: Components.ScienceDownlinkRequest
 
-        @ Driver request output
-        output port driverRequestOut: Svc.Ping
+        @ Typed radio request output
+        output port driverRequestOut: Components.RadioControlRequest
 
         @ Status output to SoH manager
         output port sohStatusOut: Components.HealthStatus
@@ -50,8 +44,29 @@ module Components {
         @ Poll the radio driver and log current RSSI in dBm
         async command PING_LINK_RSSI
 
-        @ Current link state
-        telemetry LinkState: U32 update on change
+        @ Desired radio enable policy; one means F Prime will recover it autonomously
+        telemetry DesiredRadioEnabled: U32 update on change
+
+        @ Whether at least one factual radio response has been received
+        telemetry RadioStatusKnown: U32 update on change
+
+        @ Factual RFM23BP hardware state
+        telemetry RadioState: Components.RadioState update on change
+
+        @ Last factual local RFM23BP fault
+        telemetry RadioFault: Components.RadioFault update on change
+
+        @ Most recent channel-2 RPC result
+        telemetry RadioRpcResult: Components.RadioRpcResult update on change
+
+        @ Consecutive failed automatic recovery attempts
+        telemetry RadioRecoveryFailures: U32 update on change
+
+        @ Approximate seconds remaining until the next recovery attempt
+        telemetry RadioRetrySeconds: U32 update on change
+
+        @ Radio initialization attempts reported by the Teensy
+        telemetry RadioInitAttempts: U32 update on change
 
         @ Pending science bytes
         telemetry PendingScienceBytes: U32 update on change
@@ -74,6 +89,12 @@ module Components {
         @ Latest RF link RSSI in dBm
         telemetry RssiDbm: I32 update on change \
             low { yellow -100, orange -110, red -120 }
+
+        @ Whether RSSI is backed by an accepted addressed packet
+        telemetry RssiValid: U32 update on change
+
+        @ Age in milliseconds of the last accepted RSSI sample
+        telemetry RssiAgeMs: U32 update on change
 
         @ Downlink request event
         event DownlinkRequested(bytes: U32) severity activity high format "Downlink requested for {} bytes"
@@ -99,11 +120,20 @@ module Components {
         @ Downlink failure from payload transfer/status paths; keep throttled because RF/status paths can storm.
         event DownlinkFailed(stateValue: U32, lastError: U32) severity warning low format "Downlink failed state={} error={}" throttle 5
 
-        @ Link state event from polling/status paths; keep throttled because RF/status paths can storm.
-        event LinkStateUpdated(linkState: U32, rssiDbm: I32) severity activity low format "Comms link state updated {} rssi={}dBm" throttle 10
+        @ Factual radio status changed or an explicit operator status poll completed.
+        event RadioStatusUpdated(radioState: Components.RadioState, radioFault: Components.RadioFault, result: Components.RadioRpcResult) \
+            severity activity low format "Comms radio state={} fault={} result={}" throttle 10
+
+        @ A bounded autonomous recovery retry was scheduled.
+        event RadioRecoveryScheduled(failures: U32, retrySeconds: U32, fault: Components.RadioFault, result: Components.RadioRpcResult) \
+            severity warning low format "Comms radio recovery failures={} retry={}s fault={} result={}" throttle 5
+
+        @ Radio service returned to READY after one or more failed attempts.
+        event RadioRecovered(recoveryFailures: U32) severity activity high format "Comms radio recovered after {} failed attempts"
 
         @ RSSI ping event
-        event LinkRssiPing(linkState: U32, rssiDbm: I32, pollCount: U32) severity activity high format "Comms link RSSI ping state={} rssi={}dBm polls={}"
+        event LinkRssiPing(radioState: Components.RadioState, rssiValid: U32, rssiDbm: I32, rssiAgeMs: U32, pollCount: U32) \
+            severity activity high format "Comms radio RSSI state={} valid={} rssi={}dBm age={}ms polls={}"
 
         @ Port for requesting the current time
         time get port timeCaller

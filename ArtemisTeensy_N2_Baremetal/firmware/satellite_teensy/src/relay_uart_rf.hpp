@@ -57,6 +57,8 @@ class RelayUartRf {
   void processCommandByte(uint8_t b);
   void processFrameByte(uint8_t b);
   void flushRfToUart();
+  void handleRadioStateTransition();
+  void discardRadioWorkOnOff();
 
   void resetFrameParser(bool timeoutReset);
   void handleCompletedFrame();
@@ -106,6 +108,7 @@ class RelayUartRf {
   Rf23Driver& m_rf;
   LinkCounters& m_counters;
   RelayConfig m_config;
+  bool m_lastRadioReady;
 
   ParseState m_state;
   uint8_t m_frameChannel;
