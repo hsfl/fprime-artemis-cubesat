@@ -124,12 +124,44 @@ If GDS accepts the command but no `Pong` appears:
 - confirm stale `fprime-gds` processes are not holding the port
 - in HIL, check Pi service logs before reflashing Teensy
 
+If the GDS page still loads but ground debug `uart_rx` and `rf_tx_pkt` stay
+flat after a command, the web UI is alive but the command/UART backend is not.
+This can happen when a local-emulation GDS reused the global
+`/tmp/fprime-server-in` and `-out` IPC endpoints while the hardware GDS was
+already running. `Cmd-Shift-R` refreshes only the browser. Restart the complete
+hardware GDS process tree and retry one PING; do not reflash either Teensy for
+this symptom.
+
 Pi service check:
 
 ```bash
 ssh artemis-pi 'systemctl is-active artemis-fprime.service; pgrep -af ArtemisRpiTeensyDeployment || true'
 ssh artemis-pi 'journalctl -u artemis-fprime.service --since "2 minutes ago" --no-pager | tail -100'
 ```
+
+### Radio Is OFF Or Keeps Recovering
+
+Use GDS `commsApp.REQUEST_LINK_STATUS` or `commsApp.PING_LINK_RSSI` before
+restarting processes or reflashing firmware. Inspect the `RadioStatusUpdated`,
+`RadioRecoveryScheduled`, and `RadioRecovered` events plus these fields:
+
+- `RadioState`: `OFF` or `READY`
+- `RadioFault`: `NONE`, `INIT_FAILED`, `WATCHDOG_RESET`, or `LOCAL_TX_FAULT`
+- `RadioRpcResult`: `OK`, target/protocol error, timeout, or bad response
+- `RadioRetrySeconds`: time until the next bounded F Prime attempt
+
+`OFF + NONE` is a safe boot/not-yet-enabled condition. `OFF + INIT_FAILED`,
+`WATCHDOG_RESET`, or `LOCAL_TX_FAULT` is a factual local failure. An RPC
+`TIMEOUT` or `BAD_RESPONSE` is also local recovery evidence. F Prime retries
+after `30 s`, then `120 s`, then every `900 s`; do not restart GDS/Pi or spam
+enable/status commands during that planned backoff.
+
+The relay performs one bounded low-level recovery retry before a terminal local
+TX failure forces SDN shutdown. Peer silence, an absent ground station, RSSI
+changes, and ordinary ACK timeouts are not proof of a local chip wedge and do
+not trigger this power-cycle path. If channel 2 remains responsive, let F Prime
+restore the radio. Escalate only if the retry deadline passes without a new
+attempt/event, the Pi service is down, or channel 2 itself is unavailable.
 
 ### Local Demo Fails
 
@@ -312,6 +344,8 @@ Important counters:
 - `crc_drops`, `framing_drops`: bad local frames
 - `rf_reasm_timeouts`, `rf_reasm_drops`: incomplete RF messages
 - `rf_tx_drops`, `rf_retries`, `rf_ack_timeouts`: RF send or ACK trouble
+- `rf_tx_terminal_failures`: bounded local TX recovery was exhausted and the satellite radio was forced safely `OFF`
+- `state`, `fault`, `init_attempts`: local `OFF`/`READY` truth, last factual fault, and SDN/POR enable attempts
 - `up_q_drops`, `down_q_drops`: firmware queue pressure
 
 Common interpretations:

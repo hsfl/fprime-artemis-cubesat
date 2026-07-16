@@ -1107,7 +1107,8 @@ Driver tier, formerly repo "Adapter":
 ## C3M Best-Effort Thermal Reception (2026-07-10)
 
 - The channel-1 web receiver preserves the complete CRC-verified happy path
-  and finalizes incomplete transfers after a 90-second total window.
+  and finalizes incomplete transfers at the 120-second demo cutoff. The UI
+  shows `75 s` as nominal and approximately `90 s` as longer than target.
 - Partial products are position-preserving `.fdp.partial` files. Missing
   channel-1 packets are never collapsed out of the byte stream.
 - The Lepton partial decoder treats pixels intersecting missing packet bytes as
@@ -1182,11 +1183,12 @@ Driver tier, formerly repo "Adapter":
   or off-axis antenna geometry.
 - The clean post-reset cycle passed 1,100/1,100 with exact source/ground SHA,
   zero repairs, zero satellite TX timeouts, and no stale partial contamination.
-- Planned only, not implemented: after Pi/F Prime boot, add bounded
-  satellite-local channel-2 radio health/reinitialization RPC so local health
-  logic can recover a wedged radio without depending on the dead RF link or
-  toggling `RPI_ENABLE_PIN`. Preserve this as a separate follow-up after the
-  existing HIL matrix.
+- Implemented on 2026-07-16: Pi/F Prime owns bounded satellite-local channel-2
+  radio status and re-enable policy. The Teensy boots the RFM23BP safely `OFF`,
+  asserts `RPI_ENABLE` independently, exposes factual `OFF`/`READY` status, and
+  performs one SDN/POR initialization attempt per request. F Prime retries at
+  `30 s`, `120 s`, then capped `900 s` intervals without depending on RF or
+  toggling Pi power.
 - HIL-MVP-7 ground USB reconnect passed. Removing the ground Teensy during
   product/transfer 2 made all three ports disappear at 423/1,100 and put the
   receiver into explicit recovery. Replug auto-restored the ports, payload
@@ -1220,3 +1222,73 @@ Driver tier, formerly repo "Adapter":
   `receiving` despite 1,100/1,100 and `crc_ok=true`; product 6 replaced the
   stale presentation cleanly. Treat that label reconciliation as a ground-UI
   follow-up, not evidence of RF corruption.
+
+## C3M RFM23BP Pi-Owned Recovery Finalization (2026-07-16)
+
+- The authoritative plan/evidence is
+  `docs/C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md`.
+- Teensy steady states remain only `OFF` and `READY`; factual fault metadata is
+  separate. F Prime owns desired-enabled policy and retries after `30 s`,
+  `120 s`, then at a capped `900 s` cadence. Channel 2 remains responsive and
+  radio recovery never toggles `RPI_ENABLE`.
+- The final local-TX refinement forces `OFF + LOCAL_TX_FAULT` through real SDN
+  shutdown only after the relay's one bounded FIFO recovery retry also fails.
+  RSSI is invalidated on shutdown. Peer silence and ordinary ACK loss do not
+  trigger the local hardware reset path.
+- Full validation passed 81 Python tests, 7/7 F Prime CTest executables
+  (`CommsApp` 12 cases and `CommsDriver_TeensyRfm23` 3 cases), both Teensy
+  builds, native F Prime build, and 3/3 exact local C3M demo cycles.
+- Satellite firmware was flashed to physical upload ID `usb:2100000`. The
+  final ARMv6KZ/VFPv2 release is
+  `/home/pi/artemis/releases/c3m-rf-recovery-20260716T213916Z-9e392fb3`, SHA-256
+  `9e392fb31ea7e4751a5e18898bf83f55b46f2ae0519de05b9b3b7db3b13dee84`.
+  Dictionary SHA-256 is
+  `5a961fb5d301097cb0ad0dcd01d6ef2a27709f3156c5f7ed96084b0c4b54716d`.
+- Final controlled HIL probe acknowledged `OFF + NONE`; fresh F Prime startup
+  then observed `OFF`, issued one `SET_ENABLED`, and reached `READY + NONE` in
+  the same second. Post-recovery PING `47164` and `PING_LINK_RSSI` passed.
+  Satellite status showed two init attempts and zero terminal TX failures;
+  Pi service `NRestarts` remained zero.
+- A stale-GDS case was reproduced and explained: local emulation reused the
+  global `/tmp/fprime-server-in` and `-out` IPC endpoints while the hardware
+  GDS remained open. The web UI stayed HTTP 200 but command UART writes stopped.
+  Browser refresh cannot repair that backend; restart the complete GDS process
+  tree after local emulation. The final GDS and payload receiver remain in
+  detached screens `c3m-gds` and `c3m-payload-hil`.
+- Physical-only gates remain: meter/scope proof of SDN, pin 37,
+  `RPI_ENABLE`, VCC/current/backfeed/brownout behavior; five true cold cycles
+  per node; a safely induced physical init stall/watchdog case; and a physical
+  mid-transfer Teensy reset.
+
+## Payload Ground Cancel, Retained Retry, and UVC Guard (2026-07-16)
+
+- `CommsApp` retains the latest successfully captured science descriptor after
+  a completed downlink. A later `REQUEST_SCIENCE_DOWNLINK` therefore sends the
+  same product with a new transfer ID; a new capture replaces it. Retention is
+  intentionally volatile across an F Prime process restart.
+- The payload receiver's **Stop & save partial** remains ground-only. Operators
+  must wait for `commsApp.DownlinkFinished` / `DownlinkActive = 0` before
+  requesting the retained product again because the spacecraft cannot see the
+  ground cancel and continues its first transfer.
+- HIL exposed a startup UVC frame with a zero-filled tail. The camera callback
+  had ignored `data_bytes`, and its validity rule allowed nearly 80% impossible
+  pixels. The conservative fix requires exact 160x120 dimensions, at least
+  38,400 received bytes, and no more than 1% samples below 1,000 centikelvin.
+  The Cubeternet/libuvc Y16 path reports `step=0` even for valid full frames, so
+  stride is deliberately not used as a validity gate.
+- Full validation passed 87 Python tests, the native deployment build, and 7/7
+  F Prime component test executables. The final Pi build verified as ARMv6KZ +
+  VFPv2 with `/lib/ld-linux-armhf.so.3`.
+- Active release:
+  `/home/pi/artemis/releases/c3m-payload-retry-camera-20260716T224440Z-7c23d355`,
+  SHA-256
+  `7c23d3554e4d6abb0b5c81180190c1113c779fc1271b74ebfb7f687edf5d9e79`.
+- Final HIL: product 1 transfer 1 was canceled on the ground at 253/1,100 and
+  saved under `data/c3m_20260716_224646_transfer_1/`. After spacecraft
+  `DownlinkFinished`, the same product was requested without another capture
+  and completed as transfer 2, 1,100/1,100, CRC OK, zero repair rounds, 64.8 s,
+  with PING 37121 passing during the transfer. Evidence:
+  `data/c3m_20260716_224901_transfer_2/`.
+- Spacecraft source and complete ground `.fdp` matched SHA-256
+  `1babc1aa35ed840d12b6353cf44cabbd1face542d69cd544384ed9a33ffb472c`.
+  Decode was 160x120 / 19,200 pixels, 14.83–24.69 C, with zero invalid pixels.

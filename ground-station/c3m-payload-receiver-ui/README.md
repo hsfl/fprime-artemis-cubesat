@@ -61,11 +61,24 @@ python3 ground-station/c3m-payload-receiver-ui/c3m_payload_receiver_ui.py \
   --no-open
 ```
 
-Normal operation keeps the preferred CRC-verified path. If repair is still
-incomplete at the default 90-second deadline, the app saves a positional
+Normal operation keeps the preferred CRC-verified path. The operator timing
+bands are nominal at `75 s` or less, longer than target around `90 s`, and a
+`120 s` cutoff. If repair is still incomplete at the default 120-second cutoff,
+the app saves a positional
 `.fdp.partial`, labels it partial, renders pixels touched by missing packets as
 white/`NaN`, and records the missing packet map and timeout reason in
 `run.json`. Hovering over white pixels reports `No data`.
+
+During an active transfer, **Stop & save partial** ends ground-side reception
+immediately and runs that same position-preserving partial-save path. It does
+not command or interrupt the satellite: the satellite finishes transmitting
+the current downlink while the receiver drains and ignores packets for that
+transfer. A later downlink with a new transfer ID is accepted normally. Use
+this action when the partial data is already sufficient; use GDS spacecraft
+commands separately if mission operations actually need to stop RF airtime.
+Once GDS reports `commsApp.DownlinkFinished`, request science downlink again to
+resend the same latest picture. The receiver preserves both the partial run and
+the later complete retry as separate History entries.
 
 ## Validation
 

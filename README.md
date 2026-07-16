@@ -40,7 +40,7 @@ Computer) board and carry the same compute and radio kit:
 
 | Item | Detail |
 |------|--------|
-| OBC board | Version 4.23 (both nodes) |
+| OBC board | Printed `4.23`; actual design may be v4.23 or v4.24 because the PCB marking did not change |
 | Microcontroller | Teensy 4.1 |
 | Single-board computer | Raspberry Pi Zero W |
 | Radio | RFM23BP (RFM23BP transceiver / radio head) |
@@ -251,12 +251,13 @@ New here? Read these roughly in order to fully understand the project:
 5. `docs/TIME_AND_SCHEDULING.md` — rate groups, the clock, and how the "collect in N seconds" countdown works.
 6. `EMULATION.md` and `docs/NEUTRON2_LOCAL_EMULATION_RUNBOOK.md` — laptop-only closed-loop emulation (no hardware).
 7. `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md` — the real hardware-in-the-loop (HIL) demo flow.
-8. `docs/HARDWARE_PORT_MAP_AND_POWER.md` — which USB/serial device is which, and how to power the bench safely.
-9. `docs/MISSION_OPS_QUICK_RUN.md` — one-page local rehearsal and FlatSat/HIL operator checklist.
-10. `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md` — Windows laptop setup for student developers and viewer users.
-11. `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md` and `docs/RPI_BUILD.md` — building the Pi Zero W flight binary (cross-compile preferred; native is the manual fallback).
-12. `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` — where to look first when commands, telemetry, payload downlink, or EPS/PDU behavior fails.
-13. `docs/agents_notes.md` — current implementation status and next-agent guidance.
+8. `docs/C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md` — Pi-owned RFM23BP lifecycle, bounded autonomous recovery, HIL evidence, and remaining electrical gates.
+9. `docs/HARDWARE_PORT_MAP_AND_POWER.md` — which USB/serial device is which, and how to power the bench safely.
+10. `docs/MISSION_OPS_QUICK_RUN.md` — one-page local rehearsal and FlatSat/HIL operator checklist.
+11. `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md` — Windows laptop setup for student developers and viewer users.
+12. `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md` and `docs/RPI_BUILD.md` — building the Pi Zero W flight binary (cross-compile preferred; native is the manual fallback).
+13. `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` — where to look first when commands, telemetry, payload downlink, or EPS/PDU behavior fails.
+14. `docs/agents_notes.md` — current implementation status and next-agent guidance.
 
 ## Build and run (local emulation)
 
@@ -374,6 +375,9 @@ Implemented:
 - RPi-hosted neutron payload simulator wired through `PayloadManager` and `PayloadDriver_NeutronSim`, including a latest-capture handoff for downlink.
 - File-backed `PayloadDownlinkApp` and payload receiver tooling for arbitrary payload bytes over channel 1.
 - Artemis EPS/PDU command driver over channel 2 using the PDU v2 protocol from `external/artemis-pdu`, with timeout/recovery handling.
+- Pi-first RFM23BP lifecycle control over channel 2: boot-safe SDN shutdown,
+  factual `OFF`/`READY` status, one pending RPC, watchdog-aware timeout, and
+  autonomous `30 s`/`120 s`/`900 s` capped recovery without toggling Pi power.
 - HIL proof of the shortened demo story over the real RPi UART, satellite
   Teensy, RFM23BP pair, ground Teensy, `fprime-gds`, payload receiver, and
   payload viewer path. See `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`.
@@ -383,9 +387,11 @@ Not implemented yet:
 - RF/GDS cleanup to reduce APID sequence-count warnings on lossy channel 0 traffic.
 - Broader EPS/PDU telemetry beyond the current command/status path, plus thermal, GPS, and IMU telemetry + command driver behavior.
 - Full uplink robustness (deterministic packet-boundary extraction and retry/ack strategy).
-- Target/bench proof for the 2026-07-06 hardening sprint: ARMv6 cross-build
-  verification, HIL RF smoke on the unified topology, WDT trip test, Pi service
-  migration, and `PRM_SAVE` round-trip behavior on the Pi filesystem.
+- Remaining physical RFM23BP qualification: scope/meter proof of SDN,
+  `RPI_ENABLE`, VCC/current/backfeed and brownout margins; five true cold power
+  cycles per node; a safely induced physical init-stall/watchdog case; and a
+  physical mid-transfer Teensy reset. ARMv6 deployment and software-observable
+  close-range recovery HIL have passed.
 - Longer-term ground-side presentation beyond the current `fprime-gds` plus
   Neutron 2 payload viewer MVP.
 

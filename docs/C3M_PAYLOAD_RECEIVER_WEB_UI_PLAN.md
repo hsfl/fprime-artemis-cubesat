@@ -9,6 +9,10 @@ payload progress, CRC proof, automatic Lepton decode, and payload history.
 This plan implements the ground-side portion of
 [`C3M_DEMO_HARDENING_PLAN_2026-07-09.md`](C3M_DEMO_HARDENING_PLAN_2026-07-09.md).
 
+**Status (2026-07-16):** implemented and passed local regression plus live HIL,
+including operator cancel at 253/1,100 packets and a complete retry of the same
+retained spacecraft product as a new transfer.
+
 ## Operator Intent
 
 The demo operator should not need to manage receiver flags, retry bitmaps,
@@ -18,7 +22,9 @@ output paths, or decoder commands. Their channel-1 flow is:
 2. Confirm `Ready — awaiting downlink`.
 3. Run the mission commands in GDS.
 4. Watch the current product arrive, verify, decode, and render.
-5. Optionally browse earlier products in History.
+5. If needed, stop ground reception and save an honest partial product without
+   commanding the satellite.
+6. Optionally browse earlier products in History.
 
 The web app does not send F Prime commands. GDS remains the command and
 telemetry authority.
@@ -150,9 +156,9 @@ creating a new checked-in reference sample.
 
 ## Timing Presentation
 
-- Under `60 s`: nominal/green.
-- `60–120 s`: taking longer than nominal but acceptable/yellow.
-- Over `120 s`: delayed/operator attention/red.
+- `75 s` or less: nominal/green.
+- Around `90 s`: longer than target but still inside the demo window/yellow.
+- At `120 s`: cutoff/operator attention/red; preserve best-effort evidence.
 
 The delayed state does not hide or stop an active transfer. Continue showing
 real packet progress, retries, and elapsed time, and offer a simple reset or
@@ -242,6 +248,13 @@ Use this event-gated sequence:
   older image as current.
 - Two consecutive transfers complete without restarting the app and appear as
   distinct History entries.
+- Operator cancel saves a positional `.fdp.partial`, records
+  `completion_reason: operator_cancelled`, sends no spacecraft command or
+  retry after acknowledgement, ignores the canceled transfer's remaining
+  packets, and accepts the next transfer ID without restarting the app. After
+  `commsApp.DownlinkFinished` confirms the canceled-on-ground transmission is
+  over, re-requesting science downlink resends the same retained picture and
+  can complete normally.
 - Port unavailable, port busy, and serial disconnect states provide clear
   operator actions.
 - Three consecutive fresh HIL products at the intended demo geometry each

@@ -18,7 +18,10 @@ values in this work.
 As of 2026-07-09, WP1–WP7 are implemented and validated. The obsolete Pi
 rollback binary is removed, the current ARMv6/libuvc release is active, and the
 new web app passed three consecutive live HIL capture/downlink/decode runs at
-the tabletop demo geometry.
+the tabletop demo geometry. On 2026-07-16, the receiver-only cancel flow and
+same-picture retry also passed HIL: the partial was preserved, the spacecraft
+finished its original transfer, and a later request completed the same retained
+product without a new capture.
 
 ## User Intent
 
@@ -28,10 +31,11 @@ the tabletop demo geometry.
 > the payload web app, confirm the app is ready, run the mission commands in
 > GDS, and watch the current thermal product arrive and render.
 
-The happy path should normally finish in about 60 seconds. A real demo geometry
-may require retries, so 60–120 seconds remains acceptable when progress is
-visible and the final product passes CRC. The operator must never wait several
-minutes without a clear state, timer, retry count, or failure explanation.
+The happy path should normally finish within the `75 s` nominal target. A real
+demo geometry may require retries; around `90 s` is longer than target but still
+acceptable when progress is visible and the final product passes CRC. `120 s`
+is the timed-demo cutoff. The operator must never wait several minutes without
+a clear state, timer, retry count, or failure explanation.
 
 ## Proven Baseline To Preserve
 
@@ -130,15 +134,15 @@ The primary operator states are:
 - `Verifying`: all packets are present and whole-file CRC is being checked.
 - `Decoding`: CRC passed and the exact current `.fdp` is being decoded.
 - `Complete`: CRC passed, outputs exist, and current thermal image is visible.
-- `Delayed`: elapsed time exceeded 120 seconds while transfer remains active.
+- `Delayed`: elapsed time reached the 120-second cutoff while transfer remains active.
 - `Failed`: CRC, timeout, decode, or filesystem failure with an explicit reason.
 - `Disconnected`: selected serial port disappeared or cannot be reopened.
 
 Timing presentation:
 
-- Under 60 seconds: nominal.
-- 60–120 seconds: yellow, taking longer than nominal but acceptable.
-- Over 120 seconds: red operator-attention state; keep showing actual progress
+- 75 seconds or less: nominal.
+- Around 90 seconds: yellow, longer than target but still inside the demo window.
+- At 120 seconds: red cutoff/operator-attention state; keep showing actual progress
   and retries and expose `Reset receiver`. The timed run is unsuccessful even
   if a later transfer completes.
 
@@ -250,7 +254,7 @@ Acceptance:
 
 - 3/3 current products reach CRC-complete and decode successfully.
 - Each completes within 120 seconds.
-- Nominal goal remains approximately 60 seconds.
+- Nominal goal is 75 seconds or less; 120 seconds is the cutoff.
 - No unexplained multi-minute wait.
 - Channel 0 remains usable.
 
@@ -348,8 +352,8 @@ Extend the web viewer using the behavior of the Python viewer in
 ### Proposed Acceptance
 
 - A complete transfer still passes CRC and behaves exactly as it does now.
-- A controlled packet-loss test stops within the configured approximately
-  90-second window and produces an honestly labeled partial image.
+- A controlled packet-loss test stops at the configured 120-second cutoff and
+  produces an honestly labeled partial image.
 - Missing packet locations become `NaN` samples and appear as white
   lines/regions without moving valid pixels.
 - Hover inspection reports correct temperatures for valid pixels and `No data`

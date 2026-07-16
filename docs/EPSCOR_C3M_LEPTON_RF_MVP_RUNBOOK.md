@@ -4,10 +4,18 @@ BLUF: use this for the C3M Lepton laptop proof and refined RF demo operation.
 The normal operator uses `fprime-gds` for channel 0 and the C3M payload receiver
 web app for channel 1; the raw receiver and decoder CLIs are engineering
 fallbacks. The 2026-07-09 HIL run proved real UVC capture and a byte-identical
-full-resolution RF downlink in `58.557 s`.
+full-resolution RF downlink in `58.557 s`. The July 16 close-range hardening run
+passed 10/10 real radio `OFF` to `READY` cycles and 3/3 new byte-identical
+payload cycles in 65–67 seconds; mid-transfer PING responded immediately in 2/3
+runs and the one missed response passed on the immediate idle retry. The final
+July 16 acceptance also proved ground-only cancel with a saved partial, followed
+by a byte-identical retry of the same retained spacecraft picture without a new
+capture.
 
 The active hardening scope and live HIL matrix are defined in
 [`C3M_RF_RELIABILITY_HARDENING_PLAN_2026-07-14.md`](C3M_RF_RELIABILITY_HARDENING_PLAN_2026-07-14.md).
+The implemented Pi-owned radio lifecycle and recovery contract is defined in
+[`C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md`](C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md).
 Do not change transport constants during a timed HIL run. The July 9 validated
 baseline below used `22` payload/retry messages per tick; the current July 15
 hardening artifacts deliberately use `18`. Treat the July 9 section as
@@ -349,6 +357,30 @@ Minimum pass:
 
 If this fails, stop and fix camera/libuvc access before running the RF demo.
 
+### Radio recovery preflight
+
+In GDS, send `commsApp.REQUEST_LINK_STATUS` or `commsApp.PING_LINK_RSSI`.
+The nominal result is a `RadioStatusUpdated` event showing `READY`, `NONE`, and
+`OK`, with telemetry:
+
+- `DesiredRadioEnabled = 1`
+- `RadioStatusKnown = 1`
+- `RadioState = READY`
+- `RadioFault = NONE`
+- `RadioRpcResult = OK`
+- `RadioRetrySeconds = 0`
+
+If the radio reports `OFF`, do not spam commands, restart GDS/Pi, or immediately
+reflash the Teensy. Watch for `RadioRecoveryScheduled` and `RadioRecovered`.
+F Prime retries after `30 s`, then `120 s`, then at a capped `900 s` cadence.
+A factual terminal local TX failure causes the Teensy to assert SDN and report
+`OFF + LOCAL_TX_FAULT`; F Prime then performs the same known-good enable path.
+Ordinary peer/ACK loss does not power-cycle the radio.
+
+At the deliberately saturated 30 dBm close bench, a command response may be
+missed during bulk downlink. Wait for the transfer to become idle and retry the
+single command once; do not send a burst of duplicate commands.
+
 ## Start Mission Operations Tools
 
 The normal demo operator needs two surfaces: GDS and the payload web app. Start
@@ -369,6 +401,14 @@ export GDS_DATA_PORT=/dev/cu.usbmodem115553301
 Replace the example value with the first port in the ground Teensy's
 triple-serial group on this laptop. Keep the terminal open so `$GDS_DATA_PORT`
 remains set.
+
+Run local emulation **before** starting the hardware GDS. Local demo GDS
+instances use the same global `/tmp/fprime-server-in` and
+`/tmp/fprime-server-out` IPC endpoints. If local emulation is run while the HIL
+GDS is already open, the old browser UI can remain HTTP 200 while UART commands
+stop. A browser refresh does not rebuild that backend; stop and restart the
+complete hardware GDS process tree, then confirm a PING and moving ground
+`uart_rx`/`rf_tx_pkt` counters.
 
 ```bash
 cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
@@ -400,6 +440,19 @@ under repo-root `data/`, verifies whole-file CRC, decodes the exact current
 `.fdp`, and displays its PNG. History browses earlier `data/` runs without
 making them look current. See
 [`C3M_PAYLOAD_RECEIVER_WEB_UI_PLAN.md`](C3M_PAYLOAD_RECEIVER_WEB_UI_PLAN.md).
+
+If an incomplete product is already useful, click **Stop & save partial**.
+This is ground-only: it saves the packets already received in their correct
+positions, marks missing pixels white/`NaN`, and ignores the remaining packets
+for that transfer while leaving the receiver ready for the next transfer ID.
+The satellite continues its current transmission. Use the separate GDS abort
+command only when mission operations intend to stop spacecraft RF airtime.
+After GDS reports `commsApp.DownlinkFinished` (and `DownlinkActive = 0`), the
+latest captured product remains available: send
+`commsApp.REQUEST_SCIENCE_DOWNLINK` again to retry the same picture with a new
+transfer ID. Do not retry immediately after the ground partial save because
+the spacecraft is still sending transfer 1. A newer collection replaces the
+retained latest-product descriptor; a Pi/F´ process restart clears it.
 
 ### Engineering CLI Fallback
 
@@ -490,13 +543,12 @@ Record these without changing pacing or ACK policy:
 
 Timing interpretation:
 
-- under `60 s`: nominal.
-- `60–120 s`: degraded but acceptable when progress remains visible and CRC
-  succeeds.
-- over `120 s`: outside the live-demo acceptance window. Let the app continue
-  showing real progress, but mark the rehearsal run unsuccessful and preserve
-  its evidence for diagnosis. If progress has stopped, click `Reset receiver`,
-  wait for `Ready`, then make any retry an explicit new GDS action.
+- `75 s` or less: nominal target.
+- around `90 s`: longer than target but still acceptable while progress remains
+  visible and CRC succeeds.
+- `120 s`: live-demo cutoff. Preserve best-effort evidence and mark the timed
+  rehearsal unsuccessful. If progress has stopped, click `Reset receiver`, wait
+  for `Ready`, then make any retry an explicit new GDS action.
 
 ## Three-Run Demo Rehearsal
 
@@ -511,7 +563,7 @@ record the product/transfer identity, elapsed time, retry count, CRC result, and
 `data/` output directory. Require:
 
 - `3/3` newly captured products reach CRC-complete decode.
-- each finishes within `120 s`; under `60 s` remains the nominal target.
+- each finishes before the `120 s` cutoff; `75 s` or less is the nominal target.
 - exactly one mid-transfer PING per run and no other bulk-transfer channel-0
   traffic.
 - channel 0 remains usable and the transport/parser queue-drop counters remain
@@ -553,6 +605,53 @@ Final acceptance evidence:
 - viewer: `160x120`, `19200` pixels; PNG opened successfully.
 - mid-transfer ping returned in the same second.
 - satellite counters: zero CRC, framing, timeout, RF TX, and queue drops.
+
+### July 16 close-range recovery hardening
+
+- Fixed antennas stayed approximately 2–5 ft apart; RF power and RadioHead
+  configuration were unchanged.
+- ARMv6 Pi deployment, GDS, and payload receiver stayed running across the
+  recovery and repeated-transfer tests.
+- Real channel-2 radio control passed 10/10 `OFF` to `READY` cycles without a
+  Pi restart or systemd restart.
+- Three new 38,480-byte Lepton products completed 1,100/1,100 transfer, CRC,
+  160x120 decode, and exact Pi/ground SHA-256 matching in 65–67 seconds.
+- Mid-transfer PING passed immediately in 2/3 runs; the missed response did not
+  wedge the link and passed on the immediate idle retry.
+- `CommsApp` now owns authoritative comms health. A quiet but healthy RF channel
+  no longer becomes a false SOH failure through the legacy transport monitor.
+
+See the KISS recovery plan for exact release hashes, evidence paths, and the
+physical electrical/fault gates that remain pending.
+
+### July 16 ground-cancel and same-picture retry acceptance
+
+- Active Pi release:
+  `/home/pi/artemis/releases/c3m-payload-retry-camera-20260716T224440Z-7c23d355`;
+  ARMv6 binary SHA-256
+  `7c23d3554e4d6abb0b5c81180190c1113c779fc1271b74ebfb7f687edf5d9e79`.
+- A post-restart UVC capture produced product 1 with 19,200 valid pixels, zero
+  values below 1,000 centikelvin, and a plausible 14.83–24.69 C range.
+- The camera wrapper now rejects short UVC frames and frames with more than 1%
+  physically impossible low pixels. This prevents a partial startup frame from
+  becoming the retained science product; the existing five-second capture
+  timeout remains the bounded failure path.
+- Ground reception of transfer 1 was stopped at 253/1,100 packets. The receiver
+  saved `data/c3m_20260716_224646_transfer_1/` as an operator-cancelled partial
+  with 4,389 valid image pixels while the spacecraft continued transmitting.
+- After `commsApp.DownlinkFinished`, no new collection command was sent.
+  `commsApp.REQUEST_SCIENCE_DOWNLINK` resent product 1 as transfer 2.
+- Transfer 2 completed 1,100/1,100 in 64.8 seconds with no repair round, matching
+  CRC, and a successful mid-transfer PING. Complete evidence is
+  `data/c3m_20260716_224901_transfer_2/`.
+- Spacecraft source, pre-RF local copy, and complete ground file all matched
+  SHA-256
+  `1babc1aa35ed840d12b6353cf44cabbd1face542d69cd544384ed9a33ffb472c`.
+
+This is the intended demo contract: capture once, make a best-effort ground
+attempt, preserve any useful partial, then request the same latest picture
+again after the spacecraft finishes. A newer capture replaces the retained
+picture, and a Pi/F Prime process restart clears the volatile descriptor.
 
 ## Stop Rules
 

@@ -208,6 +208,39 @@ The RFM23BP has a small packet budget, so each cross-RF channel is segmented:
   retry requests, and final CRC repair at the application layer.
 - Reassembly timeout is `500 ms`; inter-segment gap is `8 ms`.
 
+### RFM23BP lifecycle and autonomous recovery
+
+The Raspberry Pi/F Prime deployment owns radio-service policy; the satellite
+Teensy is the deterministic hardware executor. On every Teensy reset, the
+firmware first places the RFM23BP in datasheet shutdown (`SDN = HIGH`), asserts
+`RPI_ENABLE`, and brings up the Pi UART/channel-2 path. F Prime then requests
+the first radio enable. Radio startup is never allowed to gate Pi power-up.
+
+The Teensy exposes only two steady radio states, `OFF` and `READY`, with a
+separate factual fault reason. Channel 2 provides `STATUS` and idempotent
+`SET_ENABLED` operations, permits one pending request, and uses a 15-second F
+Prime timeout so the Teensy's 12-second watchdog remains the final escape from
+a stalled RadioHead initialization. A failed request is retried by F Prime
+after `30 s`, then `120 s`, then at a capped `900 s` cadence until the critical
+radio service returns. While healthy, F Prime polls status every 60 seconds.
+
+After the relay's one low-level FIFO recovery retry, a factual local transmit
+completion/start failure forces `SDN = HIGH` and reports `OFF + LOCAL_TX_FAULT`.
+F Prime then uses the same bounded enable path to perform a known SDN power-on
+reset. Peer silence, an absent ground station, RSSI changes, and ordinary RF
+ACK loss do **not** trigger this hardware recovery path because they do not
+prove that the local RFM23BP is wedged.
+
+`CommsApp` is the authoritative SOH owner for radio readiness: comms is `OK`
+only for `READY + NONE`. Legacy transport-silence counters remain diagnostic
+and do not turn a quiet but healthy RF channel into a bus failure. The
+low-level disable operation is retained for trusted local/bench verification;
+there is no public persistent ground command that can strand the spacecraft by
+turning off its only command link.
+
+See [C3M RFM23BP KISS Control and Recovery Plan](C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md)
+for the exact recovery contract, test evidence, and remaining electrical gates.
+
 ### RF mission identity and nearby-booth isolation
 
 The RadioHead `TO`, `FROM`, `ID`, and `FLAGS` bytes are assigned as a strict,

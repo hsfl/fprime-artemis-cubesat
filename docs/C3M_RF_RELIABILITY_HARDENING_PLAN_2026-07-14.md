@@ -19,8 +19,12 @@ current F Prime App-Man-Drv architecture and current N2 wire format. Add only
 the bounded recovery, transfer isolation, and honest failure behavior needed
 for a reliable proof-of-concept demonstration.
 
-This file is the active monitoring source of truth. The executable protocol
-contract is [C3M MVP Downlink Protocol](C3M_MVP_DOWNLINK_PROTOCOL.md).
+This file remains the historical transport/USB reliability campaign and HIL
+matrix. The implemented Pi-owned RFM23BP lifecycle, autonomous recovery policy,
+latest close-range HIL evidence, and remaining electrical gates are maintained
+in [C3M RFM23BP KISS Control and Recovery Plan](C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md).
+The executable data-transfer contract remains
+[C3M MVP Downlink Protocol](C3M_MVP_DOWNLINK_PROTOCOL.md).
 
 ## Demo Intent And Operator Story
 
@@ -312,15 +316,22 @@ hardware identities before every flash; do not assume July 14 device paths.
 | HIL-MVP-7 ground USB reconnect | Unplug/replug ground Teensy once | Ports rediscovered; no silent complete; current attempt resolves honestly; next cycle succeeds | **PASS** — all ground ports disappeared at 423/1,100; receiver entered `recovering`; ports, receiver, and GDS auto-reconnected; transfer completed after two repairs; PING 39008 and a zero-repair next cycle passed |
 | HIL-MVP-8 RF TX timeout injection | Exercise the bounded `waitPacketSent` failure path with a focused host-injected test; optionally remove the peer only to exercise ACK retry | Bounded retry/recovery; no 12-second watchdog reset; do not mislabel no-peer ACK loss as a TX-completion timeout | **PASS focused injection / N/A physical** — both bridges use a 500 ms completion timeout and one recovered retry; injected timeout/terminal cases pass; no MVP-only hardware hook added |
 
-### Post-HIL Follow-Up Backlog — Plan Only, Not Implemented
+### Post-HIL Follow-Up Backlog — Current Disposition
 
-Preserve the currently proven firmware and F Prime build for the outdoor/Yagi
-campaign. The following tasks capture findings from the July 15 HIL session
-and the subsequent source investigation. They are intentionally deferred until
-after range testing so the outdoor comparison is not contaminated by an
-untested boot, firmware, or UI change.
+These tasks originated after the July 15 HIL session. Range testing is complete;
+follow-ups 1–4 were subsequently implemented and validated as small changes.
+Follow-up 5 was intentionally reduced to the single KISS unavailable-radio
+pattern; the expanded fault/reset blink alphabet remains deferred.
 
 #### Follow-up 1 — Pi-First Boot and Bounded Local Radio Recovery
+
+**Status (2026-07-16): Implemented with the narrower KISS design and passed
+software-observable HIL.** The final implementation uses only factual `OFF` and
+`READY` states, asserts `RPI_ENABLE` before radio work, keeps channel 2 alive,
+and lets F Prime retry at 30 s, 120 s, then a capped 900 s cadence. The numbered
+proposal below is retained as historical rationale; the authoritative design,
+results, and remaining electrical gates are in
+[`C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md`](C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md).
 
 **Context:** The aluminum incident was not a valid RF-fade test, but it exposed
 a persistent local satellite RFM23BP TX-completion wedge. Static inspection also
@@ -438,6 +449,12 @@ with no browser warnings or errors.
 
 #### Follow-up 4 — Boot Link Acquisition and GDS RSSI Visibility
 
+**Status (2026-07-16): Implemented in KISS scope.** F Prime exposes radio
+readiness, fault, valid last-accepted uplink RSSI, and sample age. RSSI remains
+unknown until an addressed packet is accepted, while end-to-end PING remains
+the primary contact proof. The larger derived acquisition-state model below
+was deliberately not added.
+
 **Context:** The satellite channel `2` RF-statistics response and F Prime comms
 driver already carry `last_rssi_dbm`, but the MVP does not provide a clear,
 fresh, operator-facing link-strength indication. An RSSI register read before a
@@ -465,6 +482,11 @@ a timestamped RSSI from a verified received packet, and GDS never displays a
 stale/default value as current link strength.
 
 #### Follow-up 5 — Visible Teensy/F Prime Fault LED Patterns
+
+**Status (2026-07-16): Partially implemented by design.** Normal traffic
+flicker remains and `OFF`/unavailable has one slow recognizable pattern. The
+multi-pattern fatal/reset/watchdog proposal below remains optional and is not
+an MVP acceptance requirement.
 
 **Context:** The OBC exposes the Teensy LED and the Raspberry Pi activity LED,
 which are useful during field work when serial logs or SSH are not immediately
@@ -496,9 +518,8 @@ detected-fatal, intentional-reset, and post-watchdog patterns; the Pi stays
 powered during a radio-only fault; and the patterns do not interfere with RF
 timing, watchdog servicing, or normal activity indication.
 
-These are planned tasks only. Do not implement them during the current outdoor
-range campaign. After range evidence is captured, implement and validate them
-as small, independently reviewable changes rather than one combined refactor.
+Do not expand the remaining LED or mission-grade recovery ideas without a
+reproduced need. Keep any future work small and independently reviewable.
 
 For every case record:
 
@@ -586,11 +607,18 @@ Re-query live USB identities before every future flash.
 | 2026-07-15 11:57 | Fixed-position handheld Yagi movement, 15-20 ft | PASS HIL | The operator remained about 15-20 ft from the battery-powered satellite but waved and mispointed the handheld ground Yagi during the transfer; the satellite retained its normal monopole. PING 39015 passed before capture; fresh product/transfer 6 completed 38,480 bytes, 1,100/1,100, zero repairs, CRC 32905, and 64.7 s. Pi/ground SHA-256 matched exactly at `15a5f0ff...43ecea`, decode was 160x120, PING 39016 returned, and PID 254 remained at zero restarts |
 | 2026-07-16 07:29 | Receiver reconnect-state reconciliation | PASS local | Terminal complete/partial/failed states now survive a subsequent `ready`; incomplete checkpoints alone resume as receiving. Focused 16-test UI suite, broader 71-test transport/receiver suite, a receiver-restart capture/downlink/decode cycle, and the standard three-cycle exact-decode demo passed; evidence: `tools/logs/c3m_local_demo_20260716_072820` and `tools/logs/c3m_local_demo_20260716_073027` |
 | 2026-07-16 07:31 | Archived thermal hover inspection | PASS local/browser | Selected History image reused its archived CSV and displayed `Column 79, row 59 · 19.54°C` as an on-image overlay; thumbnails remained passive and browser console had no warnings/errors |
+| 2026-07-16 11:39 | Pi-owned RFM23BP recovery | PASS local/build/HIL | F Prime-owned `OFF`/`READY` lifecycle, bounded 30/120/900 s retry policy, truthful RSSI age/validity, terminal local-TX safe-off, 10/10 real `OFF` to `READY` cycles, ARMv6 deployment, and repeated exact payload cycles passed. Remaining work is the explicitly separate electrical/cold-boot matrix in the KISS plan |
+| 2026-07-16 12:49 | Ground cancel and retained same-picture retry | PASS HIL | Ground saved an operator-cancelled partial at 253/1,100 while flight completed transfer 1. Without another capture, product 1 completed as transfer 2 at 1,100/1,100 in 64.8 s with CRC OK, PING 37121, and exact source/ground SHA-256 `1babc1aa...b472c` |
 
 The hashes above were verified against the live Pi and the exact locally built
 HEX artifacts uploaded by physical Teensy IDs during this bench session.
 
 ## Completion Definition
+
+**Disposition (2026-07-16): the MVP hardening definition below is satisfied.**
+The separate meter/scope, true cold-boot, induced-init-stall, and mid-transfer
+satellite-reset gates remain physical qualification work, not blockers for the
+proven tabletop demo.
 
 MVP hardening is complete when:
 
