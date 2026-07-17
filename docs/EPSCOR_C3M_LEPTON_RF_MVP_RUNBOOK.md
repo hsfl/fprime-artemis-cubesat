@@ -1,5 +1,104 @@
 # EPSCoR C3M Lepton Local And RF Mission Operations Runbook
 
+## START HERE: Manual HIL Operator Script
+
+Use this section when you have the C3M satellite and ground hardware with you
+and want to run the real RF demo manually from a Mac. You need:
+
+- both nodes powered with antennas attached.
+- the ground Teensy connected to the Mac by USB.
+- the satellite Pi and Teensy powered and connected together.
+- the Mac able to reach `artemis-pi-c3m` over SSH.
+
+If `ssh artemis-pi-c3m` cannot reach the Pi, fix the network first. The demo
+cannot be operated remotely through SSH alone: the ground RF node must be with
+the operator and connected to the Mac.
+
+### 1. Find the three ground Teensy ports
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat
+GROUND_PORTS=(/dev/cu.usbmodem*(N))
+printf 'GDS:     %s\nDebug:   %s\nPayload: %s\n' \
+  "${GROUND_PORTS[1]}" "${GROUND_PORTS[2]}" "${GROUND_PORTS[3]}"
+```
+
+Continue only when this prints three ground Teensy ports with the same number
+stem:
+
+```text
+first port  = GDS
+second port = debug
+third port  = payload receiver
+```
+
+Do not use a satellite Teensy port if one is separately connected to the Mac.
+
+### 2. Confirm the satellite Pi is running F Prime
+
+```bash
+ssh artemis-pi-c3m 'systemctl is-active artemis-fprime.service; pgrep -af ArtemisRpiTeensyDeployment'
+```
+
+Continue only when the service prints `active` and the deployment is running
+with `-d /dev/serial0`.
+
+### 3. Terminal 1: start GDS
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+. fprime-venv/bin/activate
+GROUND_PORTS=(/dev/cu.usbmodem*(N))
+export GDS_DATA_PORT="${GROUND_PORTS[1]}"
+./tools/run_gds_uart.sh \
+  --port "$GDS_DATA_PORT" \
+  --baud 115200 \
+  --gui-port 5050 \
+  --dictionary build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json
+```
+
+Leave this terminal running. Open the GDS URL printed by the launcher, normally
+`http://127.0.0.1:5050`.
+
+### 4. Terminal 2: start the payload receiver
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat
+. ArtemisRpiTeensy_N2/fprime-venv/bin/activate
+python3 ground-station/c3m-payload-receiver-ui/c3m_payload_receiver_ui.py
+```
+
+Leave this terminal running. Open `http://127.0.0.1:8064` and wait for green
+**Ready - awaiting downlink**. If asked for a port, select the **third** ground
+Teensy port from step 1.
+
+### 5. Run one picture from the GDS Commanding page
+
+Send these commands in order:
+
+1. `missionApp.ENTER_BASE_MODE`
+2. `sohApp.EMIT_SOH_SNAPSHOT`
+3. `missionApp.SCHEDULE_COLLECTION` with `delaySeconds = 10`
+4. Wait for a new `storageManager.ScienceStored` event with a nonzero size.
+5. `commsApp.REQUEST_SCIENCE_DOWNLINK`
+6. Wait for the payload web app to show `Complete` with a passing CRC and the
+   decoded `160x120` image.
+
+During the transfer, send only one optional channel-0 proof command:
+`missionApp.PING` with token `37002`. Otherwise leave GDS alone until the image
+finishes.
+
+To take another picture, repeat steps 3-6. Do not restart GDS, the payload web
+app, the Pi, or either Teensy between pictures.
+
+### 6. Stop when finished
+
+Press `Ctrl-C` once in Terminal 2, then once in Terminal 1. Completed payloads
+remain under repo-root `data/`.
+
+Everything below is validation, recovery, engineering fallback, and historical
+evidence. You do not need it for a normal manual HIL run.
+
 BLUF: use this for the C3M Lepton laptop proof and refined RF demo operation.
 The normal operator uses `fprime-gds` for channel 0 and the C3M payload receiver
 web app for channel 1; the raw receiver and decoder CLIs are engineering
