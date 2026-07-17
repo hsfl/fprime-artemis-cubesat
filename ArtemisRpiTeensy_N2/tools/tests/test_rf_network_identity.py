@@ -196,7 +196,8 @@ int main() {{
 
         ground_driver = (roots[0] / "src/rf23_driver.cpp").read_text()
         self.assertIn("initRadio(m_radio, m_radioPins, m_radioProfile, &SerialUSB1)", ground_driver)
-        self.assertIn("&SerialUSB1);", ground_driver)
+        self.assertIn("&SerialUSB1,", ground_driver)
+        self.assertIn("&attemptSnapshot);", ground_driver)
 
     def test_satellite_radio_shutdown_and_pi_first_contract(self) -> None:
         helper_paths = (
@@ -214,7 +215,14 @@ int main() {{
         self.assertIn("digitalWrite(pins.sdn_pin, LOW)", helper)
         self.assertIn("probeDeviceIdentity", helper)
         self.assertNotIn("probeChipReady", helper)
-        self.assertNotIn("spiWrite(RH_RF22_REG_07_OPERATING_MODE1, RH_RF22_SWRES)", helper)
+        self.assertIn("class BoundedRf22", helper)
+        self.assertIn("initBounded", helper)
+        self.assertIn("chip_ready_timeout_ms", helper)
+        self.assertIn("spiWrite(RH_RF22_REG_07_OPERATING_MODE1, RH_RF22_SWRES)", helper)
+        self.assertNotIn(
+            "while (!(spiRead(RH_RF22_REG_04_INTERRUPT_STATUS2) & RH_RF22_ICHIPRDY))",
+            helper,
+        )
 
         satellite_root = REPO_ROOT / "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy"
         driver_header = (satellite_root / "src/rf23_driver.hpp").read_text()
