@@ -646,6 +646,16 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
     resetReassembly(channel, true, true);
   }
 
+  // Re-ACK a completed-message retry without forwarding the same command or
+  // payload twice. This covers lost ACKs and ambiguous TX-completion timeouts.
+  if (!state.active && state.seenRxMsgId && msgId == state.lastRxMsgId) {
+    m_counters.rfDuplicateDrops += 1;
+    if (link_protocol::rxAckRequiredForChannel(channel)) {
+      sendAck(channel, msgId, segIdx);
+    }
+    return;
+  }
+
   if (!state.active) {
     if (segIdx != 0) {
       m_counters.rfReassemblyDrops += 1;
@@ -754,7 +764,7 @@ void RelayUartRf::emitLinkStatus() {
   const int n =
       snprintf(statusLine,
                sizeof(statusLine),
-               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu rf_tx_timeouts=%lu rf_recoveries=%lu rf_tx_terminal_failures=%lu rf_msg_id_gaps=%lu rf_ack_rx=%lu rf_ack_tx=%lu rf_retries=%lu rf_ack_timeouts=%lu rf_wrong_network=%lu rf_wrong_address=%lu rf_wrong_version=%lu up_q_drops=%lu down_q_drops=%lu\\n",
+               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu rf_tx_timeouts=%lu rf_recoveries=%lu rf_tx_terminal_failures=%lu rf_msg_id_gaps=%lu rf_ack_rx=%lu rf_ack_tx=%lu rf_retries=%lu rf_ack_timeouts=%lu rf_wrong_network=%lu rf_wrong_address=%lu rf_wrong_version=%lu rf_duplicate_drops=%lu up_q_drops=%lu down_q_drops=%lu\\n",
                static_cast<unsigned long>(m_counters.uartRxBytes),
                static_cast<unsigned long>(m_counters.uartTxBytes),
                static_cast<unsigned long>(m_counters.rfRxPackets),
@@ -781,6 +791,7 @@ void RelayUartRf::emitLinkStatus() {
                static_cast<unsigned long>(m_counters.rfWrongNetworkDrops),
                static_cast<unsigned long>(m_counters.rfWrongAddressDrops),
                static_cast<unsigned long>(m_counters.rfVersionDrops),
+               static_cast<unsigned long>(m_counters.rfDuplicateDrops),
                static_cast<unsigned long>(m_counters.uplinkQueueDrops),
                static_cast<unsigned long>(m_counters.downlinkQueueDrops));
 

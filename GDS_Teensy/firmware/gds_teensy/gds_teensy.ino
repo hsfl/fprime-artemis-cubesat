@@ -10,6 +10,7 @@ static constexpr int RADIO_CS = 38;
 static constexpr int RADIO_INT = 40;
 static constexpr uint8_t RADIO_RX_ON_PIN = 30;
 static constexpr uint8_t RADIO_TX_ON_PIN = 31;
+static constexpr uint8_t RADIO_SDN_PIN = 37;
 
 static constexpr uint32_t USB_UART_BAUD = 115200;
 static constexpr uint32_t DEBUG_UART_BAUD = 115200;
@@ -33,7 +34,8 @@ static constexpr uint32_t RADIO_TRAFFIC_LED_BLINK_MS = 60;
 #endif
 
 LinkCounters g_linkCounters;
-Rf23Driver g_rfDriver(RADIO_CS, RADIO_INT, RADIO_RX_ON_PIN, RADIO_TX_ON_PIN);
+Rf23Driver g_rfDriver(
+    RADIO_CS, RADIO_INT, RADIO_RX_ON_PIN, RADIO_TX_ON_PIN, RADIO_SDN_PIN);
 // Channelized bridge mode:
 // - Serial remains raw CCSDS for fprime-gds on channel 0
 // - SerialUSB2 is a raw payload-blob packet stream on channel 1 when triple serial is enabled
@@ -159,12 +161,32 @@ void debugPrintCounters(const char* prefix) {
   SerialUSB1.print(g_linkCounters.rfWrongAddressDrops);
   SerialUSB1.print(" rf_wrong_version=");
   SerialUSB1.print(g_linkCounters.rfVersionDrops);
+  SerialUSB1.print(" rf_duplicate_drops=");
+  SerialUSB1.print(g_linkCounters.rfDuplicateDrops);
+  SerialUSB1.print(" rf_recovery_purged_uplinks=");
+  SerialUSB1.print(g_linkCounters.rfRecoveryPurgedUplinks);
+  SerialUSB1.print(" rf_recovery_discarded_bytes=");
+  SerialUSB1.print(g_linkCounters.rfRecoveryDiscardedBytes);
   SerialUSB1.print(" rf_reasm_drops=");
   SerialUSB1.print(g_linkCounters.rfReassemblyDrops);
   SerialUSB1.print(" up_q_drops=");
   SerialUSB1.print(g_linkCounters.uplinkQueueDrops);
   SerialUSB1.print(" down_q_drops=");
   SerialUSB1.print(g_linkCounters.downlinkQueueDrops);
+  SerialUSB1.print(" rf_state=");
+  SerialUSB1.print(g_rfDriver.stateName());
+  SerialUSB1.print(" rf_fault=");
+  SerialUSB1.print(g_rfDriver.faultName());
+  SerialUSB1.print(" rf_init_attempts=");
+  SerialUSB1.print(g_rfDriver.initAttempts());
+  SerialUSB1.print(" rf_init_failures=");
+  SerialUSB1.print(g_rfDriver.initFailures());
+  SerialUSB1.print(" rf_sdn_recoveries=");
+  SerialUSB1.print(g_rfDriver.sdnRecoveries());
+  SerialUSB1.print(" rf_recovery_pending=");
+  SerialUSB1.print(g_rfDriver.recoveryPending() ? 1 : 0);
+  SerialUSB1.print(" rf_recovery_backoff_ms=");
+  SerialUSB1.print(g_rfDriver.recoveryBackoffMs());
   if (usb0 != nullptr && usb1 != nullptr) {
     SerialUSB1.print(" usb0_zero=");
     SerialUSB1.print(usb0->zeroWrites);
@@ -197,6 +219,34 @@ void debugPrintCounters(const char* prefix) {
 #endif
 }
 
+void debugPrintRfFaultSnapshot() {
+#if ARTEMIS_HAS_DEBUG_USB
+  artemis::rf23bp::FaultSnapshot snapshot;
+  if (!g_rfDriver.consumeFaultSnapshot(snapshot)) {
+    return;
+  }
+  char line[512] = {0};
+  snprintf(line,
+           sizeof(line),
+           "[GDS_Teensy] RF_FAULT cause=%u captured_ms=%lu nirq=%u rh_mode=%u reg00=%02X reg01=%02X reg02=%02X reg05=%02X reg06=%02X reg07=%02X reg08=%02X reg26=%02X irq03=%02X irq04=%02X",
+           static_cast<unsigned int>(snapshot.cause),
+           static_cast<unsigned long>(snapshot.captured_ms),
+           static_cast<unsigned int>(snapshot.nirq_level),
+           static_cast<unsigned int>(snapshot.radiohead_mode),
+           static_cast<unsigned int>(snapshot.device_type),
+           static_cast<unsigned int>(snapshot.version_code),
+           static_cast<unsigned int>(snapshot.device_status),
+           static_cast<unsigned int>(snapshot.interrupt_enable1),
+           static_cast<unsigned int>(snapshot.interrupt_enable2),
+           static_cast<unsigned int>(snapshot.operating_mode1),
+           static_cast<unsigned int>(snapshot.operating_mode2),
+           static_cast<unsigned int>(snapshot.raw_rssi),
+           static_cast<unsigned int>(snapshot.interrupt_status1),
+           static_cast<unsigned int>(snapshot.interrupt_status2));
+  SerialUSB1.println(line);
+#endif
+}
+
 void setup() {
   const bool watchdogReset = wdt_guard::consumeWatchdogResetFlag();
 
@@ -213,6 +263,7 @@ void setup() {
   wdt_guard::begin();
 
   // Keep USB clean: no banner prints on this stream.
+  g_rfDriver.beginSafeOff();
   const bool radioOk = g_rfDriver.begin();
   g_relay.begin();
 
@@ -240,10 +291,12 @@ void loop() {
 #endif
 
   g_relay.poll();
+  g_rfDriver.serviceRecovery();
   wdt_guard::feed();
   updateRadioTrafficLed(millis());
 
 #if ARTEMIS_HAS_DEBUG_USB
+  debugPrintRfFaultSnapshot();
   const uint32_t now = millis();
   if ((now - lastDebugStatusMs) >= DEBUG_STATUS_PERIOD_MS) {
     debugPrintCounters("[GDS_Teensy] counters");

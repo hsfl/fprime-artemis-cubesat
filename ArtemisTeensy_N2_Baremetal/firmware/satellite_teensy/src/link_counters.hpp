@@ -39,6 +39,9 @@ struct LinkCounters {
   uint32_t rfWrongNetworkDrops = 0;
   uint32_t rfWrongAddressDrops = 0;
   uint32_t rfVersionDrops = 0;
+  uint32_t rfDuplicateDrops = 0;
+  uint32_t rfRecoveryPurgedUplinks = 0;
+  uint32_t rfRecoveryDiscardedBytes = 0;
   uint32_t uplinkQueueDrops = 0;
   uint32_t downlinkQueueDrops = 0;
 
@@ -78,6 +81,9 @@ struct LinkCounters {
     rfWrongNetworkDrops = 0;
     rfWrongAddressDrops = 0;
     rfVersionDrops = 0;
+    rfDuplicateDrops = 0;
+    rfRecoveryPurgedUplinks = 0;
+    rfRecoveryDiscardedBytes = 0;
     uplinkQueueDrops = 0;
     downlinkQueueDrops = 0;
   }

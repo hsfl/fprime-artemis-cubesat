@@ -77,6 +77,7 @@ class RelayUartRf {
   void serviceDownlinkQueue();
   void serviceDownlinkChannel(uint8_t channel);
   void popDownlinkEntry(uint8_t channel);
+  void discardRadioWorkOnOff();
 
   static constexpr uint8_t MAX_QUEUE_DEPTH = 32;
 
@@ -133,6 +134,7 @@ class RelayUartRf {
   uint8_t m_uplinkHead;
   uint8_t m_uplinkTail;
   uint8_t m_uplinkCount;
+  bool m_lastRadioReady;
 
   QueueEntry m_downlinkQueue[usb_tx::CHANNEL_COUNT][MAX_QUEUE_DEPTH];
   uint8_t m_downlinkHead[usb_tx::CHANNEL_COUNT];

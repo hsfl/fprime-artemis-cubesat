@@ -162,6 +162,8 @@ void debugPrintCounters(const char* prefix) {
   Serial.print(g_linkCounters.rfWrongAddressDrops);
   Serial.print(" rf_wrong_version=");
   Serial.print(g_linkCounters.rfVersionDrops);
+  Serial.print(" rf_duplicate_drops=");
+  Serial.print(g_linkCounters.rfDuplicateDrops);
   Serial.print(" rf_reasm_drops=");
   Serial.print(g_linkCounters.rfReassemblyDrops);
   Serial.print(" up_q_drops=");

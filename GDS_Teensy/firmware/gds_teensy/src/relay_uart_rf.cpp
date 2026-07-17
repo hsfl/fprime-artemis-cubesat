@@ -31,7 +31,8 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
       m_lastPayloadUartByteMs(0),
       m_uplinkHead(0),
       m_uplinkTail(0),
-      m_uplinkCount(0) {
+      m_uplinkCount(0),
+      m_lastRadioReady(false) {
   memset(m_framePayload, 0, sizeof(m_framePayload));
   memset(m_commandBuffer, 0, sizeof(m_commandBuffer));
   memset(m_nextMsgId, 0, sizeof(m_nextMsgId));
@@ -68,6 +69,19 @@ const usb_tx::ChannelCounters* RelayUartRf::usbTxCounters(uint8_t channel) const
 
 void RelayUartRf::poll() {
   wdt_guard::feed();
+  if (!m_rf.isReady()) {
+    m_lastRadioReady = false;
+    discardRadioWorkOnOff();
+    serviceDownlinkQueue();
+    return;
+  }
+  if (!m_lastRadioReady) {
+    // Bytes can arrive while the SDN/POR/init sequence is running. They are
+    // temporally ambiguous, so drain them once on OFF -> READY.
+    discardRadioWorkOnOff();
+    m_lastRadioReady = true;
+  }
+
   if (m_config.enableUartToRf) {
     while (m_linkIo.available() > 0) {
       const uint8_t b = static_cast<uint8_t>(m_linkIo.read());
@@ -96,7 +110,19 @@ void RelayUartRf::poll() {
   }
 
   flushRfToUart();
+  if (!m_rf.isReady()) {
+    m_lastRadioReady = false;
+    discardRadioWorkOnOff();
+    serviceDownlinkQueue();
+    return;
+  }
   serviceUplinkQueue();
+  if (!m_rf.isReady()) {
+    m_lastRadioReady = false;
+    // serviceUplinkQueue has already popped the uncertain attempted entry.
+    // Purge only the remaining radio work; completed USB downlinks survive.
+    discardRadioWorkOnOff();
+  }
   serviceDownlinkQueue();
 }
 
@@ -443,6 +469,7 @@ bool RelayUartRf::sendRfPacket(const uint8_t* packet, uint8_t packetLen) {
   m_counters.rfRecoveries += outcome.recoveries;
   if (outcome.terminalFailure) {
     m_counters.rfTxTerminalFailures += 1;
+    m_rf.failSafeOffLocalTx();
   }
   return outcome.sent;
 }
@@ -580,6 +607,16 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
     resetReassembly(channel, true, true);
   }
 
+  // A lost ACK or local TX-completion interrupt can cause the sender to retry a
+  // message that was already delivered. Re-ACK it, but never enqueue it twice.
+  if (!state.active && state.seenRxMsgId && msgId == state.lastRxMsgId) {
+    m_counters.rfDuplicateDrops += 1;
+    if (link_protocol::rxAckRequiredForChannel(channel)) {
+      sendAck(channel, msgId, segIdx);
+    }
+    return;
+  }
+
   if (!state.active) {
     if (segIdx != 0) {
       m_counters.rfReassemblyDrops += 1;
@@ -696,7 +733,7 @@ void RelayUartRf::emitLinkStatus() {
   const int n =
       snprintf(statusLine,
                sizeof(statusLine),
-               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu rf_tx_timeouts=%lu rf_recoveries=%lu rf_tx_terminal_failures=%lu rf_msg_id_gaps=%lu rf_ack_rx=%lu rf_ack_tx=%lu rf_retries=%lu rf_ack_timeouts=%lu rf_wrong_network=%lu rf_wrong_address=%lu rf_wrong_version=%lu up_q_drops=%lu down_q_drops=%lu usb0_zero=%lu usb0_partial=%lu usb0_backpressure=%lu usb0_recoveries=%lu usb0_high_water=%lu usb0_discards=%lu usb1_zero=%lu usb1_partial=%lu usb1_backpressure=%lu usb1_recoveries=%lu usb1_high_water=%lu usb1_discards=%lu\\n",
+               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu rf_tx_timeouts=%lu rf_recoveries=%lu rf_tx_terminal_failures=%lu rf_msg_id_gaps=%lu rf_ack_rx=%lu rf_ack_tx=%lu rf_retries=%lu rf_ack_timeouts=%lu rf_wrong_network=%lu rf_wrong_address=%lu rf_wrong_version=%lu rf_duplicate_drops=%lu rf_recovery_purged_uplinks=%lu rf_recovery_discarded_bytes=%lu up_q_drops=%lu down_q_drops=%lu usb0_zero=%lu usb0_partial=%lu usb0_backpressure=%lu usb0_recoveries=%lu usb0_high_water=%lu usb0_discards=%lu usb1_zero=%lu usb1_partial=%lu usb1_backpressure=%lu usb1_recoveries=%lu usb1_high_water=%lu usb1_discards=%lu\\n",
                static_cast<unsigned long>(m_counters.uartRxBytes),
                static_cast<unsigned long>(m_counters.uartTxBytes),
                static_cast<unsigned long>(m_counters.rfRxPackets),
@@ -723,6 +760,9 @@ void RelayUartRf::emitLinkStatus() {
                static_cast<unsigned long>(m_counters.rfWrongNetworkDrops),
                static_cast<unsigned long>(m_counters.rfWrongAddressDrops),
                static_cast<unsigned long>(m_counters.rfVersionDrops),
+               static_cast<unsigned long>(m_counters.rfDuplicateDrops),
+               static_cast<unsigned long>(m_counters.rfRecoveryPurgedUplinks),
+               static_cast<unsigned long>(m_counters.rfRecoveryDiscardedBytes),
                static_cast<unsigned long>(m_counters.uplinkQueueDrops),
                static_cast<unsigned long>(m_counters.downlinkQueueDrops),
                static_cast<unsigned long>(usb0->zeroWrites),
@@ -748,6 +788,11 @@ void RelayUartRf::emitLinkStatus() {
 }
 
 bool RelayUartRf::enqueueUplinkMessage(uint8_t channel, const uint8_t* payload, uint16_t length) {
+  if (!m_rf.isReady()) {
+    m_counters.uplinkQueueDrops += 1;
+    m_counters.rfRecoveryPurgedUplinks += 1;
+    return false;
+  }
   if (length == 0 || length > link_protocol::FRAME_MAX_PAYLOAD) {
     m_counters.rfOversizeDrops += 1;
     return false;
@@ -806,7 +851,7 @@ bool RelayUartRf::enqueueDownlinkMessage(uint8_t channel, const uint8_t* payload
 }
 
 void RelayUartRf::serviceUplinkQueue() {
-  if (m_uplinkCount == 0) {
+  if (m_uplinkCount == 0 || !m_rf.isReady()) {
     return;
   }
 
@@ -814,6 +859,54 @@ void RelayUartRf::serviceUplinkQueue() {
   sendPayloadOverRf(entry.channel, entry.payload, entry.length);
   m_uplinkTail = static_cast<uint8_t>((m_uplinkTail + 1) % m_config.uplinkQueueDepth);
   m_uplinkCount = static_cast<uint8_t>(m_uplinkCount - 1);
+}
+
+void RelayUartRf::discardRadioWorkOnOff() {
+  uint32_t discardedBytes = 0;
+  while (m_linkIo.available() > 0) {
+    (void)m_linkIo.read();
+    m_counters.uartRxBytes += 1;
+    discardedBytes += 1;
+  }
+  if (m_payloadIo != nullptr) {
+    while (m_payloadIo->available() > 0) {
+      (void)m_payloadIo->read();
+      m_counters.uartRxBytes += 1;
+      m_counters.payloadUartRxBytes += 1;
+      discardedBytes += 1;
+    }
+  }
+
+  uint32_t purgedUplinks = m_uplinkCount;
+  if (m_rawUartLen > 0) {
+    purgedUplinks += 1;
+  }
+  if (m_payloadUartLen > 0) {
+    purgedUplinks += 1;
+  }
+  if (m_state != ParseState::WAIT_MAGIC_0 || m_inCommandMode) {
+    purgedUplinks += 1;
+  }
+
+  m_uplinkHead = 0;
+  m_uplinkTail = 0;
+  m_uplinkCount = 0;
+  m_rawUartLen = 0;
+  m_lastRawUartByteMs = 0;
+  m_payloadUartLen = 0;
+  m_lastPayloadUartByteMs = 0;
+  resetFrameParser(false);
+  m_inCommandMode = false;
+  m_commandIndex = 0;
+  memset(m_commandBuffer, 0, sizeof(m_commandBuffer));
+
+  for (uint8_t channel = 0; channel < link_protocol::CHANNEL_COUNT; channel++) {
+    const bool partialMessage = m_reassembly[channel].active;
+    resetReassembly(channel, false, partialMessage);
+  }
+
+  m_counters.rfRecoveryPurgedUplinks += purgedUplinks;
+  m_counters.rfRecoveryDiscardedBytes += discardedBytes;
 }
 
 void RelayUartRf::serviceDownlinkQueue() {

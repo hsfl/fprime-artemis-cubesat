@@ -44,7 +44,7 @@ class Rf23Driver {
   uint8_t m_rxOnPin;
   uint8_t m_txOnPin;
   uint8_t m_sdnPin;
-  RH_RF22 m_radio;
+  artemis::rf23bp::BoundedRf22 m_radio;
   artemis::rf23bp::RadioPins m_radioPins;
   artemis::rf23bp::RadioProfile m_radioProfile;
   uint8_t m_state;
