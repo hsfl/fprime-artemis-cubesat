@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "link_protocol.hpp"
+#include "rf_tx_retry.hpp"
 #include "wdt_guard.hpp"
 
 RelayUartRf::RelayUartRf(Stream& linkIo,
@@ -24,7 +25,6 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
       m_inCommandMode(false),
       m_commandIndex(0),
       m_lastFrameByteMs(0),
-      m_nextMsgId(0),
       m_rawUartLen(0),
       m_lastRawUartByteMs(0),
       m_payloadUartLen(0),
@@ -34,9 +34,11 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
       m_uplinkCount(0),
       m_downlinkHead(0),
       m_downlinkTail(0),
-      m_downlinkCount(0) {
+      m_downlinkCount(0),
+      m_lastRadioReady(false) {
   memset(m_framePayload, 0, sizeof(m_framePayload));
   memset(m_commandBuffer, 0, sizeof(m_commandBuffer));
+  memset(m_nextMsgId, 0, sizeof(m_nextMsgId));
   memset(m_reassembly, 0, sizeof(m_reassembly));
   memset(m_rawUartBuf, 0, sizeof(m_rawUartBuf));
   memset(m_payloadUartBuf, 0, sizeof(m_payloadUartBuf));
@@ -63,6 +65,18 @@ void RelayUartRf::begin() {
 
 void RelayUartRf::poll() {
   wdt_guard::feed();
+  if (!m_rf.isReady()) {
+    m_lastRadioReady = false;
+    discardRadioWorkOnOff();
+    serviceDownlinkQueue();
+    return;
+  }
+  if (!m_lastRadioReady) {
+    // Bytes received while the SDN/POR/init sequence ran are ambiguous.
+    discardRadioWorkOnOff();
+    m_lastRadioReady = true;
+  }
+
   if (m_config.enableUartToRf) {
     while (m_linkIo.available() > 0) {
       const uint8_t b = static_cast<uint8_t>(m_linkIo.read());
@@ -91,7 +105,18 @@ void RelayUartRf::poll() {
   }
 
   flushRfToUart();
+  if (!m_rf.isReady()) {
+    m_lastRadioReady = false;
+    discardRadioWorkOnOff();
+    serviceDownlinkQueue();
+    return;
+  }
   serviceUplinkQueue();
+  if (!m_rf.isReady()) {
+    m_lastRadioReady = false;
+    // Keep completed radio-to-USB downlinks, but purge uncertain RF work.
+    discardRadioWorkOnOff();
+  }
   serviceDownlinkQueue();
 }
 
@@ -282,7 +307,8 @@ void RelayUartRf::flushRfToUart() {
 
   while (m_rf.available()) {
     rfLen = static_cast<uint8_t>(sizeof(rfBuffer));
-    if (m_rf.recv(rfBuffer, &rfLen) && rfLen > 0) {
+    const Rf23ReceiveResult result = m_rf.recv(rfBuffer, &rfLen);
+    if (acceptRfReceiveResult(result) && rfLen > 0) {
       m_counters.rfRxPackets += 1;
       processRfSegment(rfBuffer, rfLen);
     }
@@ -369,7 +395,7 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
   }
 
   const uint8_t segCount = static_cast<uint8_t>(segCountU16);
-  const uint8_t msgId = m_nextMsgId++;
+  const uint8_t msgId = m_nextMsgId[channel]++;
 
   uint16_t sent = 0;
   for (uint8_t segIdx = 0; segIdx < segCount; segIdx++) {
@@ -388,7 +414,11 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
     memcpy(&rfPacket[link_protocol::RF_SEGMENT_HEADER_LEN], payload + sent, chunkLen);
 
     const uint8_t rfLen = static_cast<uint8_t>(link_protocol::RF_SEGMENT_HEADER_LEN + chunkLen);
-    const bool sentOk = sendRfPacketWithAck(rfPacket, rfLen, channel, msgId, segIdx);
+    wdt_guard::feed();
+    const bool sentOk = link_protocol::txAckRequiredForChannel(channel)
+                            ? sendRfPacketWithAck(rfPacket, rfLen, channel, msgId, segIdx)
+                            : sendRfPacket(rfPacket, rfLen);
+    wdt_guard::feed();
     if (!sentOk) {
       m_counters.rfTxDrops += 1;
       return false;
@@ -415,6 +445,30 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
   return true;
 }
 
+bool RelayUartRf::sendRfPacket(const uint8_t* packet, uint8_t packetLen) {
+  const rf_tx_retry::Outcome outcome = rf_tx_retry::sendWithBoundedTimeoutRetry([&]() {
+    wdt_guard::feed();
+    const Rf23SendResult result = m_rf.send(packet, packetLen);
+    wdt_guard::feed();
+    switch (result) {
+      case Rf23SendResult::SENT:
+        return rf_tx_retry::AttemptResult::SENT;
+      case Rf23SendResult::TX_TIMEOUT:
+        return rf_tx_retry::AttemptResult::TX_TIMEOUT;
+      case Rf23SendResult::START_FAILED:
+        return rf_tx_retry::AttemptResult::START_FAILED;
+    }
+    return rf_tx_retry::AttemptResult::START_FAILED;
+  });
+  m_counters.rfTxTimeouts += outcome.timeouts;
+  m_counters.rfRecoveries += outcome.recoveries;
+  if (outcome.terminalFailure) {
+    m_counters.rfTxTerminalFailures += 1;
+    m_rf.failSafeOffLocalTx();
+  }
+  return outcome.sent;
+}
+
 bool RelayUartRf::sendRfPacketWithAck(const uint8_t* packet,
                                       uint8_t packetLen,
                                       uint8_t channel,
@@ -422,7 +476,7 @@ bool RelayUartRf::sendRfPacketWithAck(const uint8_t* packet,
                                       uint8_t segIdx) {
   for (uint8_t attempt = 0; attempt <= link_protocol::RF_ACK_RETRIES; attempt++) {
     wdt_guard::feed();
-    if (!m_rf.send(packet, packetLen)) {
+    if (!sendRfPacket(packet, packetLen)) {
       return false;
     }
     if (waitForAck(channel, msgId, segIdx)) {
@@ -444,7 +498,8 @@ bool RelayUartRf::waitForAck(uint8_t channel, uint8_t msgId, uint8_t segIdx) {
     wdt_guard::feed();
     while (m_rf.available()) {
       uint8_t rfLen = static_cast<uint8_t>(sizeof(rfBuffer));
-      if (m_rf.recv(rfBuffer, &rfLen) && rfLen > 0) {
+      const Rf23ReceiveResult result = m_rf.recv(rfBuffer, &rfLen);
+      if (acceptRfReceiveResult(result) && rfLen > 0) {
         if (isAckPacket(rfBuffer, rfLen, channel, msgId, segIdx)) {
           m_counters.rfAckRx += 1;
           return true;
@@ -471,6 +526,25 @@ bool RelayUartRf::isAckPacket(const uint8_t* packet,
          packet[4] == 0;
 }
 
+bool RelayUartRf::acceptRfReceiveResult(Rf23ReceiveResult result) {
+  switch (result) {
+    case Rf23ReceiveResult::ACCEPTED:
+      return true;
+    case Rf23ReceiveResult::WRONG_NETWORK:
+      m_counters.rfWrongNetworkDrops += 1;
+      break;
+    case Rf23ReceiveResult::WRONG_ADDRESS:
+      m_counters.rfWrongAddressDrops += 1;
+      break;
+    case Rf23ReceiveResult::WRONG_VERSION:
+      m_counters.rfVersionDrops += 1;
+      break;
+    case Rf23ReceiveResult::NO_PACKET:
+      break;
+  }
+  return false;
+}
+
 bool RelayUartRf::sendAck(uint8_t channel, uint8_t msgId, uint8_t segIdx) {
   uint8_t ackPacket[link_protocol::RF_SEGMENT_HEADER_LEN] = {
       link_protocol::magicForChannel(channel),
@@ -479,7 +553,7 @@ bool RelayUartRf::sendAck(uint8_t channel, uint8_t msgId, uint8_t segIdx) {
       segIdx,
       0,
   };
-  const bool ok = m_rf.send(ackPacket, sizeof(ackPacket));
+  const bool ok = sendRfPacket(ackPacket, sizeof(ackPacket));
   if (ok) {
     m_counters.rfAckTx += 1;
   }
@@ -528,6 +602,15 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
     resetReassembly(channel, true, true);
   }
 
+  // Re-ACK a retry of a completed message, but never forward it twice.
+  if (!state.active && state.seenRxMsgId && msgId == state.lastRxMsgId) {
+    m_counters.rfDuplicateDrops += 1;
+    if (link_protocol::rxAckRequiredForChannel(channel)) {
+      sendAck(channel, msgId, segIdx);
+    }
+    return;
+  }
+
   if (!state.active) {
     if (segIdx != 0) {
       m_counters.rfReassemblyDrops += 1;
@@ -545,7 +628,9 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
   }
 
   if (msgId == state.expectedMsgId && segCount == state.expectedSegCount && segIdx < state.expectedSegIndex) {
-    sendAck(channel, msgId, segIdx);
+    if (link_protocol::rxAckRequiredForChannel(channel)) {
+      sendAck(channel, msgId, segIdx);
+    }
     return;
   }
 
@@ -577,7 +662,9 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
   if (channel == link_protocol::CHANNEL_PAYLOAD) {
     m_counters.payloadRfRxSegments += 1;
   }
-  sendAck(channel, msgId, segIdx);
+  if (link_protocol::rxAckRequiredForChannel(channel)) {
+    sendAck(channel, msgId, segIdx);
+  }
 
   if (segIdx + 1 == segCount) {
     m_counters.rfRxMessages += 1;
@@ -628,11 +715,11 @@ uint16_t RelayUartRf::crc16Ccitt(const uint8_t* data, uint16_t len) const {
 }
 
 void RelayUartRf::emitLinkStatus() {
-  char statusLine[360] = {0};
+  char statusLine[640] = {0};
   const int n =
       snprintf(statusLine,
                sizeof(statusLine),
-               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu rf_msg_id_gaps=%lu rf_ack_rx=%lu rf_ack_tx=%lu rf_retries=%lu rf_ack_timeouts=%lu up_q_drops=%lu down_q_drops=%lu\\n",
+               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu rf_tx_timeouts=%lu rf_recoveries=%lu rf_tx_terminal_failures=%lu rf_msg_id_gaps=%lu rf_ack_rx=%lu rf_ack_tx=%lu rf_retries=%lu rf_ack_timeouts=%lu rf_wrong_network=%lu rf_wrong_address=%lu rf_wrong_version=%lu rf_duplicate_drops=%lu rf_recovery_purged_uplinks=%lu rf_recovery_discarded_bytes=%lu up_q_drops=%lu down_q_drops=%lu\\n",
                static_cast<unsigned long>(m_counters.uartRxBytes),
                static_cast<unsigned long>(m_counters.uartTxBytes),
                static_cast<unsigned long>(m_counters.rfRxPackets),
@@ -648,21 +735,37 @@ void RelayUartRf::emitLinkStatus() {
                static_cast<unsigned long>(m_counters.rfReassemblyDrops),
                static_cast<unsigned long>(m_counters.rfOversizeDrops),
                static_cast<unsigned long>(m_counters.rfTxDrops),
+               static_cast<unsigned long>(m_counters.rfTxTimeouts),
+               static_cast<unsigned long>(m_counters.rfRecoveries),
+               static_cast<unsigned long>(m_counters.rfTxTerminalFailures),
                static_cast<unsigned long>(m_counters.rfMsgIdGaps),
                static_cast<unsigned long>(m_counters.rfAckRx),
                static_cast<unsigned long>(m_counters.rfAckTx),
                static_cast<unsigned long>(m_counters.rfRetries),
                static_cast<unsigned long>(m_counters.rfAckTimeouts),
+               static_cast<unsigned long>(m_counters.rfWrongNetworkDrops),
+               static_cast<unsigned long>(m_counters.rfWrongAddressDrops),
+               static_cast<unsigned long>(m_counters.rfVersionDrops),
+               static_cast<unsigned long>(m_counters.rfDuplicateDrops),
+               static_cast<unsigned long>(m_counters.rfRecoveryPurgedUplinks),
+               static_cast<unsigned long>(m_counters.rfRecoveryDiscardedBytes),
                static_cast<unsigned long>(m_counters.uplinkQueueDrops),
                static_cast<unsigned long>(m_counters.downlinkQueueDrops));
 
   if (n > 0) {
-    m_linkIo.write(reinterpret_cast<const uint8_t*>(statusLine), static_cast<size_t>(n));
-    m_counters.uartTxBytes += static_cast<uint32_t>(n);
+    const size_t writeLen =
+        static_cast<size_t>(n) < sizeof(statusLine) ? static_cast<size_t>(n) : sizeof(statusLine) - 1U;
+    m_linkIo.write(reinterpret_cast<const uint8_t*>(statusLine), writeLen);
+    m_counters.uartTxBytes += static_cast<uint32_t>(writeLen);
   }
 }
 
 bool RelayUartRf::enqueueUplinkMessage(uint8_t channel, const uint8_t* payload, uint16_t length) {
+  if (!m_rf.isReady()) {
+    m_counters.uplinkQueueDrops += 1;
+    m_counters.rfRecoveryPurgedUplinks += 1;
+    return false;
+  }
   if (length == 0 || length > link_protocol::FRAME_MAX_PAYLOAD) {
     m_counters.rfOversizeDrops += 1;
     return false;
@@ -711,7 +814,7 @@ bool RelayUartRf::enqueueDownlinkMessage(uint8_t channel, const uint8_t* payload
 }
 
 void RelayUartRf::serviceUplinkQueue() {
-  if (m_uplinkCount == 0) {
+  if (m_uplinkCount == 0 || !m_rf.isReady()) {
     return;
   }
 
@@ -719,6 +822,54 @@ void RelayUartRf::serviceUplinkQueue() {
   sendPayloadOverRf(entry.channel, entry.payload, entry.length);
   m_uplinkTail = static_cast<uint8_t>((m_uplinkTail + 1) % m_config.uplinkQueueDepth);
   m_uplinkCount = static_cast<uint8_t>(m_uplinkCount - 1);
+}
+
+void RelayUartRf::discardRadioWorkOnOff() {
+  uint32_t discardedBytes = 0;
+  while (m_linkIo.available() > 0) {
+    (void)m_linkIo.read();
+    m_counters.uartRxBytes += 1;
+    discardedBytes += 1;
+  }
+  if (m_payloadIo != nullptr) {
+    while (m_payloadIo->available() > 0) {
+      (void)m_payloadIo->read();
+      m_counters.uartRxBytes += 1;
+      m_counters.payloadUartRxBytes += 1;
+      discardedBytes += 1;
+    }
+  }
+
+  uint32_t purgedUplinks = m_uplinkCount;
+  if (m_rawUartLen > 0) {
+    purgedUplinks += 1;
+  }
+  if (m_payloadUartLen > 0) {
+    purgedUplinks += 1;
+  }
+  if (m_state != ParseState::WAIT_MAGIC_0 || m_inCommandMode) {
+    purgedUplinks += 1;
+  }
+
+  m_uplinkHead = 0;
+  m_uplinkTail = 0;
+  m_uplinkCount = 0;
+  m_rawUartLen = 0;
+  m_lastRawUartByteMs = 0;
+  m_payloadUartLen = 0;
+  m_lastPayloadUartByteMs = 0;
+  resetFrameParser(false);
+  m_inCommandMode = false;
+  m_commandIndex = 0;
+  memset(m_commandBuffer, 0, sizeof(m_commandBuffer));
+
+  for (uint8_t channel = 0; channel < link_protocol::CHANNEL_COUNT; channel++) {
+    const bool partialMessage = m_reassembly[channel].active;
+    resetReassembly(channel, false, partialMessage);
+  }
+
+  m_counters.rfRecoveryPurgedUplinks += purgedUplinks;
+  m_counters.rfRecoveryDiscardedBytes += discardedBytes;
 }
 
 void RelayUartRf::serviceDownlinkQueue() {

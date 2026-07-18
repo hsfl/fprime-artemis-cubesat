@@ -20,7 +20,8 @@ class CommsAppTester final : public CommsAppGTestBase {
     void testDownlinkFailureReturnsBase();
     void testIgnoresPayloadStatusWhenInactive();
     void testDriverStatusPollingAndRssiPing();
-    void testRunPublishesHealthFromLinkState();
+    void testBootReconcilesOffToReadyAndPublishesHealth();
+    void testFailedEnableSchedulesThirtySecondRetry();
 
   private:
     void connectPorts();

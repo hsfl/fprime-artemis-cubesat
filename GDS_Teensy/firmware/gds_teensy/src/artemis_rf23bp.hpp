@@ -33,6 +33,7 @@ struct RadioPins {
   uint8_t irq_pin = 40;
   uint8_t rx_on_pin = 30;
   uint8_t tx_on_pin = 31;
+  uint8_t sdn_pin = 37;
   Spi1Pins spi1 = {};
 };
 
@@ -43,6 +44,7 @@ struct RadioProfile {
   uint8_t tx_power = RH_RF22_RF23BP_TXPOW_30DBM;
   bool start_in_receive = true;
   unsigned long settle_us = 300;
+  uint16_t chip_ready_timeout_ms = 100;
 };
 
 // Snapshot of interrupt status registers.
@@ -91,12 +93,144 @@ struct LinkStats {
   int16_t last_rssi_dbm = 0;
 };
 
+enum class SendResult : uint8_t {
+  SENT = 0,
+  START_FAILED = 1,
+  TX_TIMEOUT = 2,
+};
+
+// First-failure evidence captured before recovery changes radio state. Reading
+// interrupt status registers 0x03/0x04 clears them, so they are always sampled
+// last and diagnostics must print this stored snapshot instead of reading live.
+struct FaultSnapshot {
+  bool valid = false;
+  SendResult cause = SendResult::START_FAILED;
+  uint32_t captured_ms = 0;
+  uint8_t nirq_level = 0xFF;
+  uint8_t radiohead_mode = 0xFF;
+  uint8_t device_type = 0;
+  uint8_t version_code = 0;
+  uint8_t device_status = 0;
+  uint8_t interrupt_enable1 = 0;
+  uint8_t interrupt_enable2 = 0;
+  uint8_t operating_mode1 = 0;
+  uint8_t operating_mode2 = 0;
+  uint8_t raw_rssi = 0;
+  uint8_t interrupt_status1 = 0;
+  uint8_t interrupt_status2 = 0;
+};
+
+// RadioHead's RH_RF22::init() waits forever for CHIPRDY. Production bridge
+// firmware uses this project-owned subclass so a failed radio reset returns to
+// the caller and can be retried without letting the MCU watchdog reset USB.
+class BoundedRf22 : public RH_RF22 {
+ public:
+  BoundedRf22(uint8_t slave_select_pin, uint8_t interrupt_pin, RHGenericSPI& spi)
+      : RH_RF22(slave_select_pin, interrupt_pin, spi) {}
+
+  bool initBounded(uint16_t chip_ready_timeout_ms) {
+    if (chip_ready_timeout_ms == 0 || !RHSPIDriver::init()) {
+      return false;
+    }
+
+    int interrupt_number = digitalPinToInterrupt(_interruptPin);
+    if (interrupt_number == NOT_AN_INTERRUPT) {
+      return false;
+    }
+#ifdef RH_ATTACHINTERRUPT_TAKES_PIN_NUMBER
+    interrupt_number = _interruptPin;
+#endif
+    spiUsingInterrupt(interrupt_number);
+
+    _mode = RHModeInitialising;
+    reset();
+    _deviceType = spiRead(RH_RF22_REG_00_DEVICE_TYPE);
+    if (_deviceType != RH_RF22_DEVICE_TYPE_RX_TRX &&
+        _deviceType != RH_RF22_DEVICE_TYPE_TX) {
+      return false;
+    }
+
+    spiWrite(RH_RF22_REG_07_OPERATING_MODE1, RH_RF22_SWRES);
+    const uint32_t chip_ready_start_ms = millis();
+    while ((spiRead(RH_RF22_REG_04_INTERRUPT_STATUS2) & RH_RF22_ICHIPRDY) == 0) {
+      if ((millis() - chip_ready_start_ms) >= chip_ready_timeout_ms) {
+        return false;
+      }
+      yield();
+    }
+
+    pinMode(_interruptPin, INPUT);
+    spiWrite(RH_RF22_REG_05_INTERRUPT_ENABLE1,
+             RH_RF22_ENTXFFAEM | RH_RF22_ENRXFFAFULL | RH_RF22_ENPKSENT |
+                 RH_RF22_ENPKVALID | RH_RF22_ENCRCERROR | RH_RF22_ENFFERR);
+    spiWrite(RH_RF22_REG_06_INTERRUPT_ENABLE2, RH_RF22_ENPREAVAL);
+
+    if (_myInterruptIndex == 0xff) {
+      if (_interruptCount >= RH_RF22_NUM_INTERRUPTS) {
+        return false;
+      }
+      _myInterruptIndex = _interruptCount++;
+    }
+    _deviceForInterrupt[_myInterruptIndex] = this;
+    if (_myInterruptIndex == 0) {
+      attachInterrupt(interrupt_number, isr0, FALLING);
+    } else if (_myInterruptIndex == 1) {
+      attachInterrupt(interrupt_number, isr1, FALLING);
+    } else if (_myInterruptIndex == 2) {
+      attachInterrupt(interrupt_number, isr2, FALLING);
+    } else {
+      return false;
+    }
+
+    setModeIdle();
+    clearTxBuf();
+    clearRxBuf();
+    spiWrite(RH_RF22_REG_7D_TX_FIFO_CONTROL2, RH_RF22_TXFFAEM_THRESHOLD);
+    spiWrite(RH_RF22_REG_7E_RX_FIFO_CONTROL, RH_RF22_RXFFAFULL_THRESHOLD);
+    spiWrite(RH_RF22_REG_30_DATA_ACCESS_CONTROL,
+             RH_RF22_ENPACRX | RH_RF22_ENPACTX | RH_RF22_ENCRC |
+                 (_polynomial & RH_RF22_CRC));
+    spiWrite(RH_RF22_REG_32_HEADER_CONTROL1,
+             RH_RF22_BCEN_HEADER3 | RH_RF22_HDCH_HEADER3);
+    spiWrite(RH_RF22_REG_33_HEADER_CONTROL2,
+             RH_RF22_HDLEN_4 | RH_RF22_SYNCLEN_2);
+    setPreambleLength(8);
+    uint8_t sync_words[] = {0x2d, 0xd4};
+    setSyncWords(sync_words, sizeof(sync_words));
+    setPromiscuous(false);
+    setFrequency(434.0f, 0.05f);
+    setModemConfig(FSK_Rb2_4Fd36);
+    setGpioReversed(false);
+    setTxPower(RH_RF22_TXPOW_8DBM);
+    return true;
+  }
+};
+
 // Configure Teensy SPI1 pin mux and start the bus.
 inline void setupSpi1(const Spi1Pins& pins) {
   SPI1.setMISO(pins.miso_pin);
   SPI1.setMOSI(pins.mosi_pin);
   SPI1.setSCK(pins.sck_pin);
   SPI1.begin();
+}
+
+// Hold chip select high before the radio is probed or initialized.
+inline void setupChipSelect(const RadioPins& pins) {
+  pinMode(pins.cs_pin, OUTPUT);
+  digitalWrite(pins.cs_pin, HIGH);
+}
+
+// Put the module into the RFM23BP datasheet shutdown state. This leaves VCC
+// present but removes register state and makes SPI unavailable until SDN falls.
+inline void shutdownRadio(const RadioPins& pins) {
+  detachInterrupt(digitalPinToInterrupt(pins.irq_pin));
+  setupChipSelect(pins);
+  pinMode(pins.rx_on_pin, OUTPUT);
+  pinMode(pins.tx_on_pin, OUTPUT);
+  digitalWrite(pins.rx_on_pin, LOW);
+  digitalWrite(pins.tx_on_pin, LOW);
+  pinMode(pins.sdn_pin, OUTPUT);
+  digitalWrite(pins.sdn_pin, HIGH);
 }
 
 // Put RF front-end control lines into low-power idle.
@@ -130,22 +264,61 @@ inline void setupAmpPins(const RadioPins& pins, const RadioProfile& profile) {
   }
 }
 
+// Verify stable device identity without changing a radio register. The bounded
+// driver owns the software-reset/init sequence that follows this check.
+inline bool probeDeviceIdentity(RH_RF22& radio, const RadioPins& pins, Print* log = nullptr) {
+  setupChipSelect(pins);
+
+  const uint8_t first = radio.spiRead(RH_RF22_REG_00_DEVICE_TYPE);
+  delay(1);
+  const uint8_t second = radio.spiRead(RH_RF22_REG_00_DEVICE_TYPE);
+  const bool knownType =
+      first == RH_RF22_DEVICE_TYPE_RX_TRX || first == RH_RF22_DEVICE_TYPE_TX;
+  if (!knownType || first != second) {
+    if (log != nullptr) {
+      log->println(F("RF23BP device probe failed"));
+    }
+    return false;
+  }
+  return true;
+}
+
 // One-call radio init:
-// 1) amp pin setup
-// 2) SPI1 setup
-// 3) RH_RF22 init + frequency/modem/tx power
-// 4) enter RX or IDLE based on profile
-inline bool initRadio(RH_RF22& radio, const RadioPins& pins = RadioPins(),
+// 1) force safe datasheet shutdown
+// 2) release SDN and wait through the worst-case POR interval
+// 3) perform stable, non-mutating identity reads
+// 4) run one bounded RF22 init + apply the proven RF profile
+// 5) enter RX or IDLE based on profile
+inline bool initRadioDriver(RH_RF22& radio, uint16_t) {
+  // Compatibility path for simple student sketches. Production bridge drivers
+  // instantiate BoundedRf22 and select the bounded overload below.
+  return radio.init();
+}
+
+inline bool initRadioDriver(BoundedRf22& radio, uint16_t chip_ready_timeout_ms) {
+  return radio.initBounded(chip_ready_timeout_ms);
+}
+
+template <typename RadioT>
+inline bool initRadio(RadioT& radio, const RadioPins& pins = RadioPins(),
                       const RadioProfile& profile = RadioProfile(),
                       Print* log = nullptr) {
-  setupAmpPins(pins, profile);
+  shutdownRadio(pins);
+  delay(50);
   setupSpi1(pins.spi1);
-  delay(10);
+  digitalWrite(pins.sdn_pin, LOW);
+  delay(50);
 
-  if (!radio.init()) {
+  if (!probeDeviceIdentity(radio, pins, log)) {
+    shutdownRadio(pins);
+    return false;
+  }
+
+  if (!initRadioDriver(radio, profile.chip_ready_timeout_ms)) {
     if (log != nullptr) {
       log->println(F("RF23BP init failed"));
     }
+    shutdownRadio(pins);
     return false;
   }
 
@@ -153,12 +326,20 @@ inline bool initRadio(RH_RF22& radio, const RadioPins& pins = RadioPins(),
     if (log != nullptr) {
       log->println(F("RF23BP setFrequency failed"));
     }
+    shutdownRadio(pins);
     return false;
   }
 
   radio.setModemConfig(profile.modem);
+  // RFM23BP datasheet section 3.5.7: rates above 100 kbps require
+  // register 0x58 = 0xC0. RadioHead's 125 kbps preset leaves the POR/default
+  // 0x80 value, which increases eye closure and packet loss.
+  if (profile.modem == RH_RF22::GFSK_Rb125Fd125) {
+    radio.spiWrite(RH_RF22_REG_58_CHARGE_PUMP_CURRENT_TRIMMING, 0xC0);
+  }
   radio.setTxPower(profile.tx_power);
 
+  setupAmpPins(pins, profile);
   if (profile.start_in_receive) {
     setAmpReceive(pins, profile);
     radio.setModeRx();
@@ -173,28 +354,92 @@ inline bool initRadio(RH_RF22& radio, const RadioPins& pins = RadioPins(),
   return true;
 }
 
-// Send one packet and restore post-send state (RX or IDLE).
-// Optional timeout avoids indefinite wait when TX-done interrupt is missing.
-inline bool sendPacket(RH_RF22& radio, const RadioPins& pins,
-                       const RadioProfile& profile, const uint8_t* data,
-                       uint8_t len, uint16_t tx_complete_timeout_ms = 0) {
-  if (data == nullptr || len == 0 || len > radio.maxMessageLength()) {
-    return false;
+inline void captureFirstFaultSnapshot(RH_RF22& radio, const RadioPins& pins,
+                                      SendResult cause,
+                                      FaultSnapshot* first_fault) {
+  if (first_fault == nullptr || first_fault->valid) {
+    return;
+  }
+
+  FaultSnapshot snapshot;
+  snapshot.cause = cause;
+  snapshot.captured_ms = millis();
+  ATOMIC_BLOCK_START;
+  snapshot.nirq_level = static_cast<uint8_t>(digitalRead(pins.irq_pin));
+  snapshot.radiohead_mode = static_cast<uint8_t>(radio.mode());
+  snapshot.device_type = radio.spiRead(RH_RF22_REG_00_DEVICE_TYPE);
+  snapshot.version_code = radio.spiRead(RH_RF22_REG_01_VERSION_CODE);
+  snapshot.device_status = radio.spiRead(RH_RF22_REG_02_DEVICE_STATUS);
+  snapshot.interrupt_enable1 = radio.spiRead(RH_RF22_REG_05_INTERRUPT_ENABLE1);
+  snapshot.interrupt_enable2 = radio.spiRead(RH_RF22_REG_06_INTERRUPT_ENABLE2);
+  snapshot.operating_mode1 = radio.spiRead(RH_RF22_REG_07_OPERATING_MODE1);
+  snapshot.operating_mode2 = radio.spiRead(RH_RF22_REG_08_OPERATING_MODE2);
+  snapshot.raw_rssi = radio.spiRead(RH_RF22_REG_26_RSSI);
+  // Destructive reads must remain last.
+  snapshot.interrupt_status1 = radio.spiRead(RH_RF22_REG_03_INTERRUPT_STATUS1);
+  snapshot.interrupt_status2 = radio.spiRead(RH_RF22_REG_04_INTERRUPT_STATUS2);
+  ATOMIC_BLOCK_END;
+  snapshot.valid = true;
+  *first_fault = snapshot;
+}
+
+// Recover the radio after a terminal TX wait timeout. Always return to RX so
+// the peer can re-establish the link after the local transmit path wedges.
+inline void recoverTransmitPath(RH_RF22& radio, const RadioPins& pins,
+                                const RadioProfile& profile) {
+  radio.setModeIdle();
+  const uint8_t op_mode2 = radio.spiRead(RH_RF22_REG_08_OPERATING_MODE2);
+  radio.spiWrite(RH_RF22_REG_08_OPERATING_MODE2,
+                 op_mode2 | RH_RF22_FFCLRTX | RH_RF22_FFCLRRX);
+  radio.spiWrite(RH_RF22_REG_08_OPERATING_MODE2, op_mode2);
+  (void)radio.spiRead(RH_RF22_REG_03_INTERRUPT_STATUS1);
+  (void)radio.spiRead(RH_RF22_REG_04_INTERRUPT_STATUS2);
+  setAmpReceive(pins, profile);
+  radio.setModeRx();
+}
+
+// Send one packet with a mandatory bounded completion wait.
+inline SendResult sendPacket(RH_RF22& radio, const RadioPins& pins,
+                             const RadioProfile& profile, const uint8_t* data,
+                             uint8_t len, uint16_t tx_complete_timeout_ms,
+                             Print* log = nullptr,
+                             FaultSnapshot* first_fault = nullptr) {
+  if (data == nullptr || len == 0 || len > radio.maxMessageLength() ||
+      tx_complete_timeout_ms == 0) {
+    return SendResult::START_FAILED;
+  }
+
+  // RH_RF22::send() begins with an unbounded waitPacketSent(). Never enter it
+  // while a previous TX is still wedged.
+  if (radio.mode() == RHGenericDriver::RHModeTx) {
+    captureFirstFaultSnapshot(radio, pins, SendResult::TX_TIMEOUT, first_fault);
+    recoverTransmitPath(radio, pins, profile);
+    if (log != nullptr) {
+      log->println(F("RF23BP pre-send TX wedge; FIFOs cleared and RX restored"));
+    }
+    return SendResult::TX_TIMEOUT;
   }
 
   setAmpTransmit(pins, profile);
-  const bool sent = radio.send(data, len);
-
-  bool tx_complete = false;
-  if (sent) {
-    if (tx_complete_timeout_ms > 0) {
-      // Prevent lock-up if TX completion interrupt never arrives.
-      tx_complete =
-          static_cast<RHGenericDriver&>(radio).waitPacketSent(tx_complete_timeout_ms);
+  if (!radio.send(data, len)) {
+    captureFirstFaultSnapshot(radio, pins, SendResult::START_FAILED, first_fault);
+    if (profile.start_in_receive) {
+      setAmpReceive(pins, profile);
+      radio.setModeRx();
     } else {
-      radio.waitPacketSent();
-      tx_complete = true;
+      setAmpIdle(pins);
+      radio.setModeIdle();
     }
+    return SendResult::START_FAILED;
+  }
+
+  if (!static_cast<RHGenericDriver&>(radio).waitPacketSent(tx_complete_timeout_ms)) {
+    captureFirstFaultSnapshot(radio, pins, SendResult::TX_TIMEOUT, first_fault);
+    recoverTransmitPath(radio, pins, profile);
+    if (log != nullptr) {
+      log->println(F("RF23BP TX completion timeout; FIFOs cleared and RX restored"));
+    }
+    return SendResult::TX_TIMEOUT;
   }
 
   if (profile.start_in_receive) {
@@ -205,7 +450,7 @@ inline bool sendPacket(RH_RF22& radio, const RadioPins& pins,
     radio.setModeIdle();
   }
 
-  return sent && tx_complete;
+  return SendResult::SENT;
 }
 
 // Receive one packet if available.
@@ -281,13 +526,7 @@ inline LinkStats readLinkStats(RH_RF22& radio) {
 // 4) return to RX
 inline void recoverFromFifoError(RH_RF22& radio, const RadioPins& pins,
                                  const RadioProfile& profile) {
-  radio.setModeIdle();
-  const uint8_t op_mode2 = radio.spiRead(RH_RF22_REG_08_OPERATING_MODE2);
-  radio.spiWrite(RH_RF22_REG_08_OPERATING_MODE2,
-                 op_mode2 | RH_RF22_FFCLRTX | RH_RF22_FFCLRRX);
-  (void)readAndClearInterruptStatus(radio);
-  setAmpReceive(pins, profile);
-  radio.setModeRx();
+  recoverTransmitPath(radio, pins, profile);
 }
 
 }  // namespace rf23bp

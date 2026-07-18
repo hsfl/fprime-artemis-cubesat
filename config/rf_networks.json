@@ -1,0 +1,17 @@
+{
+  "protocol_version": 1,
+  "addresses": {
+    "ground": 161,
+    "satellite": 162
+  },
+  "networks": {
+    "epscorc3m": {
+      "id": 195,
+      "label": "EPSCoR C3M"
+    },
+    "neutron2": {
+      "id": 210,
+      "label": "Neutron 2"
+    }
+  }
+}

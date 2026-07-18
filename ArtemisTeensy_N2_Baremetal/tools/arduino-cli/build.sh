@@ -12,6 +12,7 @@ export ARDUINO_CONFIG_FILE="$ROOT_DIR/tools/arduino-cli/arduino-cli.yaml"
 arduino-cli core update-index
 arduino-cli core install teensy:avr
 arduino-cli compile \
+  --verbose \
   --fqbn "$FQBN" \
   --libraries "$LIBRARIES_DIR" \
   --build-path "$BUILD_DIR" \

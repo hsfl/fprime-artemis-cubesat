@@ -28,11 +28,20 @@ struct LinkCounters {
   uint32_t rfReassemblyDrops = 0;
   uint32_t rfOversizeDrops = 0;
   uint32_t rfTxDrops = 0;
+  uint32_t rfTxTimeouts = 0;
+  uint32_t rfRecoveries = 0;
+  uint32_t rfTxTerminalFailures = 0;
   uint32_t rfMsgIdGaps = 0;
   uint32_t rfAckRx = 0;
   uint32_t rfAckTx = 0;
   uint32_t rfRetries = 0;
   uint32_t rfAckTimeouts = 0;
+  uint32_t rfWrongNetworkDrops = 0;
+  uint32_t rfWrongAddressDrops = 0;
+  uint32_t rfVersionDrops = 0;
+  uint32_t rfDuplicateDrops = 0;
+  uint32_t rfRecoveryPurgedUplinks = 0;
+  uint32_t rfRecoveryDiscardedBytes = 0;
   uint32_t uplinkQueueDrops = 0;
   uint32_t downlinkQueueDrops = 0;
 
@@ -61,11 +70,20 @@ struct LinkCounters {
     rfReassemblyDrops = 0;
     rfOversizeDrops = 0;
     rfTxDrops = 0;
+    rfTxTimeouts = 0;
+    rfRecoveries = 0;
+    rfTxTerminalFailures = 0;
     rfMsgIdGaps = 0;
     rfAckRx = 0;
     rfAckTx = 0;
     rfRetries = 0;
     rfAckTimeouts = 0;
+    rfWrongNetworkDrops = 0;
+    rfWrongAddressDrops = 0;
+    rfVersionDrops = 0;
+    rfDuplicateDrops = 0;
+    rfRecoveryPurgedUplinks = 0;
+    rfRecoveryDiscardedBytes = 0;
     uplinkQueueDrops = 0;
     downlinkQueueDrops = 0;
   }

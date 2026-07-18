@@ -44,9 +44,35 @@ Not validated:
 
 The HIL demo and laptop rehearsal use the same topology. The scheduled science
 path, payload downlink app, transport manager, command/telemetry framework,
-and EPS driver ticks are active. The higher-volume periodic `sohApp.run`,
-`payloadManager.run`, `storageManager.run`, and `commsApp.run` loops remain
-disabled; use command-triggered SOH/storage/link checks for demo visibility.
+EPS driver ticks, and the slow `commsApp.run` radio-recovery policy are active.
+The higher-volume periodic `sohApp.run`, `payloadManager.run`, and
+`storageManager.run` loops remain disabled; use command-triggered SOH/storage
+checks for demo visibility.
+
+## RF Reliability Wiring Gate
+
+The hardened firmware uses RFM23BP `SDN` as a functional hardware reset. Verify
+this wiring before the demo:
+
+| Teensy pin | Signal | Required behavior |
+| --- | --- | --- |
+| 37 | RFM23BP `SDN` | HIGH shuts the radio down; LOW permits initialization |
+| 36 | Raspberry Pi enable | remains HIGH while the radio is reset/recovered |
+| 38 / 40 | RFM23BP CS / IRQ | unchanged |
+| 30 / 31 | RF front-end RX / TX control | unchanged |
+
+On every satellite Teensy boot, including a watchdog reboot, pin 37 is asserted
+HIGH before the Pi enable and UART initialization path. F Prime then queries
+channel 2 and enables the radio. A repeated 500 ms TX-completion failure also
+asserts SDN; F Prime retries after 30 seconds, 120 seconds, and then every 15
+minutes. The ground Teensy independently performs SDN recovery with bounded
+1-second, 5-second, and 30-second initialization backoff, without requiring a
+GDS or USB restart.
+
+SDN does not remove the radio board's power rail. If the failure persists, test
+28 dBm versus 30 dBm, scope RFM23BP VCC during TX, inspect SPI/nIRQ/SDN with a
+logic analyzer, verify common ground and backfeed paths, and swap the module or
+cable before attributing the remaining fault to software.
 
 ## Output Files
 
@@ -212,8 +238,28 @@ Useful channels:
 - `storageManager.StoredProducts`
 - `commsApp.PendingScienceBytes`
 - `commsApp.LinkState`
+- `commsApp.RadioStatusKnown`
+- `commsApp.RadioState`
+- `commsApp.RadioFault`
+- `commsApp.RadioRpcResult`
+- `commsApp.RadioRecoveryFailures`
+- `commsApp.RadioRetrySeconds`
+- `commsApp.RadioInitAttempts`
+- `commsApp.RssiValid`
 - `commsApp.RssiDbm`
 - `payloadDownlinkApp.ProgressPercent`
+
+Expected startup sequence:
+
+1. `RadioStatusKnown=0`, `RadioState=OFF`, compatibility `LinkState=0`.
+2. The Pi receives factual OFF status and issues `SET_ENABLED(1)`.
+3. `RadioStatusKnown=1`, `RadioState=READY`, `RadioFault=NONE`, and
+   compatibility `LinkState=2`.
+
+If `RadioState=OFF` with `RadioFault=INIT_FAILED` or `LOCAL_TX_FAULT`, leave the
+Pi and GDS running and watch `RadioRetrySeconds`; autonomous recovery is now the
+expected behavior. `RssiValid=0` means no addressed Neutron 2 RF packet has yet
+been accepted, so `RssiDbm` must not be treated as a live link measurement.
 
 Command bounds:
 

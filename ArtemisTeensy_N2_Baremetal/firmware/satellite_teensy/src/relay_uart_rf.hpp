@@ -57,6 +57,8 @@ class RelayUartRf {
   void processCommandByte(uint8_t b);
   void processFrameByte(uint8_t b);
   void flushRfToUart();
+  void handleRadioStateTransition();
+  void discardRadioWorkOnOff();
 
   void resetFrameParser(bool timeoutReset);
   void handleCompletedFrame();
@@ -64,11 +66,13 @@ class RelayUartRf {
   bool sendRawToUart(const uint8_t* payload, uint16_t length);
 
   bool sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uint16_t length);
+  bool sendRfPacket(const uint8_t* packet, uint8_t packetLen);
   bool sendRfPacketWithAck(const uint8_t* packet, uint8_t packetLen, uint8_t channel, uint8_t msgId, uint8_t segIdx);
   bool waitForAck(uint8_t channel, uint8_t msgId, uint8_t segIdx);
   bool isAckPacket(const uint8_t* packet, uint8_t packetLen, uint8_t channel, uint8_t msgId, uint8_t segIdx) const;
   bool sendAck(uint8_t channel, uint8_t msgId, uint8_t segIdx);
   void processRfSegment(const uint8_t* packet, uint8_t packetLen);
+  bool acceptRfReceiveResult(Rf23ReceiveResult result);
   void resetReassembly(uint8_t channel, bool timeoutReset, bool dropReset);
 
   uint16_t crc16Ccitt(const uint8_t* data, uint16_t len) const;
@@ -104,6 +108,7 @@ class RelayUartRf {
   Rf23Driver& m_rf;
   LinkCounters& m_counters;
   RelayConfig m_config;
+  bool m_lastRadioReady;
 
   ParseState m_state;
   uint8_t m_frameChannel;
@@ -117,7 +122,7 @@ class RelayUartRf {
   size_t m_commandIndex;
   uint32_t m_lastFrameByteMs;
 
-  uint8_t m_nextMsgId;
+  uint8_t m_nextMsgId[link_protocol::CHANNEL_COUNT];
   ReassemblyState m_reassembly[link_protocol::CHANNEL_COUNT];
 
   uint8_t m_rawUartBuf[link_protocol::FRAME_MAX_PAYLOAD];

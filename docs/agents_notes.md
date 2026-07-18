@@ -8,6 +8,19 @@ This repo is the Neutron 2 team F' integration workspace:
 - Channel 0 is the normal F Prime/GDS CCSDS stream, channel 1 is payload/science packets, and channel 2 is satellite-Teensy-local subsystem RPC.
 - Ground Teensy reassembles RF channel 0 to the laptop GDS USB serial stream and RF channel 1 to payload USB when triple-serial mode is enabled.
 
+## RF Reliability Hardening (2026-07-17)
+
+- Neutron 2 now uses RFM23BP `SDN` on Teensy pin 37 for a real radio-context reset.
+- Satellite Teensy boot and watchdog reboot hold the radio OFF first while pin 36 keeps the Pi enabled.
+- F Prime owns satellite radio enable/status through channel-2 target 2 RPCs.
+- Pi recovery policy retries failed enables after 30 seconds, 120 seconds, then every 15 minutes.
+- Ground Teensy autonomously performs SDN/POR/reinit after terminal local TX faults, without restarting GDS or USB.
+- RF TX completion is bounded at 500 ms, followed by one FIFO/RX recovery retry; a second failure forces SDN shutdown.
+- Neutron 2 retains ACK/retry behavior on channel 0 and channel 1 in both directions.
+- RF RadioHead headers now enforce the Neutron 2 network ID (`0xD2`), ground/satellite addresses, and protocol version before forwarding.
+- Message IDs advance independently per channel and completed-message retries are re-ACKed without duplicate delivery.
+- `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md` contains the wiring gate, startup telemetry sequence, recovery expectations, and residual electrical checks.
+
 ## Demo Target Snapshot (2026-04-07)
 
 The current top-level target is the shortened FlatSat FSR end-to-end demo shown in the team's planning slides. Treat this as the active demonstration narrative when making architecture, implementation, or documentation decisions.

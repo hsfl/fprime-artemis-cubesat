@@ -4,13 +4,17 @@
 from __future__ import annotations
 
 import ast
+import json
 import operator
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+MANIFEST = ROOT / "config/transport_constants.json"
+RF_NETWORKS = ROOT / "config/rf_networks.json"
 
 SOURCES = {
     "fprime": ROOT / "ArtemisRpiTeensy_N2/Components/LinkCfg/LinkCfg.hpp",
@@ -67,12 +71,28 @@ def expect_equal(errors: list[str], label: str, *pairs: tuple[str, int]) -> None
 
 
 def main() -> int:
+    generated_check = subprocess.run(
+        [sys.executable, str(ROOT / "tools/generate_transport_constants.py"), "--check"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if generated_check.returncode != 0:
+        output = (generated_check.stdout + generated_check.stderr).strip()
+        if output:
+            print(output)
+        print("ERROR: generated transport headers do not match their manifests")
+        return 1
+
     constants = {name: read_constants(path) for name, path in SOURCES.items()}
+    manifest = json.loads(MANIFEST.read_text())
+    registry = json.loads(RF_NETWORKS.read_text())
     errors: list[str] = []
 
     fp = constants["fprime"]
     sat = constants["satellite_teensy"]
     gnd = constants["ground_teensy"]
+    selected_network = registry["networks"][manifest["rf"]["network"]]
 
     common_pairs = [
         ("frame magic 0", ("fprime", fp["UART_FRAME_MAGIC_0"]), ("satellite", sat["FRAME_MAGIC_0"]), ("ground", gnd["FRAME_MAGIC_0"])),
@@ -81,6 +101,15 @@ def main() -> int:
         ("channel payload", ("fprime", fp["CHANNEL_PAYLOAD"]), ("satellite", sat["CHANNEL_PAYLOAD"]), ("ground", gnd["CHANNEL_PAYLOAD"])),
         ("UART max payload", ("fprime", fp["UART_FRAME_MAX_PAYLOAD"]), ("satellite", sat["FRAME_MAX_PAYLOAD"]), ("ground", gnd["FRAME_MAX_PAYLOAD"])),
         ("RF payload segment data", ("fprime", fp["RF_SEGMENT_MAX_DATA_BYTES"]), ("satellite", sat["RF_SEGMENT_MAX_DATA"]), ("ground", gnd["RF_SEGMENT_MAX_DATA"])),
+        ("RF network ID", ("registry", selected_network["id"]), ("fprime", fp["RF_NETWORK_ID"]), ("satellite", sat["RF_NETWORK_ID"]), ("ground", gnd["RF_NETWORK_ID"])),
+        ("RF protocol version", ("registry", registry["protocol_version"]), ("fprime", fp["RF_PROTOCOL_VERSION"]), ("satellite", sat["RF_PROTOCOL_VERSION"]), ("ground", gnd["RF_PROTOCOL_VERSION"])),
+        ("RF ground address", ("registry", registry["addresses"]["ground"]), ("fprime", fp["RF_GROUND_ADDRESS"]), ("ground local", gnd["RF_LOCAL_ADDRESS"]), ("satellite remote", sat["RF_REMOTE_ADDRESS"])),
+        ("RF satellite address", ("registry", registry["addresses"]["satellite"]), ("fprime", fp["RF_SATELLITE_ADDRESS"]), ("satellite local", sat["RF_LOCAL_ADDRESS"]), ("ground remote", gnd["RF_REMOTE_ADDRESS"])),
+        ("RF TX completion timeout", ("manifest", manifest["rf"]["tx_complete_timeout_ms"]), ("fprime", fp["RF_TX_COMPLETE_TIMEOUT_MS"]), ("satellite", sat["RF_TX_COMPLETE_TIMEOUT_MS"]), ("ground", gnd["RF_TX_COMPLETE_TIMEOUT_MS"])),
+        ("ground TX CCSDS ACK", ("fprime", fp["RF_GROUND_TX_ACK_REQUIRED_CCSDS"]), ("ground TX", gnd["RF_TX_ACK_REQUIRED_CCSDS"]), ("satellite RX", sat["RF_RX_ACK_REQUIRED_CCSDS"])),
+        ("ground TX payload ACK", ("fprime", fp["RF_GROUND_TX_ACK_REQUIRED_PAYLOAD"]), ("ground TX", gnd["RF_TX_ACK_REQUIRED_PAYLOAD"]), ("satellite RX", sat["RF_RX_ACK_REQUIRED_PAYLOAD"])),
+        ("satellite TX CCSDS ACK", ("fprime", fp["RF_SATELLITE_TX_ACK_REQUIRED_CCSDS"]), ("satellite TX", sat["RF_TX_ACK_REQUIRED_CCSDS"]), ("ground RX", gnd["RF_RX_ACK_REQUIRED_CCSDS"])),
+        ("satellite TX payload ACK", ("fprime", fp["RF_SATELLITE_TX_ACK_REQUIRED_PAYLOAD"]), ("satellite TX", sat["RF_TX_ACK_REQUIRED_PAYLOAD"]), ("ground RX", gnd["RF_RX_ACK_REQUIRED_PAYLOAD"])),
     ]
     for label, *pairs in common_pairs:
         expect_equal(errors, label, *pairs)
@@ -97,6 +126,14 @@ def main() -> int:
         errors.append("F Prime and satellite Teensy must keep channel 2 for local subsystem RPC")
     if gnd["CHANNEL_COUNT"] != 2:
         errors.append("Ground Teensy should expose only the RF-forwarded channels 0 and 1")
+    for name in (
+        "RF_GROUND_TX_ACK_REQUIRED_CCSDS",
+        "RF_GROUND_TX_ACK_REQUIRED_PAYLOAD",
+        "RF_SATELLITE_TX_ACK_REQUIRED_CCSDS",
+        "RF_SATELLITE_TX_ACK_REQUIRED_PAYLOAD",
+    ):
+        if fp[name] != 1:
+            errors.append(f"Neutron 2 compatibility requires {name}=1")
 
     if errors:
         for error in errors:

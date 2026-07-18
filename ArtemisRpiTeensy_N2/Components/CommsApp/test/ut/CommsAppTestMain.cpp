@@ -25,9 +25,14 @@ TEST(Nominal, DriverStatusPollingAndRssiPing) {
     tester.testDriverStatusPollingAndRssiPing();
 }
 
-TEST(Nominal, RunPublishesHealthFromLinkState) {
+TEST(Reliability, BootReconcilesOffToReadyAndPublishesHealth) {
     Components::CommsAppTester tester;
-    tester.testRunPublishesHealthFromLinkState();
+    tester.testBootReconcilesOffToReadyAndPublishesHealth();
+}
+
+TEST(Reliability, FailedEnableSchedulesThirtySecondRetry) {
+    Components::CommsAppTester tester;
+    tester.testFailedEnableSchedulesThirtySecondRetry();
 }
 
 int main(int argc, char** argv) {
