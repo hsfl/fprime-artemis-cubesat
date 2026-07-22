@@ -157,11 +157,6 @@ int main() {{
             REPO_ROOT / "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/artemis_rf23bp.hpp",
             REPO_ROOT / "GDS_Teensy/firmware/gds_teensy/src/artemis_rf23bp.hpp",
         )
-        fifo_clear_pulse = re.compile(
-            r"spiWrite\(RH_RF22_REG_08_OPERATING_MODE2,\s*"
-            r"op_mode2 \| RH_RF22_FFCLRTX \| RH_RF22_FFCLRRX\);\s*"
-            r"radio\.spiWrite\(RH_RF22_REG_08_OPERATING_MODE2, op_mode2\);"
-        )
         for helper_path in helper_paths:
             with self.subTest(helper=helper_path):
                 helper = helper_path.read_text()
@@ -170,7 +165,7 @@ int main() {{
                 self.assertNotIn("radio.waitPacketSent();", helper)
                 self.assertIn("waitPacketSent(tx_complete_timeout_ms)", helper)
                 self.assertIn("tx_complete_timeout_ms == 0", helper)
-                self.assertRegex(helper, fifo_clear_pulse)
+                self.assertNotIn("RH_RF22_FFCLRTX", helper)
                 self.assertIn("setModeRx();", helper)
 
         roots = (
@@ -213,8 +208,7 @@ int main() {{
         self.assertIn("detachInterrupt(digitalPinToInterrupt(pins.irq_pin))", helper)
         self.assertIn("digitalWrite(pins.sdn_pin, HIGH)", helper)
         self.assertIn("digitalWrite(pins.sdn_pin, LOW)", helper)
-        self.assertIn("probeDeviceIdentity", helper)
-        self.assertNotIn("probeChipReady", helper)
+        self.assertNotIn("probeDeviceIdentity", helper)
         self.assertIn("class BoundedRf22", helper)
         self.assertIn("initBounded", helper)
         self.assertIn("chip_ready_timeout_ms", helper)
@@ -243,7 +237,9 @@ int main() {{
         self.assertGreaterEqual(relay.count("if (!m_rf.isReady())"), 2)
         self.assertIn("discardRadioWorkOnOff", relay)
         self.assertIn("resetReassembly(channel, false, partialMessage)", relay)
-        self.assertIn("m_rf.failSafeOffLocalTx();", relay)
+        self.assertIn("TX_TIMEOUTS_BEFORE_RECOVERY = 3", driver)
+        self.assertIn("failSafeOffLocalTx();", driver)
+        self.assertIn("m_rf.consumeTxTimeoutRecoveryRequest()", relay)
         self.assertIn("TEENSY_STATUS_TARGET_ERROR", router)
         self.assertIn("m_fault == link_protocol::TEENSY_RF_FAULT_LOCAL_TX", driver)
         self.assertIn("isReady() && m_fault == link_protocol::TEENSY_RF_FAULT_NONE", driver)
@@ -251,7 +247,7 @@ int main() {{
         self.assertNotIn("g_rfDriver.begin();", sketch)
         self.assertIn("RADIO_SDN_PIN = 37", sketch)
         self.assertLess(
-            sketch.index("g_rfDriver.beginSafeOff(watchdogReset)"),
+            sketch.index("g_rfDriver.beginSafeOff()"),
             sketch.index("digitalWrite(RPI_ENABLE_PIN, HIGH)"),
         )
         self.assertLess(

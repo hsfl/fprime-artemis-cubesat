@@ -77,7 +77,7 @@ int main() {
             )
             subprocess.run([str(executable)], check=True)
 
-    def test_shared_helper_snapshot_and_bounded_paths(self) -> None:
+    def test_shared_helper_uses_tagged_init_and_bounded_tx(self) -> None:
         helper_bytes = [path.read_bytes() for path in HELPER_COPIES]
         self.assertEqual(helper_bytes[0], helper_bytes[1])
         self.assertEqual(helper_bytes[0], helper_bytes[2])
@@ -87,14 +87,17 @@ int main() {
             "struct FaultSnapshot",
             "class BoundedRf22",
             "initBounded",
-            "chip_ready_timeout_ms",
+            "MAX_INIT_ATTEMPTS = 3",
             "captureFirstFaultSnapshot",
             "first_fault->valid",
+            "waitPacketSent(tx_complete_timeout_ms)",
         ):
             self.assertIn(contract, helper)
+        self.assertNotIn("recoverTransmitPath", helper)
+        self.assertNotIn("RH_RF22_REG_58_CHARGE_PUMP_CURRENT_TRIMMING, 0xC0", helper)
 
         capture_start = helper.index("inline void captureFirstFaultSnapshot")
-        capture_end = helper.index("// Recover the radio", capture_start)
+        capture_end = helper.index("// Send one packet", capture_start)
         capture = helper[capture_start:capture_end]
         ordered_reads = (
             "digitalRead(pins.irq_pin)",
@@ -123,14 +126,13 @@ int main() {
         timeout_capture = send.rindex(
             "captureFirstFaultSnapshot(radio, pins, SendResult::TX_TIMEOUT"
         )
-        timeout_recovery = send.rindex("recoverTransmitPath(radio, pins, profile)")
-        self.assertLess(timeout_capture, timeout_recovery)
+        self.assertNotIn("recoverTransmitPath", send)
 
         for driver in (
             GROUND_ROOT / "src/rf23_driver.hpp",
             SAT_ROOT / "src/rf23_driver.hpp",
         ):
-            self.assertIn("artemis::rf23bp::BoundedRf22 m_radio;", driver.read_text())
+            self.assertIn("BoundedRf22 m_radio;", driver.read_text())
 
     def test_ground_terminal_fault_containment_contract(self) -> None:
         relay = (GROUND_ROOT / "src/relay_uart_rf.cpp").read_text()
@@ -144,15 +146,27 @@ int main() {
             "serviceRecovery",
             "failSafeOffLocalTx",
             "consumeFaultSnapshot",
+            "consumeTxTimeoutRecoveryRequest",
             "recoveryBackoffMs",
         ):
             self.assertIn(contract, driver_header)
         self.assertIn("return isReady() && m_radio.available();", driver)
         self.assertGreaterEqual(driver.count("if (!isReady())"), 2)
 
-        terminal = relay.index("if (outcome.terminalFailure)")
-        terminal_end = relay.index("return outcome.sent", terminal)
-        self.assertIn("m_rf.failSafeOffLocalTx();", relay[terminal:terminal_end])
+        recovery_start = driver.index("void Rf23Driver::failSafeOffLocalTx()")
+        recovery_end = driver.index("bool Rf23Driver::isReady()", recovery_start)
+        recovery = driver[recovery_start:recovery_end]
+        self.assertIn("m_radio.setModeIdle();", recovery)
+        self.assertLess(recovery.index("m_radio.setModeIdle();"),
+                        recovery.index("enterOff(Rf23Fault::LOCAL_TX);"))
+
+        send_start = relay.index("bool RelayUartRf::sendRfPacket(")
+        send_end = relay.index("bool RelayUartRf::sendRfPacketWithAck", send_start)
+        send = relay[send_start:send_end]
+        self.assertEqual(send.count("m_rf.send(packet, packetLen)"), 1)
+        self.assertIn("if (result == Rf23SendResult::TX_TIMEOUT)", send)
+        self.assertIn("m_rf.consumeTxTimeoutRecoveryRequest()", send)
+        self.assertNotIn("m_rf.failSafeOffLocalTx();", send)
 
         poll_start = relay.index("void RelayUartRf::poll()")
         poll_end = relay.index("void RelayUartRf::processUartByte", poll_start)

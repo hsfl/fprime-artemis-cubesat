@@ -47,8 +47,6 @@ check_shared_teensy_drift() {
   local shared_pairs=(
     "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/artemis_rf23bp.hpp|GDS_Teensy/firmware/gds_teensy/src/artemis_rf23bp.hpp"
     "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/link_counters.hpp|GDS_Teensy/firmware/gds_teensy/src/link_counters.hpp"
-    "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/rf_tx_retry.hpp|GDS_Teensy/firmware/gds_teensy/src/rf_tx_retry.hpp"
-    "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/wdt_guard.hpp|GDS_Teensy/firmware/gds_teensy/src/wdt_guard.hpp"
   )
 
   # rf23_driver.* and relay_uart_rf.cpp are shared in concept but intentionally diverge.

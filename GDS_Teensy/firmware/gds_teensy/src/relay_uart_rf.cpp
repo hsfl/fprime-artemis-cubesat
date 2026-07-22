@@ -3,8 +3,6 @@
 #include <string.h>
 
 #include "link_protocol.hpp"
-#include "rf_tx_retry.hpp"
-#include "wdt_guard.hpp"
 
 RelayUartRf::RelayUartRf(Stream& linkIo,
                          Rf23Driver& rfDriver,
@@ -67,8 +65,19 @@ const usb_tx::ChannelCounters* RelayUartRf::usbTxCounters(uint8_t channel) const
   return m_usbDownlink.forChannel(channel);
 }
 
+#if defined(GDS_TX_LOAD_TEST)
+bool RelayUartRf::diagnosticEnqueueDownlink(uint8_t channel,
+                                            const uint8_t* payload,
+                                            uint16_t length) {
+  return enqueueDownlinkMessage(channel, payload, length);
+}
+
+uint8_t RelayUartRf::diagnosticDownlinkPending(uint8_t channel) const {
+  return channel < usb_tx::CHANNEL_COUNT ? m_downlinkCount[channel] : 0;
+}
+#endif
+
 void RelayUartRf::poll() {
-  wdt_guard::feed();
   if (!m_rf.isReady()) {
     m_lastRadioReady = false;
     discardRadioWorkOnOff();
@@ -91,7 +100,6 @@ void RelayUartRf::poll() {
       } else {
         processRawUartByte(b, m_config.defaultUartChannel);
       }
-      wdt_guard::feed();
     }
 
     if (!m_config.uartInputFramed) {
@@ -104,7 +112,6 @@ void RelayUartRf::poll() {
       const uint8_t b = static_cast<uint8_t>(m_payloadIo->read());
       m_counters.uartRxBytes += 1;
       processRawUartByte(b, link_protocol::CHANNEL_PAYLOAD);
-      wdt_guard::feed();
     }
     flushPayloadUartIfStale();
   }
@@ -411,11 +418,9 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
     memcpy(&rfPacket[link_protocol::RF_SEGMENT_HEADER_LEN], payload + sent, chunkLen);
 
     const uint8_t rfLen = static_cast<uint8_t>(link_protocol::RF_SEGMENT_HEADER_LEN + chunkLen);
-    wdt_guard::feed();
     const bool sentOk = link_protocol::txAckRequiredForChannel(channel)
                             ? sendRfPacketWithAck(rfPacket, rfLen, channel, msgId, segIdx)
                             : sendRfPacket(rfPacket, rfLen);
-    wdt_guard::feed();
     if (!sentOk) {
       m_counters.rfTxDrops += 1;
       return false;
@@ -431,15 +436,11 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
     if (channel == link_protocol::CHANNEL_PAYLOAD) {
       // Payload messages fit in one segment and do not use RF ACKs. Give the
       // peer time to drain each packet before the next preamble.
-      wdt_guard::feed();
       delay(link_protocol::RF_PAYLOAD_INTER_PACKET_GAP_MS);
-      wdt_guard::feed();
     } else if (segIdx + 1 < segCount) {
       // ACK turnaround already paces CCSDS packets; retain only the original
       // between-segment guard for multi-segment CCSDS messages.
-      wdt_guard::feed();
       delay(link_protocol::RF_INTER_SEGMENT_GAP_MS);
-      wdt_guard::feed();
     }
   }
 
@@ -451,27 +452,19 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
 }
 
 bool RelayUartRf::sendRfPacket(const uint8_t* packet, uint8_t packetLen) {
-  const rf_tx_retry::Outcome outcome = rf_tx_retry::sendWithBoundedTimeoutRetry([&]() {
-    wdt_guard::feed();
-    const Rf23SendResult result = m_rf.send(packet, packetLen);
-    wdt_guard::feed();
-    switch (result) {
-      case Rf23SendResult::SENT:
-        return rf_tx_retry::AttemptResult::SENT;
-      case Rf23SendResult::TX_TIMEOUT:
-        return rf_tx_retry::AttemptResult::TX_TIMEOUT;
-      case Rf23SendResult::START_FAILED:
-        return rf_tx_retry::AttemptResult::START_FAILED;
-    }
-    return rf_tx_retry::AttemptResult::START_FAILED;
-  });
-  m_counters.rfTxTimeouts += outcome.timeouts;
-  m_counters.rfRecoveries += outcome.recoveries;
-  if (outcome.terminalFailure) {
-    m_counters.rfTxTerminalFailures += 1;
-    m_rf.failSafeOffLocalTx();
+  const Rf23SendResult result = m_rf.send(packet, packetLen);
+  if (result == Rf23SendResult::SENT) {
+    return true;
   }
-  return outcome.sent;
+
+  m_counters.rfTxTerminalFailures += 1;
+  if (result == Rf23SendResult::TX_TIMEOUT) {
+    m_counters.rfTxTimeouts += 1;
+    if (m_rf.consumeTxTimeoutRecoveryRequest()) {
+      m_counters.rfRecoveries += 1;
+    }
+  }
+  return false;
 }
 
 bool RelayUartRf::sendRfPacketWithAck(const uint8_t* packet,
@@ -480,7 +473,6 @@ bool RelayUartRf::sendRfPacketWithAck(const uint8_t* packet,
                                       uint8_t msgId,
                                       uint8_t segIdx) {
   for (uint8_t attempt = 0; attempt <= link_protocol::RF_ACK_RETRIES; attempt++) {
-    wdt_guard::feed();
     if (!sendRfPacket(packet, packetLen)) {
       return false;
     }
@@ -500,7 +492,6 @@ bool RelayUartRf::waitForAck(uint8_t channel, uint8_t msgId, uint8_t segIdx) {
   uint8_t rfBuffer[link_protocol::RF_PACKET_MAX_LEN] = {0};
 
   while ((millis() - startMs) < link_protocol::RF_ACK_TIMEOUT_MS) {
-    wdt_guard::feed();
     while (m_rf.available()) {
       uint8_t rfLen = static_cast<uint8_t>(sizeof(rfBuffer));
       const Rf23ReceiveResult result = m_rf.recv(rfBuffer, &rfLen);
@@ -511,7 +502,6 @@ bool RelayUartRf::waitForAck(uint8_t channel, uint8_t msgId, uint8_t segIdx) {
         }
         m_counters.rfRxPackets += 1;
         processRfSegment(rfBuffer, rfLen);
-        wdt_guard::feed();
       }
     }
   }

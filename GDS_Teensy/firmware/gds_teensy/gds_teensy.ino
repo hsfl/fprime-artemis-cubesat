@@ -3,7 +3,9 @@
 #include "src/link_counters.hpp"
 #include "src/relay_uart_rf.hpp"
 #include "src/rf23_driver.hpp"
-#include "src/wdt_guard.hpp"
+#if defined(GDS_TX_LOAD_TEST)
+#include "src/gds_tx_load_test.hpp"
+#endif
 
 // Teensy 4.1 + RF23BP pinout from EPSCOR demo baseline.
 static constexpr int RADIO_CS = 38;
@@ -53,6 +55,9 @@ RelayConfig g_relayConfig{
 RelayUartRf g_relay(Serial, g_rfDriver, g_linkCounters, g_relayConfig, &SerialUSB2);
 #else
 RelayUartRf g_relay(Serial, g_rfDriver, g_linkCounters, g_relayConfig);
+#endif
+#if defined(GDS_TX_LOAD_TEST) && ARTEMIS_HAS_DEBUG_USB
+GdsTxLoadTest g_txLoadTest(SerialUSB1, g_relay, g_rfDriver, g_linkCounters);
 #endif
 static uint32_t g_radioTrafficLedUntilMs = 0;
 
@@ -247,9 +252,63 @@ void debugPrintRfFaultSnapshot() {
 #endif
 }
 
-void setup() {
-  const bool watchdogReset = wdt_guard::consumeWatchdogResetFlag();
+void debugPrintRejectedRfPacket() {
+#if defined(GDS_TX_LOAD_TEST) && ARTEMIS_HAS_DEBUG_USB
+  Rf23RejectedPacketSnapshot snapshot;
+  if (!g_rfDriver.consumeRejectedPacketSnapshot(snapshot)) {
+    return;
+  }
+  SerialUSB1.printf(
+      "[GDS_DIAG] RF_REJECT reason=%u captured_ms=%lu to=%02X from=%02X network=%02X version=%02X len=%u rssi_dbm=%d payload_prefix=",
+      static_cast<unsigned int>(snapshot.reason),
+      static_cast<unsigned long>(snapshot.capturedMs),
+      static_cast<unsigned int>(snapshot.to),
+      static_cast<unsigned int>(snapshot.from),
+      static_cast<unsigned int>(snapshot.network),
+      static_cast<unsigned int>(snapshot.version),
+      static_cast<unsigned int>(snapshot.length),
+      static_cast<int>(snapshot.rssiDbm));
+  for (uint8_t i = 0; i < snapshot.payloadPrefixLength; ++i) {
+    if (snapshot.payloadPrefix[i] < 0x10) {
+      SerialUSB1.print('0');
+    }
+    SerialUSB1.print(snapshot.payloadPrefix[i], HEX);
+  }
+  SerialUSB1.println();
+#endif
+}
 
+void debugPrintRfHealthSnapshot() {
+#if defined(GDS_TX_LOAD_TEST) && ARTEMIS_HAS_DEBUG_USB
+  const Rf23HealthSnapshot s = g_rfDriver.captureHealthSnapshot();
+  SerialUSB1.printf(
+      "[GDS_DIAG] RF_HEALTH identity_stable=%u nirq=%u rh_mode=%u pins_cs_rx_tx_sdn=%u,%u,%u,%u reg00=%02X reg01=%02X reg02=%02X reg05=%02X reg06=%02X reg07=%02X reg08=%02X reg30=%02X reg58=%02X reg6D=%02X reg75=%02X reg76=%02X reg77=%02X reg7D=%02X reg7E=%02X\n",
+      s.identityStable ? 1U : 0U,
+      static_cast<unsigned int>(s.nirqLevel),
+      static_cast<unsigned int>(s.radioheadMode),
+      static_cast<unsigned int>(s.csLevel),
+      static_cast<unsigned int>(s.rxOnLevel),
+      static_cast<unsigned int>(s.txOnLevel),
+      static_cast<unsigned int>(s.sdnLevel),
+      static_cast<unsigned int>(s.deviceType),
+      static_cast<unsigned int>(s.versionCode),
+      static_cast<unsigned int>(s.deviceStatus),
+      static_cast<unsigned int>(s.interruptEnable1),
+      static_cast<unsigned int>(s.interruptEnable2),
+      static_cast<unsigned int>(s.operatingMode1),
+      static_cast<unsigned int>(s.operatingMode2),
+      static_cast<unsigned int>(s.dataAccessControl),
+      static_cast<unsigned int>(s.chargePump),
+      static_cast<unsigned int>(s.txPower),
+      static_cast<unsigned int>(s.frequencyBand),
+      static_cast<unsigned int>(s.frequency1),
+      static_cast<unsigned int>(s.frequency0),
+      static_cast<unsigned int>(s.txFifoThreshold),
+      static_cast<unsigned int>(s.rxFifoThreshold));
+#endif
+}
+
+void setup() {
   // USB serial to laptop GDS.
   Serial.begin(USB_UART_BAUD);
 #if ARTEMIS_HAS_DEBUG_USB
@@ -260,8 +319,6 @@ void setup() {
 #endif
   pinMode(TEENSY_LED_PIN, OUTPUT);
   digitalWrite(TEENSY_LED_PIN, HIGH);
-  wdt_guard::begin();
-
   // Keep USB clean: no banner prints on this stream.
   g_rfDriver.beginSafeOff();
   const bool radioOk = g_rfDriver.begin();
@@ -269,10 +326,6 @@ void setup() {
 
 #if ARTEMIS_HAS_DEBUG_USB
   delay(200);
-  if (watchdogReset) {
-    SerialUSB1.println("[GDS_Teensy] watchdog reset detected");
-  }
-  SerialUSB1.println("[GDS_Teensy] hardware watchdog armed (12s)");
   SerialUSB1.println("[GDS_Teensy] debug port ready; data port is USB Serial");
   if (radioOk) {
     SerialUSB1.println("[GDS_Teensy] RF23 bridge ready (raw GDS channel + payload channel + RF segmentation)");
@@ -280,6 +333,10 @@ void setup() {
     SerialUSB1.println("[GDS_Teensy] RF23 init failed; relay running without RF");
   }
   debugPrintCounters("[GDS_Teensy] counters");
+#if defined(GDS_TX_LOAD_TEST)
+  g_txLoadTest.begin();
+  debugPrintRfHealthSnapshot();
+#endif
 #else
   (void)radioOk;
 #endif
@@ -290,13 +347,24 @@ void loop() {
   static uint32_t lastDebugStatusMs = 0;
 #endif
 
+#if defined(GDS_TX_LOAD_TEST) && ARTEMIS_HAS_DEBUG_USB
+  g_txLoadTest.pollCommands();
+  if (!g_txLoadTest.isolatesRf()) {
+    g_relay.poll();
+  }
+#else
   g_relay.poll();
+#endif
   g_rfDriver.serviceRecovery();
-  wdt_guard::feed();
   updateRadioTrafficLed(millis());
+
+#if defined(GDS_TX_LOAD_TEST) && ARTEMIS_HAS_DEBUG_USB
+  g_txLoadTest.tick(millis());
+#endif
 
 #if ARTEMIS_HAS_DEBUG_USB
   debugPrintRfFaultSnapshot();
+  debugPrintRejectedRfPacket();
   const uint32_t now = millis();
   if ((now - lastDebugStatusMs) >= DEBUG_STATUS_PERIOD_MS) {
     debugPrintCounters("[GDS_Teensy] counters");

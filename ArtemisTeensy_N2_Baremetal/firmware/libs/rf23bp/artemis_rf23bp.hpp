@@ -120,9 +120,9 @@ struct FaultSnapshot {
   uint8_t interrupt_status2 = 0;
 };
 
-// RadioHead's RH_RF22::init() waits forever for CHIPRDY. Production bridge
-// firmware uses this project-owned subclass so a failed radio reset returns to
-// the caller and can be retried without letting the MCU watchdog reset USB.
+// This is the tagged RadioHead RH_RF22::init() sequence with only its
+// unbounded CHIPRDY wait changed to a timeout. It lets the caller pulse SDN
+// and retry rather than hanging the Teensy forever.
 class BoundedRf22 : public RH_RF22 {
  public:
   BoundedRf22(uint8_t slave_select_pin, uint8_t interrupt_pin, RHGenericSPI& spi)
@@ -132,7 +132,6 @@ class BoundedRf22 : public RH_RF22 {
     if (chip_ready_timeout_ms == 0 || !RHSPIDriver::init()) {
       return false;
     }
-
     int interrupt_number = digitalPinToInterrupt(_interruptPin);
     if (interrupt_number == NOT_AN_INTERRUPT) {
       return false;
@@ -141,8 +140,6 @@ class BoundedRf22 : public RH_RF22 {
     interrupt_number = _interruptPin;
 #endif
     spiUsingInterrupt(interrupt_number);
-
-    _mode = RHModeInitialising;
     reset();
     _deviceType = spiRead(RH_RF22_REG_00_DEVICE_TYPE);
     if (_deviceType != RH_RF22_DEVICE_TYPE_RX_TRX &&
@@ -151,9 +148,9 @@ class BoundedRf22 : public RH_RF22 {
     }
 
     spiWrite(RH_RF22_REG_07_OPERATING_MODE1, RH_RF22_SWRES);
-    const uint32_t chip_ready_start_ms = millis();
+    const uint32_t started_ms = millis();
     while ((spiRead(RH_RF22_REG_04_INTERRUPT_STATUS2) & RH_RF22_ICHIPRDY) == 0) {
-      if ((millis() - chip_ready_start_ms) >= chip_ready_timeout_ms) {
+      if ((millis() - started_ms) >= chip_ready_timeout_ms) {
         return false;
       }
       yield();
@@ -164,7 +161,6 @@ class BoundedRf22 : public RH_RF22 {
              RH_RF22_ENTXFFAEM | RH_RF22_ENRXFFAFULL | RH_RF22_ENPKSENT |
                  RH_RF22_ENPKVALID | RH_RF22_ENCRCERROR | RH_RF22_ENFFERR);
     spiWrite(RH_RF22_REG_06_INTERRUPT_ENABLE2, RH_RF22_ENPREAVAL);
-
     if (_myInterruptIndex == 0xff) {
       if (_interruptCount >= RH_RF22_NUM_INTERRUPTS) {
         return false;
@@ -264,94 +260,57 @@ inline void setupAmpPins(const RadioPins& pins, const RadioProfile& profile) {
   }
 }
 
-// Verify stable device identity without changing a radio register. The bounded
-// driver owns the software-reset/init sequence that follows this check.
-inline bool probeDeviceIdentity(RH_RF22& radio, const RadioPins& pins, Print* log = nullptr) {
-  setupChipSelect(pins);
-
-  const uint8_t first = radio.spiRead(RH_RF22_REG_00_DEVICE_TYPE);
-  delay(1);
-  const uint8_t second = radio.spiRead(RH_RF22_REG_00_DEVICE_TYPE);
-  const bool knownType =
-      first == RH_RF22_DEVICE_TYPE_RX_TRX || first == RH_RF22_DEVICE_TYPE_TX;
-  if (!knownType || first != second) {
-    if (log != nullptr) {
-      log->println(F("RF23BP device probe failed"));
-    }
-    return false;
-  }
-  return true;
-}
-
 // One-call radio init:
-// 1) force safe datasheet shutdown
-// 2) release SDN and wait through the worst-case POR interval
-// 3) perform stable, non-mutating identity reads
-// 4) run one bounded RF22 init + apply the proven RF profile
-// 5) enter RX or IDLE based on profile
-inline bool initRadioDriver(RH_RF22& radio, uint16_t) {
-  // Compatibility path for simple student sketches. Production bridge drivers
-  // instantiate BoundedRf22 and select the bounded overload below.
-  return radio.init();
-}
-
-inline bool initRadioDriver(BoundedRf22& radio, uint16_t chip_ready_timeout_ms) {
-  return radio.initBounded(chip_ready_timeout_ms);
-}
-
-template <typename RadioT>
-inline bool initRadio(RadioT& radio, const RadioPins& pins = RadioPins(),
+// 1) reset the separately powered radio through SDN
+// 2) initialize SPI1 and use the tagged RadioHead initialization path
+// 3) apply the proven RF profile
+// 4) enter RX or IDLE based on profile
+inline bool initRadio(BoundedRf22& radio, const RadioPins& pins = RadioPins(),
                       const RadioProfile& profile = RadioProfile(),
                       Print* log = nullptr) {
+  static constexpr uint8_t MAX_INIT_ATTEMPTS = 3;
+  for (uint8_t attempt = 1; attempt <= MAX_INIT_ATTEMPTS; ++attempt) {
+    // The radio remains powered during a Teensy reset. Pulse SDN before every
+    // attempt so each probe begins from a known radio state.
+    shutdownRadio(pins);
+    delay(100);
+    SPI1.end();
+    setupSpi1(pins.spi1);
+    digitalWrite(pins.sdn_pin, LOW);
+    delay(100);
+
+    if (!radio.initBounded(profile.chip_ready_timeout_ms) ||
+        !radio.setFrequency(profile.frequency_mhz)) {
+      if (log != nullptr) {
+        log->print(F("RF23BP init attempt failed: "));
+        log->println(attempt);
+      }
+      continue;
+    }
+
+    radio.setModemConfig(profile.modem);
+    radio.setTxPower(profile.tx_power);
+
+    setupAmpPins(pins, profile);
+    if (profile.start_in_receive) {
+      setAmpReceive(pins, profile);
+      radio.setModeRx();
+    } else {
+      setAmpIdle(pins);
+      radio.setModeIdle();
+    }
+
+    if (log != nullptr) {
+      log->println(F("RF23BP ready"));
+    }
+    return true;
+  }
+
   shutdownRadio(pins);
-  delay(50);
-  setupSpi1(pins.spi1);
-  digitalWrite(pins.sdn_pin, LOW);
-  delay(50);
-
-  if (!probeDeviceIdentity(radio, pins, log)) {
-    shutdownRadio(pins);
-    return false;
-  }
-
-  if (!initRadioDriver(radio, profile.chip_ready_timeout_ms)) {
-    if (log != nullptr) {
-      log->println(F("RF23BP init failed"));
-    }
-    shutdownRadio(pins);
-    return false;
-  }
-
-  if (!radio.setFrequency(profile.frequency_mhz)) {
-    if (log != nullptr) {
-      log->println(F("RF23BP setFrequency failed"));
-    }
-    shutdownRadio(pins);
-    return false;
-  }
-
-  radio.setModemConfig(profile.modem);
-  // RFM23BP datasheet section 3.5.7: rates above 100 kbps require
-  // register 0x58 = 0xC0. RadioHead's 125 kbps preset leaves the POR/default
-  // 0x80 value, which increases eye closure and packet loss.
-  if (profile.modem == RH_RF22::GFSK_Rb125Fd125) {
-    radio.spiWrite(RH_RF22_REG_58_CHARGE_PUMP_CURRENT_TRIMMING, 0xC0);
-  }
-  radio.setTxPower(profile.tx_power);
-
-  setupAmpPins(pins, profile);
-  if (profile.start_in_receive) {
-    setAmpReceive(pins, profile);
-    radio.setModeRx();
-  } else {
-    setAmpIdle(pins);
-    radio.setModeIdle();
-  }
-
   if (log != nullptr) {
-    log->println(F("RF23BP ready"));
+    log->println(F("RF23BP init failed after 3 attempts"));
   }
-  return true;
+  return false;
 }
 
 inline void captureFirstFaultSnapshot(RH_RF22& radio, const RadioPins& pins,
@@ -383,21 +342,6 @@ inline void captureFirstFaultSnapshot(RH_RF22& radio, const RadioPins& pins,
   *first_fault = snapshot;
 }
 
-// Recover the radio after a terminal TX wait timeout. Always return to RX so
-// the peer can re-establish the link after the local transmit path wedges.
-inline void recoverTransmitPath(RH_RF22& radio, const RadioPins& pins,
-                                const RadioProfile& profile) {
-  radio.setModeIdle();
-  const uint8_t op_mode2 = radio.spiRead(RH_RF22_REG_08_OPERATING_MODE2);
-  radio.spiWrite(RH_RF22_REG_08_OPERATING_MODE2,
-                 op_mode2 | RH_RF22_FFCLRTX | RH_RF22_FFCLRRX);
-  radio.spiWrite(RH_RF22_REG_08_OPERATING_MODE2, op_mode2);
-  (void)radio.spiRead(RH_RF22_REG_03_INTERRUPT_STATUS1);
-  (void)radio.spiRead(RH_RF22_REG_04_INTERRUPT_STATUS2);
-  setAmpReceive(pins, profile);
-  radio.setModeRx();
-}
-
 // Send one packet with a mandatory bounded completion wait.
 inline SendResult sendPacket(RH_RF22& radio, const RadioPins& pins,
                              const RadioProfile& profile, const uint8_t* data,
@@ -413,9 +357,8 @@ inline SendResult sendPacket(RH_RF22& radio, const RadioPins& pins,
   // while a previous TX is still wedged.
   if (radio.mode() == RHGenericDriver::RHModeTx) {
     captureFirstFaultSnapshot(radio, pins, SendResult::TX_TIMEOUT, first_fault);
-    recoverTransmitPath(radio, pins, profile);
     if (log != nullptr) {
-      log->println(F("RF23BP pre-send TX wedge; FIFOs cleared and RX restored"));
+      log->println(F("RF23BP pre-send TX wedge"));
     }
     return SendResult::TX_TIMEOUT;
   }
@@ -435,9 +378,8 @@ inline SendResult sendPacket(RH_RF22& radio, const RadioPins& pins,
 
   if (!static_cast<RHGenericDriver&>(radio).waitPacketSent(tx_complete_timeout_ms)) {
     captureFirstFaultSnapshot(radio, pins, SendResult::TX_TIMEOUT, first_fault);
-    recoverTransmitPath(radio, pins, profile);
     if (log != nullptr) {
-      log->println(F("RF23BP TX completion timeout; FIFOs cleared and RX restored"));
+      log->println(F("RF23BP TX completion timeout"));
     }
     return SendResult::TX_TIMEOUT;
   }
@@ -517,16 +459,6 @@ inline LinkStats readLinkStats(RH_RF22& radio) {
   stats.tx_good = radio.txGood();
   stats.last_rssi_dbm = radio.lastRssi();
   return stats;
-}
-
-// Basic FIFO fault recovery:
-// 1) force IDLE
-// 2) clear TX/RX FIFOs
-// 3) clear latched interrupts
-// 4) return to RX
-inline void recoverFromFifoError(RH_RF22& radio, const RadioPins& pins,
-                                 const RadioProfile& profile) {
-  recoverTransmitPath(radio, pins, profile);
 }
 
 }  // namespace rf23bp

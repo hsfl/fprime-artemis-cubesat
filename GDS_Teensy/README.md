@@ -6,6 +6,7 @@ Detailed docs live in:
 
 - `../docs/GDS_TEENSY_RUNBOOK.md`
 - `docs/transport_contract.md`
+- `docs/gds_tx_load_test.md` for the dedicated RF/USB TX stall discriminator
 
 ## Scope
 

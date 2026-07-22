@@ -31,6 +31,10 @@ class RelayUartRf {
   void begin();
   void poll();
   const usb_tx::ChannelCounters* usbTxCounters(uint8_t channel) const;
+#if defined(GDS_TX_LOAD_TEST)
+  bool diagnosticEnqueueDownlink(uint8_t channel, const uint8_t* payload, uint16_t length);
+  uint8_t diagnosticDownlinkPending(uint8_t channel) const;
+#endif
 
  private:
   enum class ParseState {

@@ -19,9 +19,17 @@ Rf23Driver::Rf23Driver(int csPin,
       m_initFailures(0),
       m_sdnRecoveries(0),
       m_recoveringLocalTx(false),
+      m_consecutiveTxTimeouts(0),
+      m_txTimeoutRecoveryRequested(false),
       m_recoverySchedule{},
       m_faultSnapshot{},
-      m_faultSnapshotPending(false) {
+      m_faultSnapshotPending(false)
+#if defined(GDS_TX_LOAD_TEST)
+      ,
+      m_rejectedPacketSnapshot{},
+      m_rejectedPacketSnapshotPending(false)
+#endif
+      {
   m_radioPins.cs_pin = static_cast<uint8_t>(csPin);
   m_radioPins.irq_pin = static_cast<uint8_t>(irqPin);
   m_radioPins.rx_on_pin = rxOnPin;
@@ -32,6 +40,8 @@ Rf23Driver::Rf23Driver(int csPin,
 void Rf23Driver::beginSafeOff() {
   m_recoverySchedule.succeeded();
   m_recoveringLocalTx = false;
+  m_consecutiveTxTimeouts = 0;
+  m_txTimeoutRecoveryRequested = false;
   enterOff(Rf23Fault::NONE);
 }
 
@@ -73,6 +83,11 @@ bool Rf23Driver::serviceRecovery() {
 void Rf23Driver::failSafeOffLocalTx() {
   if (!isReady() && m_recoveringLocalTx) {
     return;
+  }
+  // Leave TX before SDN so the radio enters shutdown from a known idle state.
+  if (isReady()) {
+    m_radio.setModeIdle();
+    delay(1);
   }
   m_recoveringLocalTx = true;
   enterOff(Rf23Fault::LOCAL_TX);
@@ -136,6 +151,12 @@ bool Rf23Driver::consumeFaultSnapshot(artemis::rf23bp::FaultSnapshot& snapshot) 
   return true;
 }
 
+bool Rf23Driver::consumeTxTimeoutRecoveryRequest() {
+  const bool requested = m_txTimeoutRecoveryRequested;
+  m_txTimeoutRecoveryRequested = false;
+  return requested;
+}
+
 bool Rf23Driver::available() {
   return isReady() && m_radio.available();
 }
@@ -149,6 +170,41 @@ Rf23ReceiveResult Rf23Driver::recv(uint8_t* buf, uint8_t* len) {
   }
   const link_protocol::RfHeaderStatus status = link_protocol::classifyRfHeader(
       m_radio.headerTo(), m_radio.headerFrom(), m_radio.headerId(), m_radio.headerFlags());
+#if defined(GDS_TX_LOAD_TEST)
+  if (status != link_protocol::RfHeaderStatus::ACCEPT && !m_rejectedPacketSnapshotPending) {
+    Rf23ReceiveResult reason = Rf23ReceiveResult::NO_PACKET;
+    switch (status) {
+      case link_protocol::RfHeaderStatus::WRONG_NETWORK:
+        reason = Rf23ReceiveResult::WRONG_NETWORK;
+        break;
+      case link_protocol::RfHeaderStatus::WRONG_ADDRESS:
+        reason = Rf23ReceiveResult::WRONG_ADDRESS;
+        break;
+      case link_protocol::RfHeaderStatus::WRONG_VERSION:
+        reason = Rf23ReceiveResult::WRONG_VERSION;
+        break;
+      case link_protocol::RfHeaderStatus::ACCEPT:
+        break;
+    }
+    m_rejectedPacketSnapshot.valid = true;
+    m_rejectedPacketSnapshot.reason = reason;
+    m_rejectedPacketSnapshot.capturedMs = millis();
+    m_rejectedPacketSnapshot.to = m_radio.headerTo();
+    m_rejectedPacketSnapshot.from = m_radio.headerFrom();
+    m_rejectedPacketSnapshot.network = m_radio.headerId();
+    m_rejectedPacketSnapshot.version = m_radio.headerFlags();
+    m_rejectedPacketSnapshot.length = *len;
+    m_rejectedPacketSnapshot.rssiDbm = m_radio.lastRssi();
+    m_rejectedPacketSnapshot.payloadPrefixLength =
+        *len < Rf23RejectedPacketSnapshot::PAYLOAD_PREFIX_CAPACITY
+            ? *len
+            : Rf23RejectedPacketSnapshot::PAYLOAD_PREFIX_CAPACITY;
+    memcpy(m_rejectedPacketSnapshot.payloadPrefix,
+           buf,
+           m_rejectedPacketSnapshot.payloadPrefixLength);
+    m_rejectedPacketSnapshotPending = true;
+  }
+#endif
   switch (status) {
     case link_protocol::RfHeaderStatus::ACCEPT:
       return Rf23ReceiveResult::ACCEPTED;
@@ -182,14 +238,104 @@ Rf23SendResult Rf23Driver::send(const uint8_t* data, uint8_t len) {
     m_faultSnapshotPending = true;
   }
   if (result == Rf23SendResult::SENT) {
+    m_consecutiveTxTimeouts = 0;
     if (m_fault == Rf23Fault::LOCAL_TX) {
       m_fault = Rf23Fault::NONE;
     }
   } else {
     m_fault = Rf23Fault::LOCAL_TX;
+    if (result == Rf23SendResult::TX_TIMEOUT) {
+      static constexpr uint8_t TX_TIMEOUTS_BEFORE_RECOVERY = 3;
+      m_consecutiveTxTimeouts += 1U;
+      if (m_consecutiveTxTimeouts >= TX_TIMEOUTS_BEFORE_RECOVERY) {
+        m_consecutiveTxTimeouts = 0;
+        m_txTimeoutRecoveryRequested = true;
+        failSafeOffLocalTx();
+      }
+    }
   }
   return result;
 }
+
+#if defined(GDS_TX_LOAD_TEST)
+bool Rf23Driver::setTxPowerDbm(uint8_t dbm) {
+  uint8_t setting = 0;
+  switch (dbm) {
+    case 28:
+      setting = RH_RF22_RF23BP_TXPOW_28DBM;
+      break;
+    case 29:
+      setting = RH_RF22_RF23BP_TXPOW_29DBM;
+      break;
+    case 30:
+      setting = RH_RF22_RF23BP_TXPOW_30DBM;
+      break;
+    default:
+      return false;
+  }
+
+  m_radioProfile.tx_power = setting;
+  if (isReady()) {
+    m_radio.setTxPower(setting);
+  }
+  return true;
+}
+
+uint8_t Rf23Driver::txPowerDbm() const {
+  switch (m_radioProfile.tx_power) {
+    case RH_RF22_RF23BP_TXPOW_28DBM:
+      return 28;
+    case RH_RF22_RF23BP_TXPOW_29DBM:
+      return 29;
+    case RH_RF22_RF23BP_TXPOW_30DBM:
+      return 30;
+    default:
+      return 0;
+  }
+}
+
+bool Rf23Driver::consumeRejectedPacketSnapshot(Rf23RejectedPacketSnapshot& snapshot) {
+  if (!m_rejectedPacketSnapshotPending) {
+    return false;
+  }
+  snapshot = m_rejectedPacketSnapshot;
+  m_rejectedPacketSnapshotPending = false;
+  return true;
+}
+
+Rf23HealthSnapshot Rf23Driver::captureHealthSnapshot() {
+  Rf23HealthSnapshot snapshot;
+  ATOMIC_BLOCK_START;
+  snapshot.nirqLevel = static_cast<uint8_t>(digitalRead(m_irqPin));
+  snapshot.radioheadMode = static_cast<uint8_t>(m_radio.mode());
+  snapshot.csLevel = static_cast<uint8_t>(digitalRead(m_csPin));
+  snapshot.rxOnLevel = static_cast<uint8_t>(digitalRead(m_rxOnPin));
+  snapshot.txOnLevel = static_cast<uint8_t>(digitalRead(m_txOnPin));
+  snapshot.sdnLevel = static_cast<uint8_t>(digitalRead(m_sdnPin));
+  const uint8_t typeFirst = m_radio.spiRead(RH_RF22_REG_00_DEVICE_TYPE);
+  const uint8_t versionFirst = m_radio.spiRead(RH_RF22_REG_01_VERSION_CODE);
+  snapshot.deviceType = m_radio.spiRead(RH_RF22_REG_00_DEVICE_TYPE);
+  snapshot.versionCode = m_radio.spiRead(RH_RF22_REG_01_VERSION_CODE);
+  snapshot.identityStable = typeFirst == snapshot.deviceType &&
+                            versionFirst == snapshot.versionCode &&
+                            snapshot.deviceType == RH_RF22_DEVICE_TYPE_RX_TRX;
+  snapshot.deviceStatus = m_radio.spiRead(RH_RF22_REG_02_DEVICE_STATUS);
+  snapshot.interruptEnable1 = m_radio.spiRead(RH_RF22_REG_05_INTERRUPT_ENABLE1);
+  snapshot.interruptEnable2 = m_radio.spiRead(RH_RF22_REG_06_INTERRUPT_ENABLE2);
+  snapshot.operatingMode1 = m_radio.spiRead(RH_RF22_REG_07_OPERATING_MODE1);
+  snapshot.operatingMode2 = m_radio.spiRead(RH_RF22_REG_08_OPERATING_MODE2);
+  snapshot.dataAccessControl = m_radio.spiRead(RH_RF22_REG_30_DATA_ACCESS_CONTROL);
+  snapshot.chargePump = m_radio.spiRead(RH_RF22_REG_58_CHARGE_PUMP_CURRENT_TRIMMING);
+  snapshot.txPower = m_radio.spiRead(RH_RF22_REG_6D_TX_POWER);
+  snapshot.frequencyBand = m_radio.spiRead(RH_RF22_REG_75_FREQUENCY_BAND_SELECT);
+  snapshot.frequency1 = m_radio.spiRead(RH_RF22_REG_76_NOMINAL_CARRIER_FREQUENCY1);
+  snapshot.frequency0 = m_radio.spiRead(RH_RF22_REG_77_NOMINAL_CARRIER_FREQUENCY0);
+  snapshot.txFifoThreshold = m_radio.spiRead(RH_RF22_REG_7D_TX_FIFO_CONTROL2);
+  snapshot.rxFifoThreshold = m_radio.spiRead(RH_RF22_REG_7E_RX_FIFO_CONTROL);
+  ATOMIC_BLOCK_END;
+  return snapshot;
+}
+#endif
 
 void Rf23Driver::enterOff(Rf23Fault fault) {
   m_state = Rf23State::OFF;
