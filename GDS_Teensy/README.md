@@ -1,6 +1,15 @@
 # GDS_Teensy
 
-Ground-station Teensy baremetal workspace for the Neutron 2 RF MVP bridge.
+Ground Teensy/RFM23BP baremetal workspace. It is the C3M cold-fallback ground
+bridge, not the current C3M student baseline. It also remains the ground
+adapter for the separately qualified Neutron-2 `D2`/Windows workflow.
+
+The primary ground station is the fixed HackRF launcher documented in
+[`../docs/HACKRF_GROUND_STATION_RUNBOOK.md`](../docs/HACKRF_GROUND_STATION_RUNBOOK.md).
+It pins `433 MHz`, TX gain `16`, RX LNA/VGA `8/8`, ACK mode, RF amplifier off,
+antenna bias off, and no AGC or runtime tuning. Keep this firmware and its
+known hardware together as a ready fallback; do not run it alongside the
+HackRF stack.
 
 Detailed docs live in:
 
@@ -25,9 +34,16 @@ cd GDS_Teensy
 ```
 
 ## Upload
+
+Build first, list boards, and confirm the physical ground-board upload ID.
+The current bench mapping is `usb:100000`; stop if it is absent or identifies
+another board. Do not upload by a wildcard serial port when multiple Teensies
+are connected.
+
 ```bash
 cd GDS_Teensy
-./tools/arduino-cli/upload.sh /dev/ttyACM0
+arduino-cli board list
+./tools/arduino-cli/upload.sh usb:100000
 ```
 
 ## Source Layout

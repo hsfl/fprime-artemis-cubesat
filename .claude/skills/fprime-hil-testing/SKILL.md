@@ -1,6 +1,6 @@
 ---
 name: fprime-hil-testing
-description: "Use when guiding live or rehearsal hardware-in-the-loop testing for the Artemis/Neutron 2 F Prime repo: staged ground Teensy and satellite Teensy bring-up, USB serial enumeration, Raspberry Pi SSH/service checks, fprime-gds launch, payload receiver/viewer setup, RF MVP smoke tests, demo-story validation, and HIL handoff/debugging on macOS or Windows WSL2."
+description: "Use when guiding live or rehearsal hardware-in-the-loop testing for the Artemis/Neutron 2 F Prime repo: fixed HackRF C3M/macOS bring-up, fallback ground Teensy and satellite Teensy staging, Raspberry Pi SSH/service checks, fprime-gds launch, payload receiver/viewer setup, RF MVP smoke tests, demo-story validation, and HIL handoff/debugging."
 ---
 
 # F Prime HIL Testing
@@ -8,16 +8,25 @@ description: "Use when guiding live or rehearsal hardware-in-the-loop testing fo
 ## Operating Style
 
 Keep it KISS: one physical step, one confirmation, then move on. Do not assume
-old ports, old IPs, old SSH aliases, or old running processes. The goal is to
-walk the operator through live HIL safely:
+old ports, old IPs, old SSH aliases, or old running processes. First identify
+the profile and host:
 
-1. Plug in the ground/GDS Teensy.
-2. Confirm triple serial.
-3. Plug in the satellite Teensy.
-4. Confirm the satellite serial port.
-5. Confirm Raspberry Pi SSH and `artemis-fprime.service`.
-6. Start GDS and payload receiver.
-7. Run the smallest useful smoke test, then the full demo story only if asked.
+- **C3M on the qualified macOS bench:** use the fixed HackRF path in
+  `docs/HACKRF_GROUND_STATION_RUNBOOK.md`. Do not add AGC, tune gain, select an
+  alternate TX mode, or stage the ground Teensy unless the fixed path fails.
+- **C3M fallback:** stop the HackRF supervisor, then stage the
+  GDS Teensy/RFM23BP node using the backup section in
+  `docs/EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md`.
+- **Neutron-2 `D2` or Windows:** use the existing ground-Teensy stages below.
+  The current HackRF proof does not qualify those combinations.
+
+For the primary C3M path:
+
+1. Confirm the exact HackRF/9–10 inch monopole/no-attenuator geometry.
+2. Confirm Raspberry Pi SSH and `artemis-fprime.service`.
+3. Start the single fixed supervisor.
+4. Wait for HackRF RX, both virtual ports, GDS, and the payload receiver.
+5. Run one PING, then the demo story.
 
 If hardware is absent, do not fail the task. Say what could be checked locally
 and what remains blocked by hardware.
@@ -32,12 +41,16 @@ git submodule status --recursive
 sed -n '1,220p' AGENTS.md
 sed -n '1,220p' README.md
 sed -n '1,260p' docs/SYSTEM_ARCHITECTURE.md
-sed -n '400,490p' docs/agents_notes.md
+tail -120 docs/agents_notes.md
+sed -n '1,220p' docs/HACKRF_GROUND_STATION_RUNBOOK.md
+sed -n '1,140p' docs/EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md
 sed -n '1,140p' docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md
 ```
 
-Use `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md` as the current HIL proof source. Older
-`HIL_TEST_HANDOFF_*` files may be stale or branch-specific.
+Use `docs/HACKRF_GROUND_STATION_RUNBOOK.md` as the current C3M/macOS source.
+Use `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md` only for the separately qualified
+Neutron-2/ground-Teensy path. Older `HIL_TEST_HANDOFF_*` files may be stale or
+branch-specific.
 
 ## Platform Detection
 
@@ -157,6 +170,12 @@ satellite debug prints [ArtemisTeensy] counters
 
 Do not treat triple-serial enumeration alone as proof that the correct ground
 firmware is running.
+
+## Fallback / Neutron-2 Ground-Teensy Stages
+
+The stages below are not the primary C3M/macOS workflow. Use them only after
+selecting the C3M cold fallback or when running the separately documented
+Neutron-2 `D2`/Windows path.
 
 ## Stage 1: Ground Teensy
 

@@ -1292,3 +1292,81 @@ Driver tier, formerly repo "Adapter":
 - Spacecraft source and complete ground `.fdp` matched SHA-256
   `1babc1aa35ed840d12b6353cf44cabbd1face542d69cd544384ed9a33ffb472c`.
   Decode was 160x120 / 19,200 pixels, 14.83–24.69 C, with zero invalid pixels.
+
+## HackRF Ground Adapter Qualification (2026-07-22)
+
+- `ground-station/hackrf-rf22/` is a direct-libhackrf ground adapter for the
+  existing RFM23BP/RadioHead contract. It exposes stable virtual serial ports
+  for channel 0 (`A5`, F Prime GDS) and channel 1 (`A6`, payload receiver);
+  channel 2 remains satellite-local. No F Prime, satellite firmware, or system
+  architecture refactor was required, and the ground Teensy remains fallback.
+- Exact RF filtering requires downlink header `A1 A2 C3 01` and rejects other
+  headers; uplink uses `A2 A1 C3 01`. This filters nearby nonmatching nodes but
+  cannot distinguish another transmitter deliberately using the same contract.
+- The current functional demo qualification is specific to the connected
+  HackRF One, 9--10 inch vertical monopole with no attenuator, unchanged
+  separation/geometry, USB path, TX gain `16`, RX LNA/VGA `8/8`, and `100 ms`
+  zero-IQ settle lead. RF amplifier and antenna bias remain off. The historical
+  `50FFD-010`/dipole and TX-gain-47 result is a separate prior geometry.
+- Three consecutive fresh scheduled-collection/downlink runs passed while the
+  satellite was already verified in Base Mode with live SOH. Product/transfer
+  `7/8` completed `1100/1100` in `81.448 s` after four repair rounds and one
+  controlled mid-transfer `PING(49104)`. Quiet runs `8/9` and `9/10` completed
+  in `64.892 s` and `64.912 s` with zero repairs. All passed CRC, automatic
+  160x120 decode, and exact Pi/ground SHA matching.
+- The strict product 9 / transfer 10 proof passed the ordered full demo chain
+  and matched SHA-256
+  `4fa042fab6383c5cfde5687d3b457336ae8251c0400f02166f4416b178dd219e`.
+  It was collected after clean supervisor shutdown at
+  `/private/tmp/c3m-sdr-monopole/runs/20260722_160907/proof-summary.md` and also
+  gates RF path/gain/interlock provenance. The hardware-free suite passed
+  `76/76` tests.
+- Operator procedures and requalification gates are in
+  `docs/HACKRF_GROUND_STATION_RUNBOOK.md`.
+- The `codex/hackrf-antenna-requalification` branch changes the launcher to
+  fail-closed RX-only operation. TX now requires `--enable-tx`,
+  `--tx-safety-confirmed`, and a descriptive `--rf-path-label`; gain above zero
+  additionally requires `--allow-elevated-tx-gain`. RX-only mode forces gain
+  zero, and the device layer rejects RF-amplifier or antenna-bias enablement.
+  Runtime status now records the physical path, TX/RX gains, interlock state,
+  and live cs8 rail-clipping/headroom metrics.
+- Initial RX measurement on the 9–10 inch monopole/no-attenuator path found
+  `1.18%` clipped complex samples at the prior `LNA 16 / VGA 20` setting.
+  Gain sweeps at `0/0`, `0/8`, and `8/8` had zero clipped samples; the launcher
+  now defaults to and records `LNA 8 / VGA 8`. TX gains `0` and `8` exhausted
+  bounded ACK retries without Pi execution; gain `16` succeeded and is the
+  minimum qualified step. Final `PING(49105)` received its exact ACK on retry
+  2, executed once, and returned GDS Pong count `11` with no TX failure.
+- This is functional/demo qualification at the exact tested geometry. Zero
+  cs8 clipping cannot prove incident power below HackRF's `-5 dBm` maximum,
+  and antenna length cannot prove a 50-ohm match; VNA/SWR and power/link-budget
+  measurement remain the electrical-characterization gate.
+
+## Fixed C3M Ground Baseline Decision (2026-07-22)
+
+- The primary student/operator C3M ground path is now the fixed HackRF
+  supervisor. The normal command is only:
+  `run_hackrf_ground_station.py --enable-tx --tx-safety-confirmed`.
+- The supervisor pins the qualified configuration in code: `epscorc3m`, ACK
+  mode, TX gain `16`, RX LNA/VGA `8/8`, `100 ms` zero-IQ lead, path label
+  `monopole-9to10in-no-attenuator`, RF amplifier off, and antenna bias off.
+  The student CLI no longer exposes profile, mode, gain, or path controls.
+- There is no AGC, automatic TX power, adaptive profile, or runtime gain
+  tuning. If the exact physical path or tested geometry changes, students stop;
+  a lead owns requalification.
+- Channel-0 blind/degraded repeat is no longer accepted. Channel 0 always uses
+  bounded ACK/retry. Channel 1 remains RF-ACK-free because its application
+  protocol owns CRC, missing-packet detection, and selective repair.
+- `rf22_tx.py` is offline waveform generation only and cannot radiate around
+  the supervisor safety gate. The low-level device defaults now match RX
+  `8/8`, and strict proof rejects nonbaseline gain, path, settle timing,
+  automatic gain control, or channel-0 mode.
+- `GDS_Teensy` plus the ground RFM23BP is the cold fallback. Changing ground
+  adapters does not change the Pi binary, satellite Teensy firmware, F Prime
+  dictionary, RF headers, mission commands, or payload protocol.
+- Current HackRF proof is C3M/macOS-specific. Do not claim Neutron-2 `D2` or
+  Windows qualification. The historical qualification notes immediately above
+  explain how the fixed values were established; they are not current
+  student-facing launch instructions.
+- Hardware-free HackRF regression after the simplification passes `80/80`
+  tests.

@@ -35,10 +35,34 @@ Pass criteria:
 
 Use this only when the bench hardware is available.
 
+### C3M/macOS primary ground path
+
+Confirm the exact qualified HackRF/9–10 inch monopole/no-attenuator geometry,
+then run:
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat/ground-station/hackrf-rf22
+.venv/bin/python run_hackrf_ground_station.py \
+  --enable-tx \
+  --tx-safety-confirmed
+```
+
+The supervisor pins ACK mode, TX `16`, RX `8/8`, `100 ms` lead, amplifier/bias
+off, starts GDS and the payload receiver, and prints both URLs. There is no AGC
+or student RF tuning. Use
+[`HACKRF_GROUND_STATION_RUNBOOK.md`](HACKRF_GROUND_STATION_RUNBOOK.md) for the
+ready gates and demo sequence. If the fixed path fails, stop it and use the
+GDS Teensy/RFM23BP cold fallback.
+
+### Neutron-2 `D2` or ground-Teensy fallback
+
+The current HackRF proof does not qualify `D2` or Windows. For that path,
+identify the exact ground-Teensy channel-0 port—never select the first wildcard
+device when multiple Teensies are present—then run:
+
 ```bash
 cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
-./tools/run_gds_uart.sh --port "$PORT"
+./tools/run_gds_uart.sh --port "<verified-ground-channel-0-port>"
 ```
 
 HIL validates what laptop rehearsal cannot:

@@ -1,13 +1,25 @@
-# GDS Teensy Runbook
+# GDS Teensy/RFM23BP Cold-Fallback Runbook
 
-Ground-station Teensy workflow for RF bridge + laptop UART integration.
+This is the cold fallback for the C3M student ground station, and remains the
+ground-adapter procedure for the separately qualified Neutron-2 `D2`/Windows
+workflow. The primary C3M/macOS path is the fixed HackRF launcher in
+[`HACKRF_GROUND_STATION_RUNBOOK.md`](HACKRF_GROUND_STATION_RUNBOOK.md):
+`433 MHz`, TX gain `16`, RX LNA/VGA `8/8`, ACK mode, RF amplifier off, antenna
+bias off, and no AGC or student tuning.
+
+Use this runbook only after stopping the HackRF launcher and intentionally
+connecting the known ground Teensy/RFM23BP node. Do not run both ground
+adapters at once.
 
 ## Scope
 
-- Build and upload `GDS_Teensy` firmware.
+- Recover, build, or upload `GDS_Teensy` firmware when the fallback needs it.
 - Verify USB serial connectivity.
 - Run `fprime-gds` over UART using the RPi-side launcher script.
 - Troubleshoot common failures.
+
+Normal fallback startup does not require a rebuild or reflash. Preserve the
+known-good firmware unless recovery evidence points to a stale or wrong upload.
 
 ## Paths
 
@@ -16,7 +28,7 @@ Ground-station Teensy workflow for RF bridge + laptop UART integration.
 - Arduino config: `GDS_Teensy/tools/arduino-cli/arduino-cli.yaml`
 - GDS launcher: `ArtemisRpiTeensy_N2/tools/run_gds_uart.sh`
 
-## 1) Build Ground Teensy Firmware
+## 1) Build Ground Teensy Firmware When Required
 
 ### macOS
 
@@ -46,35 +58,41 @@ export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
 arduino-cli compile --fqbn teensy:avr:teensy41 --build-path "$PWD/build/arduino-cli" "$PWD/firmware/gds_teensy"
 ```
 
-## 2) Upload Ground Teensy Firmware
+## 2) Upload Ground Teensy Firmware When Required
 
 ### macOS
 
-Find device:
+Find the physical upload ID:
 ```bash
 cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
 export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
 arduino-cli board list
 ```
 
-Upload:
+The current bench mapping is `usb:100000`, but confirm it before every upload.
+Do not upload through `/dev/cu.usbmodem*` when more than one Teensy is attached.
+
+Upload by confirmed physical ID:
 ```bash
 cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
-PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
-./tools/arduino-cli/upload.sh "$PORT"
+./tools/arduino-cli/upload.sh usb:100000
 ```
 
 ### Windows Laptop (WSL2)
 
-Attach the Teensy USB device to WSL first, then run:
+Attach the Teensy USB device to WSL first, then confirm the physical upload ID.
+This documents the fallback workflow; it is not a claim that the current C3M
+HackRF baseline is Windows-qualified.
 
 ```bash
 cd ~/fprime-artemis-cubesat/GDS_Teensy
 export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
 arduino-cli board list
-PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
-./tools/arduino-cli/upload.sh "$PORT"
+./tools/arduino-cli/upload.sh usb:100000
 ```
+
+Stop if `usb:100000` is absent or identifies the wrong board. Never guess
+another ID.
 
 ## 3) Optional Serial Monitor Check
 
@@ -83,17 +101,22 @@ PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
 ```bash
 cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
 export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
-PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
-arduino-cli monitor -p "$PORT" -c baudrate=115200
+python3 -m serial.tools.list_ports -v
+DEBUG_PORT=/dev/cu.usbmodem...
+arduino-cli monitor -p "$DEBUG_PORT" -c baudrate=115200
 ```
+
+Select the second port in the ground board's three-port group. The first is
+binary GDS data; the third is payload data.
 
 ### Windows Laptop (WSL2)
 
 ```bash
 cd ~/fprime-artemis-cubesat/GDS_Teensy
 export ARDUINO_CONFIG_FILE="$PWD/tools/arduino-cli/arduino-cli.yaml"
-PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
-arduino-cli monitor -p "$PORT" -c baudrate=115200
+python3 -m serial.tools.list_ports -v
+DEBUG_PORT=/dev/ttyACM...
+arduino-cli monitor -p "$DEBUG_PORT" -c baudrate=115200
 ```
 
 ## 4) Run `fprime-gds` over UART
@@ -102,16 +125,21 @@ arduino-cli monitor -p "$PORT" -c baudrate=115200
 
 ```bash
 cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
-./tools/run_gds_uart.sh --port "$PORT"
+python3 -m serial.tools.list_ports -v
+GDS_DATA_PORT=/dev/cu.usbmodem...
+./tools/run_gds_uart.sh --port "$GDS_DATA_PORT"
 ```
+
+Select the first port in the confirmed ground triple-serial group. Do not use a
+separately connected satellite Teensy port.
 
 ### Windows Laptop (WSL2)
 
 ```bash
 cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
-./tools/run_gds_uart.sh --port "$PORT"
+python3 -m serial.tools.list_ports -v
+GDS_DATA_PORT=/dev/ttyACM...
+./tools/run_gds_uart.sh --port "$GDS_DATA_PORT"
 ```
 
 Open UI:

@@ -45,7 +45,7 @@ Keep `external/epscorc3m` as a reference for how the Artemis hardware actually b
 | `EPS` | Artemis EPS / PDU / battery system | Real power-system baseline for the demo | Treat as the real EPS prototype, not a stub. PDU v2 protocol per the [PDU ICD](#reference-documents). |
 | `ADCS` | `D2S2` simulator | Simulated ADCS behavior for the demo | The current demo does not require full physical flight ADCS implementation inside this repo. |
 | `PLD` | `Neutron 2` payload **simulator** now, `Neutron 2` **development payload board** (loaned to us) later | Payload/science data source | Simulated payload data is acceptable for the demo. The driver swaps to the loaned Neutron 2 dev board when it arrives, with no change to mission logic. |
-| `COMMS` | `RFM23BP` for MVP, `SatNOGS` board as alternate/future path | Radio/transport subsystem | Default assumption is `RFM23BP` until the in-house `SatNOGS` board is validated. |
+| `COMMS` | Satellite `RFM23BP`; fixed ground `HackRF One` adapter for the demo, with a ground `RFM23BP`/Teensy fallback; `SatNOGS` board as alternate/future path | Radio/transport subsystem | The ground adapter can change without changing the satellite packet protocol or F´ mission logic. |
 | `GPS` | Artemis kit GPS module | Position/time reference from installed Artemis hardware | Exact module may vary by kit configuration. |
 | `S&M` | Artemis structure and antenna deployment baseline | Mechanical/structural context for the demo | Important for full-system understanding, but not the primary focus of current software work. |
 | `TCS` | Artemis thermal baseline with sensors/heater context | Thermal and battery-heater context | Relevant to system understanding; currently a lower-priority software slice for the MVP demo. |
@@ -145,8 +145,10 @@ The `OBC` is the most important subsystem for this repository.
   - active `F'` project and flight-software root (applications, managers, drivers, topology)
 - `ArtemisTeensy_N2_Baremetal`
   - satellite-side Teensy firmware (UART↔RF relay + local RPC)
+- `ground-station/hackrf-rf22`
+  - primary fixed ground adapter (HackRF RF↔two virtual serial endpoints)
 - `GDS_Teensy`
-  - ground-side Teensy firmware (RF↔USB triple-serial bridge)
+  - fallback ground-side Teensy firmware (RFM23BP RF↔USB triple-serial bridge)
 
 ### Important conceptual rule
 
@@ -160,13 +162,49 @@ Today, the codebase is strongest in:
 
 The broader subsystem architecture still matters, but several subsystem functions remain planned, simulated, or partially integrated. The HAL is what lets those slices firm up one driver at a time.
 
+### Ground-adapter boundary: fixed baseline and fallback
+
+The spacecraft side is unchanged for both ground adapters:
+
+```text
+F Prime on Pi /dev/serial0 <-> satellite Teensy <-> satellite RFM23BP
+```
+
+The **primary student/demo ground adapter** is the fixed HackRF One software
+path in [`ground-station/hackrf-rf22`](../ground-station/hackrf-rf22). It
+decodes the existing RF22/RadioHead packets and exposes two virtual serial
+endpoints: channel `0` for `fprime-gds` and channel `1` for the payload
+receiver. Structured bridge metrics replace the old ground debug serial port.
+
+The **fallback ground adapter** is `GDS_Teensy` plus a ground RFM23BP. It
+implements the same RF packet contract and exposes three physical USB serial
+ports: channel `0`, diagnostics, and channel `1`. Switching between these
+ground adapters does not change the Pi binary, satellite firmware, F´
+dictionary, mission commands, or payload protocol.
+
+Channel `2` has no ground endpoint in either setup. It is consumed by the
+satellite Teensy for local subsystem RPC and never crosses RF.
+
+The HackRF student path is deliberately fixed: no AGC, automatic gain or TX
+power selection, adaptive profiles, or operator tuning. Use the exact
+qualified settings and physical geometry in
+[`HACKRF_GROUND_STATION_RUNBOOK.md`](HACKRF_GROUND_STATION_RUNBOOK.md); a
+physical-path change requires lead-supervised requalification. The current
+proof covers the C3M profile on the tested macOS host only. It is not HackRF
+qualification for the Neutron 2 (`D2`) profile or Windows.
+
 ## Transport Architecture: One UART, Three Channels
 
-![Basic command dataflow from fprime-gds through the ground Teensy, RF link, satellite Teensy, custom UART framing, ComCcsds, and F Prime deployment](GDS_TO_SATELLITE_DATAFLOW.png)
+![Basic command dataflow from fprime-gds through the fallback ground Teensy, RF link, satellite Teensy, custom UART framing, ComCcsds, and F Prime deployment](GDS_TO_SATELLITE_DATAFLOW.png)
 
 Source diagram: [`GDS_TO_SATELLITE_DATAFLOW.svg`](GDS_TO_SATELLITE_DATAFLOW.svg), generated from [`GDS_TO_SATELLITE_DATAFLOW.mmd`](GDS_TO_SATELLITE_DATAFLOW.mmd). The PNG is checked in for GitHub Markdown rendering.
 
-This section is the corrected, authoritative description of how bytes move between the Raspberry Pi, the satellite Teensy, the RF link, the ground Teensy, and the ground laptop. The single source of truth for the constants below is [`config/transport_constants.json`](../config/transport_constants.json).
+The diagram preserves the fallback ground-Teensy physical path; the primary
+HackRF adapter terminates the same channel `0`/`1` packet contract in software.
+This section is the corrected, authoritative description of how bytes move
+between the Raspberry Pi, satellite Teensy, RF link, selected ground adapter,
+and ground laptop. The single source of truth for the constants below is
+[`config/transport_constants.json`](../config/transport_constants.json).
 
 ### Why one UART
 
@@ -194,9 +232,10 @@ Every Pi↔Teensy UART frame is wrapped as:
 
 Only channels `0` and `1` cross the RF link (`rf_count = 2`); the satellite UART carries all three (`satellite_count = 3`).
 
-### RF segmentation (Teensy ↔ Teensy)
+### RF segmentation (satellite Teensy ↔ selected ground adapter)
 
-The RFM23BP has a small packet budget, so each cross-RF channel is segmented:
+The satellite RFM23BP has a small packet budget, so each cross-RF channel is
+segmented. Both ground adapters implement this same wire contract:
 
 - RF packet max `49` bytes, `5`-byte segment header, per-segment magic (`165` CCSDS / `166` payload).
 - ACK policy is generated from `config/transport_constants.json`.
@@ -267,9 +306,12 @@ in [Neutron 2 Radio Architecture Summary](NEUTRON2_RADIO_ARCHITECTURE_SUMMARY.md
 
 See the [RFM23BP datasheet](#reference-documents) for the radio's packet/FIFO limits that drive these numbers.
 
-### The three ground USB serial ports
+### Fallback ground Teensy: three USB serial ports
 
-The ground Teensy presents **three USB serial ports** to the ground laptop (Teensy USB triple-serial). 
+The fallback ground Teensy presents **three USB serial ports** to the ground
+laptop (Teensy USB triple-serial). The primary HackRF adapter instead presents
+two virtual serial endpoints for channels `0` and `1`; its structured metrics
+replace the debug port.
 
 > ⚠️ **Numbering warning:** the ground USB serial **port** index is *not* the same axis as the satellite UART **channel** index. Don't conflate "channel 2" (satellite-local RPC, never on RF) with "ground serial port 2" (payload receiver).
 
@@ -283,9 +325,10 @@ The ground Teensy presents **three USB serial ports** to the ground laptop (Teen
 
 ```text
 Channel 0: fprime-gds command/events/telemetry
-laptop fprime-gds  (ground USB serial port 0)
--> ground Teensy
--> ground RFM23BP  -> RF ->  satellite RFM23BP
+laptop fprime-gds
+-> primary: /tmp/c3m-sdr/gds-port -> HackRF software adapter
+   fallback: ground USB serial port 0 -> ground Teensy -> ground RFM23BP
+-> RF -> satellite RFM23BP
 -> satellite Teensy
 -> Raspberry Pi /dev/serial0
 -> UartChannelMux
@@ -296,7 +339,8 @@ F Prime PayloadDownlinkApp
 -> UartChannelMux
 -> satellite Teensy
 -> RFM23BP RF link
--> ground Teensy  (ground USB serial port 2)
+-> primary: HackRF software adapter -> /tmp/c3m-sdr/payload-port
+   fallback: ground RFM23BP -> ground Teensy -> ground USB serial port 2
 -> tools/payload_receiver.py
 -> reconstructed .bin/.csv or .fdp file
 -> ground-station/neutron2-payload-viewer or ground-station/lepton-dp-viewer
@@ -311,9 +355,12 @@ F Prime driver (e.g. EpsDriver_Artemis)
 
 Important student-facing rule:
 
-- `fprime-gds` is the command, event, telemetry, and progress screen (ground serial port 0).
-- ground serial port 1 is a **read-only debug** view of link health.
-- `tools/payload_receiver.py` is the file reconstruction tool for channel 1 (ground serial port 2).
+- `fprime-gds` is the command, event, telemetry, and progress screen (HackRF
+  `gds-port`, or fallback ground serial port 0).
+- HackRF structured metrics are the primary link-health view; fallback ground
+  serial port 1 is the **read-only debug** view.
+- `tools/payload_receiver.py` is the file reconstruction tool for channel 1
+  (HackRF `payload-port`, or fallback ground serial port 2).
 - `ground-station/neutron2-payload-viewer` is the science review tool after a payload file exists. It can parse `.bin` payload products when the bytes inside are the Neutron 2 CSV format.
 - `ground-station/lepton-dp-viewer` is the C3M review tool after a Lepton
   `.fdp` exists. It decodes the thermal product produced by
@@ -353,7 +400,10 @@ To make GDS comms work over this radio at all, we deliberately shrank and thrott
 - **Shrink the CCSDS frame:** `ComCfg.TmFrameFixedSize` 1024 → **128 bytes**, which is exactly **3 RF packets** (128 / 44 ≈ 3). A 3-strip frame can mostly survive the hop; a 24-strip frame cannot.
 - **Shrink the buffers:** `FW_COM_BUFFER_MAX_SIZE = 96` and `FW_LOG_STRING_MAX_SIZE = 80` so packets and event strings fit the smaller frame. Tradeoff: long command arguments, long event strings, and stock file downlink can break — this is an MVP hack (see *Open Risks* in the RCA).
 - **Throttle telemetry:** disable high-volume periodic subsystem telemetry. Keep `SOH` to a tiny heartbeat (a few integers, every 1–2 s). The radio cannot carry full subsystem telemetry without flooding and dropping frames.
-- **Per-segment ACK/retry + partial-chunk dropping** in the Teensy relay (see [Transport Architecture](#transport-architecture-one-uart-three-channels)), so the 3 segments of a frame reassemble correctly and stale fragments never reach GDS.
+- **Per-segment ACK/retry + partial-chunk dropping** in the selected ground
+  adapter and satellite relay (see [Transport Architecture](#transport-architecture-one-uart-three-channels)),
+  so the 3 segments of a frame reassemble correctly and stale fragments never
+  reach GDS.
 - **Avoid stock F´ file downlink over RF.** Science data uses the custom, chunked **channel 1 payload sidecar** (35-byte payload packets) instead of the CCSDS TM path. This is why payload downlink is its own channel and not a normal F´ file transfer.
 
 ### What this means in practice
@@ -389,8 +439,12 @@ This section ties the component tiers and the transport together using **real in
 
 ### Uplink: a command from the ground to a handler
 
-1. Operator runs `fprime-cli command-send ...missionApp.PING --arguments 4245` (or clicks it in the GDS GUI). `fprime-gds` serializes it as a CCSDS **TC** byte stream out ground USB serial port 0.
-2. Ground Teensy → RF (channel 0) → satellite Teensy → Pi `/dev/serial0`.
+1. Operator runs `fprime-cli command-send ...missionApp.PING --arguments 4245`
+   (or clicks it in the GDS GUI). `fprime-gds` serializes it as a CCSDS **TC**
+   byte stream to the HackRF `gds-port` (primary) or ground USB serial port 0
+   (fallback).
+2. Selected ground adapter → RF (channel 0) → satellite Teensy → Pi
+   `/dev/serial0`.
 3. On the Pi, `comDriver` (the `LinuxUartDriver`) receives bytes: `comDriver.$recv -> uartChannelMux.drvReceiveIn`.
 4. `uartChannelMux` de-multiplexes channel 0 and passes CCSDS bytes up: `uartChannelMux.ccsdsRecvOut -> ComCcsds.comStub.drvReceiveIn`.
 5. `ComCcsds` deframes the CCSDS frame/packet and routes the command: `ComCcsds.fprimeRouter.commandOut -> CdhCore.cmdDisp.seqCmdBuff`.
@@ -404,9 +458,15 @@ This section ties the component tiers and the transport together using **real in
 2. The telemetry path aggregates channels and emits CCSDS packets: `CdhCore.tlmSend.PktSend -> ComCcsds.comQueue.comPacketQueueIn[TELEMETRY]`.
 3. `ComCcsds` frames it into a (128-byte) CCSDS **TM** frame: `ComCcsds.comStub.drvSendOut -> uartChannelMux.ccsdsSendIn`.
 4. `uartChannelMux` wraps it on channel 0 and pushes it to the UART: `uartChannelMux.drvSendOut -> comDriver.$send`.
-5. Pi → satellite Teensy → RF (segmented into 3 packets) → ground Teensy → ground USB serial port 0 → `fprime-gds` validates the frame CRC and updates the channel in the GUI.
+5. Pi → satellite Teensy → RF (segmented into 3 packets) → selected ground
+   adapter → HackRF `gds-port` or fallback ground USB serial port 0 →
+   `fprime-gds` validates the frame CRC and updates the channel in the GUI.
 
-Events follow the same downlink path via `CdhCore.events`; ground debug serial port 1 can watch the raw link counters while this happens. The **science/payload path is different** — it never touches `ComCcsds`/CCSDS; it uses `PayloadDownlinkApp` → channel 1 (see [Transport Architecture](#transport-architecture-one-uart-three-channels)).
+Events follow the same downlink path via `CdhCore.events`; HackRF structured
+metrics or fallback ground debug serial port 1 show link health while this
+happens. The **science/payload path is different** — it never touches
+`ComCcsds`/CCSDS; it uses `PayloadDownlinkApp` → channel 1 (see
+[Transport Architecture](#transport-architecture-one-uart-three-channels)).
 
 ### Where the HAL fits in this trace
 
@@ -427,7 +487,8 @@ These are the interfaces that matter most for the current demo architecture.
 - `OBC <-> GPS`
   - Artemis-provided GPS module
 - `COMMS <-> Ground`
-  - ground-station data path used by `fprime-gds` for the MVP demo
+  - fixed HackRF software adapter used by `fprime-gds` for the current demo;
+    ground Teensy/RFM23BP is the fallback adapter
 
 ## Ground Segment
 
@@ -496,6 +557,10 @@ and `CommsApp.DownlinkFinished` are the lifecycle completion signals.
 Unless the user says otherwise, agents should assume the following:
 
 - `RFM23BP` is the default communications path for the MVP demo.
+- The fixed HackRF software adapter is the primary C3M ground path; the
+  `GDS_Teensy`/RFM23BP triple-serial node is the fallback.
+- Do not add AGC or student/operator RF tuning to the HackRF baseline, and do
+  not treat its C3M/macOS proof as Neutron 2 (`D2`) or Windows qualification.
 - `SatNOGS` is an alternate or future communications path, not the default assumption.
 - `D2S2` provides simulated `ADCS` behavior.
 - The payload source is the **Neutron 2 payload simulator**, with the loaned **Neutron 2 development payload board** as the future real source; simulation is acceptable until the dev board is integrated and stable.

@@ -9,7 +9,7 @@ Acronyms and terms used across this repository, for students and new team member
 - **FlatSat** — a spacecraft integrated and tested "flat" on a bench (boards laid out and wired, not in the flight chassis) so it is easy to probe and debug.
 - **FSR** — Flight/Functional System Review-style demo milestone the shortened end-to-end story targets.
 - **MVP** — Minimum Viable Product; the smallest implementation that supports the live demo story.
-- **HIL** — Hardware-In-the-Loop; testing with the real Teensies, radios, and Pi in the loop (as opposed to laptop-only emulation). See [`NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`](NEUTRON2_RF_MVP_DEMO_RUNBOOK.md).
+- **HIL** — Hardware-In-the-Loop; testing with the real Pi, satellite Teensy/radio, and selected ground adapter in the loop (as opposed to laptop-only emulation). See the primary [`HACKRF_GROUND_STATION_RUNBOOK.md`](HACKRF_GROUND_STATION_RUNBOOK.md) and fallback [`NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`](NEUTRON2_RF_MVP_DEMO_RUNBOOK.md).
 - **D2S2** — orbit / pass-timing simulator ([dawndusk.space](https://dawndusk.space/)) that tells the flight software when the spacecraft is approaching its orbit/contact window, driving Base ↔ Science Collection transitions. See [`SYSTEM_ARCHITECTURE.md` › D2S2](SYSTEM_ARCHITECTURE.md#d2s2-orbit--pass-timing-simulator).
 
 ## Subsystems
@@ -18,7 +18,9 @@ Acronyms and terms used across this repository, for students and new team member
 - **EPS** — Electrical Power System. Battery, power conditioning, and rail control.
 - **PDU** — Power Distribution Unit. The board that switches individual power rails on/off. Uses the PDU v2 protocol; see the [PDU ICD](../external/artemis-pdu/PDU_PROTOCOL_ICD.md).
 - **PLD** — Payload. The science instrument; here a Neutron 2 payload **simulator** now, the loaned Neutron 2 **development payload board** later.
-- **COMMS** — Communications/radio subsystem. RFM23BP for the MVP; SatNOGS-style board later.
+- **COMMS** — Communications/radio subsystem. The satellite uses RFM23BP for
+  the MVP. The fixed HackRF software adapter is the primary ground path, with
+  a ground RFM23BP/Teensy fallback; a SatNOGS-style board is a later path.
 - **ADCS** — Attitude Determination and Control System. Simulated via D2S2 for the demo.
 - **GPS** — Global Positioning System receiver; position/time source.
 - **TCS** — Thermal Control System. Heaters/sensors and battery-heater context.
@@ -27,8 +29,17 @@ Acronyms and terms used across this repository, for students and new team member
 
 ## Hardware
 
-- **RFM23BP** — the low-cost, ~50-byte-packet, half-duplex 433 MHz COTS packet radio used for the MVP RF link. Essentially a digital walkie-talkie. See the [RFM23BP constraint](SYSTEM_ARCHITECTURE.md#the-rf-link-constraint-how-fprime-gds-talks-over-a-walkie-talkie).
-- **Teensy 4.1** — microcontroller used as the bridge between the Pi UART and the RFM23BP radio (satellite side) and between RF and laptop USB (ground side).
+- **RFM23BP** — the low-cost, ~50-byte-packet, half-duplex 433 MHz COTS packet
+  radio used on the satellite MVP link and by the fallback ground node.
+  Essentially a digital walkie-talkie. See the
+  [RFM23BP constraint](SYSTEM_ARCHITECTURE.md#the-rf-link-constraint-how-fprime-gds-talks-over-a-walkie-talkie).
+- **HackRF One** — the SDR used by the primary fixed C3M ground adapter. Repo
+  software translates the existing RF22/RadioHead link into channel-0 and
+  channel-1 virtual serial endpoints. Its student baseline has no AGC or
+  operator gain tuning; the current proof does not qualify D2 or Windows.
+- **Teensy 4.1** — microcontroller used between the Pi UART and RFM23BP on the
+  satellite. A second Teensy is used between the RFM23BP and laptop USB only
+  by the fallback ground adapter.
 - **Raspberry Pi Zero W** — single-board computer that hosts the F´ flight-software deployment on the satellite.
 - **SatNOGS** — open-source satellite ground-station/radio ecosystem; the longer-term in-house comms-board path for real data downlink.
 - **COTS** — Commercial Off-The-Shelf; a part bought as-is rather than custom-built.
@@ -50,6 +61,14 @@ Acronyms and terms used across this repository, for students and new team member
 ## Ground / protocol
 
 - **fprime-gds** — the F´ Ground Data System: the laptop tool for sending commands and viewing events/telemetry over the link.
+- **Ground adapter** — the boundary that maps RF channels `0` and `1` to
+  laptop serial endpoints. The primary adapter is HackRF software with two
+  virtual serial ports; the fallback is a GDS Teensy/RFM23BP with USB
+  triple-serial. Satellite-local channel `2` never reaches either adapter.
+- **Virtual serial port (PTY)** — a software-created serial endpoint. The
+  HackRF adapter presents one PTY for GDS/channel `0` and one for
+  payload/channel `1`, so existing ground programs do not need an SDR-specific
+  rewrite.
 - **Yamcs** — a mission-control software stack; the longer-term ground presentation target beyond the `fprime-gds` MVP.
 - **CCSDS** — the international spacecraft data standard. F´ frames telemetry/commands as CCSDS Space Packets inside Space Data Link transfer frames.
 - **TM / TC** — Telemetry (downlink) and Telecommand (uplink) frames.

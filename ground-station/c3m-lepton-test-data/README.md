@@ -97,16 +97,40 @@ rendering path.
 
 ## HIL Use
 
-For real bench downlink, run the payload receiver against the ground Teensy
-payload serial port and write outputs to a run directory, not over this checked
-in reference sample:
+For the current real C3M bench, use the single fixed HackRF launcher:
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat/ground-station/hackrf-rf22
+.venv/bin/python run_hackrf_ground_station.py \
+  --enable-tx \
+  --tx-safety-confirmed
+```
+
+The student profile is fixed at `433 MHz`, TX gain `16`, RX LNA/VGA `8/8`, ACK
+mode, RF amplifier off, antenna bias off, and no AGC or runtime tuning. It
+starts GDS and the payload receiver together. The payload app writes each
+transfer under repo-root `data/`, verifies its CRC, and decodes the exact
+current `.fdp`. Never write a live capture over this checked-in reference
+sample.
+
+If the antenna, direct/no-attenuator path, host, USB path, distance, or geometry
+changes, stop and use the engineering requalification procedure in
+[`../../docs/HACKRF_GROUND_STATION_RUNBOOK.md`](../../docs/HACKRF_GROUND_STATION_RUNBOOK.md).
+
+### Cold fallback: raw receiver
+
+Use this only after the HackRF launcher is stopped and the known ground
+Teensy/RFM23BP fallback is intentionally connected. The normal fallback UI is
+preferred; this raw receiver is an engineering diagnostic. Write outputs to a
+run directory, not over this checked-in reference sample:
 
 ```bash
 cd ~/Developer/fprime-artemis-cubesat
 RUN_DIR=/tmp/neutron_hil/c3m_rf_demo_$(date +%Y%m%d_%H%M%S)
+GDS_PAYLOAD_PORT=/dev/cu.usbmodem...
 mkdir -p "$RUN_DIR"
 python3 ArtemisRpiTeensy_N2/tools/payload_receiver.py \
-  --port <ground-teensy-payload-port> \
+  --port "$GDS_PAYLOAD_PORT" \
   --output-dir "$RUN_DIR" \
   --ext .fdp \
   --debug
@@ -124,8 +148,8 @@ python3 ground-station/lepton-dp-viewer/lepton_dp_viewer.py \
 Commit new HIL captures here only when they are intentionally promoted as
 reference samples.
 
-Future receiver UI intent is captured in
+Receiver UI design and behavior are captured in
 [`docs/C3M_PAYLOAD_RECEIVER_WEB_UI_PLAN.md`](../../docs/C3M_PAYLOAD_RECEIVER_WEB_UI_PLAN.md).
 The reason is simple: GDS shows flight-side downlink progress, while the
-payload receiver proves the ground node actually reconstructed and decoded the
-`.fdp`.
+payload receiver proves the selected ground adapter actually reconstructed and
+decoded the `.fdp`.

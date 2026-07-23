@@ -1,5 +1,9 @@
 # RF MVP Demo Runbook
 
+> **Scope:** this remains the separately qualified Neutron-2 `D2` /
+> GDS-Teensy/RFM23BP procedure. The fixed HackRF baseline is currently
+> C3M/macOS-specific; do not substitute it here until `D2` HIL is qualified.
+
 BLUF: use this to manually demonstrate the Neutron 2 RF demo story with the
 real Raspberry Pi, satellite Teensy, ground Teensy, and RFM23BP link.
 

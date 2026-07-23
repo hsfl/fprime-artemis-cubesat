@@ -1,20 +1,49 @@
-# Hardware Port Map & Power Bring-Up
+# C3M Hardware Port Map & Power Bring-Up
 
-A practical reference for the Neutron 2 bench: which USB/serial device is which, how to tell the two Teensies apart, and how to power the bench safely. This is the doc to open when "it's plugged in but which port do I use?" or "are we ready to power this from the PDU yet?"
+A practical reference for the current C3M student bench: which USB/serial
+device is which, how to tell the two Teensies apart when using the cold
+fallback, and how to power the bench safely. This is the doc to open when "it's
+plugged in but which port do I use?" or "are we ready to power this from the PDU
+yet?"
 
 See [`SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHITECTURE.md) for why the link is built this way, and the [Glossary](GLOSSARY.md) for terms.
 
-## The three compute devices
+## Current student ground baseline
 
-| Device | What it is | How the host sees it |
+```text
+Mac USB -> HackRF One -> 9--10 inch vertical monopole, no attenuator
+```
+
+Start it with the single fixed launcher in
+[`HACKRF_GROUND_STATION_RUNBOOK.md`](HACKRF_GROUND_STATION_RUNBOOK.md). The
+tested profile is `433 MHz`, TX gain `16`, RX LNA/VGA `8/8`, ACK mode, RF
+amplifier off, antenna bias off, and a `100 ms` TX settle lead. There is no
+AGC, adaptive gain, automatic power control, or student runtime tuning.
+
+The HackRF does not enumerate as three serial ports. The launcher owns the USB
+device and creates the channel-0 and channel-1 virtual paths consumed by GDS
+and the payload receiver. Use `hackrf_info` to confirm the device. Do not also
+connect or start the ground Teensy stack.
+
+This baseline is specific to the tested Mac, antenna, direct/no-attenuator RF
+path, USB path, separation, and geometry. Any physical change is an engineering
+requalification, not a reason for students to adjust gains.
+
+## Bench devices
+
+| Device | Role | How the host sees it |
 | --- | --- | --- |
 | Satellite Raspberry Pi Zero W | Hosts the F´ flight-software deployment | SSH over the network; talks to the satellite Teensy on its own `/dev/serial0` UART |
 | Satellite Teensy 4.1 | UART↔RF relay + local subsystem RPC | One USB serial (debug console) when plugged into a laptop |
-| Ground Teensy 4.1 | RF↔USB bridge for the ground laptop | **Three** USB serial ports (triple-serial), see below |
+| HackRF One | **Primary** C3M ground RF adapter | One USB SDR visible to `hackrf_info`; software provides channel 0 and channel 1 |
+| Ground Teensy 4.1 + RFM23BP | **Cold fallback** ground RF adapter | **Three** USB serial ports (triple-serial), see below |
 
-## USB serial enumeration (varies by OS and USB port)
+## Cold-fallback USB serial enumeration
 
-There is no fixed device name — the suffix depends on the machine and which USB port you used. **Always enumerate, don't hardcode.**
+This section is only for the ground Teensy/RFM23BP fallback and optional
+satellite debug USB. There is no fixed serial-device name — the suffix depends
+on the machine and which USB port you used. **Always enumerate, don't
+hardcode.**
 
 - **macOS:** `ls /dev/cu.usbmodem*`
 - **Windows (WSL2):** `ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null`
@@ -22,11 +51,14 @@ There is no fixed device name — the suffix depends on the machine and which US
 
 Tip: unplug everything, plug in **one** Teensy, run the enumerate command, and note which port(s) appear before adding the next device. Label the physical USB cables.
 
-On Windows, the Teensy must be attached into WSL2 before these Linux device names
-appear. See [`STUDENT_WINDOWS_LAPTOP_SETUP.md`](STUDENT_WINDOWS_LAPTOP_SETUP.md)
-for the `usbipd-win` bind/attach/detach workflow.
+On Windows, the Teensy must be attached into WSL2 before these Linux device
+names appear. See
+[`STUDENT_WINDOWS_LAPTOP_SETUP.md`](STUDENT_WINDOWS_LAPTOP_SETUP.md) for the
+`usbipd-win` bind/attach/detach workflow. Those instructions cover the existing
+Teensy fallback workflow; they do not qualify the current HackRF baseline on
+Windows.
 
-## Ground Teensy: three USB serial ports
+## Cold fallback: Ground Teensy three USB serial ports
 
 When the ground Teensy is built with `USB_TRIPLE_SERIAL`, it presents three ports to the laptop. **The port index is its own axis — it is *not* the same as the satellite UART channel numbers.** (See [Transport Architecture](SYSTEM_ARCHITECTURE.md#the-three-ground-usb-serial-ports).)
 
@@ -55,7 +87,10 @@ The Pi runs the deployment as a systemd service (`artemis-fprime.service`) execu
 
 ### Current reality: USB power only
 
-So far the bench has been brought up **USB-powered only** — the OBC/Teensy on both the ground and satellite nodes run off USB. The PDU, battery board, and solar panels are **not yet integrated** into the bring-up. This is the safe default for software/RF work.
+The current ground HackRF is USB-powered by the Mac. The satellite OBC/Teensy
+and the fallback ground Teensy have been brought up with USB power. The PDU,
+battery board, and solar panels are **not yet integrated** into this bring-up.
+This is the safe default for software/RF work.
 
 ### Future: power from the Artemis bus (PDU → battery → solar)
 

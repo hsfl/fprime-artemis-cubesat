@@ -1,40 +1,35 @@
 # EPSCoR C3M Lepton Local And RF Mission Operations Runbook
 
-## START HERE: Manual HIL Operator Script
+## START HERE: Fixed HackRF Student Baseline
 
-Use this section when you have the C3M satellite and ground hardware with you
-and want to run the real RF demo manually from a Mac. You need:
-
-- both nodes powered with antennas attached.
-- the ground Teensy connected to the Mac by USB.
-- the satellite Pi and Teensy powered and connected together.
-- the Mac able to reach `artemis-pi-c3m` over SSH.
-
-If `ssh artemis-pi-c3m` cannot reach the Pi, fix the network first. The demo
-cannot be operated remotely through SSH alone: the ground RF node must be with
-the operator and connected to the Mac.
-
-### 1. Find the three ground Teensy ports
-
-```bash
-cd ~/Developer/fprime-artemis-cubesat
-GROUND_PORTS=(/dev/cu.usbmodem*(N))
-printf 'GDS:     %s\nDebug:   %s\nPayload: %s\n' \
-  "${GROUND_PORTS[1]}" "${GROUND_PORTS[2]}" "${GROUND_PORTS[3]}"
-```
-
-Continue only when this prints three ground Teensy ports with the same number
-stem:
+Use this section for the normal C3M student demo on the tested Mac bench. The
+baseline has one ground-side process and no student tuning:
 
 ```text
-first port  = GDS
-second port = debug
-third port  = payload receiver
+Mac USB -> HackRF One -> 9--10 inch vertical monopole, no attenuator
 ```
 
-Do not use a satellite Teensy port if one is separately connected to the Mac.
+The launcher fixes the qualified radio settings at `433 MHz`, TX gain `16`, RX
+LNA/VGA `8/8`, ACK mode, and a `100 ms` TX settle lead. The RF amplifier and
+antenna bias are off. There is no AGC, adaptive gain, automatic power control,
+or runtime profile selection.
 
-### 2. Confirm the satellite Pi is running F Prime
+Before starting, confirm:
+
+- the C3M satellite Pi and satellite Teensy are powered with their antenna
+  attached;
+- the HackRF is connected by USB with the tested 9--10 inch vertical monopole
+  attached directly and no attenuator;
+- the tested lab separation and geometry have not changed;
+- the Mac can reach `artemis-pi-c3m` over SSH; and
+- no other application owns the HackRF.
+
+If the antenna, cable, attenuator state, USB path, host, distance, or geometry
+changes, stop. That is an engineering requalification, not a student tuning
+exercise. See
+[`HACKRF_GROUND_STATION_RUNBOOK.md`](HACKRF_GROUND_STATION_RUNBOOK.md).
+
+### 1. Confirm the satellite Pi is running F Prime
 
 ```bash
 ssh artemis-pi-c3m 'systemctl is-active artemis-fprime.service; pgrep -af ArtemisRpiTeensyDeployment'
@@ -43,36 +38,28 @@ ssh artemis-pi-c3m 'systemctl is-active artemis-fprime.service; pgrep -af Artemi
 Continue only when the service prints `active` and the deployment is running
 with `-d /dev/serial0`.
 
-### 3. Terminal 1: start GDS
+### 2. Start the complete ground station
 
 ```bash
-cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-. fprime-venv/bin/activate
-GROUND_PORTS=(/dev/cu.usbmodem*(N))
-export GDS_DATA_PORT="${GROUND_PORTS[1]}"
-./tools/run_gds_uart.sh \
-  --port "$GDS_DATA_PORT" \
-  --baud 115200 \
-  --gui-port 5050 \
-  --dictionary build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json
+cd ~/Developer/fprime-artemis-cubesat/ground-station/hackrf-rf22
+.venv/bin/python run_hackrf_ground_station.py \
+  --enable-tx \
+  --tx-safety-confirmed
 ```
 
-Leave this terminal running. Open the GDS URL printed by the launcher, normally
-`http://127.0.0.1:5050`.
+This single launcher owns the HackRF and starts both `fprime-gds` and the C3M
+payload receiver. Continue only after it prints `GROUND_STATION_READY`. Open
+the printed URLs, normally:
 
-### 4. Terminal 2: start the payload receiver
-
-```bash
-cd ~/Developer/fprime-artemis-cubesat
-. ArtemisRpiTeensy_N2/fprime-venv/bin/activate
-python3 ground-station/c3m-payload-receiver-ui/c3m_payload_receiver_ui.py
+```text
+GDS:     http://127.0.0.1:5057
+Payload: http://127.0.0.1:8064
 ```
 
-Leave this terminal running. Open `http://127.0.0.1:8064` and wait for green
-**Ready - awaiting downlink**. If asked for a port, select the **third** ground
-Teensy port from step 1.
+Wait for green **Ready - awaiting downlink** in the payload app. Do not add
+gain, mode, amplifier, bias, or AGC options to this student command.
 
-### 5. Run one picture from the GDS Commanding page
+### 3. Run one picture from the GDS Commanding page
 
 Send these commands in order:
 
@@ -88,27 +75,33 @@ During the transfer, send only one optional channel-0 proof command:
 `missionApp.PING` with token `37002`. Otherwise leave GDS alone until the image
 finishes.
 
-To take another picture, repeat steps 3-6. Do not restart GDS, the payload web
-app, the Pi, or either Teensy between pictures.
+To take another picture, repeat command steps 3-6. Do not restart the HackRF
+launcher, GDS, the payload web app, the Pi, or the satellite Teensy between
+pictures.
 
-### 6. Stop when finished
+### 4. Stop when finished
 
-Press `Ctrl-C` once in Terminal 2, then once in Terminal 1. Completed payloads
-remain under repo-root `data/`.
+Press `Ctrl-C` once in the launcher terminal. It stops the payload receiver,
+GDS, and HackRF bridge in order. Completed payloads remain under repo-root
+`data/`.
 
-Everything below is validation, recovery, engineering fallback, and historical
-evidence. You do not need it for a normal manual HIL run.
+The `GDS_Teensy` + ground RFM23BP node is the cold fallback. Do not connect or
+run it alongside the HackRF stack. Its recovery procedure and historical
+evidence remain below so the fallback is still usable without changing the
+flight software, dictionary, mission commands, or payload format.
 
-BLUF: use this for the C3M Lepton laptop proof and refined RF demo operation.
-The normal operator uses `fprime-gds` for channel 0 and the C3M payload receiver
-web app for channel 1; the raw receiver and decoder CLIs are engineering
-fallbacks. The 2026-07-09 HIL run proved real UVC capture and a byte-identical
-full-resolution RF downlink in `58.557 s`. The July 16 close-range hardening run
-passed 10/10 real radio `OFF` to `READY` cycles and 3/3 new byte-identical
-payload cycles in 65–67 seconds; mid-transfer PING responded immediately in 2/3
-runs and the one missed response passed on the immediate idle retry. The final
-July 16 acceptance also proved ground-only cancel with a saved partial, followed
-by a byte-identical retry of the same retained spacecraft picture without a new
+BLUF: use the fixed HackRF launcher above for current C3M Lepton demo
+operations. It provides `fprime-gds` on channel 0 and the C3M payload receiver
+web app on channel 1. The ground Teensy/RFM23BP node and raw receiver/decoder
+CLIs are fallbacks. Primary HackRF qualification evidence is in the HackRF
+runbook. The preserved RFM23BP fallback evidence starts with a 2026-07-09 HIL
+run that proved real UVC capture and a byte-identical full-resolution RF
+downlink in `58.557 s`. The July 16 close-range hardening run passed 10/10 real
+radio `OFF` to `READY` cycles and 3/3 new byte-identical payload cycles in
+65–67 seconds; mid-transfer PING responded immediately in 2/3 runs and the one
+missed response passed on the immediate idle retry. The final July 16
+acceptance also proved ground-only cancel with a saved partial, followed by a
+byte-identical retry of the same retained spacecraft picture without a new
 capture.
 
 The active hardening scope and live HIL matrix are defined in
@@ -139,7 +132,8 @@ Requires HIL rather than local emulation:
 - real Lepton/libuvc capture.
 - Raspberry Pi runtime on `/dev/serial0`.
 - Teensy serial bridge behavior.
-- RFM23BP airtime, ACK timeouts, retries, or packet loss.
+- primary HackRF airtime, ACK timing, half-duplex behavior, or packet loss.
+- cold-fallback RFM23BP airtime, ACK timeouts, retries, or packet loss.
 - HIL bench downlink timing.
 
 ## Local Preflight
@@ -275,8 +269,9 @@ C3M dataflow remain intact:
 - channel-1 payload transfer shape.
 - Lepton `.fdp` reconstruction and decode.
 
-Local emulation cannot prove RF throughput. The 2026-07-09 HIL values are frozen
-for this mission-operations work:
+Local emulation cannot prove RF throughput. The protocol values carried forward
+from the 2026-07-09 HIL campaign are frozen for current HackRF operations and
+the RFM23BP fallback:
 
 Current optimized RF policy:
 
@@ -289,9 +284,9 @@ Current optimized RF policy:
 Do not adjust pacing, packet counts, UART values, ACK policy, RF gaps, or PHY
 values to compensate for a failed rehearsal. Preserve the run evidence and
 inspect the directional counters first. Any future transport-value change is a
-separate bench campaign that invalidates the validated Pi release and both
-Teensy firmware images until the local gate, rebuilds, and HIL acceptance flow
-pass again.
+separate bench campaign that invalidates the validated Pi release, satellite
+Teensy image, HackRF bridge qualification, and ground fallback image until the
+local gate, rebuilds, and selected-path HIL acceptance flow pass again.
 
 ### Transport Source-To-Artifact Map
 
@@ -320,6 +315,10 @@ ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/link_protocol.hpp
 GDS_Teensy/firmware/gds_teensy/src/link_protocol.hpp
 ```
 
+The HackRF bridge reads the same manifest directly through
+`ground-station/hackrf-rf22/rf22_protocol.py`; it is not a fourth generated
+header.
+
 The RFM23BP PHY register profile, including the validated 125 kbps
 `0x58=0xC0` setting, still lives in the two firmware driver implementations and
 is not generated from this manifest. Do not relocate or retune it during the
@@ -327,24 +326,32 @@ mission-operations pass.
 
 After any approved manifest or PHY change: regenerate, run
 `./tools/validate_local.sh --demo c3m`, rebuild the ARMv6/libuvc Pi release,
-rebuild and flash both Teensies, then repeat live HIL acceptance. Until all of
-those pass, the changed artifact set is not the validated demo configuration.
+rebuild the satellite Teensy, run the HackRF regression suite, and repeat
+primary-path HIL acceptance. Also rebuild and requalify the ground Teensy before
+calling the fallback ready. Until the applicable gates pass, the changed
+artifact set is not the validated demo configuration.
 
 ## Firmware Build Gates
 
-Build both bridge firmwares before HIL:
+The HackRF baseline replaces only the ground bridge. Build the satellite bridge
+firmware before primary-path HIL:
 
 ```bash
 cd ~/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
 ./tools/arduino-cli/build.sh
+```
 
+Build the ground bridge firmware only when validating or recovering the cold
+fallback:
+
+```bash
 cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
 ./tools/arduino-cli/build.sh
 ```
 
 Pass criteria:
 
-- both builds exit `0`.
+- each build required for the selected path exits `0`.
 - no generated build/cache files are staged.
 
 Web-app-only changes do not require a Teensy rebuild or reflash. Never reflash a
@@ -371,7 +378,12 @@ still useful for ARM/runtime smoke, but it is not real-camera HIL-ready. Install
 or sync `libuvc`, `libuvc/libuvc.h`, and `libusb-1.0` into the Pi build
 environment, then rebuild until the `libuvc enabled` line appears.
 
-## RF MVP Bench Prep
+## Cold Fallback: GDS Teensy/RFM23BP Bench Prep
+
+Skip this section for the fixed HackRF baseline. Use it only after stopping the
+HackRF launcher and intentionally switching to the known ground
+Teensy/RFM23BP node. The fallback is a separate physical ground adapter; it
+does not change the satellite software or mission command sequence.
 
 Recheck ports every HIL session:
 
@@ -480,10 +492,11 @@ At the deliberately saturated 30 dBm close bench, a command response may be
 missed during bulk downlink. Wait for the transfer to become idle and retry the
 single command once; do not send a burst of duplicate commands.
 
-## Start Mission Operations Tools
+## Cold Fallback: Start Mission Operations Tools
 
-The normal demo operator needs two surfaces: GDS and the payload web app. Start
-both before scheduling a capture.
+These manual two-process steps apply only to the ground Teensy/RFM23BP
+fallback. The normal HackRF operator uses the single launcher in **START
+HERE**, which starts both surfaces.
 
 ### GDS On Channel 0
 
@@ -612,7 +625,9 @@ for normal demo operations.
 7. Otherwise keep channel 0 quiet until the payload web app reports CRC-complete
    decode. Do not use `GET_PAYLOAD_STATUS` during a normal timed run.
 8. Confirm the receiver is back at **Ready**, then repeat steps 3-7 for the
-   next picture. Leave all processes and both Teensys running between cycles.
+   next picture. On the primary path, leave the HackRF launcher and satellite
+   stack running between cycles. On the cold fallback, leave both Teensies and
+   both ground processes running.
 
 The Lepton driver opens the camera when the collection arrives and takes one
 frame; separate enable and capture-duration commands are not required for this
@@ -633,8 +648,10 @@ Record these without changing pacing or ACK policy:
 - web app reaches `Complete`, final CRC succeeds, and its exact current product
   decodes as `width=160`, `height=120`, `pixels=19200`.
 - the app writes `.fdp`, JSON, CSV, PNG, and `run.json` under repo-root `data/`.
-- `rf_retries`, `rf_ack_timeouts`, `rf_msg_id_gaps`, and queue drops are
-  recorded from both Teensy debug ports.
+- HackRF bridge status records ACK/retry, RF-message-gap, RX-drop,
+  clipping, and queue/backpressure metrics on the primary path.
+- Both Teensy debug ports record RF retry/timeout/message-gap and queue-drop
+  counters when the cold fallback is used.
 - exactly one mid-transfer PING proves channel 0 remains responsive; otherwise
   channel 0 remains quiet during bulk transfer.
 - any retry round count is acceptable only if the final file is byte-correct and
@@ -669,10 +686,11 @@ record the product/transfer identity, elapsed time, retry count, CRC result, and
   zero.
 - no transport-value changes between runs.
 
-## Validated Final Bench Configuration (2026-07-09)
+## Historical GDS Teensy/RFM23BP Bench Configuration (2026-07-09)
 
-The live C3M Lepton/RFM23BP bench passes both gates with the following generated
-transport constants:
+This is preserved evidence for the cold fallback, not the current HackRF
+student baseline. The live C3M Lepton/RFM23BP bench passed both gates with the
+following generated transport constants:
 
 - Ground and satellite RF antennas were approximately 30 inches apart on the
   tabletop, line-of-sight.
@@ -758,21 +776,25 @@ Stop the timed run and preserve its evidence if any of these happen:
 
 - channel-0 commands or telemetry become unreliable.
 - payload web app never reaches final CRC or reports an explicit failure.
-- Teensy queue drops appear.
+- primary HackRF bridge reports RX drops, TX failures, clipping above the
+  qualified baseline, or exhausted backpressure.
+- fallback Teensy queue drops appear.
 - RF message-id gaps climb continuously.
 - Pi deployment restarts or watchdogs.
 - C3M full-res HIL timing exceeds `120 s` after retries.
 
 Do not retune transport values during this mission-operations hardening pass.
 First distinguish serial ownership, stale-product sequencing, camera/backend,
-decode/filesystem, and genuine RF transport failures using the saved `run.json`,
-GDS events, Pi journal, and Teensy counters.
+decode/filesystem, and genuine RF transport failures using the saved
+`run.json`, GDS events, Pi journal, and selected ground-adapter metrics. Do not
+enable AGC or tune gains during a student run.
 
 ## Cleanup
 
-Stop the web app with `Ctrl-C` in its terminal after the demo session. If the
-engineering CLI fallback was used instead, stop that process before reopening
-the web app.
+On the primary path, press `Ctrl-C` once in the HackRF launcher terminal and
+let it stop the payload app, GDS, and bridge in order. On the cold fallback,
+stop the web app and GDS from their owning terminals. If the engineering CLI
+receiver was used instead, stop it before reopening the web app.
 
 Keep repo-root `data/` as the operator's local payload history. It is ignored by
 Git; do not delete run folders until hashes, logs, and screenshots needed for

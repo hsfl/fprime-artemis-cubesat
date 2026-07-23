@@ -15,9 +15,11 @@ hardware.
   (`ArtemisTeensy_N2_Baremetal`). This handles the microcontroller-side
   subsystem/radio work: the single Pi UART, local subsystem RPC such as EPS/PDU,
   and the RFM23BP link.
-- **Ground Teensy:** runs baremetal RF/USB bridge firmware (`GDS_Teensy`). It
-  reassembles RF packets to laptop USB streams and packetizes uplink bytes back
-  over RF.
+- **Primary C3M ground adapter:** one HackRF One runs the fixed software bridge
+  in `ground-station/hackrf-rf22`. It maps RF channel 0 to `fprime-gds` and
+  channel 1 to the payload receiver through two virtual serial ports.
+- **Fallback ground node:** `GDS_Teensy` plus a ground RFM23BP provides the
+  older physical triple-serial bridge when the HackRF path is unavailable.
 - **Ground laptop:** uses `fprime-gds` for the current MVP command, event, and
   telemetry surface, plus the Neutron 2 payload viewer for reconstructed science
   files.
@@ -29,35 +31,18 @@ test bench, written for students and new team members so the hardware context
 behind the software is clear. The prototype is based on the
 [Artemis CubeSat Kit](https://sites.google.com/hawaii.edu/artemiscubesatkit).
 
-The bench is intentionally a **two-node mirror**: the ground station and the
-satellite are built from the same kitted hardware. This keeps the radio code and
-bring-up procedure identical on both ends.
+The current student bench is intentionally asymmetric:
 
-### Two identical nodes: ground station and satellite
+```text
+satellite: Pi Zero W <-> Teensy 4.1 <-> RFM23BP <-> antenna
+ground:    laptop <-> USB <-> HackRF One <-> 9-10 inch vertical monopole
+fallback:  laptop <-> USB <-> GDS Teensy <-> RFM23BP <-> antenna
+```
 
-Both the ground station and the satellite are built on the same OBC (On-Board
-Computer) board and carry the same compute and radio kit:
-
-| Item | Detail |
-|------|--------|
-| OBC board | Printed `4.23`; actual design may be v4.23 or v4.24 because the PCB marking did not change |
-| Microcontroller | Teensy 4.1 |
-| Single-board computer | Raspberry Pi Zero W |
-| Radio | RFM23BP (RFM23BP transceiver / radio head) |
-| Antenna | Antenna board with good (non-rusty) antennas |
-
-So the bench is **two OBC boards**, each kitted with a Teensy 4.1 and a Raspberry
-Pi Zero W — one acting as the **ground station**, the other as the **satellite**.
-
-Roles inside each node:
-
-- The **Raspberry Pi Zero W** runs the higher-level software (on the satellite,
-  the F Prime flight-software deployment).
-- The **Teensy 4.1** is required to interface with the **RFM23BP** radio — it
-  drives the radio head and the RF link.
-- The **antenna board** carries the antennas for the RF link.
-
-That is the whole RF path on each node: Pi <-> Teensy 4.1 <-> RFM23BP <-> antenna.
+The satellite uses the Artemis OBC/radio kit. The primary ground side uses the
+HackRF software adapter, so students do not need to identify or route three
+physical ground serial ports. The mirrored RFM23BP ground node is retained as a
+cold fallback, not a peer configuration to tune during a demo.
 
 ### Power / EPS hardware
 
@@ -75,33 +60,36 @@ panels are not yet integrated into the bring-up.
 [Artemis CubeSat Kit](https://sites.google.com/hawaii.edu/artemiscubesatkit) bus
 instead of USB power.
 
-### Future direction: stay on the RFM23BP radio head for now
+### Current C3M ground baseline
 
-A longer-term option is to move the ground station **away from a carbon-copy of
-the satellite** and toward a **Software Defined Radio (SDR)**. We are
-intentionally **not** doing that right now.
+The C3M/macOS student baseline is one fixed HackRF configuration: ACK mode, TX
+gain `16`, RX LNA/VGA `8/8`, `100 ms` TX lead, RF amplifier off, and antenna
+bias off. There is no AGC, adaptive profile, automatic power control, or
+student-facing RF tuning. The normal launch command only asks the operator to
+confirm that the exact qualified physical path is assembled.
 
-Reasons to stay on the current RFM23BP radio for now:
+The adapter speaks the existing RadioHead/RF22 contract and exposes separate
+channel-0 GDS and channel-1 payload virtual serial ports. Switching to the
+fallback GDS Teensy/RFM23BP node does not require an F Prime, flight-software,
+packet-format, or payload-tool refactor.
 
-- **Lower maintenance:** Going SDR means someone has to learn and maintain the
-  SDR stack, and effectively relearn how RF comms works at a lower level.
-- **Code reuse:** Keeping the same RFM23BP radio head lets us reuse the existing
-  RadioHead-library-based radio code on both nodes instead of rewriting the link
-  layer.
-- **Two identical nodes are simpler:** Building the ground station from the same
-  kit as the satellite means one bring-up procedure and one radio codebase.
-
-In short: an SDR is a "someday" upgrade, not a near-term need. Until the benefit
-clearly outweighs the added learning and maintenance burden, we keep the
-RFM23BP + RadioHead path on both the ground station and the satellite. See
-[`docs/archive/HACKRF_SDR_GROUND_STATION_INVESTIGATION_2026-06-30.md`](docs/archive/HACKRF_SDR_GROUND_STATION_INVESTIGATION_2026-06-30.md)
-for the HackRF/SDR packet-compatibility investigation.
+Qualification is specific to the tested monopole, no-attenuator path, distance,
+macOS host, USB path, and geometry. A lead must requalify any changed path; a
+student should stop and use the fallback instead of tuning gains. This is a
+functional/demo qualification, not proof of antenna impedance or absolute
+HackRF input power. See
+the [HackRF operator runbook](docs/HACKRF_GROUND_STATION_RUNBOOK.md), the
+[adapter README](ground-station/hackrf-rf22/README.md), and the original
+[investigation](docs/archive/HACKRF_SDR_GROUND_STATION_INVESTIGATION_2026-06-30.md).
+The current proof is C3M/macOS-specific; it does not yet qualify the Neutron-2
+`D2` profile or Windows. This bench adapter also does not replace the
+longer-term SatNOGS-class radio plan.
 
 ## Target demo
 
 ![FlatSat FSR end-to-end demo plan](docs/images/flatsat-fsr-end-to-end-demo-plan.png)
 
-The current target is a shortened FlatSat FSR end-to-end demo based on the team's system diagram and operator flow. The live demo is not a full mission implementation; it is a controlled proof-of-concept showing command, telemetry, timed data collection, and science-data downlink across the full Raspberry Pi -> satellite Teensy -> RF -> ground Teensy -> ground station chain.
+The current target is a shortened FlatSat FSR end-to-end demo based on the team's system diagram and operator flow. The live demo is not a full mission implementation; it is a controlled proof-of-concept showing command, telemetry, timed data collection, and science-data downlink across the full Raspberry Pi -> satellite Teensy -> RF -> fixed HackRF ground adapter -> ground station chain. The GDS Teensy/RFM23BP node is the fallback.
 
 ### Target operator story
 
@@ -226,7 +214,9 @@ Where to find things:
 - `ArtemisTeensy_N2_Baremetal/`
   - Satellite Teensy relay firmware workspace (Arduino CLI workflow).
 - `GDS_Teensy/`
-  - Ground-station Teensy relay firmware workspace (Arduino CLI workflow).
+  - Fallback ground-station Teensy/RFM23BP relay firmware workspace.
+- `ground-station/hackrf-rf22/`
+  - Primary fixed C3M/macOS HackRF adapter, supervisor, proof collector, and tests.
 - `ground-station/neutron2-payload-viewer/`
   - Neutron 2 payload/science viewer used on the ground laptop.
 - `student_onboarding/`
@@ -250,14 +240,16 @@ New here? Read these roughly in order to fully understand the project:
 4. `docs/archive/OPTIMAL_FPRIME_COMPONENT_TOPOLOGY_PLAN.md` — component and topology plan.
 5. `docs/TIME_AND_SCHEDULING.md` — rate groups, the clock, and how the "collect in N seconds" countdown works.
 6. `EMULATION.md` and `docs/NEUTRON2_LOCAL_EMULATION_RUNBOOK.md` — laptop-only closed-loop emulation (no hardware).
-7. `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md` — the real hardware-in-the-loop (HIL) demo flow.
-8. `docs/C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md` — Pi-owned RFM23BP lifecycle, bounded autonomous recovery, HIL evidence, and remaining electrical gates.
-9. `docs/HARDWARE_PORT_MAP_AND_POWER.md` — which USB/serial device is which, and how to power the bench safely.
-10. `docs/MISSION_OPS_QUICK_RUN.md` — one-page local rehearsal and FlatSat/HIL operator checklist.
-11. `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md` — Windows laptop setup for student developers and viewer users.
-12. `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md` and `docs/RPI_BUILD.md` — building the Pi Zero W flight binary (cross-compile preferred; native is the manual fallback).
-13. `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` — where to look first when commands, telemetry, payload downlink, or EPS/PDU behavior fails.
-14. `docs/agents_notes.md` — current implementation status and next-agent guidance.
+7. `docs/HACKRF_GROUND_STATION_RUNBOOK.md` — the primary fixed C3M/macOS hardware-in-the-loop ground flow.
+8. `docs/EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md` — the C3M demo commands and the GDS Teensy/RFM23BP fallback procedure.
+9. `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md` — the separately qualified Neutron-2/ground-Teensy HIL flow; do not infer HackRF `D2` qualification.
+10. `docs/C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md` — Pi-owned RFM23BP lifecycle, bounded autonomous recovery, HIL evidence, and remaining electrical gates.
+11. `docs/HARDWARE_PORT_MAP_AND_POWER.md` — which USB/serial device is which, and how to power the bench safely.
+12. `docs/MISSION_OPS_QUICK_RUN.md` — one-page local rehearsal and FlatSat/HIL operator checklist.
+13. `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md` — Windows laptop setup for student developers and viewer users.
+14. `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md` and `docs/RPI_BUILD.md` — building the Pi Zero W flight binary (cross-compile preferred; native is the manual fallback).
+15. `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` — where to look first when commands, telemetry, payload downlink, or EPS/PDU behavior fails.
+16. `docs/agents_notes.md` — current implementation status and next-agent guidance.
 
 ## Build and run (local emulation)
 
@@ -358,11 +350,12 @@ local demo sequence.
 
 ## Hardware-in-the-loop (HIL) testing
 
-The build-and-run section above is laptop emulation only. For the **full demo on
-real hardware** — RPi UART, satellite Teensy, RFM23BP pair, ground Teensy,
-`fprime-gds`, and the payload receiver/viewer — follow
-`docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`, with `docs/MISSION_OPS_QUICK_RUN.md` as
-the operator checklist.
+The build-and-run section above is laptop emulation only. For the current
+**C3M/macOS demo on real hardware**—RPi UART, satellite Teensy/RFM23BP, HackRF,
+`fprime-gds`, and the payload receiver/viewer—follow
+`docs/HACKRF_GROUND_STATION_RUNBOOK.md`. The separately qualified
+Neutron-2/ground-Teensy flow remains in
+`docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`.
 
 ## Status
 
@@ -371,6 +364,9 @@ Implemented:
 - Satellite and ground Teensy relay firmware with channelized UART framing plus RF segmentation/reassembly.
 - Channel 0 CCSDS/GDS path, channel 1 payload/science path, and channel 2 satellite-local EPS/PDU RPC path.
 - Ground Teensy simple uplink path (USB raw byte burst -> RF segmentation for channels that cross RF).
+- Fixed HackRF C3M/macOS ground adapter with ACK command uplink, two stable
+  virtual serial endpoints, supervised GDS/payload processes, and strict proof
+  collection at TX `16`, RX `8/8`, amplifier/bias off.
 - Updated UART/RF transport contract documentation.
 - RPi-hosted neutron payload simulator wired through `PayloadManager` and `PayloadDriver_NeutronSim`, including a latest-capture handoff for downlink.
 - File-backed `PayloadDownlinkApp` and payload receiver tooling for arbitrary payload bytes over channel 1.
@@ -381,9 +377,13 @@ Implemented:
 - HIL proof of the shortened demo story over the real RPi UART, satellite
   Teensy, RFM23BP pair, ground Teensy, `fprime-gds`, payload receiver, and
   payload viewer path. See `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`.
+- Three consecutive fresh C3M collection/downlink runs over the fixed HackRF
+  path, including one controlled mid-transfer command and exact Pi/ground hash
+  matches. See `docs/HACKRF_GROUND_STATION_RUNBOOK.md`.
 
 Not implemented yet:
 - HIL validation of channel 2 against the real PDU.
+- HackRF qualification for the Neutron-2 `D2` RF profile or Windows hosts.
 - RF/GDS cleanup to reduce APID sequence-count warnings on lossy channel 0 traffic.
 - Broader EPS/PDU telemetry beyond the current command/status path, plus thermal, GPS, and IMU telemetry + command driver behavior.
 - Full uplink robustness (deterministic packet-boundary extraction and retry/ack strategy).
@@ -399,7 +399,8 @@ Not implemented yet:
 
 - Use `docs/archive/` for historical implementation plans, sizing memos, and RF debug notes.
 - See [Read next](#read-next) above for the architecture, runbook, emulation, and setup docs.
-- The UART channel mux and RF transport (one Pi↔Teensy UART, three channels, the
-  ground triple-serial mapping, and the Application -> Manager -> Driver HAL pattern)
+- The UART channel mux and RF transport (one Pi↔Teensy UART, three channels,
+  the primary HackRF virtual-port mapping, the fallback ground triple-serial
+  mapping, and the Application -> Manager -> Driver HAL pattern)
   are documented in `docs/SYSTEM_ARCHITECTURE.md` under **Transport Architecture:
   One UART, Three Channels** and **Flight Software Architecture**.

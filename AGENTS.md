@@ -74,8 +74,29 @@ Use this project with the `fprime-swe` skill and follow these steps exactly.
   - `ArtemisRpiTeensy_N2`
 - Active baremetal Teensy workspace is:
   - `ArtemisTeensy_N2_Baremetal`
-- Active ground-station Teensy workspace is:
+- Primary ground-station adapter is:
+  - `ground-station/hackrf-rf22`
+- Fallback ground-station Teensy workspace is:
   - `GDS_Teensy`
+
+### Current Ground-Station Baseline
+
+- The student/demo baseline is the fixed, repo-maintained HackRF One software
+  adapter described in `docs/HACKRF_GROUND_STATION_RUNBOOK.md`.
+- It exposes only the two ground data endpoints: virtual serial channel `0`
+  for `fprime-gds` and virtual serial channel `1` for the payload receiver.
+  Satellite channel `2` remains local to the Pi/Teensy and never reaches the
+  ground adapter.
+- Do not add AGC, automatic gain/power selection, adaptive RF profiles, or
+  student-facing gain controls. Use the exact qualified settings and physical
+  geometry in the runbook. A changed antenna, cable, attenuator, distance,
+  host, USB path, or geometry requires lead-supervised requalification.
+- The current HackRF proof applies to the C3M profile on the tested macOS host.
+  Do not claim HackRF qualification for Neutron 2 (`D2`) or Windows yet.
+- `GDS_Teensy` plus the ground RFM23BP is the hardware fallback. Its
+  triple-serial ports provide channel `0`, diagnostics, and channel `1`
+  respectively; switching adapters does not require a flight-software or
+  packet-protocol refactor.
 
 ## Quick Start
 1. Activate the venv before any F' command:
@@ -128,9 +149,13 @@ fprime-util build
 - Build policy:
   - build on the Raspberry Pi target and run the locally built binary.
 
-## Run `fprime-gds` over UART (RPi/Operator Side)
+## Run `fprime-gds` over UART (Ground-Teensy Fallback)
 
-Preferred launcher (repo-maintained defaults):
+Use this direct-UART procedure only with the fallback `GDS_Teensy`/RFM23BP
+ground adapter. The primary HackRF path is launched through the single
+supervisor documented in `docs/HACKRF_GROUND_STATION_RUNBOOK.md`.
+
+Fallback launcher (repo-maintained defaults):
 macOS:
 ```bash
 cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
@@ -221,9 +246,9 @@ PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
 - Editing generated build cache under `ArtemisTeensy_N2_Baremetal/build/` instead of source files.
 - Changing UART settings without updating both firmware and UART contract docs.
 
-## Ground Teensy (`GDS_Teensy`) Agent Usage Guide
+## Fallback Ground Teensy (`GDS_Teensy`) Agent Usage Guide
 
-Use this section when working in the ground bridge workspace:
+Use this section only when working on or staging the fallback ground bridge:
 - `GDS_Teensy`
 
 ### Build (Arduino CLI)
