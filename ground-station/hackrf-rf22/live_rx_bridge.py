@@ -1,0 +1,725 @@
+#!/usr/bin/env python3
+"""Bidirectional C3M RF22 HackRF adapter for GDS and payload PTYs."""
+
+from __future__ import annotations
+
+import argparse
+import math
+import os
+import signal
+import sys
+import time
+from collections import deque
+from pathlib import Path
+
+import numpy as np
+
+from bridge_core import (
+    BridgeBackpressureError,
+    BridgeLock,
+    UplinkBatcher,
+    VirtualChannel,
+    atomic_write_json,
+)
+from hackrf_device import HackRFConfig, HackRFDevice, HackRFError, HackRFTimeoutError
+from rf22_iq_decoder import SegmentReassembler, StreamingCs8Decoder
+from rf22_protocol import (
+    DEFAULT_PROFILE,
+    MessageIdStore,
+    build_message_packets,
+    load_profile,
+    matches_ack,
+)
+from rf22_tx import modulate
+from rf_safety import (
+    BASELINE_RX_LNA_GAIN_DB,
+    BASELINE_RX_VGA_GAIN_DB,
+    BASELINE_TX_LEADING_MS,
+    BASELINE_TX_MODE,
+    DEFAULT_RF_PATH_LABEL,
+    TxSafetyError,
+    validate_tx_request,
+)
+
+
+SAMPLE_RATE = 8_000_000
+RX_CENTER_HZ = 432_500_000
+RF_CARRIER_HZ = 433_000_000
+DEFAULT_SERIAL = "0000000000000000675c62dc301090cf"
+
+
+class HackRfGroundBridge:
+    def __init__(self, args: argparse.Namespace) -> None:
+        if args.tx_mode != BASELINE_TX_MODE:
+            raise TxSafetyError(
+                f"channel-0 TX mode is fixed to {BASELINE_TX_MODE!r}; "
+                "use the GDS Teensy/RFM23BP fallback if ACK mode is unavailable"
+            )
+        args.rf_path_label = validate_tx_request(
+            enable_tx=args.enable_tx,
+            tx_gain=args.tx_gain,
+            tx_safety_confirmed=args.tx_safety_confirmed,
+            allow_elevated_tx_gain=args.allow_elevated_tx_gain,
+            rf_path_label=args.rf_path_label,
+        )
+        if not args.enable_tx:
+            args.tx_gain = 0
+            args.tx_safety_confirmed = False
+            args.allow_elevated_tx_gain = False
+        self.args = args
+        self.profile = load_profile(args.network)
+        self.channels = {
+            0: VirtualChannel(0, args.gds_symlink, max_backlog_bytes=args.max_pty_backlog),
+            1: VirtualChannel(
+                1, args.payload_symlink, max_backlog_bytes=args.max_pty_backlog
+            ),
+        }
+        self.batchers = {
+            channel: UplinkBatcher(
+                self.profile.frame_max_payload, args.uplink_idle_ms / 1000.0
+            )
+            for channel in self.channels
+        }
+        self.reassembler = SegmentReassembler(self.profile)
+        self.decoder = StreamingCs8Decoder(
+            sample_rate=SAMPLE_RATE,
+            center_hz=RX_CENTER_HZ,
+            carrier_hz=RF_CARRIER_HZ,
+            overlap_seconds=args.rx_overlap_ms / 1000.0,
+            profile=self.profile,
+        )
+        self.message_ids = MessageIdStore(args.message_id_state)
+        self.tx_queue: deque[tuple[int, bytes]] = deque()
+        self.tx_queue_bytes = 0
+        self.device: HackRFDevice | None = None
+        self.stopping = False
+        self._rx_accumulator = bytearray()
+        self._ack_target: tuple[int, int, int] | None = None
+        self._ack_received = False
+        self._last_metrics_write = 0.0
+        self._started_wall_s = time.time()
+        self._started_monotonic_s = time.monotonic()
+        self._capture_streams = {}
+        self.metrics: dict[str, object] = {
+            "schema": 1,
+            "pid": os.getpid(),
+            "network": self.profile.name,
+            "network_id": self.profile.network_id,
+            "rf_contract": {
+                "downlink_header": self.profile.radio_header("downlink").hex(),
+                "uplink_header": self.profile.radio_header("uplink").hex(),
+                "channel_magic": {
+                    "0": f"{self.profile.segment_magic[0]:02x}",
+                    "1": f"{self.profile.segment_magic[1]:02x}",
+                },
+            },
+            "serial": args.serial,
+            "tx_enabled": args.enable_tx,
+            "tx_mode": args.tx_mode if args.enable_tx else "disabled",
+            "tx_gain": args.tx_gain if args.enable_tx else 0,
+            "tx_leading_ms": args.tx_leading_ms,
+            "rx_lna_gain": args.rx_lna_gain,
+            "rx_vga_gain": args.rx_vga_gain,
+            "gain_control": "fixed",
+            "rf_path_label": args.rf_path_label,
+            "tx_safety_confirmed": args.tx_safety_confirmed,
+            "elevated_tx_gain_confirmed": args.allow_elevated_tx_gain,
+            "rf_amp_enabled": False,
+            "antenna_power_enabled": False,
+            "started_at_s": self._started_wall_s,
+            "radio_state": "starting",
+            "reconnects": 0,
+            "rx_blocks": 0,
+            "rx_bytes": 0,
+            "rx_iq": {
+                "sampled_complex_samples": 0,
+                "clipped_complex_samples": 0,
+                "clipped_fraction": 0.0,
+                "last_block_clipped_fraction": 0.0,
+                "max_block_clipped_fraction": 0.0,
+                "peak_abs": 0,
+                "last_block_complex_rms_dbfs": None,
+            },
+            "rf22_frames": 0,
+            "messages": {"0": 0, "1": 0},
+            "message_bytes": {"0": 0, "1": 0},
+            "tx_messages": {"0": 0, "1": 0},
+            "tx_segments": 0,
+            "tx_attempts": 0,
+            "tx_failures": 0,
+            "tx_queue": {
+                "messages": 0,
+                "bytes": 0,
+                "max_messages": args.max_tx_queue_messages,
+                "max_bytes": args.max_tx_queue_bytes,
+                "high_water_messages": 0,
+                "high_water_bytes": 0,
+                "rejections": 0,
+            },
+            "ack_received": 0,
+            "ack_timeouts": 0,
+            "degraded_segments": 0,
+            "last_error": None,
+        }
+
+    def log(self, event: str, **fields: object) -> None:
+        details = " ".join(f"{key}={value}" for key, value in fields.items())
+        print(f"{event}{' ' if details else ''}{details}", flush=True)
+
+    def request_stop(self, _signum: int, _frame: object) -> None:
+        self.stopping = True
+
+    def _open_runtime(self) -> None:
+        for channel in self.channels.values():
+            channel.open()
+        self.args.uplink_capture_dir.mkdir(parents=True, exist_ok=True)
+        for channel in self.channels:
+            path = self.args.uplink_capture_dir / f"channel-{channel}-uplink.bin"
+            # Assign each stream immediately so a later open failure can close
+            # every file already opened by this attempt.
+            self._capture_streams[channel] = path.open("ab", buffering=0)
+        self.log(
+            "LIVE_READY",
+            gds=self.args.gds_symlink,
+            payload=self.args.payload_symlink,
+            metrics=self.args.metrics_file,
+            network=self.profile.name,
+        )
+        self._write_metrics(force=True)
+
+    def _close_runtime(self, *, failed: bool = False) -> None:
+        errors: list[str] = []
+        for channel, stream in list(self._capture_streams.items()):
+            try:
+                stream.close()
+            except Exception as exc:
+                errors.append(f"capture channel {channel}: {exc!r}")
+        self._capture_streams.clear()
+        for channel, port in self.channels.items():
+            try:
+                port.close()
+            except Exception as exc:
+                errors.append(f"PTY channel {channel}: {exc!r}")
+        self.metrics["radio_state"] = (
+            "cleanup_failed" if errors else ("failed" if failed else "stopped")
+        )
+        try:
+            self._write_metrics(force=True)
+        except Exception as exc:
+            errors.append(f"final metrics: {exc!r}")
+        if errors:
+            raise RuntimeError("runtime cleanup failed: " + "; ".join(errors))
+
+    def _write_metrics(self, *, force: bool = False) -> None:
+        now = time.monotonic()
+        if not force and now - self._last_metrics_write < 1.0:
+            return
+        self._last_metrics_write = now
+        device = self.device
+        self.metrics.update(
+            {
+                "updated_at_s": time.time(),
+                "uptime_s": round(now - self._started_monotonic_s, 3),
+                "hackrf_mode": device.mode if device is not None else "closed",
+                "hackrf_rx_dropped_blocks": (
+                    device.rx_dropped_blocks if device is not None else 0
+                ),
+                "pty": {
+                    str(channel): {
+                        "symlink": str(port.symlink),
+                        "target": port.slave_name,
+                        "backlog_bytes": port.backlog_bytes,
+                        "downlink_bytes": port.downlink_bytes,
+                        "uplink_bytes": port.uplink_bytes,
+                        "uplink_batch_bytes": self.batchers[channel].pending_bytes,
+                    }
+                    for channel, port in self.channels.items()
+                },
+                "reassembly": {
+                    "completed": self.reassembler.completed,
+                    "duplicates": self.reassembler.duplicates,
+                    "drops": self.reassembler.drops,
+                    "timeouts": self.reassembler.timeouts,
+                },
+            }
+        )
+        atomic_write_json(self.args.metrics_file, self.metrics)
+
+    def _handle_frames(self, frames) -> None:
+        for frame in frames:
+            self.metrics["rf22_frames"] = int(self.metrics["rf22_frames"]) + 1
+            if self._ack_target is not None and matches_ack(
+                frame.payload,
+                channel=self._ack_target[0],
+                msg_id=self._ack_target[1],
+                segment_index=self._ack_target[2],
+                profile=self.profile,
+            ):
+                self._ack_received = True
+                self.metrics["ack_received"] = int(self.metrics["ack_received"]) + 1
+                self.log(
+                    "ACK",
+                    channel=self._ack_target[0],
+                    id=f"0x{self._ack_target[1]:02x}",
+                    segment=self._ack_target[2],
+                )
+                continue
+
+            message = self.reassembler.accept(frame)
+            if message is None:
+                continue
+            self.channels[message.channel].queue_downlink(message.data)
+            messages = self.metrics["messages"]
+            message_bytes = self.metrics["message_bytes"]
+            assert isinstance(messages, dict) and isinstance(message_bytes, dict)
+            key = str(message.channel)
+            messages[key] = int(messages[key]) + 1
+            message_bytes[key] = int(message_bytes[key]) + len(message.data)
+            self.log(
+                "MESSAGE",
+                channel=message.channel,
+                id=f"0x{message.msg_id:02x}",
+                bytes=len(message.data),
+            )
+
+    def _decode_block(self, block: bytes) -> None:
+        self.metrics["rx_blocks"] = int(self.metrics["rx_blocks"]) + 1
+        self.metrics["rx_bytes"] = int(self.metrics["rx_bytes"]) + len(block)
+        self._handle_frames(self.decoder.feed(block))
+
+    def _update_rx_iq_metrics(self, block: bytes) -> None:
+        raw = np.frombuffer(block, dtype=np.int8)
+        if raw.size < 2:
+            return
+        if raw.size % 2:
+            raw = raw[:-1]
+
+        components = raw.astype(np.int16)
+        pairs = components.reshape((-1, 2))
+        component_abs = np.abs(pairs)
+        clipped = int(np.count_nonzero(np.any(component_abs >= 127, axis=1)))
+        complex_samples = int(pairs.shape[0])
+        clipped_fraction = clipped / complex_samples
+        complex_power = np.square(pairs.astype(np.float32)).sum(axis=1)
+        complex_rms = float(np.sqrt(np.mean(complex_power))) / 128.0
+        rms_dbfs = 20.0 * math.log10(max(complex_rms, np.finfo(float).tiny))
+
+        iq_metrics = self.metrics["rx_iq"]
+        assert isinstance(iq_metrics, dict)
+        total_samples = int(iq_metrics["sampled_complex_samples"]) + complex_samples
+        total_clipped = int(iq_metrics["clipped_complex_samples"]) + clipped
+        iq_metrics.update(
+            {
+                "sampled_complex_samples": total_samples,
+                "clipped_complex_samples": total_clipped,
+                "clipped_fraction": total_clipped / total_samples,
+                "last_block_clipped_fraction": clipped_fraction,
+                "max_block_clipped_fraction": max(
+                    float(iq_metrics["max_block_clipped_fraction"]),
+                    clipped_fraction,
+                ),
+                "peak_abs": max(
+                    int(iq_metrics["peak_abs"]), int(component_abs.max())
+                ),
+                "last_block_complex_rms_dbfs": round(rms_dbfs, 3),
+            }
+        )
+
+    def _update_tx_queue_metrics(self) -> dict[str, int]:
+        queue_metrics = self.metrics["tx_queue"]
+        assert isinstance(queue_metrics, dict)
+        queue_metrics["messages"] = len(self.tx_queue)
+        queue_metrics["bytes"] = self.tx_queue_bytes
+        queue_metrics["high_water_messages"] = max(
+            int(queue_metrics["high_water_messages"]), len(self.tx_queue)
+        )
+        queue_metrics["high_water_bytes"] = max(
+            int(queue_metrics["high_water_bytes"]), self.tx_queue_bytes
+        )
+        return queue_metrics
+
+    def _enqueue_tx(self, channel: int, message: bytes) -> None:
+        queued_messages = len(self.tx_queue)
+        queued_bytes = self.tx_queue_bytes
+        if (
+            queued_messages + 1 > self.args.max_tx_queue_messages
+            or queued_bytes + len(message) > self.args.max_tx_queue_bytes
+        ):
+            queue_metrics = self._update_tx_queue_metrics()
+            queue_metrics["rejections"] = int(queue_metrics["rejections"]) + 1
+            raise BridgeBackpressureError(
+                f"TX queue rejected channel {channel} message ({len(message)} bytes): "
+                f"queued={queued_messages} messages/{queued_bytes} bytes, "
+                f"limits={self.args.max_tx_queue_messages} messages/"
+                f"{self.args.max_tx_queue_bytes} bytes"
+            )
+        self.tx_queue.append((channel, bytes(message)))
+        self.tx_queue_bytes += len(message)
+        self._update_tx_queue_metrics()
+
+    def _dequeue_tx(self) -> tuple[int, bytes]:
+        channel, message = self.tx_queue.popleft()
+        self.tx_queue_bytes -= len(message)
+        self._update_tx_queue_metrics()
+        return channel, message
+
+    def _poll_rx(self, timeout_s: float, *, low_latency: bool = False) -> None:
+        assert self.device is not None
+        try:
+            block = self.device.read_rx_block(timeout_s=timeout_s)
+        except HackRFTimeoutError:
+            return
+        self._update_rx_iq_metrics(block)
+        if low_latency:
+            if self._rx_accumulator:
+                self._decode_block(bytes(self._rx_accumulator))
+                self._rx_accumulator.clear()
+            self._decode_block(block)
+            return
+        self._rx_accumulator.extend(block)
+        target = int(SAMPLE_RATE * (self.args.rx_block_ms / 1000.0)) * 2
+        while len(self._rx_accumulator) >= target:
+            chunk = bytes(self._rx_accumulator[:target])
+            del self._rx_accumulator[:target]
+            self._decode_block(chunk)
+
+    def _service_ptys(self) -> None:
+        now = time.monotonic()
+        for channel, port in self.channels.items():
+            port.flush_downlink()
+            outgoing = port.read_uplink()
+            if outgoing:
+                self._capture_streams[channel].write(outgoing)
+                self.batchers[channel].feed(outgoing, now)
+            for message in self.batchers[channel].pop_ready(now):
+                if self.args.enable_tx:
+                    self._enqueue_tx(channel, message)
+                else:
+                    self.log("UPLINK_CAPTURE", channel=channel, bytes=len(message), tx="disabled")
+
+    def _switch_and_transmit(self, waveform: bytes) -> float:
+        assert self.device is not None
+        device = self.device
+        device.discard_rx_blocks()
+        self._rx_accumulator.clear()
+        if device.mode == "rx":
+            device.stop_rx(timeout_s=self.args.stop_timeout)
+        device.set_frequency(RF_CARRIER_HZ)
+        started = time.monotonic()
+        try:
+            result = device.transmit_cs8(
+                waveform,
+                timeout_s=self.args.tx_timeout,
+                stop_timeout_s=self.args.stop_timeout,
+                resume_rx=False,
+            )
+        finally:
+            if device.mode == "idle":
+                device.set_frequency(RX_CENTER_HZ)
+                self.decoder.reset()
+                self.reassembler.reset()
+                device.start_rx()
+        return time.monotonic() - started if "result" not in locals() else result.elapsed_s
+
+    def _wait_for_ack(self, channel: int, msg_id: int, segment_index: int) -> bool:
+        self._ack_target = (channel, msg_id, segment_index)
+        self._ack_received = False
+        # The extra decoder overlap is host-side lookahead, not extra RF ACK airtime.
+        deadline = time.monotonic() + self.profile.ack_timeout_ms / 1000.0
+        decode_deadline = deadline + self.args.rx_overlap_ms / 1000.0 + 0.010
+        try:
+            while not self.stopping and time.monotonic() < decode_deadline:
+                self._poll_rx(0.020, low_latency=True)
+                self._service_ptys()
+                if self._ack_received:
+                    return True
+            return False
+        finally:
+            self._ack_target = None
+
+    def _send_packet_acknowledged(
+        self, packet: bytes, channel: int, msg_id: int, segment_index: int
+    ) -> bool:
+        for attempt in range(self.profile.ack_retries + 1):
+            self.metrics["tx_attempts"] = int(self.metrics["tx_attempts"]) + 1
+            waveform = modulate(
+                packet,
+                repeat=1,
+                offset_hz=0,
+                leading_silence_s=self.args.tx_leading_ms / 1000.0,
+                inter_burst_silence_s=0,
+                trailing_silence_s=0,
+            )
+            elapsed = self._switch_and_transmit(waveform)
+            self.log(
+                "TX_ATTEMPT",
+                mode="ack",
+                channel=channel,
+                id=f"0x{msg_id:02x}",
+                segment=segment_index,
+                attempt=attempt + 1,
+                switch_tx_s=f"{elapsed:.4f}",
+            )
+            if self._wait_for_ack(channel, msg_id, segment_index):
+                return True
+            self.metrics["ack_timeouts"] = int(self.metrics["ack_timeouts"]) + 1
+            self.log(
+                "ACK_TIMEOUT",
+                channel=channel,
+                id=f"0x{msg_id:02x}",
+                segment=segment_index,
+                attempt=attempt + 1,
+            )
+        return False
+
+    def _send_packet_unacknowledged(
+        self, packet: bytes, channel: int, msg_id: int, segment_index: int
+    ) -> bool:
+        if channel != 1:
+            raise ValueError("only channel 1 may use ACK-free application repair")
+        repeats = self.args.payload_repeats
+        waveform = modulate(
+            packet,
+            repeat=repeats,
+            offset_hz=0,
+            leading_silence_s=self.args.tx_leading_ms / 1000.0,
+            inter_burst_silence_s=self.args.repeat_gap_ms / 1000.0,
+            trailing_silence_s=0,
+        )
+        self.metrics["tx_attempts"] = int(self.metrics["tx_attempts"]) + repeats
+        self.metrics["degraded_segments"] = int(self.metrics["degraded_segments"]) + 1
+        elapsed = self._switch_and_transmit(waveform)
+        self.log(
+            "TX_UNACKNOWLEDGED",
+            channel=channel,
+            id=f"0x{msg_id:02x}",
+            segment=segment_index,
+            repeats=repeats,
+            elapsed_s=f"{elapsed:.4f}",
+            ack="not_observed",
+        )
+        return True
+
+    def _transmit_message(self, channel: int, message: bytes) -> None:
+        msg_id = self.message_ids.reserve(channel)
+        packets = build_message_packets(
+            message,
+            channel=channel,
+            msg_id=msg_id,
+            direction="uplink",
+            profile=self.profile,
+        )
+        self.log(
+            "TX_MESSAGE",
+            channel=channel,
+            id=f"0x{msg_id:02x}",
+            bytes=len(message),
+            segments=len(packets),
+            mode=self.args.tx_mode,
+        )
+        success = True
+        for segment_index, packet in enumerate(packets):
+            if channel == 0:
+                sent = self._send_packet_acknowledged(
+                    packet, channel, msg_id, segment_index
+                )
+            else:
+                sent = self._send_packet_unacknowledged(
+                    packet, channel, msg_id, segment_index
+                )
+            if not sent:
+                success = False
+                break
+            self.metrics["tx_segments"] = int(self.metrics["tx_segments"]) + 1
+
+        if success:
+            tx_messages = self.metrics["tx_messages"]
+            assert isinstance(tx_messages, dict)
+            key = str(channel)
+            tx_messages[key] = int(tx_messages[key]) + 1
+        else:
+            self.metrics["tx_failures"] = int(self.metrics["tx_failures"]) + 1
+            self.log(
+                "TX_FAILED",
+                channel=channel,
+                id=f"0x{msg_id:02x}",
+                bytes=len(message),
+            )
+
+    def _connected_loop(self) -> None:
+        assert self.device is not None
+        while not self.stopping:
+            self._poll_rx(0.025)
+            self._service_ptys()
+            if self.tx_queue:
+                channel, message = self._dequeue_tx()
+                self._transmit_message(channel, message)
+            self._write_metrics()
+
+    def run(self) -> int:
+        reconnect_delay = 0.5
+        run_failed = False
+        try:
+            self._open_runtime()
+            while not self.stopping:
+                config = HackRFConfig(
+                    center_freq_hz=RX_CENTER_HZ,
+                    sample_rate_hz=SAMPLE_RATE,
+                    bandwidth_hz=1_750_000,
+                    rx_lna_gain_db=self.args.rx_lna_gain,
+                    rx_vga_gain_db=self.args.rx_vga_gain,
+                    tx_vga_gain_db=self.args.tx_gain,
+                    amp_enabled=False,
+                    antenna_power_enabled=False,
+                    rx_queue_blocks=self.args.rx_queue_blocks,
+                )
+                try:
+                    with HackRFDevice(self.args.serial, config=config) as device:
+                        self.device = device
+                        device.start_rx()
+                        self.metrics["radio_state"] = "receiving"
+                        self.metrics["last_error"] = None
+                        self.log("HACKRF_READY", serial=self.args.serial, center=RX_CENTER_HZ)
+                        self._write_metrics(force=True)
+                        reconnect_delay = 0.5
+                        self._connected_loop()
+                except (HackRFError, OSError) as exc:
+                    self.metrics["radio_state"] = "reconnecting"
+                    self.metrics["last_error"] = str(exc)
+                    self.metrics["reconnects"] = int(self.metrics["reconnects"]) + 1
+                    self.log("HACKRF_ERROR", error=repr(exc), retry_s=reconnect_delay)
+                    self._write_metrics(force=True)
+                    deadline = time.monotonic() + reconnect_delay
+                    while not self.stopping and time.monotonic() < deadline:
+                        self._service_ptys()
+                        time.sleep(0.025)
+                    reconnect_delay = min(5.0, reconnect_delay * 2)
+                finally:
+                    self.device = None
+                    self._rx_accumulator.clear()
+                    self.decoder.reset()
+                    self.reassembler.reset()
+            return 0
+        except BridgeBackpressureError as exc:
+            run_failed = True
+            self.metrics["last_error"] = str(exc)
+            self.log("BRIDGE_FATAL", error=repr(exc))
+            return 1
+        except Exception as exc:
+            run_failed = True
+            self.metrics["last_error"] = str(exc)
+            self.log("BRIDGE_FATAL", error=repr(exc))
+            raise
+        finally:
+            active_error = sys.exc_info()[1]
+            try:
+                self._close_runtime(failed=run_failed)
+            except Exception as cleanup_exc:
+                if active_error is None:
+                    raise
+                self.log("BRIDGE_CLEANUP_FAILED", error=repr(cleanup_exc))
+
+
+def default_state_dir() -> Path:
+    return Path.home() / ".local" / "state" / "fprime-hackrf-rf22"
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--gds-symlink", type=Path, default=Path("/tmp/c3m-sdr/gds-port"))
+    parser.add_argument("--payload-symlink", type=Path, default=Path("/tmp/c3m-sdr/payload-port"))
+    parser.add_argument("--symlink", type=Path, dest="gds_symlink", help=argparse.SUPPRESS)
+    parser.add_argument("--metrics-file", type=Path, default=Path("/tmp/c3m-sdr/bridge-status.json"))
+    parser.add_argument(
+        "--uplink-capture-dir", type=Path, default=Path("/tmp/c3m-sdr/uplink")
+    )
+    parser.add_argument("--state-dir", type=Path, default=default_state_dir())
+    parser.add_argument("--lock-file", type=Path)
+    parser.add_argument("--message-id-state", type=Path)
+    parser.add_argument("--serial", default=DEFAULT_SERIAL)
+    parser.add_argument("--network", default=DEFAULT_PROFILE.name)
+    parser.add_argument("--enable-tx", action="store_true")
+    parser.add_argument("--tx-gain", type=int, choices=range(0, 48), default=0)
+    parser.add_argument("--tx-safety-confirmed", action="store_true")
+    parser.add_argument("--allow-elevated-tx-gain", action="store_true")
+    parser.add_argument("--rf-path-label", default=DEFAULT_RF_PATH_LABEL)
+    parser.add_argument("--payload-repeats", type=int, default=1)
+    parser.add_argument("--repeat-gap-ms", type=float, default=25.0)
+    # The HackRF TX path needs time for its PLL/front end to settle before the
+    # first RF22 preamble.  A 5 ms lead consistently lost the only burst on
+    # this bench; 100 ms delivered the same single frame through both
+    # hackrf_transfer and the direct libhackrf wrapper.  The lead is zero-I/Q,
+    # so the addressed RF22 packet is still transmitted exactly once.
+    parser.add_argument("--tx-leading-ms", type=float, default=BASELINE_TX_LEADING_MS)
+    parser.add_argument("--tx-timeout", type=float, default=3.0)
+    parser.add_argument("--stop-timeout", type=float, default=1.0)
+    parser.add_argument(
+        "--rx-lna-gain",
+        type=int,
+        choices=range(0, 41, 8),
+        default=BASELINE_RX_LNA_GAIN_DB,
+    )
+    parser.add_argument(
+        "--rx-vga-gain",
+        type=int,
+        choices=range(0, 63, 2),
+        default=BASELINE_RX_VGA_GAIN_DB,
+    )
+    parser.add_argument("--rx-queue-blocks", type=int, default=64)
+    parser.add_argument("--rx-block-ms", type=float, default=100.0)
+    parser.add_argument("--rx-overlap-ms", type=float, default=25.0)
+    parser.add_argument("--uplink-idle-ms", type=float, default=12.0)
+    parser.add_argument("--max-pty-backlog", type=int, default=1 << 20)
+    parser.add_argument("--max-tx-queue-messages", type=int, default=256)
+    parser.add_argument("--max-tx-queue-bytes", type=int, default=1 << 20)
+    parser.set_defaults(tx_mode=BASELINE_TX_MODE)
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    try:
+        args.rf_path_label = validate_tx_request(
+            enable_tx=args.enable_tx,
+            tx_gain=args.tx_gain,
+            tx_safety_confirmed=args.tx_safety_confirmed,
+            allow_elevated_tx_gain=args.allow_elevated_tx_gain,
+            rf_path_label=args.rf_path_label,
+        )
+    except TxSafetyError as exc:
+        parser.error(str(exc))
+    if not args.enable_tx:
+        args.tx_gain = 0
+        args.tx_safety_confirmed = False
+        args.allow_elevated_tx_gain = False
+    if args.payload_repeats < 1:
+        parser.error("payload repeat count must be at least one")
+    if args.rx_block_ms <= args.rx_overlap_ms:
+        parser.error("--rx-block-ms must be greater than --rx-overlap-ms")
+    if (
+        args.max_pty_backlog < 1
+        or args.max_tx_queue_messages < 1
+        or args.max_tx_queue_bytes < 1
+    ):
+        parser.error("PTY and TX queue limits must be at least one")
+    args.state_dir = args.state_dir.expanduser().resolve()
+    args.lock_file = args.lock_file or args.state_dir / f"{args.network}-{args.serial}.lock"
+    args.message_id_state = (
+        args.message_id_state
+        or args.state_dir / f"{args.network}-{args.serial}-message-ids.json"
+    )
+
+    bridge = HackRfGroundBridge(args)
+    signal.signal(signal.SIGINT, bridge.request_stop)
+    signal.signal(signal.SIGTERM, bridge.request_stop)
+    try:
+        with BridgeLock(args.lock_file):
+            return bridge.run()
+    except Exception as exc:
+        print(f"BRIDGE_START_FAILED error={exc!r}", file=sys.stderr, flush=True)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
