@@ -108,6 +108,7 @@ python3 -m unittest \
   ArtemisRpiTeensy_N2/tools/tests/test_payload_receiver.py \
   ArtemisRpiTeensy_N2/tools/tests/test_c3m_payload_receiver_ui.py \
   ArtemisRpiTeensy_N2/tools/tests/test_rf_network_identity.py \
+  GDS_Teensy/tools/tests/test_gds_tx_thermal_soak.py \
   GDS_Teensy/tools/tests/test_rf_recovery_hardening.py \
   GDS_Teensy/tools/tests/test_rf_tx_retry.py \
   GDS_Teensy/tools/tests/test_rf_msg_id_sequence.py \
