@@ -5,6 +5,7 @@
 #include "Components/PayloadDownlinkApp/PayloadDownlinkAppComponentAc.hpp"
 #include "Os/Mutex.hpp"
 
+#include <cstdio>
 #include <string>
 
 namespace Components {
@@ -39,6 +40,7 @@ class PayloadDownlinkApp final : public PayloadDownlinkAppComponentBase {
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void run_handler(FwIndexType portNum, U32 context) override;
     void packetIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
+    void cacheResponseIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
     void downlinkRequestIn_handler(FwIndexType portNum,
                                    U32 productId,
                                    U32 productBytes,
@@ -81,6 +83,13 @@ class PayloadDownlinkApp final : public PayloadDownlinkAppComponentBase {
     void putU32(U8* data, FwSizeType offset, U32 value) const;
     U16 getU16(const U8* data, FwSizeType offset) const;
     void failTransfer(U32 reason, U32 detail);
+    bool sendCacheBegin();
+    bool sendNextCacheChunk(U32 offset);
+    bool sendCacheCommit();
+    bool sendCacheAbort();
+    bool sendCurrentCacheRequest();
+    void closeCacheSource();
+    U32 getU32(const U8* data, FwSizeType offset) const;
 
     static constexpr U32 MAX_RETRY_PACKETS = 8U * 36U;
     static constexpr U32 CONTROL_MAILBOX_CAPACITY = 8U;
@@ -129,6 +138,17 @@ class PayloadDownlinkApp final : public PayloadDownlinkAppComponentBase {
     U32 m_reportedControlMailboxDrops;
     U32 m_reportedControlPacketsInvalid;
     U8 m_packet[LinkCfg::PAYLOAD_PACKET_MAX_BYTES];
+    std::FILE* m_cacheSource;
+    U8 m_cacheRequest[LinkCfg::UART_FRAME_MAX_PAYLOAD];
+    FwSizeType m_cacheRequestSize;
+    U8 m_cacheRequestId;
+    U8 m_cachePendingOperation;
+    U32 m_cacheUploadOffset;
+    U32 m_cacheWaitTicks;
+    U32 m_cacheRetryCount;
+    bool m_cacheMode;
+    bool m_waitingCacheResponse;
+    bool m_cacheTransmitting;
 };
 
 }  // namespace Components

@@ -116,6 +116,8 @@ module ArtemisRpiTeensyDeployment {
       # Channel 1 carries generic payload blob packets outside CCSDS.
       uartChannelMux.payloadRecvOut -> payloadDownlinkApp.packetIn
       payloadDownlinkApp.packetOut -> uartChannelMux.payloadSendIn
+      payloadDownlinkApp.cacheRequestOut -> uartChannelMux.payloadCacheSendIn
+      uartChannelMux.payloadCacheRecvOut -> payloadDownlinkApp.cacheResponseIn
     }
 
     connections FileHandling_DataProducts {
@@ -184,7 +186,6 @@ module ArtemisRpiTeensyDeployment {
       payloadManager.statusOut -> scienceApp.payloadStatusIn
       scienceApp.scienceProductOut -> storageManager.requestIn
       storageManager.downlinkReadyOut -> commsApp.scienceReadyIn
-      commsApp.downlinkRequestOut -> storageManager.downlinkRequestIn
       commsApp.payloadDownlinkRequestOut -> payloadDownlinkApp.downlinkRequestIn
       payloadDownlinkApp.statusOut -> commsApp.payloadDownlinkStatusIn
       scienceApp.missionModeOut -> missionApp.modeUpdateIn[0]

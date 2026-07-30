@@ -25,7 +25,6 @@ void CommsAppTester::testRejectsDownlinkWithoutScience() {
     ASSERT_EVENTS_CommsCommandRejected_SIZE(1);
     ASSERT_EVENTS_CommsCommandRejected(0, 1, 0);
     ASSERT_EVENTS_DownlinkFailed_SIZE(0);
-    ASSERT_from_downlinkRequestOut_SIZE(0);
     ASSERT_from_payloadDownlinkRequestOut_SIZE(0);
     ASSERT_from_missionModeOut_SIZE(0);
 }
@@ -46,8 +45,6 @@ void CommsAppTester::testCompletedDownlinkRemainsAvailableForRetry() {
     ASSERT_EVENTS_DownlinkRequested(0, 128);
     ASSERT_from_missionModeOut_SIZE(1);
     ASSERT_from_missionModeOut(0, Components::MissionMode::DOWNLINKING, 128);
-    ASSERT_from_downlinkRequestOut_SIZE(1);
-    ASSERT_from_downlinkRequestOut(0, 7, 128, Components::ScienceProductSource::NEUTRON_SIM, sourcePath, 0x1234);
     ASSERT_from_payloadDownlinkRequestOut_SIZE(1);
     ASSERT_from_payloadDownlinkRequestOut(0, 7, 128, Components::ScienceProductSource::NEUTRON_SIM, sourcePath, 0x1234);
 
@@ -68,8 +65,6 @@ void CommsAppTester::testCompletedDownlinkRemainsAvailableForRetry() {
                         Fw::CmdResponse::OK);
     ASSERT_EVENTS_DownlinkRequested_SIZE(2);
     ASSERT_EVENTS_DownlinkRequested(1, 128);
-    ASSERT_from_downlinkRequestOut_SIZE(2);
-    ASSERT_from_downlinkRequestOut(1, 7, 128, Components::ScienceProductSource::NEUTRON_SIM, sourcePath, 0x1234);
     ASSERT_from_payloadDownlinkRequestOut_SIZE(2);
     ASSERT_from_payloadDownlinkRequestOut(1, 7, 128, Components::ScienceProductSource::NEUTRON_SIM, sourcePath, 0x1234);
     ASSERT_from_missionModeOut_SIZE(3);
@@ -96,7 +91,6 @@ void CommsAppTester::testDuplicateAndConflictingActiveRequestsAreGuarded() {
     ASSERT_EVENTS_DownlinkRequested_SIZE(1);
     ASSERT_EVENTS_DownlinkRequestDuplicate_SIZE(1);
     ASSERT_EVENTS_DownlinkRequestDuplicate(0, 7, 128);
-    ASSERT_from_downlinkRequestOut_SIZE(1);
     ASSERT_from_payloadDownlinkRequestOut_SIZE(1);
     ASSERT_from_missionModeOut_SIZE(1);
     ASSERT_TLM_DownlinkActive(0, 1);
@@ -117,7 +111,6 @@ void CommsAppTester::testDuplicateAndConflictingActiveRequestsAreGuarded() {
     ASSERT_EVENTS_DownlinkRequestConflict(0, 7, 7);
     ASSERT_EVENTS_CommsCommandRejected_SIZE(1);
     ASSERT_EVENTS_CommsCommandRejected(0, 2, 7);
-    ASSERT_from_downlinkRequestOut_SIZE(1);
     ASSERT_from_payloadDownlinkRequestOut_SIZE(1);
     ASSERT_from_missionModeOut_SIZE(1);
     ASSERT_TLM_DownlinkRequestDisposition(2, 2);
@@ -147,8 +140,6 @@ void CommsAppTester::testNewPendingProductStartsAfterActiveTerminalStatus() {
                         Fw::CmdResponse::OK);
     ASSERT_EVENTS_DownlinkFinished_SIZE(1);
     ASSERT_EVENTS_DownlinkRequested_SIZE(2);
-    ASSERT_from_downlinkRequestOut_SIZE(2);
-    ASSERT_from_downlinkRequestOut(1, 8, 256, Components::ScienceProductSource::TEST, nextPath, 0x5678);
     ASSERT_from_payloadDownlinkRequestOut_SIZE(2);
     ASSERT_from_payloadDownlinkRequestOut(1, 8, 256, Components::ScienceProductSource::TEST, nextPath, 0x5678);
     ASSERT_from_missionModeOut_SIZE(3);

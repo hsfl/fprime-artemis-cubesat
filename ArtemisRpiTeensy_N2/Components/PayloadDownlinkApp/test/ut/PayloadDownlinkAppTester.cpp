@@ -16,9 +16,42 @@ PayloadDownlinkAppTester::PayloadDownlinkAppTester()
       m_rejectedPacketType(0U),
       m_rejectedStatus(Components::PayloadSendStatus::LOCAL_ACCEPTED),
       m_rejectionsRemaining(0U),
-      m_packets() {
+      m_packets(),
+      m_cacheRequests() {
     this->initComponents();
     this->connectPorts();
+}
+
+Components::PayloadSendStatus PayloadDownlinkAppTester::from_cacheRequestOut_handler(
+    FwIndexType portNum,
+    Fw::Buffer& fwBuffer) {
+    static_cast<void>(portNum);
+    const U8* data = fwBuffer.getData();
+    this->m_cacheRequests.push_back(std::vector<U8>(data, data + fwBuffer.getSize()));
+    this->pushFromPortEntry_cacheRequestOut(fwBuffer);
+    return Components::PayloadSendStatus::LOCAL_ACCEPTED;
+}
+
+void PayloadDownlinkAppTester::respondToLastCacheRequest(U8 state, U32 nextOffset, U8 status) {
+    ASSERT_FALSE(this->m_cacheRequests.empty());
+    const std::vector<U8>& request = this->m_cacheRequests.back();
+    ASSERT_GE(request.size(), 6U);
+    U8 responseBytes[12] = {
+        LinkCfg::TEENSY_TARGET_PAYLOAD_CACHE,
+        request[1],
+        status,
+        8U,
+        request[4],
+        request[5],
+        state,
+        0U,
+        static_cast<U8>(nextOffset & 0xFFU),
+        static_cast<U8>((nextOffset >> 8U) & 0xFFU),
+        static_cast<U8>((nextOffset >> 16U) & 0xFFU),
+        static_cast<U8>((nextOffset >> 24U) & 0xFFU),
+    };
+    Fw::Buffer response(responseBytes, sizeof(responseBytes));
+    this->invoke_to_cacheResponseIn(0, response);
 }
 
 PayloadDownlinkAppTester::~PayloadDownlinkAppTester() {
@@ -56,6 +89,95 @@ void PayloadDownlinkAppTester::writePayloadFile(const U8* data, FwSizeType size)
     ASSERT_EQ(written, static_cast<std::size_t>(size));
     ASSERT_EQ(std::fclose(file), 0);
     ASSERT_EQ(::setenv("NEUTRON_PAYLOAD_DOWNLINK_FILE", TEST_PAYLOAD_PATH, 1), 0);
+}
+
+void PayloadDownlinkAppTester::testOnDemandCacheTransaction() {
+    U8 payload[450] = {};
+    for (FwSizeType i = 0; i < sizeof(payload); ++i) {
+        payload[i] = static_cast<U8>((i * 7U) & 0xFFU);
+    }
+    this->writePayloadFile(payload, sizeof(payload));
+    this->clearHistory();
+    this->m_packets.clear();
+    this->m_cacheRequests.clear();
+
+    Fw::String sourcePath(TEST_PAYLOAD_PATH);
+    this->invoke_to_downlinkRequestIn(
+        0, 77U, sizeof(payload), Components::ScienceProductSource::TEST, sourcePath, 0U);
+    this->component.doDispatch();
+
+    ASSERT_from_packetOut_SIZE(0);
+    ASSERT_from_cacheRequestOut_SIZE(1);
+    ASSERT_EQ(this->m_cacheRequests[0].size(), 16U);
+    EXPECT_EQ(this->m_cacheRequests[0][0], LinkCfg::TEENSY_TARGET_PAYLOAD_CACHE);
+    EXPECT_EQ(this->m_cacheRequests[0][4], LinkCfg::PAYLOAD_CACHE_OP_BEGIN);
+
+    this->respondToLastCacheRequest(LinkCfg::PAYLOAD_CACHE_STATE_RECEIVING, 0U);
+    ASSERT_from_cacheRequestOut_SIZE(2);
+    EXPECT_EQ(this->m_cacheRequests[1][4], LinkCfg::PAYLOAD_CACHE_OP_CHUNK);
+    EXPECT_EQ(this->m_cacheRequests[1][10], LinkCfg::PAYLOAD_CACHE_CHUNK_BYTES);
+    EXPECT_EQ(this->m_cacheRequests[1].size(), 211U);
+    for (FwSizeType i = 0; i < LinkCfg::PAYLOAD_CACHE_CHUNK_BYTES; ++i) {
+        EXPECT_EQ(this->m_cacheRequests[1][11U + i], payload[i]);
+    }
+
+    this->respondToLastCacheRequest(LinkCfg::PAYLOAD_CACHE_STATE_RECEIVING, 200U);
+    this->respondToLastCacheRequest(LinkCfg::PAYLOAD_CACHE_STATE_RECEIVING, 400U);
+    this->respondToLastCacheRequest(LinkCfg::PAYLOAD_CACHE_STATE_RECEIVING, 450U);
+    ASSERT_from_cacheRequestOut_SIZE(5);
+    EXPECT_EQ(this->m_cacheRequests[4][4], LinkCfg::PAYLOAD_CACHE_OP_COMMIT_AND_SEND);
+
+    this->respondToLastCacheRequest(LinkCfg::PAYLOAD_CACHE_STATE_SENDING, 450U);
+    ASSERT_EVENTS_PayloadDownlinkComplete_SIZE(0);
+    this->respondToLastCacheRequest(LinkCfg::PAYLOAD_CACHE_STATE_READY, 450U);
+
+    ASSERT_EVENTS_PayloadDownlinkComplete_SIZE(1);
+    ASSERT_TLM_ProgressPercent_SIZE(2);
+    ASSERT_TLM_ProgressPercent(1, 100U);
+    ASSERT_from_packetOut_SIZE(0);
+}
+
+void PayloadDownlinkAppTester::testCacheRequestRetriesWithoutAdvancing() {
+    U8 payload[32] = {};
+    this->writePayloadFile(payload, sizeof(payload));
+    this->clearHistory();
+    this->m_cacheRequests.clear();
+
+    Fw::String sourcePath(TEST_PAYLOAD_PATH);
+    this->invoke_to_downlinkRequestIn(
+        0, 78U, sizeof(payload), Components::ScienceProductSource::TEST, sourcePath, 0U);
+    this->component.doDispatch();
+    ASSERT_from_cacheRequestOut_SIZE(1);
+    const std::vector<U8> firstRequest = this->m_cacheRequests[0];
+
+    this->invoke_to_run(0, 0);
+    this->component.doDispatch();
+    this->invoke_to_run(0, 0);
+    this->component.doDispatch();
+
+    ASSERT_from_cacheRequestOut_SIZE(2);
+    EXPECT_EQ(this->m_cacheRequests[1], firstRequest);
+    ASSERT_EVENTS_PayloadDownlinkComplete_SIZE(0);
+}
+
+void PayloadDownlinkAppTester::testConflictingRequestDoesNotRestartUpload() {
+    U8 payload[32] = {};
+    this->writePayloadFile(payload, sizeof(payload));
+    this->clearHistory();
+    this->m_cacheRequests.clear();
+
+    Fw::String sourcePath(TEST_PAYLOAD_PATH);
+    this->invoke_to_downlinkRequestIn(
+        0, 79U, sizeof(payload), Components::ScienceProductSource::TEST, sourcePath, 0U);
+    this->component.doDispatch();
+    ASSERT_from_cacheRequestOut_SIZE(1);
+
+    this->invoke_to_downlinkRequestIn(
+        0, 80U, sizeof(payload), Components::ScienceProductSource::TEST, sourcePath, 0U);
+    this->component.doDispatch();
+
+    ASSERT_from_cacheRequestOut_SIZE(1);
+    ASSERT_EVENTS_PayloadDownlinkRequestConflict_SIZE(1);
 }
 
 void PayloadDownlinkAppTester::testHeaderRetransmitBehavior() {

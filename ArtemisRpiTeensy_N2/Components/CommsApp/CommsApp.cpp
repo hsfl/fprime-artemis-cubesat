@@ -276,14 +276,6 @@ void CommsApp::REQUEST_SCIENCE_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdS
     if (this->isConnected_missionModeOut_OutputPort(0)) {
         this->missionModeOut_out(0, Components::MissionMode::DOWNLINKING, this->m_pendingScienceBytes);
     }
-    if (this->isConnected_downlinkRequestOut_OutputPort(0)) {
-        this->downlinkRequestOut_out(0,
-                                     this->m_pendingProductId,
-                                     this->m_pendingScienceBytes,
-                                     this->m_pendingSourceKind,
-                                     this->m_pendingSourcePath,
-                                     this->m_pendingSourceCrc);
-    }
     if (this->isConnected_payloadDownlinkRequestOut_OutputPort(0)) {
         this->payloadDownlinkRequestOut_out(0,
                                             this->m_pendingProductId,
