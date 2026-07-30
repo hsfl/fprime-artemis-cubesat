@@ -32,6 +32,7 @@ class Rf23Driver {
   int16_t lastAcceptedRssiDbm() const;
   uint32_t lastAcceptedRssiAgeMs() const;
   bool available();
+  bool receiveInProgress();
   Rf23ReceiveResult recv(uint8_t* buf, uint8_t* len);
   Rf23SendResult send(const uint8_t* data, uint8_t len);
   artemis::rf23bp::LinkStats linkStats();

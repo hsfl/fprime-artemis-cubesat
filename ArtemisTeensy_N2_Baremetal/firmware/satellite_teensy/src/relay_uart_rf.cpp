@@ -104,8 +104,12 @@ void RelayUartRf::poll() {
   handleRadioStateTransition();
   flushRfToUart();
   flushLocalResponseToUart();
-  serviceUplinkQueue();
-  serviceCachedPayload();
+  if (!m_rf.receiveInProgress()) {
+    serviceUplinkQueue();
+  }
+  if (!m_rf.receiveInProgress()) {
+    serviceCachedPayload();
+  }
   serviceDownlinkQueue();
 }
 
