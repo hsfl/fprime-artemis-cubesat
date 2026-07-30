@@ -20,6 +20,7 @@ static constexpr uint16_t FRAME_MAX_PAYLOAD = 220;
 static constexpr uint32_t FRAME_TIMEOUT_MS = 250;
 static constexpr uint32_t UART_BAUD = 115200;
 static constexpr uint32_t UART_INTER_FRAME_MARGIN_US = 37000;
+static constexpr uint32_t UART_PAYLOAD_CACHE_MARGIN_US = 1000;
 static constexpr uint32_t UART_CCSDS_EXTRA_MARGIN_US = 40000;
 
 // RF segmentation parameters.
@@ -46,6 +47,21 @@ static constexpr uint8_t RF_RX_ACK_REQUIRED_PAYLOAD = 0;
 
 static constexpr uint32_t PAYLOAD_PACKETS_PER_RUN = 18;
 static constexpr uint32_t PAYLOAD_RETRY_PACKETS_PER_RUN = 18;
+static constexpr uint8_t PAYLOAD_MAGIC_0 = 0x4E;
+static constexpr uint8_t PAYLOAD_MAGIC_1 = 0x32;
+static constexpr uint8_t PAYLOAD_PACKET_DATA_BYTES = 35;
+static constexpr uint32_t PAYLOAD_CACHE_MAX_BYTES = 65536;
+static constexpr uint16_t PAYLOAD_CACHE_CHUNK_BYTES = 200;
+static constexpr uint8_t PAYLOAD_CACHE_RF_GAP_MS = 2;
+static constexpr uint8_t PAYLOAD_CACHE_OP_BEGIN = 1;
+static constexpr uint8_t PAYLOAD_CACHE_OP_CHUNK = 2;
+static constexpr uint8_t PAYLOAD_CACHE_OP_COMMIT_AND_SEND = 3;
+static constexpr uint8_t PAYLOAD_CACHE_OP_ABORT = 4;
+static constexpr uint8_t PAYLOAD_CACHE_STATE_EMPTY = 0;
+static constexpr uint8_t PAYLOAD_CACHE_STATE_RECEIVING = 1;
+static constexpr uint8_t PAYLOAD_CACHE_STATE_READY = 2;
+static constexpr uint8_t PAYLOAD_CACHE_STATE_SENDING = 3;
+static constexpr uint8_t PAYLOAD_CACHE_STATE_ERROR = 4;
 
 static constexpr char COMMAND_PREFIX = '#';
 static constexpr size_t COMMAND_MAX_LEN = 64;
