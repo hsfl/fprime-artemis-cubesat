@@ -14,6 +14,9 @@ module Components {
         @ RF-status Teensy subsystem RPC packets, wrapped as channel 2.
         guarded input port rfLocalSendIn: Fw.BufferSend
 
+        @ Payload-cache RPC packets, wrapped as channel 2 with ACK-paced timing.
+        guarded input port payloadCacheSendIn: Components.PayloadPacketSend
+
         @ Wrapped bytes received from the UART driver.
         sync input port drvReceiveIn: Drv.ByteStreamData
 
@@ -34,6 +37,9 @@ module Components {
 
         @ Unwrapped channel 2 RF-status packets sent to the comms driver.
         output port rfLocalRecvOut: Fw.BufferSend
+
+        @ Unwrapped channel 2 payload-cache responses.
+        output port payloadCacheRecvOut: Fw.BufferSend
 
         @ Original UART receive buffer returned to the UART driver.
         output port drvReceiveReturnOut: Fw.BufferSend

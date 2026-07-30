@@ -128,6 +128,31 @@ class BoundedRf22 : public RH_RF22 {
   BoundedRf22(uint8_t slave_select_pin, uint8_t interrupt_pin, RHGenericSPI& spi)
       : RH_RF22(slave_select_pin, interrupt_pin, spi) {}
 
+  // RadioHead uses the same _buf/_bufLen storage for transmit and receive, but
+  // setModeRx() leaves the completed TX length behind. If the preamble
+  // interrupt is delayed or missed, the next packet is either rejected as
+  // shorter than that stale TX length or accepted with stale TX bytes prefixed.
+  // Re-arm RX from a known-empty software/FIFO/interrupt state after every TX.
+  void restartReceiveClean() {
+    setModeIdle();
+    resetRxFifo();
+    (void)spiRead(RH_RF22_REG_03_INTERRUPT_STATUS1);
+    (void)spiRead(RH_RF22_REG_04_INTERRUPT_STATUS2);
+    clearRxBuf();
+    setModeRx();
+  }
+
+  // A maximum 49-byte application packet occupies just under 4 ms at
+  // 125 kbps once the RadioHead framing bytes are included. Defer normal
+  // queued TX for 6 ms after a detected preamble so setModeTx() cannot clear a
+  // command that is still arriving. Immediate ACKs run only after packet-valid.
+  bool receiveInProgress(uint32_t now_ms) {
+    static constexpr uint32_t RX_PACKET_GUARD_MS = 6U;
+    const uint32_t last_preamble_ms = getLastPreambleTime();
+    return mode() == RHModeRx && last_preamble_ms != 0U &&
+           (now_ms - last_preamble_ms) < RX_PACKET_GUARD_MS;
+  }
+
   bool initBounded(uint16_t chip_ready_timeout_ms) {
     if (chip_ready_timeout_ms == 0 || !RHSPIDriver::init()) {
       return false;
@@ -205,6 +230,14 @@ class BoundedRf22 : public RH_RF22 {
     return true;
   }
 };
+
+inline void enterReceiveMode(RH_RF22& radio) {
+  radio.setModeRx();
+}
+
+inline void enterReceiveMode(BoundedRf22& radio) {
+  radio.restartReceiveClean();
+}
 
 // Configure Teensy SPI1 pin mux and start the bus.
 inline void setupSpi1(const Spi1Pins& pins) {
@@ -342,7 +375,7 @@ inline bool initRadio(RadioT& radio, const RadioPins& pins = RadioPins(),
   setupAmpPins(pins, profile);
   if (profile.start_in_receive) {
     setAmpReceive(pins, profile);
-    radio.setModeRx();
+    enterReceiveMode(radio);
   } else {
     setAmpIdle(pins);
     radio.setModeIdle();
@@ -385,7 +418,8 @@ inline void captureFirstFaultSnapshot(RH_RF22& radio, const RadioPins& pins,
 
 // Recover the radio after a terminal TX wait timeout. Always return to RX so
 // the peer can re-establish the link after the local transmit path wedges.
-inline void recoverTransmitPath(RH_RF22& radio, const RadioPins& pins,
+template <typename RadioT>
+inline void recoverTransmitPath(RadioT& radio, const RadioPins& pins,
                                 const RadioProfile& profile) {
   radio.setModeIdle();
   const uint8_t op_mode2 = radio.spiRead(RH_RF22_REG_08_OPERATING_MODE2);
@@ -395,11 +429,12 @@ inline void recoverTransmitPath(RH_RF22& radio, const RadioPins& pins,
   (void)radio.spiRead(RH_RF22_REG_03_INTERRUPT_STATUS1);
   (void)radio.spiRead(RH_RF22_REG_04_INTERRUPT_STATUS2);
   setAmpReceive(pins, profile);
-  radio.setModeRx();
+  enterReceiveMode(radio);
 }
 
 // Send one packet with a mandatory bounded completion wait.
-inline SendResult sendPacket(RH_RF22& radio, const RadioPins& pins,
+template <typename RadioT>
+inline SendResult sendPacket(RadioT& radio, const RadioPins& pins,
                              const RadioProfile& profile, const uint8_t* data,
                              uint8_t len, uint16_t tx_complete_timeout_ms,
                              Print* log = nullptr,
@@ -425,7 +460,7 @@ inline SendResult sendPacket(RH_RF22& radio, const RadioPins& pins,
     captureFirstFaultSnapshot(radio, pins, SendResult::START_FAILED, first_fault);
     if (profile.start_in_receive) {
       setAmpReceive(pins, profile);
-      radio.setModeRx();
+      enterReceiveMode(radio);
     } else {
       setAmpIdle(pins);
       radio.setModeIdle();
@@ -444,7 +479,7 @@ inline SendResult sendPacket(RH_RF22& radio, const RadioPins& pins,
 
   if (profile.start_in_receive) {
     setAmpReceive(pins, profile);
-    radio.setModeRx();
+    enterReceiveMode(radio);
   } else {
     setAmpIdle(pins);
     radio.setModeIdle();
@@ -463,8 +498,10 @@ inline bool receivePacket(RH_RF22& radio, const RadioPins& pins,
   }
 
   setAmpReceive(pins, profile);
-  radio.setModeRx();
 
+  // recv() calls available() itself. Do not force RX here: callers normally
+  // arrive with _rxBufValid already set, and re-entering RX before copying that
+  // buffer creates a preamble-interrupt window that can erase the packet.
   if (!radio.available()) {
     return false;
   }
@@ -524,7 +561,8 @@ inline LinkStats readLinkStats(RH_RF22& radio) {
 // 2) clear TX/RX FIFOs
 // 3) clear latched interrupts
 // 4) return to RX
-inline void recoverFromFifoError(RH_RF22& radio, const RadioPins& pins,
+template <typename RadioT>
+inline void recoverFromFifoError(RadioT& radio, const RadioPins& pins,
                                  const RadioProfile& profile) {
   recoverTransmitPath(radio, pins, profile);
 }

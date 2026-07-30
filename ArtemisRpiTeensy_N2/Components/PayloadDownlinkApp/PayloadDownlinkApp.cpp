@@ -10,6 +10,9 @@ namespace Components {
 
 namespace {
 constexpr U32 MAX_BLOB_BYTES = 1024U * 1024U;
+constexpr U32 CACHE_RESPONSE_RETRY_TICKS = 2U;
+constexpr U32 CACHE_RESPONSE_MAX_RETRIES = 3U;
+constexpr U32 CACHE_TRANSMIT_TIMEOUT_TICKS = 45U;
 constexpr U32 HEADER_RETRANSMIT_COUNT = 3U;
 constexpr U32 HEADER_REFRESH_COUNT = 1U;
 constexpr const char* PAYLOAD_SOURCE_ENV = "NEUTRON_PAYLOAD_DOWNLINK_FILE";
@@ -126,11 +129,24 @@ PayloadDownlinkApp::PayloadDownlinkApp(const char* const compName)
       m_controlPacketsInvalid(0),
       m_controlMailboxHighWater(0),
       m_reportedControlMailboxDrops(0),
-      m_reportedControlPacketsInvalid(0) {
+      m_reportedControlPacketsInvalid(0),
+      m_cacheSource(nullptr),
+      m_cacheRequest{},
+      m_cacheRequestSize(0),
+      m_cacheRequestId(0),
+      m_cachePendingOperation(0),
+      m_cacheUploadOffset(0),
+      m_cacheWaitTicks(0),
+      m_cacheRetryCount(0),
+      m_cacheMode(false),
+      m_waitingCacheResponse(false),
+      m_cacheTransmitting(false) {
     std::memset(this->m_packet, 0, sizeof(this->m_packet));
 }
 
-PayloadDownlinkApp::~PayloadDownlinkApp() {}
+PayloadDownlinkApp::~PayloadDownlinkApp() {
+    this->closeCacheSource();
+}
 
 void PayloadDownlinkApp::pingIn_handler(FwIndexType portNum, U32 key) {
     static_cast<void>(portNum);
@@ -141,6 +157,27 @@ void PayloadDownlinkApp::run_handler(FwIndexType portNum, U32 context) {
     static_cast<void>(portNum);
     static_cast<void>(context);
     this->m_runTicks += 1;
+    if (this->m_cacheMode) {
+        if (this->m_state != STATE_DOWNLINKING) {
+            this->emitTelemetry();
+            return;
+        }
+        this->m_cacheWaitTicks++;
+        if (this->m_waitingCacheResponse && this->m_cacheWaitTicks >= CACHE_RESPONSE_RETRY_TICKS) {
+            if (this->m_cacheRetryCount >= CACHE_RESPONSE_MAX_RETRIES ||
+                !this->sendCurrentCacheRequest()) {
+                this->failTransfer(14U, this->m_cachePendingOperation);
+                this->closeCacheSource();
+            } else {
+                this->m_cacheRetryCount++;
+            }
+        } else if (this->m_cacheTransmitting &&
+                   this->m_cacheWaitTicks >= CACHE_TRANSMIT_TIMEOUT_TICKS) {
+            this->failTransfer(15U, this->m_totalBytes);
+        }
+        this->emitTelemetry();
+        return;
+    }
     this->drainControlMailbox();
 
     const U32 packetsPerRun = LinkCfg::PAYLOAD_PACKETS_PER_RUN;
@@ -289,6 +326,79 @@ void PayloadDownlinkApp::packetIn_handler(FwIndexType portNum, Fw::Buffer& fwBuf
     }
 }
 
+void PayloadDownlinkApp::cacheResponseIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) {
+    static_cast<void>(portNum);
+    const FwSizeType size = fwBuffer.getSize();
+    const U8* data = fwBuffer.getData();
+    if (!this->m_cacheMode || !fwBuffer.isValid() || size != 12U ||
+        data[0] != LinkCfg::TEENSY_TARGET_PAYLOAD_CACHE ||
+        data[1] != this->m_cacheRequestId || data[3] != 8U ||
+        data[4] != this->m_cachePendingOperation || data[5] != this->m_transferId) {
+        return;
+    }
+
+    this->m_cacheWaitTicks = 0U;
+    this->m_cacheRetryCount = 0U;
+    if (data[2] != LinkCfg::TEENSY_STATUS_OK) {
+        this->failTransfer(16U, data[2]);
+        this->closeCacheSource();
+        return;
+    }
+
+    const U8 state = data[6];
+    const U32 nextOffset = this->getU32(data, 8);
+    if (nextOffset > this->m_totalBytes) {
+        this->failTransfer(17U, nextOffset);
+        this->closeCacheSource();
+        return;
+    }
+
+    if (this->m_cachePendingOperation == LinkCfg::PAYLOAD_CACHE_OP_BEGIN ||
+        this->m_cachePendingOperation == LinkCfg::PAYLOAD_CACHE_OP_CHUNK) {
+        this->m_waitingCacheResponse = false;
+        this->m_cacheUploadOffset = nextOffset;
+        this->m_progressPercent =
+            (this->m_totalBytes > 0U) ? ((nextOffset * 100U) / this->m_totalBytes) : 0U;
+        this->m_nextPacketIndex =
+            (nextOffset + LinkCfg::PAYLOAD_PACKET_DATA_BYTES - 1U) /
+            LinkCfg::PAYLOAD_PACKET_DATA_BYTES;
+        if (nextOffset == this->m_totalBytes) {
+            if (!this->sendCacheCommit()) {
+                this->failTransfer(18U, nextOffset);
+                this->closeCacheSource();
+            }
+        } else if (!this->sendNextCacheChunk(nextOffset)) {
+            this->failTransfer(19U, nextOffset);
+            this->closeCacheSource();
+        }
+        return;
+    }
+
+    if (this->m_cachePendingOperation == LinkCfg::PAYLOAD_CACHE_OP_COMMIT_AND_SEND) {
+        if (state == LinkCfg::PAYLOAD_CACHE_STATE_SENDING) {
+            this->m_waitingCacheResponse = false;
+            this->m_cacheTransmitting = true;
+            this->closeCacheSource();
+            return;
+        }
+        if (state == LinkCfg::PAYLOAD_CACHE_STATE_READY && this->m_cacheTransmitting) {
+            this->m_waitingCacheResponse = false;
+            this->m_cacheTransmitting = false;
+            this->m_state = STATE_DONE;
+            this->m_progressPercent = 100U;
+            this->m_nextPacketIndex = this->m_totalPackets;
+            this->m_packetsSent = this->m_totalPackets;
+            this->log_ACTIVITY_HI_PayloadDownlinkComplete(this->m_transferId, this->m_packetsSent);
+            this->emitStatus();
+            this->emitTelemetry(true);
+            return;
+        }
+    }
+
+    this->failTransfer(20U, state);
+    this->closeCacheSource();
+}
+
 void PayloadDownlinkApp::downlinkRequestIn_handler(FwIndexType portNum,
                                                        U32 productId,
                                                        U32 productBytes,
@@ -330,7 +440,8 @@ void PayloadDownlinkApp::START_PAYLOAD_DOWNLINK_cmdHandler(FwOpcodeType opCode,
         return;
     }
     if (!this->resetTransfer(productId, normalizedBytes, sourceKind, requestedSourcePath, 0U)) {
-        const bool invalidSize = (normalizedBytes == 0U) || (normalizedBytes > MAX_BLOB_BYTES);
+        const bool invalidSize =
+            (normalizedBytes == 0U) || (normalizedBytes > LinkCfg::PAYLOAD_CACHE_MAX_BYTES);
         this->cmdResponse_out(
             opCode,
             cmdSeq,
@@ -343,6 +454,10 @@ void PayloadDownlinkApp::START_PAYLOAD_DOWNLINK_cmdHandler(FwOpcodeType opCode,
 }
 
 void PayloadDownlinkApp::ABORT_PAYLOAD_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    if (this->m_cacheMode && this->m_state == STATE_DOWNLINKING) {
+        (void)this->sendCacheAbort();
+    }
+    this->closeCacheSource();
     this->m_state = STATE_ABORTED;
     this->clearRepairWork();
     this->emitStatus();
@@ -482,6 +597,13 @@ bool PayloadDownlinkApp::resetTransfer(U32 productId,
     this->m_requestedSourceKind = sourceKind;
     this->m_requestedSourcePath = preferredSourcePath;
     this->m_expectedSourceCrc = expectedSourceCrc;
+    this->m_cacheMode = true;
+    this->m_waitingCacheResponse = false;
+    this->m_cacheTransmitting = false;
+    this->m_cacheUploadOffset = 0U;
+    this->m_cacheWaitTicks = 0U;
+    this->m_cacheRetryCount = 0U;
+    this->closeCacheSource();
     this->clearRepairWork();
     this->emitStatus();
 
@@ -489,7 +611,7 @@ bool PayloadDownlinkApp::resetTransfer(U32 productId,
         this->failTransfer(8U, 0U);
         return false;
     }
-    if (byteCount > MAX_BLOB_BYTES) {
+    if (byteCount > LinkCfg::PAYLOAD_CACHE_MAX_BYTES) {
         this->failTransfer(2U, byteCount);
         return false;
     }
@@ -498,17 +620,19 @@ bool PayloadDownlinkApp::resetTransfer(U32 productId,
         this->failTransfer(reason, byteCount);
         return false;
     }
-    U16 sourceCrc = 0;
-    if (!this->computeSourceCrc(byteCount, sourceCrc)) {
+    U16 sourceCrc = static_cast<U16>(expectedSourceCrc);
+    if (expectedSourceCrc == 0U && !this->computeSourceCrc(byteCount, sourceCrc)) {
         this->failTransfer(7U, byteCount);
-        return false;
-    }
-    if ((expectedSourceCrc != 0U) && (static_cast<U16>(expectedSourceCrc) != sourceCrc)) {
-        this->failTransfer(11U, expectedSourceCrc);
         return false;
     }
 
     this->m_blobCrc = sourceCrc;
+    this->m_cacheSource = std::fopen(this->m_sourcePath.c_str(), "rb");
+    if (this->m_cacheSource == nullptr || !this->sendCacheBegin()) {
+        this->closeCacheSource();
+        this->failTransfer(7U, byteCount);
+        return false;
+    }
     return true;
 }
 
@@ -666,6 +790,117 @@ Components::PayloadSendStatus PayloadDownlinkApp::sendPacket(const U8* data, FwS
         this->m_lastError = 0U;
     }
     return status;
+}
+
+bool PayloadDownlinkApp::sendCacheBegin() {
+    std::memset(this->m_cacheRequest, 0, sizeof(this->m_cacheRequest));
+    this->m_cachePendingOperation = LinkCfg::PAYLOAD_CACHE_OP_BEGIN;
+    this->m_cacheRequest[0] = LinkCfg::TEENSY_TARGET_PAYLOAD_CACHE;
+    this->m_cacheRequestId++;
+    if (this->m_cacheRequestId == 0U) {
+        this->m_cacheRequestId = 1U;
+    }
+    this->m_cacheRequest[1] = this->m_cacheRequestId;
+    this->m_cacheRequest[2] = 12U;
+    this->m_cacheRequest[3] = 0U;
+    this->m_cacheRequest[4] = LinkCfg::PAYLOAD_CACHE_OP_BEGIN;
+    this->m_cacheRequest[5] = this->m_transferId;
+    this->putU32(this->m_cacheRequest, 6, this->m_productId);
+    this->putU32(this->m_cacheRequest, 10, this->m_totalBytes);
+    this->putU16(this->m_cacheRequest, 14, this->m_blobCrc);
+    this->m_cacheRequestSize = 16U;
+    this->m_cacheRetryCount = 0U;
+    return this->sendCurrentCacheRequest();
+}
+
+bool PayloadDownlinkApp::sendNextCacheChunk(U32 offset) {
+    if (this->m_cacheSource == nullptr || offset >= this->m_totalBytes ||
+        std::fseek(this->m_cacheSource, static_cast<long>(offset), SEEK_SET) != 0) {
+        return false;
+    }
+    U32 chunkBytes = this->m_totalBytes - offset;
+    if (chunkBytes > LinkCfg::PAYLOAD_CACHE_CHUNK_BYTES) {
+        chunkBytes = LinkCfg::PAYLOAD_CACHE_CHUNK_BYTES;
+    }
+    std::memset(this->m_cacheRequest, 0, sizeof(this->m_cacheRequest));
+    this->m_cachePendingOperation = LinkCfg::PAYLOAD_CACHE_OP_CHUNK;
+    this->m_cacheRequest[0] = LinkCfg::TEENSY_TARGET_PAYLOAD_CACHE;
+    this->m_cacheRequestId++;
+    if (this->m_cacheRequestId == 0U) {
+        this->m_cacheRequestId = 1U;
+    }
+    this->m_cacheRequest[1] = this->m_cacheRequestId;
+    this->m_cacheRequest[2] = static_cast<U8>(7U + chunkBytes);
+    this->m_cacheRequest[3] = 0U;
+    this->m_cacheRequest[4] = LinkCfg::PAYLOAD_CACHE_OP_CHUNK;
+    this->m_cacheRequest[5] = this->m_transferId;
+    this->putU32(this->m_cacheRequest, 6, offset);
+    this->m_cacheRequest[10] = static_cast<U8>(chunkBytes);
+    if (std::fread(&this->m_cacheRequest[11], 1U, chunkBytes, this->m_cacheSource) != chunkBytes) {
+        return false;
+    }
+    this->m_cacheRequestSize = 11U + chunkBytes;
+    this->m_cacheRetryCount = 0U;
+    return this->sendCurrentCacheRequest();
+}
+
+bool PayloadDownlinkApp::sendCacheCommit() {
+    std::memset(this->m_cacheRequest, 0, sizeof(this->m_cacheRequest));
+    this->m_cachePendingOperation = LinkCfg::PAYLOAD_CACHE_OP_COMMIT_AND_SEND;
+    this->m_cacheRequest[0] = LinkCfg::TEENSY_TARGET_PAYLOAD_CACHE;
+    this->m_cacheRequestId++;
+    if (this->m_cacheRequestId == 0U) {
+        this->m_cacheRequestId = 1U;
+    }
+    this->m_cacheRequest[1] = this->m_cacheRequestId;
+    this->m_cacheRequest[2] = 2U;
+    this->m_cacheRequest[3] = 0U;
+    this->m_cacheRequest[4] = LinkCfg::PAYLOAD_CACHE_OP_COMMIT_AND_SEND;
+    this->m_cacheRequest[5] = this->m_transferId;
+    this->m_cacheRequestSize = 6U;
+    this->m_cacheRetryCount = 0U;
+    return this->sendCurrentCacheRequest();
+}
+
+bool PayloadDownlinkApp::sendCacheAbort() {
+    std::memset(this->m_cacheRequest, 0, sizeof(this->m_cacheRequest));
+    this->m_cachePendingOperation = LinkCfg::PAYLOAD_CACHE_OP_ABORT;
+    this->m_cacheRequest[0] = LinkCfg::TEENSY_TARGET_PAYLOAD_CACHE;
+    this->m_cacheRequestId++;
+    if (this->m_cacheRequestId == 0U) {
+        this->m_cacheRequestId = 1U;
+    }
+    this->m_cacheRequest[1] = this->m_cacheRequestId;
+    this->m_cacheRequest[2] = 2U;
+    this->m_cacheRequest[3] = 0U;
+    this->m_cacheRequest[4] = LinkCfg::PAYLOAD_CACHE_OP_ABORT;
+    this->m_cacheRequest[5] = this->m_transferId;
+    this->m_cacheRequestSize = 6U;
+    this->m_cacheRetryCount = 0U;
+    return this->sendCurrentCacheRequest();
+}
+
+bool PayloadDownlinkApp::sendCurrentCacheRequest() {
+    if (!this->isConnected_cacheRequestOut_OutputPort(0) ||
+        this->m_cacheRequestSize == 0U ||
+        this->m_cacheRequestSize > LinkCfg::UART_FRAME_MAX_PAYLOAD) {
+        return false;
+    }
+    Fw::Buffer request(this->m_cacheRequest, this->m_cacheRequestSize);
+    const Components::PayloadSendStatus status = this->cacheRequestOut_out(0, request);
+    if (status != Components::PayloadSendStatus::LOCAL_ACCEPTED) {
+        return false;
+    }
+    this->m_waitingCacheResponse = true;
+    this->m_cacheWaitTicks = 0U;
+    return true;
+}
+
+void PayloadDownlinkApp::closeCacheSource() {
+    if (this->m_cacheSource != nullptr) {
+        (void)std::fclose(this->m_cacheSource);
+        this->m_cacheSource = nullptr;
+    }
 }
 
 void PayloadDownlinkApp::updateProgressIfDue() {
@@ -841,7 +1076,17 @@ U16 PayloadDownlinkApp::getU16(const U8* data, FwSizeType offset) const {
     return static_cast<U16>(data[offset]) | (static_cast<U16>(data[offset + 1]) << 8U);
 }
 
+U32 PayloadDownlinkApp::getU32(const U8* data, FwSizeType offset) const {
+    return static_cast<U32>(data[offset]) |
+           (static_cast<U32>(data[offset + 1U]) << 8U) |
+           (static_cast<U32>(data[offset + 2U]) << 16U) |
+           (static_cast<U32>(data[offset + 3U]) << 24U);
+}
+
 void PayloadDownlinkApp::failTransfer(U32 reason, U32 detail) {
+    this->closeCacheSource();
+    this->m_waitingCacheResponse = false;
+    this->m_cacheTransmitting = false;
     this->m_lastError = reason;
     this->m_state = STATE_ERROR;
     this->clearRepairWork();

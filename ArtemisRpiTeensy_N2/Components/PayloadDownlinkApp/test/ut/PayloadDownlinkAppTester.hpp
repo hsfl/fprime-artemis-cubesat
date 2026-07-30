@@ -31,19 +31,26 @@ class PayloadDownlinkAppTester final : public PayloadDownlinkAppGTestBase {
     void testInitializationFailurePublishesCorrelatedIdentity();
     void testRepairsDoNotStarveNominalProgress();
     void testMalformedControlIsRejectedWithoutPoisoningStatus();
+    void testOnDemandCacheTransaction();
+    void testCacheRequestRetriesWithoutAdvancing();
+    void testConflictingRequestDoesNotRestartUpload();
 
   private:
     void connectPorts();
     void initComponents();
     Components::PayloadSendStatus from_packetOut_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
+    Components::PayloadSendStatus from_cacheRequestOut_handler(FwIndexType portNum,
+                                                               Fw::Buffer& fwBuffer) override;
     void writePayloadFile(const U8* data, FwSizeType size);
     void rejectNextPacket(U8 packetType, const Components::PayloadSendStatus& status, U32 count = 1U);
+    void respondToLastCacheRequest(U8 state, U32 nextOffset, U8 status = LinkCfg::TEENSY_STATUS_OK);
 
     PayloadDownlinkApp component;
     U8 m_rejectedPacketType;
     Components::PayloadSendStatus m_rejectedStatus;
     U32 m_rejectionsRemaining;
     std::vector<std::vector<U8> > m_packets;
+    std::vector<std::vector<U8> > m_cacheRequests;
 };
 
 }  // namespace Components

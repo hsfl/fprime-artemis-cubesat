@@ -4,12 +4,16 @@
 #include <Arduino.h>
 
 #include "pdu_proxy.hpp"
+#include "payload_cache.hpp"
 #include "relay_uart_rf.hpp"
 #include "rf23_driver.hpp"
 
 class LocalTeensyRouter : public LocalChannelHandler {
  public:
-  LocalTeensyRouter(PduProxy& pduProxy, Rf23Driver& rfDriver, LinkCounters& counters);
+  LocalTeensyRouter(PduProxy& pduProxy,
+                    Rf23Driver& rfDriver,
+                    LinkCounters& counters,
+                    PayloadCache& payloadCache);
 
   bool beginLocalFrame(const uint8_t* payload, uint16_t length) override;
   bool pollLocalResponse(uint8_t* payload, uint16_t& length) override;
@@ -29,6 +33,7 @@ class LocalTeensyRouter : public LocalChannelHandler {
   PduProxy& m_pduProxy;
   Rf23Driver& m_rfDriver;
   LinkCounters& m_counters;
+  PayloadCache& m_payloadCache;
   uint8_t m_rfResponse[LOCAL_MAX_RESPONSE_LEN];
   uint16_t m_rfResponseLen;
 };

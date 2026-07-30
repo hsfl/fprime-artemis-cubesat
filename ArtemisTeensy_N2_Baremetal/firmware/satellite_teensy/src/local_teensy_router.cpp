@@ -2,10 +2,14 @@
 
 #include <string.h>
 
-LocalTeensyRouter::LocalTeensyRouter(PduProxy& pduProxy, Rf23Driver& rfDriver, LinkCounters& counters)
+LocalTeensyRouter::LocalTeensyRouter(PduProxy& pduProxy,
+                                     Rf23Driver& rfDriver,
+                                     LinkCounters& counters,
+                                     PayloadCache& payloadCache)
     : m_pduProxy(pduProxy),
       m_rfDriver(rfDriver),
       m_counters(counters),
+      m_payloadCache(payloadCache),
       m_rfResponseLen(0) {
   memset(m_rfResponse, 0, sizeof(m_rfResponse));
 }
@@ -19,6 +23,9 @@ bool LocalTeensyRouter::beginLocalFrame(const uint8_t* payload, uint16_t length)
   const uint8_t target = payload[0];
   if (target == link_protocol::TEENSY_TARGET_PDU) {
     return m_pduProxy.beginLocalFrame(payload, length);
+  }
+  if (target == link_protocol::TEENSY_TARGET_PAYLOAD_CACHE) {
+    return m_payloadCache.beginLocalFrame(payload, length);
   }
 
   const uint8_t requestId = payload[1];
@@ -60,6 +67,9 @@ bool LocalTeensyRouter::pollLocalResponse(uint8_t* payload, uint16_t& length) {
     return true;
   }
 
+  if (m_payloadCache.pollLocalResponse(payload, length)) {
+    return true;
+  }
   return m_pduProxy.pollLocalResponse(payload, length);
 }
 

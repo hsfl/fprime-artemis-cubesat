@@ -43,6 +43,32 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 
 ## Current State
 
+### C3M on-demand cached downlink acceptance (2026-07-29)
+
+- `REQUEST_SCIENCE_DOWNLINK` now performs one on-demand Pi-to-satellite-Teensy
+  cache upload; capture does not automatically stage the `.fdp`.
+- The satellite Teensy verifies the cached byte count and CRC, sequences the
+  existing ground-compatible `N2` packets locally, and retains the bytes for
+  bitmap repair requests.
+- The existing ground Teensy and payload receiver over-the-air contract did
+  not change.
+- Connected FlatSat acceptance passed 3/3 consecutive fresh pictures with CRC
+  and 160 by 120 decode at approximately 10 seconds per 38,480-byte downlink.
+  The measured legacy compatibility run was 64.7 seconds.
+- Accepted Pi release:
+  `/home/pi/artemis/releases/c3m-on-demand-cache-20260729T233825Z`.
+  `/home/pi/artemis/current` points to it and the enabled
+  `artemis-fprime.service` launches that symlink on boot.
+- Detailed design, failure behavior, pass gate, and acceptance evidence:
+  `docs/C3M_ON_DEMAND_TEENSY_CACHE_DOWNLINK_PLAN.md`.
+- A post-acceptance static review found RadioHead's shared TX/RX buffer could
+  retain a stale ACK or payload length and corrupt the next command before Pi
+  forwarding. The project wrapper now performs a clean TX-to-RX transition on
+  both radios and applies a six-millisecond in-flight-preamble TX deferral only
+  on the satellite. Offline tests/builds pass; the focused
+  command-during-downlink HIL gate is still pending and recorded in the same
+  plan.
+
 ### 1) F' side (`ArtemisRpiTeensy_N2`)
 - Deployment uses Linux UART transport (`Drv.LinuxUartDriver`) on `/dev/serial0`.
 - `UartChannelMux` wraps/unwraps the single Pi <-> satellite Teensy UART into tagged channels.

@@ -6,6 +6,7 @@
     "timeout_ms": 250,
     "uart_baud": 115200,
     "inter_frame_margin_us": 37000,
+    "payload_cache_margin_us": 1000,
     "ccsds_extra_margin_us": 40000
   },
   "channels": {
@@ -19,6 +20,7 @@
   "teensy_rpc": {
     "target_pdu": 1,
     "target_rf_status": 2,
+    "target_payload_cache": 3,
     "status_ok": 0,
     "status_bad_request": 1,
     "status_busy": 2,
@@ -64,6 +66,18 @@
     "magic_0": 78,
     "magic_1": 50,
     "packet_data_bytes": 35,
+    "cache_max_bytes": 65536,
+    "cache_chunk_bytes": 200,
+    "cache_rf_gap_ms": 2,
+    "cache_op_begin": 1,
+    "cache_op_chunk": 2,
+    "cache_op_commit_and_send": 3,
+    "cache_op_abort": 4,
+    "cache_state_empty": 0,
+    "cache_state_receiving": 1,
+    "cache_state_ready": 2,
+    "cache_state_sending": 3,
+    "cache_state_error": 4,
     "packets_per_run": 18,
     "retry_packets_per_run": 18
   },

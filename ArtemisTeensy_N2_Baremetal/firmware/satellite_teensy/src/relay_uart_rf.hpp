@@ -13,6 +13,13 @@ class LocalChannelHandler {
   virtual bool pollLocalResponse(uint8_t* payload, uint16_t& length) = 0;
 };
 
+class PayloadChannelHandler {
+ public:
+  virtual bool handlePayloadControl(const uint8_t* payload, uint16_t length) = 0;
+  virtual bool nextPayloadPacket(uint8_t* payload, uint16_t& length) = 0;
+  virtual void payloadPacketSent(bool sent) = 0;
+};
+
 struct RelayConfig {
   bool enableUartToRf = true;
   bool uartOutputFramed = true;
@@ -32,7 +39,8 @@ class RelayUartRf {
               LinkCounters& counters,
               const RelayConfig& config = RelayConfig{},
               Stream* payloadIo = nullptr,
-              LocalChannelHandler* localHandler = nullptr);
+              LocalChannelHandler* localHandler = nullptr,
+              PayloadChannelHandler* payloadHandler = nullptr);
 
   void begin();
   void poll();
@@ -65,7 +73,10 @@ class RelayUartRf {
   bool sendUartFrame(uint8_t channel, const uint8_t* payload, uint16_t length);
   bool sendRawToUart(const uint8_t* payload, uint16_t length);
 
-  bool sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uint16_t length);
+  bool sendPayloadOverRf(uint8_t channel,
+                         const uint8_t* payload,
+                         uint16_t length,
+                         bool cachedPayload = false);
   bool sendRfPacket(const uint8_t* packet, uint8_t packetLen);
   bool sendRfPacketWithAck(const uint8_t* packet, uint8_t packetLen, uint8_t channel, uint8_t msgId, uint8_t segIdx);
   bool waitForAck(uint8_t channel, uint8_t msgId, uint8_t segIdx);
@@ -80,6 +91,7 @@ class RelayUartRf {
   bool enqueueUplinkMessage(uint8_t channel, const uint8_t* payload, uint16_t length);
   bool enqueueDownlinkMessage(uint8_t channel, const uint8_t* payload, uint16_t length);
   void serviceUplinkQueue();
+  void serviceCachedPayload();
   void serviceDownlinkQueue();
 
   static constexpr uint8_t MAX_QUEUE_DEPTH = 32;
@@ -105,6 +117,7 @@ class RelayUartRf {
   Stream& m_linkIo;
   Stream* m_payloadIo;
   LocalChannelHandler* m_localHandler;
+  PayloadChannelHandler* m_payloadHandler;
   Rf23Driver& m_rf;
   LinkCounters& m_counters;
   RelayConfig m_config;

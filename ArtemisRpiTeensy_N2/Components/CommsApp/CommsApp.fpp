@@ -20,9 +20,6 @@ module Components {
         @ Payload downlink transfer status input
         async input port payloadDownlinkStatusIn: Components.PayloadDownlinkStatus
 
-        @ Downlink request output to storage
-        output port downlinkRequestOut: Components.ScienceDownlinkRequest
-
         @ Generic payload downlink request output
         output port payloadDownlinkRequestOut: Components.ScienceDownlinkRequest
 

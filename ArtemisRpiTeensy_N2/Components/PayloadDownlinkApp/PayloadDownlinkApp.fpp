@@ -20,6 +20,12 @@ module Components {
         @ Payload protocol packets to the UART channel mux.
         output port packetOut: Components.PayloadPacketSend
 
+        @ On-demand cache upload requests to the satellite Teensy.
+        output port cacheRequestOut: Components.PayloadPacketSend
+
+        @ Correlated cache upload and transmit responses from the satellite Teensy.
+        guarded input port cacheResponseIn: Fw.BufferSend
+
         @ Payload transfer status to mission communications manager.
         output port statusOut: Components.PayloadDownlinkStatus
 

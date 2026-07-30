@@ -113,6 +113,10 @@ bool Rf23Driver::available() {
   return isReady() && m_radio.available();
 }
 
+bool Rf23Driver::receiveInProgress() {
+  return isReady() && m_radio.receiveInProgress(millis());
+}
+
 Rf23ReceiveResult Rf23Driver::recv(uint8_t* buf, uint8_t* len) {
   if (!isReady()) {
     return Rf23ReceiveResult::NO_PACKET;
