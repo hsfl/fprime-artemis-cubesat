@@ -162,6 +162,43 @@ The accepted Pi release is:
 automatically after a Pi reboot. The previous release remains under
 `/home/pi/artemis/releases/` for rollback.
 
+## Command-uplink hardening (2026-07-29, HIL pending)
+
+Static analysis after the three-picture acceptance run isolated the selective
+command failure below F Prime and the Pi UART. RadioHead's `RH_RF22` driver
+reuses `_buf` and `_bufLen` for transmit and receive, leaves the transmitted
+length populated after packet-sent, and does not clear it when returning to RX.
+A following command can therefore be rejected as shorter than the stale TX
+packet or accepted with stale TX bytes prefixed. In the observed case, a stale
+five-byte ACK makes the next argument-bearing command look like another ACK, so
+the satellite relay silently ignores it before acknowledging or forwarding it
+to the Pi.
+
+The project-owned RF wrapper now:
+
+- returns both radios to RX through a clean FIFO, interrupt, and software-buffer
+  transition after TX;
+- consumes an already-complete RX packet without redundantly re-entering RX;
+- defers only normal satellite telemetry/cache TX for six milliseconds after a
+  detected incoming preamble, preventing `setModeTx()` from erasing a command
+  still in flight;
+- leaves immediate satellite ACKs and ground command transmission unguarded so
+  uplink retains priority during the fast cached downlink.
+
+No runtime debug hooks, third-party RadioHead edits, RF packet-format changes,
+or ground-receiver redesign were added. Offline validation passes 95 Python
+transport/receiver tests, both Teensy builds, the native F Prime build, and all
+7 F Prime component tests.
+
+Hardware acceptance remains pending. After flashing, require:
+
+1. 20 alternating no-argument and `U32` commands with 20 command
+   acknowledgements and 20 Pi-side executions;
+2. successful commands during and immediately after one fresh-picture
+   downlink;
+3. the existing three-picture CRC/decode gate near 10 seconds per image, with
+   no reset or persistent retry/timeout wedge.
+
 ### Operator environment note
 
 Start the C3M payload receiver after activating the F Prime virtual

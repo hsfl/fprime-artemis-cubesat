@@ -61,6 +61,13 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
   `artemis-fprime.service` launches that symlink on boot.
 - Detailed design, failure behavior, pass gate, and acceptance evidence:
   `docs/C3M_ON_DEMAND_TEENSY_CACHE_DOWNLINK_PLAN.md`.
+- A post-acceptance static review found RadioHead's shared TX/RX buffer could
+  retain a stale ACK or payload length and corrupt the next command before Pi
+  forwarding. The project wrapper now performs a clean TX-to-RX transition on
+  both radios and applies a six-millisecond in-flight-preamble TX deferral only
+  on the satellite. Offline tests/builds pass; the focused
+  command-during-downlink HIL gate is still pending and recorded in the same
+  plan.
 
 ### 1) F' side (`ArtemisRpiTeensy_N2`)
 - Deployment uses Linux UART transport (`Drv.LinuxUartDriver`) on `/dev/serial0`.
