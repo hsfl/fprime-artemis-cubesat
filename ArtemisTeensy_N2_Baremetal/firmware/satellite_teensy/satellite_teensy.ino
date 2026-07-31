@@ -32,7 +32,9 @@ static constexpr uint16_t CCSDS_TM_FRAME_BYTES = 128;
 LinkCounters g_linkCounters;
 Rf23Driver g_rfDriver(RADIO_CS, RADIO_INT, RADIO_RX_ON_PIN, RADIO_TX_ON_PIN, RADIO_SDN_PIN);
 PduProxy g_pduProxy(Serial1);
-PayloadCache g_payloadCache;
+// One cache serves whichever payload camera is selected. Place the 192 KiB
+// backing store in Teensy 4.1 RAM2 so normal stack/data remain in DTCM.
+DMAMEM PayloadCache g_payloadCache;
 LocalTeensyRouter g_localRouter(g_pduProxy, g_rfDriver, g_linkCounters, g_payloadCache);
 static uint8_t g_rpiUartRxBuffer[RPI_UART_RX_BUFFER_SIZE];
 // Channelized bridge mode:
