@@ -45,7 +45,9 @@ module ArtemisRpiTeensyDeployment {
     instance thermalManager
     instance payloadDownlinkApp
     instance epsDriverArtemis
+    instance payloadDriverSelector
     instance payloadDriverLepton
+    instance payloadDriverBoson
     instance payloadDriverNeutronSim
     instance adcsDriverD2S2
     instance gpsDriverArtemis
@@ -129,7 +131,8 @@ module ArtemisRpiTeensyDeployment {
     connections DataProducts_DpWritten {
       ArtemisDataProducts.dpWriter.dpWrittenOut -> dpWrittenRouter.dpWrittenIn
       dpWrittenRouter.catalogOut -> ArtemisDataProducts.dpCat.addToCat
-      dpWrittenRouter.notifyOut -> payloadDriverLepton.dpWrittenIn
+      dpWrittenRouter.leptonNotifyOut -> payloadDriverLepton.dpWrittenIn
+      dpWrittenRouter.bosonNotifyOut -> payloadDriverBoson.dpWrittenIn
     }
 
     connections RateGroups {
@@ -198,11 +201,19 @@ module ArtemisRpiTeensyDeployment {
       epsDriverArtemis.teensyRequestOut -> uartChannelMux.localSendIn
       uartChannelMux.localRecvOut -> epsDriverArtemis.teensyResponseIn
 
-      payloadManager.driverRequestOut -> payloadDriverLepton.requestIn
-      payloadDriverLepton.statusOut -> payloadManager.driverStatusIn
+      payloadManager.driverRequestOut -> payloadDriverSelector.requestIn
+      payloadDriverSelector.driverRequestOut[0] -> payloadDriverLepton.requestIn
+      payloadDriverSelector.driverRequestOut[1] -> payloadDriverBoson.requestIn
+      payloadDriverSelector.deactivateDriverOut[0] -> payloadDriverLepton.deactivateIn
+      payloadDriverSelector.deactivateDriverOut[1] -> payloadDriverBoson.deactivateIn
+      payloadDriverLepton.statusOut -> payloadDriverSelector.driverStatusIn[0]
+      payloadDriverBoson.statusOut -> payloadDriverSelector.driverStatusIn[1]
+      payloadDriverSelector.statusOut -> payloadManager.driverStatusIn
 
       payloadDriverLepton.productGetOut -> ArtemisDataProducts.dpMgr.productGetIn
       payloadDriverLepton.productSendOut -> ArtemisDataProducts.dpMgr.productSendIn
+      payloadDriverBoson.productGetOut -> ArtemisDataProducts.dpMgr.productGetIn
+      payloadDriverBoson.productSendOut -> ArtemisDataProducts.dpMgr.productSendIn
 
       adcsManager.driverRequestOut -> adcsDriverD2S2.requestIn
       adcsDriverD2S2.statusOut -> adcsManager.driverStatusIn

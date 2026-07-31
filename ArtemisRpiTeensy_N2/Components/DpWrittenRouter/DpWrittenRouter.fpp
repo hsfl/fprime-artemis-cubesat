@@ -8,7 +8,10 @@ module Components {
         @ Catalog notification output
         output port catalogOut: Svc.DpWritten
 
-        @ Payload-driver notification output
-        output port notifyOut: Svc.DpWritten
+        @ Lepton payload-driver notification output
+        output port leptonNotifyOut: Svc.DpWritten
+
+        @ Boson payload-driver notification output
+        output port bosonNotifyOut: Svc.DpWritten
     }
 }

@@ -1,17 +1,17 @@
-#ifndef Components_PayloadDriver_Lepton_HPP
-#define Components_PayloadDriver_Lepton_HPP
+#ifndef Components_PayloadDriver_Boson_HPP
+#define Components_PayloadDriver_Boson_HPP
 
-#include "Components/PayloadDriver_Lepton/LeptonCamera.hpp"
-#include "Components/PayloadDriver_Lepton/PayloadDriver_LeptonComponentAc.hpp"
+#include "Components/PayloadDriver_Boson/BosonCamera.hpp"
+#include "Components/PayloadDriver_Boson/PayloadDriver_BosonComponentAc.hpp"
 
 #include <string>
 
 namespace Components {
 
-class PayloadDriver_Lepton final : public PayloadDriver_LeptonComponentBase {
+class PayloadDriver_Boson final : public PayloadDriver_BosonComponentBase {
   public:
-    PayloadDriver_Lepton(const char* const compName);
-    ~PayloadDriver_Lepton();
+    PayloadDriver_Boson(const char* const compName);
+    ~PayloadDriver_Boson();
 
   private:
     enum CaptureStatus : U32 {
@@ -33,14 +33,15 @@ class PayloadDriver_Lepton final : public PayloadDriver_LeptonComponentBase {
                              FwDpPriorityType priority,
                              FwSizeType size) override;
 
-    bool captureThermalImage(U32 durationSeconds);
+    bool captureImage(U32 durationSeconds);
     bool ensureCameraOpen(char* reason, U32 reasonSize);
     void publishFailure(CaptureStatus status, const char* reason);
     void writeTelemetry();
-    static U32 clampSize(FwSizeType size);
-    static bool computeFileCrc16(const std::string& outputPath, U32& crcOut);
 
-    LeptonCamera m_camera;
+    static bool computeFileCrc16(const std::string& outputPath, U32& crcOut);
+    static U32 clampSize(FwSizeType size);
+
+    BosonCamera m_camera;
     U32 m_lastDurationSeconds;
     U32 m_lastProductId;
     U32 m_lastDataBytes;

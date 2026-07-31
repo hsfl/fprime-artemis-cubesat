@@ -23,6 +23,7 @@ class ScienceAppTester final : public ScienceAppGTestBase {
     void testScienceCaptureDoesNotPersistDuration();
     void testParamSeedsDurationAtInit();
     void testInvalidParamFallsBackToThirty();
+    void testFailedCaptureDoesNotReachStorage();
 
   private:
     void connectPorts();

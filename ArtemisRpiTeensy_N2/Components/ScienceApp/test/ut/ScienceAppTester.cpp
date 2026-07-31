@@ -216,4 +216,25 @@ void ScienceAppTester::testInvalidParamFallsBackToThirty() {
     ASSERT_from_missionModeOut(0, Components::MissionMode::COLLECTING, 30);
 }
 
+void ScienceAppTester::testFailedCaptureDoesNotReachStorage() {
+    this->clearHistory();
+
+    const Fw::String emptyPath("");
+    this->invoke_to_payloadStatusIn(
+        0,
+        0U,
+        0U,
+        Components::ScienceProductSource::UNKNOWN,
+        emptyPath,
+        0U
+    );
+    this->component.doDispatch();
+
+    ASSERT_EVENTS_ScienceProductRejected_SIZE(1);
+    ASSERT_EVENTS_ScienceProductRejected(0, 1U);
+    ASSERT_from_scienceProductOut_SIZE(0);
+    ASSERT_from_missionModeOut_SIZE(1);
+    ASSERT_from_missionModeOut(0, Components::MissionMode::BASE, 0U);
+}
+
 }  // namespace Components

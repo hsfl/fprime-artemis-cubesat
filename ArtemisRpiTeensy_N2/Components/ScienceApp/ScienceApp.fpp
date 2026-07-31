@@ -56,6 +56,11 @@ module Components {
         @ Product handoff event
         event ScienceProductReady(productSize: U32) severity activity high format "Science product ready size={}"
 
+        @ Invalid or failed payload product was rejected before storage/downlink.
+        event ScienceProductRejected(reason: U32) \
+            severity warning low \
+            format "Science product rejected reason={}"
+
         @ Capture duration configuration event
         event CaptureDurationConfigured(durationSeconds: U32) severity activity high format "Science capture duration configured {}s"
 

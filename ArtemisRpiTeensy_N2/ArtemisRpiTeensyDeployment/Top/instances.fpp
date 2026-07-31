@@ -106,10 +106,20 @@ module ArtemisRpiTeensyDeployment {
     stack size Default.STACK_SIZE \
     priority 28
 
+  instance payloadDriverSelector: Components.PayloadDriverSelector base id 0x10029000 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 28
+
   instance payloadDriverLepton: Components.PayloadDriver_Lepton base id 0x10027000 \
     queue size Default.QUEUE_SIZE \
     stack size 256 * 1024 \
     priority 27
+
+  instance payloadDriverBoson: Components.PayloadDriver_Boson base id 0x1002A000 \
+    queue size Default.QUEUE_SIZE \
+    stack size 384 * 1024 \
+    priority 25
 
   instance payloadDriverNeutronSim: Components.PayloadDriver_NeutronSim base id 0x10021000 \
     queue size Default.QUEUE_SIZE \

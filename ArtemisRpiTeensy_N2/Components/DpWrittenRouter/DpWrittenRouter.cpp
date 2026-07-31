@@ -14,8 +14,11 @@ void DpWrittenRouter::dpWrittenIn_handler(FwIndexType portNum,
     if (this->isConnected_catalogOut_OutputPort(0)) {
         this->catalogOut_out(0, fileName, priority, size);
     }
-    if (this->isConnected_notifyOut_OutputPort(0)) {
-        this->notifyOut_out(0, fileName, priority, size);
+    if (this->isConnected_leptonNotifyOut_OutputPort(0)) {
+        this->leptonNotifyOut_out(0, fileName, priority, size);
+    }
+    if (this->isConnected_bosonNotifyOut_OutputPort(0)) {
+        this->bosonNotifyOut_out(0, fileName, priority, size);
     }
 }
 
