@@ -1,4 +1,4 @@
-# EPSCoR C3M Lepton Local And RF Mission Operations Runbook
+# EPSCoR C3M Camera Local And RF Mission Operations Runbook
 
 ## START HERE: Manual HIL Operator Script
 
@@ -14,7 +14,25 @@ If `ssh artemis-pi-c3m` cannot reach the Pi, fix the network first. The demo
 cannot be operated remotely through SSH alone: the ground RF node must be with
 the operator and connected to the Mac.
 
-### 1. Find the three ground Teensy ports
+### 1. Start the two laptop operator tools
+
+The preferred launcher finds exactly one complete ground Triple-Serial Teensy,
+maps its GDS/debug/payload interfaces, and starts both GDS and the payload web
+app with the matching Pi-release dictionary:
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat
+./tools/c3m
+```
+
+Leave this terminal running. Open `http://127.0.0.1:5050` for GDS and
+`http://127.0.0.1:8064` for the payload receiver. Wait for the receiver to show
+**Ready - awaiting downlink**.
+
+If the launcher cannot identify exactly one Triple-Serial group, use the manual
+port mapping and two-terminal commands below.
+
+### 1a. Manual fallback: find the three ground Teensy ports
 
 ```bash
 cd ~/Developer/fprime-artemis-cubesat
@@ -43,7 +61,7 @@ ssh artemis-pi-c3m 'systemctl is-active artemis-fprime.service; pgrep -af Artemi
 Continue only when the service prints `active` and the deployment is running
 with `-d /dev/serial0`.
 
-### 3. Terminal 1: start GDS
+### 3. Manual fallback terminal 1: start GDS
 
 ```bash
 cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
@@ -60,7 +78,7 @@ export GDS_DATA_PORT="${GROUND_PORTS[1]}"
 Leave this terminal running. Open the GDS URL printed by the launcher, normally
 `http://127.0.0.1:5050`.
 
-### 4. Terminal 2: start the payload receiver
+### 4. Manual fallback terminal 2: start the payload receiver
 
 ```bash
 cd ~/Developer/fprime-artemis-cubesat
@@ -74,6 +92,12 @@ Teensy port from step 1.
 
 ### 5. Run one picture from the GDS Commanding page
 
+The selector defaults to `LEPTON`. To use the connected Boson instead, first
+send `payloadDriverSelector.SELECT_PAYLOAD_DRIVER` with `driver = BOSON`. To
+switch back after a powered-down camera replacement and reboot, send the same
+command with `driver = LEPTON`. Do not physically hot-swap USB cameras while
+the Pi is powered.
+
 Send these commands in order:
 
 1. `missionApp.ENTER_BASE_MODE`
@@ -82,7 +106,8 @@ Send these commands in order:
 4. Wait for a new `storageManager.ScienceStored` event with a nonzero size.
 5. `commsApp.REQUEST_SCIENCE_DOWNLINK`
 6. Wait for the payload web app to show `Complete` with a passing CRC and the
-   decoded `160x120` image.
+   decoded image: Lepton is `160x120` centikelvin data; Boson is `320x256` raw
+   U16 counts.
 
 During the transfer, send only one optional channel-0 proof command:
 `missionApp.PING` with token `37002`. Otherwise leave GDS alone until the image
@@ -99,7 +124,7 @@ remain under repo-root `data/`.
 Everything below is validation, recovery, engineering fallback, and historical
 evidence. You do not need it for a normal manual HIL run.
 
-BLUF: use this for the C3M Lepton laptop proof and refined RF demo operation.
+BLUF: use this for the C3M Lepton/Boson laptop proof and refined RF demo operation.
 The normal operator uses `fprime-gds` for channel 0 and the C3M payload receiver
 web app for channel 1; the raw receiver and decoder CLIs are engineering
 fallbacks. The 2026-07-09 HIL run proved real UVC capture and a byte-identical

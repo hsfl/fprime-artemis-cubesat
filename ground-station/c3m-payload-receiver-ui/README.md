@@ -3,9 +3,22 @@
 BLUF: this is the normal channel-1 operator surface for the EPSCoR C3M demo.
 Use F Prime GDS for commands/events/telemetry and keep this laptop browser open
 for receiver readiness, payload progress, CRC proof, automatic Lepton decode,
-and previous-run History.
+automatic Boson decode, and previous-run History.
 
 ## Start
+
+For normal HIL operation with exactly one complete ground Triple-Serial Teensy
+connected, start this payload UI and F Prime GDS together from the repository
+root:
+
+```bash
+./tools/c3m
+```
+
+The launcher uses the matching Pi-release dictionary and stops both processes
+on Ctrl-C. It does not connect to or modify the satellite/Pi.
+
+To run only the payload UI, use the command below.
 
 From the repository root on macOS:
 
