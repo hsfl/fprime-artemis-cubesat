@@ -32,6 +32,11 @@ bool LocalTeensyRouter::beginLocalFrame(const uint8_t* payload, uint16_t length)
   }
 
   const uint8_t operation = payload[LOCAL_HEADER_LEN];
+  if (operation == link_protocol::TEENSY_RF_OP_LINK_STATS && payloadLen == 1U) {
+    prepareLegacyRfStatsResponse(requestId);
+    return true;
+  }
+
   if (operation == link_protocol::TEENSY_RF_OP_STATUS && payloadLen == 1U) {
     prepareRfStatusResponse(requestId);
     return true;
@@ -69,6 +74,23 @@ void LocalTeensyRouter::prepareErrorResponse(uint8_t requestId, uint8_t status) 
   m_rfResponse[2] = status;
   m_rfResponse[3] = 0;
   m_rfResponseLen = LOCAL_HEADER_LEN;
+}
+
+void LocalTeensyRouter::prepareLegacyRfStatsResponse(uint8_t requestId) {
+  const artemis::rf23bp::LinkStats stats = m_rfDriver.linkStats();
+  m_rfResponse[0] = link_protocol::TEENSY_TARGET_RF_STATUS;
+  m_rfResponse[1] = requestId;
+  m_rfResponse[2] = link_protocol::TEENSY_STATUS_OK;
+  m_rfResponse[3] = RF_LEGACY_STATS_PAYLOAD_LEN;
+  m_rfResponse[4] = link_protocol::TEENSY_RF_OP_LINK_STATS;
+  writeLe16(&m_rfResponse[5], static_cast<uint16_t>(stats.last_rssi_dbm));
+  writeLe16(&m_rfResponse[7], stats.rx_good);
+  writeLe16(&m_rfResponse[9], stats.rx_bad);
+  writeLe16(&m_rfResponse[11], stats.tx_good);
+  writeLe32(&m_rfResponse[13], m_counters.rfRxPackets);
+  writeLe32(&m_rfResponse[17], m_counters.rfTxPackets);
+  writeLe32(&m_rfResponse[21], m_counters.rfTxDrops);
+  m_rfResponseLen = LOCAL_HEADER_LEN + RF_LEGACY_STATS_PAYLOAD_LEN;
 }
 
 void LocalTeensyRouter::prepareRfStatusResponse(uint8_t requestId) {

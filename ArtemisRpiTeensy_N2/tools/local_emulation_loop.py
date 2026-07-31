@@ -45,7 +45,8 @@ TEENSY_TARGET_RF_STATUS = 2
 TEENSY_STATUS_OK = 0
 TEENSY_STATUS_BAD_REQUEST = 1
 TEENSY_STATUS_TARGET_ERROR = 4
-TEENSY_RF_OP_STATUS = 1
+TEENSY_RF_OP_LINK_STATS = 1
+TEENSY_RF_OP_STATUS = 3
 TEENSY_RF_OP_SET_ENABLED = 2
 
 RADIO_STATE_OFF = 0
@@ -487,6 +488,11 @@ class RadioRpcEmulator:
         payload[29:33] = int(self.init_attempts & 0xFFFFFFFF).to_bytes(4, "little")
         return bytes(payload)
 
+    def _legacy_stats_payload(self, now: float) -> bytes:
+        payload = bytearray(self._status_payload(now)[:21])
+        payload[0] = TEENSY_RF_OP_LINK_STATS
+        return bytes(payload)
+
     def _set_enabled(self, enabled: bool) -> tuple[bytes, int]:
         requested = 1 if enabled else 0
         if not enabled:
@@ -517,6 +523,8 @@ class RadioRpcEmulator:
         if request[3] != 0 or len(request) != self.LOCAL_HEADER_LEN + payload_len:
             return self._response(request_id, TEENSY_STATUS_BAD_REQUEST)
         payload = request[self.LOCAL_HEADER_LEN :]
+        if payload_len == 1 and payload[0] == TEENSY_RF_OP_LINK_STATS:
+            return self._response(request_id, TEENSY_STATUS_OK, self._legacy_stats_payload(now))
         if payload_len == 1 and payload[0] == TEENSY_RF_OP_STATUS:
             return self._response(request_id, TEENSY_STATUS_OK, self._status_payload(now))
         if payload_len == 2 and payload[0] == TEENSY_RF_OP_SET_ENABLED and payload[1] in (0, 1):

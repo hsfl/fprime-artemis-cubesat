@@ -87,6 +87,25 @@ class RadioRpcEmulatorTests(unittest.TestCase):
         )
         self.assertTrue(radio.ready)
 
+    def test_legacy_link_stats_remain_compatible_with_unmerged_develop(self) -> None:
+        radio = loop.RadioRpcEmulator()
+        response = radio.handle(self.request(6, loop.TEENSY_RF_OP_LINK_STATS), 1.0)
+        self.assertIsNotNone(response)
+        assert response is not None
+        self.assertEqual(
+            response[:5],
+            bytes(
+                [
+                    loop.TEENSY_TARGET_RF_STATUS,
+                    6,
+                    loop.TEENSY_STATUS_OK,
+                    21,
+                    loop.TEENSY_RF_OP_LINK_STATS,
+                ]
+            ),
+        )
+        self.assertEqual(len(response), 25)
+
     def test_init_failure_returns_factual_off_state(self) -> None:
         radio = loop.RadioRpcEmulator(init_failures=1)
         response = radio.handle(self.request(1, loop.TEENSY_RF_OP_SET_ENABLED, 1), 0.0)

@@ -16,11 +16,13 @@ class LocalTeensyRouter : public LocalChannelHandler {
 
  private:
   static constexpr uint8_t LOCAL_HEADER_LEN = 4;
+  static constexpr uint8_t RF_LEGACY_STATS_PAYLOAD_LEN = 21;
   static constexpr uint8_t RF_STATUS_PAYLOAD_LEN = 33;
   static constexpr uint8_t RF_SET_ENABLED_PAYLOAD_LEN = 4;
   static constexpr uint16_t LOCAL_MAX_RESPONSE_LEN = LOCAL_HEADER_LEN + RF_STATUS_PAYLOAD_LEN;
 
   void prepareErrorResponse(uint8_t requestId, uint8_t status);
+  void prepareLegacyRfStatsResponse(uint8_t requestId);
   void prepareRfStatusResponse(uint8_t requestId);
   void prepareRfSetEnabledResponse(uint8_t requestId, bool enabled);
   static void writeLe16(uint8_t* out, uint16_t value);

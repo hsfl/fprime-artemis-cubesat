@@ -51,6 +51,26 @@ class RfNetworkIdentityTests(unittest.TestCase):
         self.assertIn("RF_LOCAL_ADDRESS = 0xA2", satellite)
         self.assertIn("RF_REMOTE_ADDRESS = 0xA1", satellite)
 
+    def test_channel_2_extended_status_preserves_legacy_develop_contract(self) -> None:
+        rpc = self.transport["teensy_rpc"]
+        self.assertEqual(rpc["rf_op_link_stats"], 1)
+        self.assertNotEqual(rpc["rf_op_status"], rpc["rf_op_link_stats"])
+        self.assertNotEqual(rpc["rf_op_set_enabled"], rpc["rf_op_link_stats"])
+
+        router = (
+            REPO_ROOT
+            / "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/local_teensy_router.cpp"
+        ).read_text()
+        header = (
+            REPO_ROOT
+            / "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/local_teensy_router.hpp"
+        ).read_text()
+        self.assertIn("TEENSY_RF_OP_LINK_STATS", router)
+        self.assertIn("prepareLegacyRfStatsResponse(requestId)", router)
+        self.assertIn("RF_LEGACY_STATS_PAYLOAD_LEN = 21", header)
+        self.assertIn("TEENSY_RF_OP_STATUS", router)
+        self.assertIn("RF_STATUS_PAYLOAD_LEN = 33", header)
+
     def test_duplicate_network_ids_are_rejected(self) -> None:
         registry = copy.deepcopy(self.registry)
         registry["networks"]["neutron2"]["id"] = registry["networks"]["epscorc3m"]["id"]

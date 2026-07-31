@@ -12,6 +12,7 @@ This repo is the Neutron 2 team F' integration workspace:
 
 - Neutron 2 now uses RFM23BP `SDN` on Teensy pin 37 for a real radio-context reset.
 - Satellite Teensy boot holds the radio OFF first while pin 36 keeps the Pi enabled, then auto-enables RF for compatibility with the v1 Pi image. Channel-2 target 2 RPCs still provide explicit radio control/status.
+- Channel-2 RF operation `1` retains the 21-byte legacy `neutron2-develop` link-stats response. Extended status uses operation `3`, so the same Teensy firmware works before and after the F Prime radio-control changes are merged.
 - Pi recovery policy retries failed enables after 30 seconds, 120 seconds, then every 15 minutes.
 - Ground Teensy autonomously performs SDN/POR/reinit after terminal local TX faults, without restarting GDS or USB.
 - RF TX completion is bounded at 500 ms. Three consecutive local completion timeouts trigger SDN/POR/reinitialization; the relay does not immediately repeat a high-power TX.

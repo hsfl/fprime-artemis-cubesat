@@ -22,7 +22,7 @@
     "status_timeout": 3,
     "status_target_error": 4,
     "rf_op_link_stats": 1,
-    "rf_op_status": 1,
+    "rf_op_status": 3,
     "rf_op_set_enabled": 2,
     "rf_state_off": 0,
     "rf_state_ready": 1,
