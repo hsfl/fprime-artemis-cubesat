@@ -485,6 +485,21 @@ single command once; do not send a burst of duplicate commands.
 The normal demo operator needs two surfaces: GDS and the payload web app. Start
 both before scheduling a capture.
 
+### One-command laptop operator launcher (preferred)
+
+With only the ground Triple-Serial Teensy connected, run this from the repo
+root:
+
+```bash
+./tools/c3m
+```
+
+It identifies one complete Triple-Serial group and maps the interfaces as GDS,
+debug, and payload. Then it runs the existing payload UI command followed by
+the existing `run_gds_uart.sh` command. Ctrl-C stops those two processes. It is
+laptop-only: it never connects to, restarts, flashes, or otherwise manages the
+satellite/Pi.
+
 ### GDS On Channel 0
 
 On macOS, the ground Teensy is the **Triple Serial** device. Its first serial
