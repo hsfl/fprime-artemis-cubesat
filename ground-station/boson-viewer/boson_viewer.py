@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Decode EPSCoR C3M Lepton F Prime data products."""
+"""Decode and view the standard-FDP Boson 320 raw-count data product."""
 
 from __future__ import annotations
 
@@ -18,14 +18,16 @@ from pathlib import Path
 from typing import Any
 
 
-WIDTH = 160
-HEIGHT = 120
+WIDTH = 320
+HEIGHT = 256
 NUM_PIXELS = WIDTH * HEIGHT
-PIXEL_DATA_OFFSET = 78
-PIXEL_DATA_BYTES = NUM_PIXELS * 2
+PIXEL_BYTES = NUM_PIXELS * 2
 FW_PACKET_DP = 5
-LEPTON_CONTAINER_ID = 0x10027000
-LEPTON_FDP_SIGNATURE = struct.pack(">HI", FW_PACKET_DP, LEPTON_CONTAINER_ID)
+BOSON_CONTAINER_ID = 0x1002A000
+FDP_SIGNATURE = struct.pack(">HI", FW_PACKET_DP, BOSON_CONTAINER_ID)
+# FwSizeStoreType=U32 and Fw.TimeValue uses an 11-byte timeTag. The fixed
+# record's pixels therefore begin at byte 78 in the serialized FDP.
+PIXEL_DATA_OFFSET = 78
 
 
 def read_fdp_container_id(path: Path) -> int | None:
@@ -42,10 +44,10 @@ def read_fdp_container_id(path: Path) -> int | None:
     return container_id if packet_descriptor == FW_PACKET_DP else None
 
 
-def has_lepton_fdp_signature(path: Path) -> bool:
-    """Verify the F Prime DP packet descriptor and Lepton container ID."""
+def has_boson_fdp_signature(path: Path) -> bool:
+    """Verify the standard-FDP packet descriptor and Boson container ID."""
 
-    return read_fdp_container_id(path) == LEPTON_CONTAINER_ID
+    return read_fdp_container_id(path) == BOSON_CONTAINER_ID
 
 
 def find_repo_root(start: Path) -> Path:
@@ -128,7 +130,7 @@ def extract_pixels(decoded: Any) -> list[int]:
 
     pixels = walk(decoded)
     if pixels is None:
-        raise SystemExit(f"no {NUM_PIXELS}-element Lepton pixel array found in decoded data product")
+        raise SystemExit(f"no {NUM_PIXELS}-element Boson pixel array found in decoded data product")
     return pixels
 
 
@@ -166,22 +168,25 @@ def find_captured_at(decoded: Any) -> str | None:
     if found is None:
         return None
     seconds, micros = found
-    timestamp = dt.datetime.fromtimestamp(seconds + micros / 1_000_000, dt.timezone.utc)
-    return timestamp.isoformat()
+    return dt.datetime.fromtimestamp(seconds + micros / 1_000_000, dt.timezone.utc).isoformat()
 
 
-def centikelvin_to_celsius(pixels: list[int]) -> list[float]:
-    return [(pixel / 100.0) - 273.15 for pixel in pixels]
+def _stats(values: list[int | None]) -> tuple[int | None, int | None, float | None]:
+    valid = [value for value in values if value is not None]
+    if not valid:
+        return None, None, None
+    return min(valid), max(valid), statistics.fmean(valid)
 
 
-def write_csv(path: Path, values_c: list[float | None], captured_at: str | None) -> None:
+def write_csv(path: Path, pixels: list[int | None]) -> None:
     with path.open("w", encoding="utf-8") as handle:
-        if captured_at:
-            handle.write(f"# CAPTURED_AT,{captured_at}\n")
+        handle.write("# FORMAT,fprime-fdp\n")
+        handle.write("# UNITS,raw_counts\n")
+        handle.write(f"# WIDTH,{WIDTH}\n")
+        handle.write(f"# HEIGHT,{HEIGHT}\n")
         for row in range(HEIGHT):
             offset = row * WIDTH
-            line = ",".join("NaN" if value is None else f"{value:.2f}" for value in values_c[offset : offset + WIDTH])
-            handle.write(line)
+            handle.write(",".join("NaN" if value is None else str(value) for value in pixels[offset : offset + WIDTH]))
             handle.write("\n")
 
 
@@ -202,68 +207,63 @@ def write_png_chunk(tag: bytes, data: bytes) -> bytes:
     )
 
 
-def write_fallback_png(path: Path, values_c: list[float | None], scale: int = 4) -> None:
-    valid_values = [value for value in values_c if value is not None]
-    if not valid_values:
-        raise ValueError("thermal product contains no valid pixels")
-    min_c = min(valid_values)
-    max_c = max(valid_values)
-    span = max(max_c - min_c, 1.0)
+def write_fallback_png(path: Path, pixels: list[int | None], scale: int = 2) -> None:
+    valid = [value for value in pixels if value is not None]
+    minimum = min(valid) if valid else 0
+    maximum = max(valid) if valid else 1
+    span = max(maximum - minimum, 1)
     rows: list[bytes] = []
     for row in range(HEIGHT):
         out = bytearray()
         offset = row * WIDTH
-        for value in values_c[offset : offset + WIDTH]:
-            color = b"\xff\xff\xff" if value is None else bytes(hot_color((value - min_c) / span))
+        for value in pixels[offset : offset + WIDTH]:
+            color = b"\xff\xff\xff" if value is None else bytes(hot_color((value - minimum) / span))
             out.extend(color * scale)
-        row_bytes = bytes(out)
         for _ in range(scale):
-            rows.append(row_bytes)
+            rows.append(bytes(out))
 
     png_width = WIDTH * scale
     png_height = HEIGHT * scale
     scanlines = b"".join(b"\x00" + row for row in rows)
     ihdr = struct.pack(">IIBBBBB", png_width, png_height, 8, 2, 0, 0, 0)
-    png = (
+    path.write_bytes(
         b"\x89PNG\r\n\x1a\n"
         + write_png_chunk(b"IHDR", ihdr)
         + write_png_chunk(b"IDAT", zlib.compress(scanlines, level=9))
         + write_png_chunk(b"IEND", b"")
     )
-    path.write_bytes(png)
 
 
 def open_image(path: Path) -> None:
     if sys.platform == "darwin":
         subprocess.Popen(["open", str(path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return
-    if os.name == "nt":
+    elif os.name == "nt":
         os.startfile(path)  # type: ignore[attr-defined]
-        return
-    opener = shutil.which("xdg-open") or shutil.which("wslview")
-    if opener:
-        subprocess.Popen([opener, str(path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        opener = shutil.which("xdg-open") or shutil.which("wslview")
+        if opener:
+            subprocess.Popen([opener, str(path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def write_png(path: Path, values_c: list[float | None], title: str, no_show: bool) -> bool:
+def write_png(path: Path, pixels: list[int | None], *, no_show: bool = True) -> None:
     try:
         import matplotlib.pyplot as plt  # type: ignore
     except ImportError:
-        write_fallback_png(path, values_c)
+        write_fallback_png(path, pixels)
         if not no_show:
             open_image(path)
-        return True
+        return
 
     grid = [
-        [float("nan") if value is None else value for value in values_c[row * WIDTH : (row + 1) * WIDTH]]
+        [float("nan") if value is None else value for value in pixels[row * WIDTH : (row + 1) * WIDTH]]
         for row in range(HEIGHT)
     ]
     fig, ax = plt.subplots(figsize=(8, 6))
     cmap = plt.get_cmap("hot").copy()
     cmap.set_bad(color="white")
     image = ax.imshow(grid, cmap=cmap, aspect="equal", interpolation="nearest")
-    fig.colorbar(image, ax=ax, label="Temperature (C)")
-    ax.set_title(title)
+    fig.colorbar(image, ax=ax, label="Raw counts (U16)")
+    ax.set_title("Boson 320 raw counts")
     ax.set_xlabel("Column")
     ax.set_ylabel("Row")
     fig.tight_layout()
@@ -271,7 +271,61 @@ def write_png(path: Path, values_c: list[float | None], title: str, no_show: boo
     if not no_show:
         plt.show()
     plt.close(fig)
-    return True
+
+
+def _write_partial_outputs(
+    outdir: Path,
+    pixels: list[int | None],
+    missing_packet_indices: list[int],
+    *,
+    no_show: bool,
+) -> dict[str, Any]:
+    outdir.mkdir(parents=True, exist_ok=True)
+    out_json = outdir / "payload.json"
+    out_csv = outdir / "payload.csv"
+    out_png = outdir / "payload.png"
+    minimum, maximum, mean = _stats(pixels)
+    payload = {
+        "format": "fdp",
+        "product": "boson",
+        "container_id": BOSON_CONTAINER_ID,
+        "partial": True,
+        "width": WIDTH,
+        "height": HEIGHT,
+        "units": "raw_counts",
+        "pixels_raw_counts": pixels,
+        "unknown_pixels": sum(value is None for value in pixels),
+        "missing_packet_indices": sorted(missing_packet_indices),
+        "min_raw_counts": minimum,
+        "max_raw_counts": maximum,
+        "mean_raw_counts": round(mean, 3) if mean is not None else None,
+    }
+    out_json.write_text(json.dumps(payload, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+    write_csv(out_csv, pixels)
+    write_png(out_png, pixels, no_show=no_show)
+    valid_pixels = sum(value is not None for value in pixels)
+    return {
+        "input": None,
+        "dictionary": None,
+        "json": str(out_json),
+        "csv": str(out_csv),
+        "png": str(out_png),
+        "product": "boson",
+        "format": "fdp",
+        "container_id": BOSON_CONTAINER_ID,
+        "units": "raw_counts",
+        "width": WIDTH,
+        "height": HEIGHT,
+        "pixels": NUM_PIXELS,
+        "valid_pixels": valid_pixels,
+        "missing_pixels": NUM_PIXELS - valid_pixels,
+        "min_raw_counts": minimum,
+        "max_raw_counts": maximum,
+        "mean_raw_counts": round(mean, 3) if mean is not None else None,
+        "received_percent": round(100.0 * valid_pixels / NUM_PIXELS, 3),
+        "partial": True,
+        "missing_packet_indices": sorted(missing_packet_indices),
+    }
 
 
 def decode_partial_product(
@@ -282,142 +336,96 @@ def decode_partial_product(
     *,
     no_show: bool = True,
 ) -> dict[str, Any]:
-    """Decode a positional Lepton FDP with known channel-1 packet gaps.
+    """Decode a positional Boson FDP while marking missing packet bytes unknown."""
 
-    This deliberately bypasses ``fprime-dp`` because the container checksum is
-    invalid. Only the fixed Lepton pixel record is recovered, and any sample
-    whose two source bytes intersect a missing packet is represented as null.
-    """
-
-    blob = bin_file.read_bytes()
-    if not has_lepton_fdp_signature(bin_file):
-        raise ValueError("partial Lepton product does not have the standard Lepton FDP signature")
-    if len(blob) < PIXEL_DATA_OFFSET + PIXEL_DATA_BYTES:
-        raise ValueError(f"partial Lepton product has unsafe size {len(blob)}")
+    if not (1 <= int(packet_data_bytes) <= 255):
+        raise ValueError("packet_data_bytes must be positive")
+    blob = Path(bin_file).read_bytes()
+    if not has_boson_fdp_signature(Path(bin_file)):
+        raise ValueError("partial Boson product does not have the standard Boson FDP signature")
+    if len(blob) < PIXEL_DATA_OFFSET + PIXEL_BYTES:
+        raise ValueError(f"partial Boson product has unsafe size {len(blob)}")
     missing = {int(index) for index in missing_packet_indices}
-    values_c: list[float | None] = []
-    raw_values: list[int | None] = []
+    if any(index < 0 for index in missing):
+        raise ValueError("missing packet indices must be non-negative")
+    pixels: list[int | None] = []
     for pixel_index in range(NUM_PIXELS):
-        byte_offset = PIXEL_DATA_OFFSET + pixel_index * 2
-        source_packets = {byte_offset // packet_data_bytes, (byte_offset + 1) // packet_data_bytes}
+        offset = PIXEL_DATA_OFFSET + pixel_index * 2
+        source_packets = {offset // packet_data_bytes, (offset + 1) // packet_data_bytes}
         if source_packets & missing:
-            raw_values.append(None)
-            values_c.append(None)
-            continue
-        raw = struct.unpack_from(">H", blob, byte_offset)[0]
-        raw_values.append(raw)
-        values_c.append((raw / 100.0) - 273.15)
-
-    valid_values = [value for value in values_c if value is not None]
-    if not valid_values:
-        raise ValueError("partial Lepton product has no recoverable thermal samples")
-
-    outdir.mkdir(parents=True, exist_ok=True)
-    out_json = outdir / "payload.json"
-    out_csv = outdir / "payload.csv"
-    out_png = outdir / "payload.png"
-    out_json.write_text(
-        json.dumps(
-            {
-                "partial": True,
-                "width": WIDTH,
-                "height": HEIGHT,
-                "pixels_centikelvin": raw_values,
-                "missing_packet_indices": sorted(missing),
-            },
-            indent=2,
-            allow_nan=False,
-        )
-        + "\n",
-        encoding="utf-8",
+            pixels.append(None)
+        else:
+            pixels.append(struct.unpack_from(">H", blob, offset)[0])
+    summary = _write_partial_outputs(
+        Path(outdir).resolve(),
+        pixels,
+        sorted(missing),
+        no_show=no_show,
     )
-    write_csv(out_csv, values_c, None)
-    title = (
-        f"Partial thermal product — {len(valid_values)}/{NUM_PIXELS} pixels\n"
-        f"min {min(valid_values):.1f}C  max {max(valid_values):.1f}C  "
-        f"mean {statistics.fmean(valid_values):.1f}C"
-    )
-    write_png(out_png, values_c, title, no_show)
-    return {
-        "input": str(bin_file),
-        "dictionary": None,
-        "json": str(out_json),
-        "csv": str(out_csv),
-        "png": str(out_png),
-        "width": WIDTH,
-        "height": HEIGHT,
-        "pixels": NUM_PIXELS,
-        "valid_pixels": len(valid_values),
-        "missing_pixels": NUM_PIXELS - len(valid_values),
-        "received_percent": round(100.0 * len(valid_values) / NUM_PIXELS, 3),
-        "captured_at": None,
-        "min_c": round(min(valid_values), 2),
-        "max_c": round(max(valid_values), 2),
-        "mean_c": round(statistics.fmean(valid_values), 2),
-        "partial": True,
-    }
+    summary["input"] = str(Path(bin_file).resolve())
+    return summary
 
 
 def decode_product(args: argparse.Namespace) -> dict[str, Any]:
-    bin_file = args.bin_file.resolve()
+    bin_file = Path(args.bin_file).resolve()
     if not bin_file.exists():
-        raise SystemExit(f"file not found: {bin_file}")
-    if not has_lepton_fdp_signature(bin_file):
-        raise SystemExit("input is not a standard Lepton FDP")
+        raise FileNotFoundError(bin_file)
+    if not has_boson_fdp_signature(bin_file):
+        raise SystemExit("input is not a standard Boson FDP")
 
     dictionary = args.dictionary or find_dictionary(Path(__file__).resolve())
     if dictionary is None or not dictionary.exists():
         raise SystemExit("dictionary not found; pass --dictionary <path>")
-
-    outdir = args.outdir.resolve()
+    outdir = Path(args.outdir).resolve()
     outdir.mkdir(parents=True, exist_ok=True)
-    stem = bin_file.stem
-    out_json = outdir / f"{stem}.json"
-    out_csv = outdir / f"{stem}.csv"
-    out_png = outdir / f"{stem}.png"
-
+    out_json = outdir / "payload.json"
     run_fprime_dp_decode(bin_file, dictionary, out_json)
     decoded = json.loads(out_json.read_text(encoding="utf-8"))
-    raw_pixels = extract_pixels(decoded)
-    values_c = centikelvin_to_celsius(raw_pixels)
+    pixels = extract_pixels(decoded)
     captured_at = find_captured_at(decoded)
-
-    write_csv(out_csv, values_c, captured_at)
+    out_csv = outdir / "payload.csv"
+    out_png = outdir / "payload.png"
+    write_csv(out_csv, pixels)
     png_written = False
-    if not args.no_png:
-        title = (
-            f"{stem}\n"
-            f"min {min(values_c):.1f}C  max {max(values_c):.1f}C  mean {statistics.fmean(values_c):.1f}C"
-        )
-        png_written = write_png(out_png, values_c, title, args.no_show)
-
+    if not getattr(args, "no_png", False):
+        write_png(out_png, pixels, no_show=bool(getattr(args, "no_show", True)))
+        png_written = True
+    minimum, maximum, mean = _stats(pixels)
     return {
         "input": str(bin_file),
-        "dictionary": str(dictionary.resolve()),
+        "dictionary": str(Path(dictionary).resolve()),
         "json": str(out_json),
         "csv": str(out_csv),
         "png": str(out_png) if png_written else None,
+        "product": "boson",
+        "format": "fdp",
+        "container_id": BOSON_CONTAINER_ID,
+        "units": "raw_counts",
         "width": WIDTH,
         "height": HEIGHT,
-        "pixels": len(raw_pixels),
+        "pixels": len(pixels),
         "captured_at": captured_at,
-        "min_c": round(min(values_c), 2),
-        "max_c": round(max(values_c), 2),
-        "mean_c": round(statistics.fmean(values_c), 2),
+        "first_raw_counts": pixels[0],
+        "center_raw_counts": pixels[(HEIGHT // 2) * WIDTH + (WIDTH // 2)],
+        "min_raw_counts": minimum,
+        "max_raw_counts": maximum,
+        "mean_raw_counts": round(mean, 2) if mean is not None else None,
     }
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("bin_file", type=Path, help="Path to a Lepton .fdp data product")
+    parser.add_argument("bin_file", type=Path, help="Path to a standard Boson .fdp data product")
     parser.add_argument("--dictionary", type=Path, help="Deployment topology dictionary JSON")
-    parser.add_argument("--outdir", type=Path, default=Path("./data"), help="Output directory")
-    parser.add_argument("--summary", action="store_true", help="Print compact JSON summary to stdout")
+    parser.add_argument("--outdir", type=Path, default=Path("./data"))
     parser.add_argument("--no-png", action="store_true", help="Skip PNG generation")
     parser.add_argument("--no-show", action="store_true", help="Save PNG without opening a window")
+    parser.add_argument("--summary", action="store_true", help="Print compact JSON summary")
     args = parser.parse_args(argv)
-
-    summary = decode_product(args)
+    try:
+        summary = decode_product(args)
+    except (OSError, ValueError) as exc:
+        parser.error(str(exc))
     if args.summary:
         print(json.dumps(summary, indent=2, sort_keys=True))
     else:
@@ -426,11 +434,10 @@ def main(argv: list[str]) -> int:
         if summary["png"]:
             print(f"Wrote PNG : {summary['png']}")
         else:
-            print("PNG skipped: matplotlib unavailable or --no-png was set")
+            print("PNG skipped")
         print(
             f"Frame: {summary['width']}x{summary['height']} "
-            f"{summary['min_c']:.1f}..{summary['max_c']:.1f} C "
-            f"mean {summary['mean_c']:.1f} C"
+            f"{summary['min_raw_counts']}..{summary['max_raw_counts']} raw counts"
         )
     return 0
 

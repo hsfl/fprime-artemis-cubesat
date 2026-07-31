@@ -45,9 +45,17 @@ def find_repo_root(start: Path) -> Path:
 REPO_ROOT = find_repo_root(APP_DIR)
 DEFAULT_DATA_DIR = REPO_ROOT / "data"
 NOMINAL_TRANSFER_TARGET_S = 75.0
-LIVE_DEMO_CUTOFF_S = 120.0
+SERIAL_RECONNECT_TIMEOUT_S = 120.0
 PAYLOAD_RECEIVER_PATH = REPO_ROOT / "ArtemisRpiTeensy_N2" / "tools" / "payload_receiver.py"
 LEPTON_VIEWER_PATH = REPO_ROOT / "ground-station" / "lepton-dp-viewer" / "lepton_dp_viewer.py"
+BOSON_VIEWER_PATH = REPO_ROOT / "ground-station" / "boson-viewer" / "boson_viewer.py"
+FW_PACKET_DP = 5
+LEPTON_CONTAINER_ID = 0x10027000
+BOSON_CONTAINER_ID = 0x1002A000
+PRODUCT_KIND_BY_CONTAINER_ID = {
+    LEPTON_CONTAINER_ID: "lepton",
+    BOSON_CONTAINER_ID: "boson",
+}
 
 
 def load_module(name: str, path: Path) -> ModuleType:
@@ -62,6 +70,11 @@ def load_module(name: str, path: Path) -> ModuleType:
 
 payload_receiver = load_module("c3m_payload_receiver_engine", PAYLOAD_RECEIVER_PATH)
 lepton_viewer = load_module("c3m_lepton_viewer", LEPTON_VIEWER_PATH)
+boson_viewer = load_module("c3m_boson_viewer", BOSON_VIEWER_PATH)
+
+
+class UnknownPayloadProductError(ValueError):
+    """Raised when a valid transfer is not a recognized ground product."""
 
 
 def utc_iso(timestamp_s: float | None = None) -> str:
@@ -199,7 +212,7 @@ def resolve_stable_port(
 def build_channel1_stream(
     blob: bytes,
     *,
-    product_id: int = 314549,
+    product_id: int = 1,
     transfer_id: int = 42,
     expected_crc: int | None = None,
     omit_packet_indices: set[int] | None = None,
@@ -280,6 +293,7 @@ def default_current_state() -> dict[str, Any]:
         "message": "Starting payload receiver",
         "failure_reason": None,
         "product_id": None,
+        "product_kind": None,
         "transfer_id": None,
         "total_bytes": 0,
         "received_bytes": 0,
@@ -333,7 +347,7 @@ class ReceiverController:
         dictionary: Path | None = None,
         decode_fn: Callable[[Path, Path, Path | None], dict[str, Any]] | None = None,
         partial_decode_fn: Callable[[Path, Path, list[int], int], dict[str, Any]] | None = None,
-        transfer_timeout_s: float = LIVE_DEMO_CUTOFF_S,
+        transfer_timeout_s: float | None = None,
         port_rows_fn: Callable[[], list[dict[str, str | bool | None]]] = serial_port_rows,
         serial_factory: Callable[..., object] | None = None,
     ) -> None:
@@ -341,8 +355,8 @@ class ReceiverController:
         self.incoming_dir = self.data_dir / ".incoming"
         self.baud = baud
         self.dictionary = dictionary.resolve() if dictionary is not None else None
-        self.decode_fn = decode_fn or self._decode_lepton
-        self.partial_decode_fn = partial_decode_fn or self._decode_partial_lepton
+        self.decode_fn = decode_fn
+        self.partial_decode_fn = partial_decode_fn
         self.transfer_timeout_s = transfer_timeout_s
         self.port_rows_fn = port_rows_fn
         self.serial_factory = serial_factory
@@ -385,6 +399,52 @@ class ReceiverController:
             packet_data_bytes,
             no_show=True,
         )
+
+    def _decode_boson(self, fdp_path: Path, outdir: Path, dictionary: Path | None) -> dict[str, Any]:
+        namespace = argparse.Namespace(
+            bin_file=fdp_path,
+            dictionary=dictionary,
+            outdir=outdir,
+            no_show=True,
+            no_png=False,
+            summary=False,
+        )
+        return boson_viewer.decode_product(namespace)
+
+    def _decode_partial_boson(
+        self,
+        fdp_path: Path,
+        outdir: Path,
+        missing_packet_indices: list[int],
+        packet_data_bytes: int,
+    ) -> dict[str, Any]:
+        return boson_viewer.decode_partial_product(
+            fdp_path,
+            outdir,
+            missing_packet_indices,
+            packet_data_bytes,
+            no_show=True,
+        )
+
+    def _classify_product(self, source: Path, product_id: int | None) -> str:
+        """Classify only from the verified standard-FDP bytes, never channel metadata."""
+
+        del product_id
+        try:
+            with source.open("rb") as stream:
+                signature = stream.read(struct.calcsize(">HI"))
+        except OSError:
+            return "unknown"
+        if len(signature) != struct.calcsize(">HI"):
+            return "unknown"
+        packet_descriptor, container_id = struct.unpack(">HI", signature)
+        if packet_descriptor != FW_PACKET_DP:
+            return "unknown"
+        return PRODUCT_KIND_BY_CONTAINER_ID.get(container_id, "unknown")
+
+    def _target_suffix(self, product_kind: str) -> str:
+        del product_kind
+        return ".fdp"
 
     def _append_log(self, message: str, timestamp_s: float | None = None, level: str = "info") -> None:
         if not message:
@@ -575,7 +635,7 @@ class ReceiverController:
             stop_requested=stop_event.is_set,
             consume_cancel_requested=consume_cancel_requested,
             transfer_timeout_s=self.transfer_timeout_s,
-            absolute_transfer_timeout_s=30.0 * 60.0,
+            absolute_transfer_timeout_s=None,
             save_partial_on_timeout=True,
             checkpoint_dir=(
                 self.incoming_dir / "active_transfer_checkpoint"
@@ -584,7 +644,7 @@ class ReceiverController:
             ),
             source_identity=source_identity,
             port_resolver=port_resolver,
-            reconnect_timeout_s=self.transfer_timeout_s if port_resolver is not None else 0.0,
+            reconnect_timeout_s=SERIAL_RECONNECT_TIMEOUT_S if port_resolver is not None else 0.0,
             save_partial_on_disconnect=port_resolver is not None,
             retain_checkpoint_after_complete=replay is None,
         )
@@ -665,6 +725,7 @@ class ReceiverController:
                         "actual_crc": None,
                         "crc_ok": None,
                         "run_id": None,
+                        "product_kind": None,
                         "outputs": {},
                         "decode": None,
                         "partial": False,
@@ -834,9 +895,18 @@ class ReceiverController:
         crc_ok = event.get("crc_ok") is True
         run_dir = self._next_run_dir(float(event["timestamp_s"]), event.get("transfer_id"))
         partial = event.get("partial") is True
-        target = run_dir / (
-            "payload.fdp.partial" if partial else ("payload.fdp" if crc_ok else "payload.fdp.badcrc")
+        custom_dispatch = self.decode_fn is not None or self.partial_decode_fn is not None
+        product_kind = "custom" if custom_dispatch else self._classify_product(
+            source,
+            int(event["product_id"]) if event.get("product_id") is not None else None,
         )
+        target_suffix = ".fdp" if custom_dispatch else self._target_suffix(product_kind)
+        target_name = f"payload{target_suffix}"
+        if partial:
+            target_name += ".partial"
+        elif not crc_ok:
+            target_name += ".badcrc"
+        target = run_dir / target_name
         shutil.move(str(source), str(target))
         missing_map_target: Path | None = None
         missing_map_source_value = event.get("missing_map_path")
@@ -851,10 +921,19 @@ class ReceiverController:
                 self.current.update(
                     {
                         "status": "decoding" if (crc_ok or partial) else "verifying",
+                        "product_kind": product_kind,
                         "message": (
-                            "Decoding best-effort thermal product"
-                            if partial
-                            else ("Decoding thermal product" if crc_ok else "CRC failed")
+                            "Decoding best-effort Boson raw-count product"
+                            if partial and product_kind == "boson"
+                            else (
+                                "Decoding best-effort thermal product"
+                                if partial
+                                else (
+                                    "Decoding Boson raw-count product"
+                                    if crc_ok and product_kind == "boson"
+                                    else ("Decoding thermal product" if crc_ok else "CRC failed")
+                                )
+                            )
                         ),
                         "run_id": run_dir.name,
                     }
@@ -865,8 +944,20 @@ class ReceiverController:
         result = "crc_failed"
         if crc_ok:
             try:
-                summary = self.decode_fn(target, run_dir, self.dictionary)
+                if self.decode_fn is not None:
+                    summary = self.decode_fn(target, run_dir, self.dictionary)
+                elif product_kind == "boson":
+                    summary = self._decode_boson(target, run_dir, self.dictionary)
+                elif product_kind == "lepton":
+                    summary = self._decode_lepton(target, run_dir, self.dictionary)
+                else:
+                    raise UnknownPayloadProductError(
+                        f"unknown payload product id={event.get('product_id')}; archived as {target.name}"
+                    )
                 result = "complete"
+            except UnknownPayloadProductError as exc:
+                failure_reason = str(exc)
+                result = "unknown_product"
             except SystemExit as exc:
                 failure_reason = f"decoder exited with status {exc.code}"
                 result = "decode_failed"
@@ -875,13 +966,35 @@ class ReceiverController:
                 result = "decode_failed"
         elif partial:
             try:
-                summary = self.partial_decode_fn(
-                    target,
-                    run_dir,
-                    list(event.get("missing_packet_indices") or []),
-                    int(event.get("packet_data_bytes") or payload_receiver.DATA_BYTES),
-                )
+                if self.partial_decode_fn is not None:
+                    summary = self.partial_decode_fn(
+                        target,
+                        run_dir,
+                        list(event.get("missing_packet_indices") or []),
+                        int(event.get("packet_data_bytes") or payload_receiver.DATA_BYTES),
+                    )
+                elif product_kind == "boson":
+                    summary = self._decode_partial_boson(
+                        target,
+                        run_dir,
+                        list(event.get("missing_packet_indices") or []),
+                        int(event.get("packet_data_bytes") or payload_receiver.DATA_BYTES),
+                    )
+                elif product_kind == "lepton":
+                    summary = self._decode_partial_lepton(
+                        target,
+                        run_dir,
+                        list(event.get("missing_packet_indices") or []),
+                        int(event.get("packet_data_bytes") or payload_receiver.DATA_BYTES),
+                    )
+                else:
+                    raise UnknownPayloadProductError(
+                        f"unknown payload product id={event.get('product_id')}; archived as {target.name}"
+                    )
                 result = "partial"
+            except UnknownPayloadProductError as exc:
+                failure_reason = str(exc)
+                result = "unknown_product"
             except Exception as exc:
                 failure_reason = str(exc)
                 result = "partial_decode_failed"
@@ -911,6 +1024,7 @@ class ReceiverController:
             "serial_port": event.get("port"),
             "baud": self.baud,
             "product_id": event.get("product_id"),
+            "product_kind": product_kind,
             "transfer_id": event.get("transfer_id"),
             "total_bytes": event.get("total_bytes"),
             "received_bytes": event.get("received_bytes"),
@@ -949,6 +1063,8 @@ class ReceiverController:
                 )
             elif result == "crc_failed":
                 message = "CRC failed"
+            elif result == "unknown_product":
+                message = "Unknown payload product archived"
             else:
                 message = "Payload received — decode failed"
             self.current.update(
@@ -1031,9 +1147,7 @@ class ReceiverController:
                 current["estimated_remaining_seconds"] = round((total - received) / rate, 1) if rate > 0 else None
             else:
                 current["estimated_remaining_seconds"] = None
-            if elapsed >= LIVE_DEMO_CUTOFF_S:
-                current["timing_band"] = "delayed"
-            elif elapsed > NOMINAL_TRANSFER_TARGET_S:
+            if elapsed > NOMINAL_TRANSFER_TARGET_S:
                 current["timing_band"] = "degraded"
             else:
                 current["timing_band"] = "nominal"
@@ -1209,8 +1323,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--transfer-timeout",
         type=float,
-        default=LIVE_DEMO_CUTOFF_S,
-        help="Seconds before finalizing an incomplete transfer as best-effort partial data",
+        default=None,
+        help="Optional stall timeout before saving an incomplete transfer; disabled by default",
     )
     return parser
 

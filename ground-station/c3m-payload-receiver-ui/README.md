@@ -61,13 +61,13 @@ python3 ground-station/c3m-payload-receiver-ui/c3m_payload_receiver_ui.py \
   --no-open
 ```
 
-Normal operation keeps the preferred CRC-verified path. The operator timing
-bands are nominal at `75 s` or less, longer than target around `90 s`, and a
-`120 s` cutoff. If repair is still incomplete at the default 120-second cutoff,
-the app saves a positional
-`.fdp.partial`, labels it partial, renders pixels touched by missing packets as
-white/`NaN`, and records the missing packet map and timeout reason in
-`run.json`. Hovering over white pixels reports `No data`.
+Normal operation keeps the preferred CRC-verified path. Transfers have no
+automatic time cutoff: the receiver continues until CRC-verified completion or
+the operator stops it. The `--transfer-timeout` option remains available for
+focused tests or explicitly bounded operations. When that option expires, the
+app saves a positional `.fdp.partial`, labels it partial, renders pixels touched
+by missing packets as white/`NaN`, and records the missing packet map and
+timeout reason in `run.json`. Hovering over white pixels reports `No data`.
 
 During an active transfer, **Stop & save partial** ends ground-side reception
 immediately and runs that same position-preserving partial-save path. It does

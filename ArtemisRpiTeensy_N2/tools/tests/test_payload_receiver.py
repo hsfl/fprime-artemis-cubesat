@@ -119,6 +119,30 @@ class PayloadReceiverTests(unittest.TestCase):
         self.assertEqual(receiver.reconstruct(), blob)
         self.assertEqual(serial.writes, [])
 
+    def test_reconstructs_full_boson_fdp_with_single_transport_cache(self) -> None:
+        blob = bytes((index * 17 + 3) & 0xFF for index in range(163_922))
+        transfer_id = 10
+        receiver = payload_receiver.PayloadReceiver(
+            "unused", 115200, pathlib.Path("/tmp/boson.fdp"), 1.0
+        )
+        receiver.handle_header(make_header(917, transfer_id, blob))
+
+        with mock.patch("builtins.print"):
+            for packet_index in range(receiver.total_packets):
+                start = packet_index * payload_receiver.DATA_BYTES
+                chunk = blob[start : start + payload_receiver.DATA_BYTES]
+                receiver.handle_data(make_data(transfer_id, packet_index, chunk))
+
+        self.assertEqual(receiver.total_bytes, 163_922)
+        self.assertEqual(receiver.total_packets, 4_684)
+        self.assertEqual(len(receiver.packets[4_683]), 17)
+        self.assertTrue(receiver.complete)
+        self.assertEqual(receiver.reconstruct(), blob)
+        self.assertEqual(
+            payload_receiver.crc16_ccitt(receiver.reconstruct()),
+            payload_receiver.crc16_ccitt(blob),
+        )
+
     def test_preserves_split_magic_prefix_across_serial_reads(self) -> None:
         receiver = payload_receiver.PayloadReceiver("unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0)
         header = make_header(42, 9, b"payload")

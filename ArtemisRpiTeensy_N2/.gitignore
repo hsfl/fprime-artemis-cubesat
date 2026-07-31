@@ -3,6 +3,7 @@ logs/
 cmake-build-*
 build-artifacts/
 build-fprime-*
+build-c3m-local/
 DpCat/
 releases/
 *-template

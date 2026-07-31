@@ -128,10 +128,10 @@ def receiver_event(
 
 
 class C3mPayloadReceiverUiTests(unittest.TestCase):
-    def test_timing_targets_use_75_90_120_second_operator_bands(self) -> None:
+    def test_timing_target_has_no_automatic_cutoff(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             controller = ui.ReceiverController(pathlib.Path(tmp))
-            self.assertEqual(controller.transfer_timeout_s, 120.0)
+            self.assertIsNone(controller.transfer_timeout_s)
             controller.current.update(
                 {
                     "status": "receiving",
@@ -145,7 +145,8 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
                 (75.1, "degraded"),
                 (90.0, "degraded"),
                 (119.9, "degraded"),
-                (120.0, "delayed"),
+                (120.0, "degraded"),
+                (1800.0, "degraded"),
             ):
                 with self.subTest(elapsed=elapsed), mock.patch.object(
                     ui.time, "time", return_value=1000.0 + elapsed
@@ -157,9 +158,9 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
         app_js = APP_JS_PATH.read_text(encoding="utf-8")
         index_html = INDEX_PATH.read_text(encoding="utf-8")
         self.assertIn("Past the 75 s nominal target", app_js)
-        self.assertIn("Longer than target", app_js)
-        self.assertIn("120 s cutoff reached", app_js)
-        self.assertIn("nominal ≤75 s · longer at 90 s · cutoff 120 s", index_html)
+        self.assertIn("reception will continue until complete or manually stopped", app_js)
+        self.assertNotIn("120 s cutoff reached", app_js)
+        self.assertIn("nominal ≤75 s · no automatic transfer cutoff", index_html)
 
     def test_ready_after_complete_preserves_terminal_state_until_new_transfer(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
