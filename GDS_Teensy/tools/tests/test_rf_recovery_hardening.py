@@ -144,15 +144,19 @@ int main() {
             "serviceRecovery",
             "failSafeOffLocalTx",
             "consumeFaultSnapshot",
+            "consumeTxTimeoutRecoveryRequest",
             "recoveryBackoffMs",
         ):
             self.assertIn(contract, driver_header)
         self.assertIn("return isReady() && m_radio.available();", driver)
         self.assertGreaterEqual(driver.count("if (!isReady())"), 2)
 
-        terminal = relay.index("if (outcome.terminalFailure)")
-        terminal_end = relay.index("return outcome.sent", terminal)
-        self.assertIn("m_rf.failSafeOffLocalTx();", relay[terminal:terminal_end])
+        send_start = relay.index("bool RelayUartRf::sendRfPacket(")
+        send_end = relay.index("bool RelayUartRf::sendRfPacketWithAck", send_start)
+        send = relay[send_start:send_end]
+        self.assertEqual(send.count("m_rf.send(packet, packetLen)"), 1)
+        self.assertIn("m_rf.consumeTxTimeoutRecoveryRequest()", send)
+        self.assertNotIn("m_rf.failSafeOffLocalTx();", send)
 
         poll_start = relay.index("void RelayUartRf::poll()")
         poll_end = relay.index("void RelayUartRf::processUartByte", poll_start)

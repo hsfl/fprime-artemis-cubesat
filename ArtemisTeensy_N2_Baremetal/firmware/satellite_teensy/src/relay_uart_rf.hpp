@@ -83,6 +83,7 @@ class RelayUartRf {
   void serviceDownlinkQueue();
 
   static constexpr uint8_t MAX_QUEUE_DEPTH = 32;
+  static constexpr uint32_t RX_TURNAROUND_DWELL_MS = 50U;
 
   struct QueueEntry {
     uint8_t channel;
@@ -136,6 +137,7 @@ class RelayUartRf {
   uint8_t m_uplinkHead;
   uint8_t m_uplinkTail;
   uint8_t m_uplinkCount;
+  uint32_t m_lastNormalTxCompleteMs;
 
   QueueEntry m_downlinkQueue[MAX_QUEUE_DEPTH];
   uint8_t m_downlinkHead;

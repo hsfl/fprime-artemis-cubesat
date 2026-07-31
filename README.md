@@ -196,12 +196,13 @@ the proven demo snapshot.
 
 The 2026-07-06 hardening sprint addressed the laptop-verifiable operational
 gaps without changing the frozen release baseline: scheduling/cancel edge
-cases, topology de-forking, watchdog/restart prep, drift checks, parameter
-persistence, FPP ops hygiene, Pi provisioning docs, and stale-doc cleanup.
-Remaining follow-up should focus on target/bench proof: ARMv6 cross-build
-verification of the hardened code, HIL RF smoke on the unified topology, WDT
-trip testing, Pi service migration, `PRM_SAVE` round-trip behavior, and
-PDU/payload hardware integration.
+cases, topology de-forking, restart prep, drift checks, parameter persistence,
+FPP ops hygiene, Pi provisioning docs, and stale-doc cleanup. The 2026-07-30
+RF HIL follow-up superseded whole-MCU Teensy watchdog arming with bounded RF
+operations and explicit SDN radio recovery. Remaining follow-up should focus
+on ARMv6 cross-build verification, RF power-integrity/SPI bench measurements,
+Pi service migration, `PRM_SAVE` round-trip behavior, and PDU/payload hardware
+integration.
 
 ## F Prime Version
 

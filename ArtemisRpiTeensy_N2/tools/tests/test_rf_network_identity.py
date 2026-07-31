@@ -243,15 +243,16 @@ int main() {{
         self.assertGreaterEqual(relay.count("if (!m_rf.isReady())"), 2)
         self.assertIn("discardRadioWorkOnOff", relay)
         self.assertIn("resetReassembly(channel, false, partialMessage)", relay)
-        self.assertIn("m_rf.failSafeOffLocalTx();", relay)
+        self.assertIn("consumeTxTimeoutRecoveryRequest", relay)
+        self.assertIn("failSafeOffLocalTx();", driver)
         self.assertIn("TEENSY_STATUS_TARGET_ERROR", router)
         self.assertIn("m_fault == link_protocol::TEENSY_RF_FAULT_LOCAL_TX", driver)
         self.assertIn("isReady() && m_fault == link_protocol::TEENSY_RF_FAULT_NONE", driver)
         self.assertIn("m_rssiValid = false;", driver)
-        self.assertNotIn("g_rfDriver.begin();", sketch)
+        self.assertIn("const bool radioOk = g_rfDriver.begin();", sketch)
         self.assertIn("RADIO_SDN_PIN = 37", sketch)
         self.assertLess(
-            sketch.index("g_rfDriver.beginSafeOff(watchdogReset)"),
+            sketch.index("g_rfDriver.beginSafeOff()"),
             sketch.index("digitalWrite(RPI_ENABLE_PIN, HIGH)"),
         )
         self.assertLess(

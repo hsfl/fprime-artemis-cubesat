@@ -5,7 +5,6 @@
 #include "src/pdu_proxy.hpp"
 #include "src/relay_uart_rf.hpp"
 #include "src/rf23_driver.hpp"
-#include "src/wdt_guard.hpp"
 
 // Teensy 4.1 + RF23BP pinout from EPSCOR demo baseline.
 static constexpr int RADIO_CS = 38;
@@ -167,21 +166,13 @@ void debugPrintCounters(const char* prefix) {
 }
 
 void setup() {
-  const bool watchdogReset = wdt_guard::consumeWatchdogResetFlag();
-
   // Put the RFM23BP into hardware shutdown before any potentially slow boot work.
-  // This also guarantees that a Teensy watchdog reset resets the radio context.
-  g_rfDriver.beginSafeOff(watchdogReset);
+  g_rfDriver.beginSafeOff();
   pinMode(RPI_ENABLE_PIN, OUTPUT);
   digitalWrite(RPI_ENABLE_PIN, HIGH);
   pinMode(TEENSY_LED_PIN, OUTPUT);
   digitalWrite(TEENSY_LED_PIN, HIGH);
   Serial.begin(DEBUG_UART_BAUD);
-  if (watchdogReset) {
-    Serial.println("[ArtemisTeensy] watchdog reset detected");
-  }
-  wdt_guard::begin();
-  Serial.println("[ArtemisTeensy] hardware watchdog armed (12s)");
   Serial.println("[ArtemisTeensy] RPI power enable asserted (pin 36 HIGH)");
   Serial.println("[ArtemisTeensy] LED asserted (pin 13 HIGH)");
   Serial.println("[ArtemisTeensy] RFM23BP held OFF with SDN HIGH (pin 37)");
@@ -189,9 +180,15 @@ void setup() {
   Serial2.addMemoryForRead(g_rpiUartRxBuffer, sizeof(g_rpiUartRxBuffer));
   Serial2.begin(UART_BAUD);
   g_pduProxy.begin(PDU_UART_BAUD);
+  const bool radioOk = g_rfDriver.begin();
   g_relay.begin();
 
-  Serial.println("[ArtemisTeensy] Relay/channel 2 ready; F Prime owns radio enable policy");
+  if (radioOk) {
+    Serial.println("[ArtemisTeensy] RF23 bridge ready; radio auto-enabled for v1 Pi compatibility");
+  } else {
+    Serial.println("[ArtemisTeensy] RF23 init failed; relay running with radio OFF");
+  }
+  Serial.println("[ArtemisTeensy] Relay/channel 2 ready");
   debugPrintCounters("[ArtemisTeensy] counters");
 }
 
@@ -199,7 +196,6 @@ void loop() {
   static uint32_t lastDebugStatusMs = 0;
 
   g_relay.poll();
-  wdt_guard::feed();
 
   const uint32_t now = millis();
   updateRadioTrafficLed(now);

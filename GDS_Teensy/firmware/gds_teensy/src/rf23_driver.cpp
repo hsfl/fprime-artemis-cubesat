@@ -19,6 +19,8 @@ Rf23Driver::Rf23Driver(int csPin,
       m_initFailures(0),
       m_sdnRecoveries(0),
       m_recoveringLocalTx(false),
+      m_consecutiveTxTimeouts(0),
+      m_txTimeoutRecoveryRequested(false),
       m_recoverySchedule{},
       m_faultSnapshot{},
       m_faultSnapshotPending(false) {
@@ -32,6 +34,8 @@ Rf23Driver::Rf23Driver(int csPin,
 void Rf23Driver::beginSafeOff() {
   m_recoverySchedule.succeeded();
   m_recoveringLocalTx = false;
+  m_consecutiveTxTimeouts = 0;
+  m_txTimeoutRecoveryRequested = false;
   enterOff(Rf23Fault::NONE);
 }
 
@@ -73,6 +77,10 @@ bool Rf23Driver::serviceRecovery() {
 void Rf23Driver::failSafeOffLocalTx() {
   if (!isReady() && m_recoveringLocalTx) {
     return;
+  }
+  if (isReady()) {
+    m_radio.setModeIdle();
+    delay(1);
   }
   m_recoveringLocalTx = true;
   enterOff(Rf23Fault::LOCAL_TX);
@@ -136,6 +144,12 @@ bool Rf23Driver::consumeFaultSnapshot(artemis::rf23bp::FaultSnapshot& snapshot) 
   return true;
 }
 
+bool Rf23Driver::consumeTxTimeoutRecoveryRequest() {
+  const bool requested = m_txTimeoutRecoveryRequested;
+  m_txTimeoutRecoveryRequested = false;
+  return requested;
+}
+
 bool Rf23Driver::available() {
   return isReady() && m_radio.available();
 }
@@ -149,6 +163,22 @@ Rf23ReceiveResult Rf23Driver::recv(uint8_t* buf, uint8_t* len) {
   }
   const link_protocol::RfHeaderStatus status = link_protocol::classifyRfHeader(
       m_radio.headerTo(), m_radio.headerFrom(), m_radio.headerId(), m_radio.headerFlags());
+  if (status != link_protocol::RfHeaderStatus::ACCEPT) {
+    static uint32_t lastRejectDiagnosticMs = 0;
+    const uint32_t nowMs = millis();
+    if ((nowMs - lastRejectDiagnosticMs) >= 1000U) {
+      SerialUSB1.printf(
+          "[GDS_Teensy] RF_REJECT status=%u to=%02X from=%02X network=%02X version=%02X len=%u rssi_dbm=%d\n",
+          static_cast<unsigned int>(status),
+          static_cast<unsigned int>(m_radio.headerTo()),
+          static_cast<unsigned int>(m_radio.headerFrom()),
+          static_cast<unsigned int>(m_radio.headerId()),
+          static_cast<unsigned int>(m_radio.headerFlags()),
+          static_cast<unsigned int>(*len),
+          static_cast<int>(m_radio.lastRssi()));
+      lastRejectDiagnosticMs = nowMs;
+    }
+  }
   switch (status) {
     case link_protocol::RfHeaderStatus::ACCEPT:
       return Rf23ReceiveResult::ACCEPTED;
@@ -182,11 +212,21 @@ Rf23SendResult Rf23Driver::send(const uint8_t* data, uint8_t len) {
     m_faultSnapshotPending = true;
   }
   if (result == Rf23SendResult::SENT) {
+    m_consecutiveTxTimeouts = 0;
     if (m_fault == Rf23Fault::LOCAL_TX) {
       m_fault = Rf23Fault::NONE;
     }
   } else {
     m_fault = Rf23Fault::LOCAL_TX;
+    if (result == Rf23SendResult::TX_TIMEOUT) {
+      static constexpr uint8_t TX_TIMEOUTS_BEFORE_RECOVERY = 3;
+      m_consecutiveTxTimeouts += 1U;
+      if (m_consecutiveTxTimeouts >= TX_TIMEOUTS_BEFORE_RECOVERY) {
+        m_consecutiveTxTimeouts = 0;
+        m_txTimeoutRecoveryRequested = true;
+        failSafeOffLocalTx();
+      }
+    }
   }
   return result;
 }

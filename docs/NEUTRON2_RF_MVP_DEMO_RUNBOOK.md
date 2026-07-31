@@ -61,13 +61,13 @@ this wiring before the demo:
 | 38 / 40 | RFM23BP CS / IRQ | unchanged |
 | 30 / 31 | RF front-end RX / TX control | unchanged |
 
-On every satellite Teensy boot, including a watchdog reboot, pin 37 is asserted
-HIGH before the Pi enable and UART initialization path. F Prime then queries
-channel 2 and enables the radio. A repeated 500 ms TX-completion failure also
-asserts SDN; F Prime retries after 30 seconds, 120 seconds, and then every 15
-minutes. The ground Teensy independently performs SDN recovery with bounded
-1-second, 5-second, and 30-second initialization backoff, without requiring a
-GDS or USB restart.
+On every satellite Teensy boot, pin 37 is asserted HIGH before the Pi enable
+and UART initialization path. The satellite then auto-enables RF for
+compatibility with the v1 Pi image; F Prime can still query or control it over
+channel 2. Three consecutive 500 ms local TX-completion failures assert SDN and
+reinitialize the radio. The ground Teensy independently performs SDN recovery
+with bounded 1-second, 5-second, and 30-second initialization backoff, without
+requiring a GDS or USB restart.
 
 SDN does not remove the radio board's power rail. If the failure persists, test
 28 dBm versus 30 dBm, scope RFM23BP VCC during TX, inspect SPI/nIRQ/SDN with a
@@ -643,13 +643,14 @@ Unexpected sequence count received. Packets may have been dropped.
 That means the RF/GDS stream is lossy, not necessarily dead. Confirm the command
 or event reached the Pi before retrying.
 
-Teensy watchdog boot lines are visible on bench serial logs:
+The RF relay sketches intentionally do not arm the whole-MCU watchdog. Expect
+bounded TX timeout logs followed by SDN recovery instead. This preserves USB
+debug output and distinguishes a local radio/SPI/PA fault from a Teensy reset.
 
-- `[ArtemisTeensy] hardware watchdog armed (12s)` or
-  `[GDS_Teensy] hardware watchdog armed (12s)` is normal boot arming.
-- `[ArtemisTeensy] watchdog reset detected` or
-  `[GDS_Teensy] watchdog reset detected` means the previous reset was caused by
-  the hardware watchdog.
+Repeated `RF_REJECT ... network=C3` lines identify a different network on the
+same 433 MHz channel. Power down that transmitter for a clean Neutron 2 test;
+network rejection protects payload integrity but does not prevent airtime
+contention.
 
 ## Fast Troubleshooting
 

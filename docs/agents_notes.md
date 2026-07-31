@@ -8,17 +8,20 @@ This repo is the Neutron 2 team F' integration workspace:
 - Channel 0 is the normal F Prime/GDS CCSDS stream, channel 1 is payload/science packets, and channel 2 is satellite-Teensy-local subsystem RPC.
 - Ground Teensy reassembles RF channel 0 to the laptop GDS USB serial stream and RF channel 1 to payload USB when triple-serial mode is enabled.
 
-## RF Reliability Hardening (2026-07-17)
+## RF HIL Follow-up (2026-07-30)
 
 - Neutron 2 now uses RFM23BP `SDN` on Teensy pin 37 for a real radio-context reset.
-- Satellite Teensy boot and watchdog reboot hold the radio OFF first while pin 36 keeps the Pi enabled.
-- F Prime owns satellite radio enable/status through channel-2 target 2 RPCs.
+- Satellite Teensy boot holds the radio OFF first while pin 36 keeps the Pi enabled, then auto-enables RF for compatibility with the v1 Pi image. Channel-2 target 2 RPCs still provide explicit radio control/status.
 - Pi recovery policy retries failed enables after 30 seconds, 120 seconds, then every 15 minutes.
 - Ground Teensy autonomously performs SDN/POR/reinit after terminal local TX faults, without restarting GDS or USB.
-- RF TX completion is bounded at 500 ms, followed by one FIFO/RX recovery retry; a second failure forces SDN shutdown.
+- RF TX completion is bounded at 500 ms. Three consecutive local completion timeouts trigger SDN/POR/reinitialization; the relay does not immediately repeat a high-power TX.
+- The satellite leaves a 50 ms receive dwell after each normal downlink message so sustained Pi telemetry cannot starve command uplink on the half-duplex radio.
+- Hardware watchdog arming was removed from both relay sketches. Bounded radio operations and explicit SDN recovery keep USB/debug state observable instead of resetting the entire Teensy during RF diagnosis.
 - Neutron 2 retains ACK/retry behavior on channel 0 and channel 1 in both directions.
 - RF RadioHead headers now enforce the Neutron 2 network ID (`0xD2`), ground/satellite addresses, and protocol version before forwarding.
 - Message IDs advance independently per channel and completed-message retries are re-ACKed without duplicate delivery.
+- The 2026-07-30 bench smoke delivered `missionApp.PING(7502)` end to end and decoded `MissionApp pong token=7502 count=2` with a matching current dictionary.
+- A separate C3 transmitter was present on 433 MHz at about -56 to -62 dBm (`network=C3`, `from=A2`, `to=A1`). A 434 MHz diagnostic eliminated those rejects, but satellite local TX-completion wedges persisted, so the co-channel transmitter is real interference but not the sole fault.
 - `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md` contains the wiring gate, startup telemetry sequence, recovery expectations, and residual electrical checks.
 
 ## Demo Target Snapshot (2026-04-07)
@@ -1013,26 +1016,25 @@ Still open (not demo-blocking):
   durable default changes use `PRM_SET` then `PRM_SAVE`.
 - FPP ops pass landed: selected events have throttles, many stable channels use
   `update on change`, and comms RSSI channels have low warning limits.
-- Both Teensy bridge sketches now arm a 12 s hardware watchdog, feed it through
-  normal relay paths, and print boot lines for normal arming or WDT-caused
-  reset detection.
+- The July 6 watchdog work was superseded by the July 30 RF HIL follow-up:
+  both relay sketches now rely on bounded RF operations and SDN recovery
+  without arming the whole-MCU watchdog.
 - `tools/validate_local.sh` now includes a shared Teensy drift guard before
-  build/cache work, including the shared watchdog helper.
+  build/cache work for the byte-identical RF helper copies.
 - Pi provisioning was versioned under `deploy/pi/` with
   `artemis-fprime.service`, `Restart=always`, release-symlink layout guidance,
   and `ln.service` migration notes.
 - Operator docs were updated for cancel behavior, command bounds, parameter
-  persistence, `PrmDb.dat` runtime-location caveat, watchdog boot logs, and the
+  persistence, `PrmDb.dat` runtime-location caveat, and the
   moved downlink-reliability research doc.
 - Validation evidence: final orchestrator-run `./tools/validate_local.sh`
   passed end-to-end on the unified topology, including drift checks, generated
   transport checks, Python tests, F Prime build, 6/6 component UT executables,
   and the automated local demo CSV path.
 - Validation evidence: both Arduino CLI builds passed for satellite and ground
-  Teensy firmware after watchdog changes.
+  Teensy firmware after the July 30 RF recovery/turnaround changes.
 - Still open for the next bench/target session: ARMv6 cross-build verification
-  of the hardened code, HIL RF smoke on the unified topology, deliberate WDT
-  trip test, live `ln` to `artemis-fprime.service` migration, and `PRM_SAVE`
+  of the hardened code, live `ln` to `artemis-fprime.service` migration, and `PRM_SAVE`
   round-trip on the Pi filesystem/release-symlink layout.
 
 ## Native App-Man-Drv rename (2026-07-06)

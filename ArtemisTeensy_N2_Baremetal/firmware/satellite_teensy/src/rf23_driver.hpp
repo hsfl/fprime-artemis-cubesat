@@ -19,7 +19,7 @@ class Rf23Driver {
  public:
   Rf23Driver(int csPin, int irqPin, uint8_t rxOnPin, uint8_t txOnPin, uint8_t sdnPin);
 
-  void beginSafeOff(bool watchdogReset);
+  void beginSafeOff();
   bool begin();
   bool setEnabled(bool enabled);
   void failSafeOffLocalTx();
@@ -31,6 +31,8 @@ class Rf23Driver {
   bool rssiValid() const;
   int16_t lastAcceptedRssiDbm() const;
   uint32_t lastAcceptedRssiAgeMs() const;
+  bool consumeTxTimeoutRecoveryRequest();
+  bool receiveInProgress();
   bool available();
   Rf23ReceiveResult recv(uint8_t* buf, uint8_t* len);
   Rf23SendResult send(const uint8_t* data, uint8_t len);
@@ -51,6 +53,8 @@ class Rf23Driver {
   uint8_t m_fault;
   uint8_t m_bootFlags;
   uint32_t m_initAttempts;
+  uint8_t m_consecutiveTxTimeouts;
+  bool m_txTimeoutRecoveryRequested;
   bool m_rssiValid;
   int16_t m_lastAcceptedRssiDbm;
   uint32_t m_lastAcceptedRssiMs;

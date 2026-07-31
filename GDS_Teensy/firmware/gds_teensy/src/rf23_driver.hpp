@@ -50,6 +50,7 @@ class Rf23Driver {
   bool recoveryPending() const;
   uint32_t recoveryBackoffMs() const;
   bool consumeFaultSnapshot(artemis::rf23bp::FaultSnapshot& snapshot);
+  bool consumeTxTimeoutRecoveryRequest();
   bool available();
   Rf23ReceiveResult recv(uint8_t* buf, uint8_t* len);
   Rf23SendResult send(const uint8_t* data, uint8_t len);
@@ -71,6 +72,8 @@ class Rf23Driver {
   uint32_t m_initFailures;
   uint32_t m_sdnRecoveries;
   bool m_recoveringLocalTx;
+  uint8_t m_consecutiveTxTimeouts;
+  bool m_txTimeoutRecoveryRequested;
   rf_recovery::Schedule m_recoverySchedule;
   artemis::rf23bp::FaultSnapshot m_faultSnapshot;
   bool m_faultSnapshotPending;

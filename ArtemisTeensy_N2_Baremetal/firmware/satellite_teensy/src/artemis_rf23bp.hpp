@@ -128,6 +128,22 @@ class BoundedRf22 : public RH_RF22 {
   BoundedRf22(uint8_t slave_select_pin, uint8_t interrupt_pin, RHGenericSPI& spi)
       : RH_RF22(slave_select_pin, interrupt_pin, spi) {}
 
+  void restartReceiveClean() {
+    setModeIdle();
+    resetRxFifo();
+    (void)spiRead(RH_RF22_REG_03_INTERRUPT_STATUS1);
+    (void)spiRead(RH_RF22_REG_04_INTERRUPT_STATUS2);
+    clearRxBuf();
+    setModeRx();
+  }
+
+  bool receiveInProgress(uint32_t now_ms) {
+    static constexpr uint32_t RX_PACKET_GUARD_MS = 6U;
+    const uint32_t last_preamble_ms = getLastPreambleTime();
+    return mode() == RHModeRx && last_preamble_ms != 0U &&
+           (now_ms - last_preamble_ms) < RX_PACKET_GUARD_MS;
+  }
+
   bool initBounded(uint16_t chip_ready_timeout_ms) {
     if (chip_ready_timeout_ms == 0 || !RHSPIDriver::init()) {
       return false;
@@ -198,13 +214,21 @@ class BoundedRf22 : public RH_RF22 {
     uint8_t sync_words[] = {0x2d, 0xd4};
     setSyncWords(sync_words, sizeof(sync_words));
     setPromiscuous(false);
-    setFrequency(434.0f, 0.05f);
+    setFrequency(433.0f, 0.05f);
     setModemConfig(FSK_Rb2_4Fd36);
     setGpioReversed(false);
     setTxPower(RH_RF22_TXPOW_8DBM);
     return true;
   }
 };
+
+inline void enterReceiveMode(RH_RF22& radio) {
+  radio.setModeRx();
+}
+
+inline void enterReceiveMode(BoundedRf22& radio) {
+  radio.restartReceiveClean();
+}
 
 // Configure Teensy SPI1 pin mux and start the bus.
 inline void setupSpi1(const Spi1Pins& pins) {
@@ -342,7 +366,7 @@ inline bool initRadio(RadioT& radio, const RadioPins& pins = RadioPins(),
   setupAmpPins(pins, profile);
   if (profile.start_in_receive) {
     setAmpReceive(pins, profile);
-    radio.setModeRx();
+    enterReceiveMode(radio);
   } else {
     setAmpIdle(pins);
     radio.setModeIdle();
@@ -385,7 +409,8 @@ inline void captureFirstFaultSnapshot(RH_RF22& radio, const RadioPins& pins,
 
 // Recover the radio after a terminal TX wait timeout. Always return to RX so
 // the peer can re-establish the link after the local transmit path wedges.
-inline void recoverTransmitPath(RH_RF22& radio, const RadioPins& pins,
+template <typename RadioT>
+inline void recoverTransmitPath(RadioT& radio, const RadioPins& pins,
                                 const RadioProfile& profile) {
   radio.setModeIdle();
   const uint8_t op_mode2 = radio.spiRead(RH_RF22_REG_08_OPERATING_MODE2);
@@ -395,11 +420,12 @@ inline void recoverTransmitPath(RH_RF22& radio, const RadioPins& pins,
   (void)radio.spiRead(RH_RF22_REG_03_INTERRUPT_STATUS1);
   (void)radio.spiRead(RH_RF22_REG_04_INTERRUPT_STATUS2);
   setAmpReceive(pins, profile);
-  radio.setModeRx();
+  enterReceiveMode(radio);
 }
 
 // Send one packet with a mandatory bounded completion wait.
-inline SendResult sendPacket(RH_RF22& radio, const RadioPins& pins,
+template <typename RadioT>
+inline SendResult sendPacket(RadioT& radio, const RadioPins& pins,
                              const RadioProfile& profile, const uint8_t* data,
                              uint8_t len, uint16_t tx_complete_timeout_ms,
                              Print* log = nullptr,
@@ -425,7 +451,7 @@ inline SendResult sendPacket(RH_RF22& radio, const RadioPins& pins,
     captureFirstFaultSnapshot(radio, pins, SendResult::START_FAILED, first_fault);
     if (profile.start_in_receive) {
       setAmpReceive(pins, profile);
-      radio.setModeRx();
+      enterReceiveMode(radio);
     } else {
       setAmpIdle(pins);
       radio.setModeIdle();
@@ -444,7 +470,7 @@ inline SendResult sendPacket(RH_RF22& radio, const RadioPins& pins,
 
   if (profile.start_in_receive) {
     setAmpReceive(pins, profile);
-    radio.setModeRx();
+    enterReceiveMode(radio);
   } else {
     setAmpIdle(pins);
     radio.setModeIdle();
@@ -463,7 +489,6 @@ inline bool receivePacket(RH_RF22& radio, const RadioPins& pins,
   }
 
   setAmpReceive(pins, profile);
-  radio.setModeRx();
 
   if (!radio.available()) {
     return false;

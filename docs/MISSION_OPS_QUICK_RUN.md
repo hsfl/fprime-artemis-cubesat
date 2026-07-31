@@ -66,8 +66,9 @@ HIL validates what laptop rehearsal cannot:
   change the default duration. Persist a new default with
   `PRM_SET scienceApp.CAPTURE_DURATION_SECONDS`, then `PRM_SAVE`.
 - F Prime writes `PrmDb.dat` in the runtime working directory.
-- Teensy bench serial logs print `watchdog reset detected` after a WDT-caused
-  reset; `hardware watchdog armed (12s)` is the normal boot arming line.
+- Teensy RF operations are bounded and repeated local TX timeouts trigger an
+  SDN radio recovery. The relay sketches intentionally leave the whole-MCU
+  watchdog disabled so USB/debug state survives RF diagnosis.
 
 ## Top Failure Checks
 

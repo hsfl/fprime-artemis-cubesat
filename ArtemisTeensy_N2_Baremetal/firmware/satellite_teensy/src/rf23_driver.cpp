@@ -17,6 +17,8 @@ Rf23Driver::Rf23Driver(int csPin,
       m_fault(link_protocol::TEENSY_RF_FAULT_NONE),
       m_bootFlags(0),
       m_initAttempts(0),
+      m_consecutiveTxTimeouts(0),
+      m_txTimeoutRecoveryRequested(false),
       m_rssiValid(false),
       m_lastAcceptedRssiDbm(0),
       m_lastAcceptedRssiMs(0),
@@ -28,10 +30,11 @@ Rf23Driver::Rf23Driver(int csPin,
   m_radioPins.sdn_pin = sdnPin;
 }
 
-void Rf23Driver::beginSafeOff(bool watchdogReset) {
-  m_bootFlags = watchdogReset ? link_protocol::TEENSY_RF_BOOT_FLAG_WATCHDOG : 0U;
-  enterOff(watchdogReset ? link_protocol::TEENSY_RF_FAULT_WATCHDOG_RESET
-                         : link_protocol::TEENSY_RF_FAULT_NONE);
+void Rf23Driver::beginSafeOff() {
+  m_bootFlags = 0U;
+  m_consecutiveTxTimeouts = 0;
+  m_txTimeoutRecoveryRequested = false;
+  enterOff(link_protocol::TEENSY_RF_FAULT_NONE);
 }
 
 bool Rf23Driver::begin() {
@@ -109,6 +112,16 @@ uint32_t Rf23Driver::lastAcceptedRssiAgeMs() const {
   return millis() - m_lastAcceptedRssiMs;
 }
 
+bool Rf23Driver::consumeTxTimeoutRecoveryRequest() {
+  const bool requested = m_txTimeoutRecoveryRequested;
+  m_txTimeoutRecoveryRequested = false;
+  return requested;
+}
+
+bool Rf23Driver::receiveInProgress() {
+  return isReady() && m_radio.receiveInProgress(millis());
+}
+
 bool Rf23Driver::available() {
   return isReady() && m_radio.available();
 }
@@ -125,6 +138,22 @@ Rf23ReceiveResult Rf23Driver::recv(uint8_t* buf, uint8_t* len) {
   }
   const link_protocol::RfHeaderStatus status = link_protocol::classifyRfHeader(
       m_radio.headerTo(), m_radio.headerFrom(), m_radio.headerId(), m_radio.headerFlags());
+  if (status != link_protocol::RfHeaderStatus::ACCEPT) {
+    static uint32_t lastRejectDiagnosticMs = 0;
+    const uint32_t nowMs = millis();
+    if ((nowMs - lastRejectDiagnosticMs) >= 1000U) {
+      Serial.printf(
+          "[ArtemisTeensy] RF_REJECT status=%u to=%02X from=%02X network=%02X version=%02X len=%u rssi_dbm=%d\n",
+          static_cast<unsigned int>(status),
+          static_cast<unsigned int>(m_radio.headerTo()),
+          static_cast<unsigned int>(m_radio.headerFrom()),
+          static_cast<unsigned int>(m_radio.headerId()),
+          static_cast<unsigned int>(m_radio.headerFlags()),
+          static_cast<unsigned int>(*len),
+          static_cast<int>(receivedRssiDbm));
+      lastRejectDiagnosticMs = nowMs;
+    }
+  }
   switch (status) {
     case link_protocol::RfHeaderStatus::ACCEPT:
       m_rssiValid = true;
@@ -154,8 +183,17 @@ Rf23SendResult Rf23Driver::send(const uint8_t* data, uint8_t len) {
                                                             &Serial);
   if (result == Rf23SendResult::TX_TIMEOUT) {
     m_fault = link_protocol::TEENSY_RF_FAULT_LOCAL_TX;
+    static constexpr uint8_t TX_TIMEOUTS_BEFORE_RECOVERY = 3;
+    m_consecutiveTxTimeouts += 1U;
+    if (m_consecutiveTxTimeouts >= TX_TIMEOUTS_BEFORE_RECOVERY) {
+      m_consecutiveTxTimeouts = 0;
+      m_txTimeoutRecoveryRequested = true;
+      failSafeOffLocalTx();
+      setEnabled(true);
+    }
   } else if (result == Rf23SendResult::SENT &&
              m_fault == link_protocol::TEENSY_RF_FAULT_LOCAL_TX) {
+    m_consecutiveTxTimeouts = 0;
     m_fault = link_protocol::TEENSY_RF_FAULT_NONE;
   }
   return result;
