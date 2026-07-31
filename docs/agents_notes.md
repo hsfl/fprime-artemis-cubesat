@@ -1318,3 +1318,27 @@ Driver tier, formerly repo "Adapter":
 - Spacecraft source and complete ground `.fdp` matched SHA-256
   `1babc1aa35ed840d12b6353cf44cabbd1face542d69cd544384ed9a33ffb472c`.
   Decode was 160x120 / 19,200 pixels, 14.83–24.69 C, with zero invalid pixels.
+
+## C3M Lepton/Boson HIL Acceptance (2026-07-30)
+
+- The unified C3M demo produced viewable captures from both the real Lepton and
+  real Boson. Lepton remains the default driver; the F Prime selector switches
+  between separate camera drivers while both use one standard U32 `.fdp`
+  handling path, one 196,608-byte Teensy payload cache, channel 1, and the
+  shared C3M receiver/viewer.
+- A complete 163,922-byte Boson product (4,684 packets) downlinked in about
+  3 minutes 13 seconds with retries under current lab conditions. This is a
+  measured bench result, not a guaranteed upper bound. Start the payload
+  receiver before requesting downlink and budget at least four minutes for the
+  current lab demo.
+- During one physical Boson-to-Lepton USB replacement, the Raspberry Pi
+  abruptly rebooted before GDS transmitted the Lepton selection command.
+  Surviving GDS logs showed the Boson downlink completed, `ENTER_BASE_MODE`
+  completed, F Prime started fresh, and only then was `SELECT_PAYLOAD_DRIVER
+  LEPTON` sent. The new boot also reported an unclean filesystem, so the
+  evidence points to a board-level reset during the physical USB/power event,
+  not the selector's Boson V4L2 teardown.
+- Operator rule: power down the Pi before physically changing cameras. An
+  independently powered USB hub may be qualified separately; do not assume a
+  powered USB camera swap is safe merely because logical driver selection is
+  supported.

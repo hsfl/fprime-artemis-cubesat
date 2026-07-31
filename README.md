@@ -381,6 +381,10 @@ Implemented:
 - HIL proof of the shortened demo story over the real RPi UART, satellite
   Teensy, RFM23BP pair, ground Teensy, `fprime-gds`, payload receiver, and
   payload viewer path. See `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`.
+- EPSCoR C3M HIL proof with both real Lepton and Boson captures, standard
+  `.fdp` products, the one-product Teensy cache, RF reconstruction, and the
+  shared C3M payload viewer. A full 163,922-byte Boson transfer completed in
+  about 3 minutes 13 seconds with retries under current lab conditions.
 
 Not implemented yet:
 - HIL validation of channel 2 against the real PDU.

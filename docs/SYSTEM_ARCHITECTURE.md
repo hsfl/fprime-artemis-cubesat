@@ -114,8 +114,13 @@ pieces:
 
 - Neutron 2 demo: `PayloadDriver_NeutronSim` produces neutron payload bytes,
   and `ground-station/neutron2-payload-viewer` parses the reconstructed file.
-- EPSCoR C3M demo: `PayloadDriver_Lepton` produces Lepton `.fdp` Data Products,
-  and `ground-station/lepton-dp-viewer` parses the reconstructed `.fdp`.
+- EPSCoR C3M demo: `PayloadDriverSelector` defaults to
+  `PayloadDriver_Lepton` and can select the separate `PayloadDriver_Boson`.
+  Both drivers produce standard `.fdp` Data Products through the same
+  application/manager, Data Products, one-product Teensy cache, channel-1
+  downlink, and receiver path. Their record schemas and pixel decoders remain
+  separate because Lepton is 160x120 centikelvin data while Boson is 320x256
+  raw U16 counts.
 
 Do not fork the application/manager stack for payload identity. Swap the driver
 wiring and keep `PayloadManager`, `StorageManager`, `CommsApp`, and
@@ -315,9 +320,10 @@ Important student-facing rule:
 - ground serial port 1 is a **read-only debug** view of link health.
 - `tools/payload_receiver.py` is the file reconstruction tool for channel 1 (ground serial port 2).
 - `ground-station/neutron2-payload-viewer` is the science review tool after a payload file exists. It can parse `.bin` payload products when the bytes inside are the Neutron 2 CSV format.
-- `ground-station/lepton-dp-viewer` is the C3M review tool after a Lepton
-  `.fdp` exists. It decodes the thermal product produced by
-  `PayloadDriver_Lepton`.
+- The C3M payload receiver/viewer is the shared operator surface for both
+  cameras. It dispatches each reconstructed `.fdp` to the Lepton or Boson
+  decoder from the Data Product identity; the two pixel formats are not
+  treated as interchangeable.
 
 ## The RF Link Constraint: How fprime-gds Talks Over a Walkie-Talkie
 
@@ -475,14 +481,16 @@ For the MVP path, F Prime does not use stock GDS file downlink for the science p
 
 Runtime ownership is:
 
-- `PayloadDriver_NeutronSim`, `PayloadDriver_Lepton`, or a future real payload
+- `PayloadDriver_NeutronSim`, the selected C3M camera driver
+  (`PayloadDriver_Lepton` or `PayloadDriver_Boson`), or a future real payload
   board driver produces mission-specific payload bytes.
 - `StorageManager` tracks the latest science product.
 - `CommsApp.REQUEST_SCIENCE_DOWNLINK` requests downlink of the latest stored product.
 - `PayloadDownlinkApp` packetizes the product, sends channel 1 packets, and maintains progress telemetry.
 - `tools/payload_receiver.py` reconstructs bytes, requests retries for missing packets, verifies CRC, and writes the output file.
 - The mission payload viewer opens the reconstructed file: Neutron 2 uses the
-  neutron CSV viewer, while C3M uses the Lepton `.fdp` viewer.
+  neutron CSV viewer, while the C3M viewer dispatches Lepton and Boson `.fdp`
+  products to their camera-specific decoders.
 
 The channel-1 receiver GUI is the normal per-packet progress display.
 `PayloadDownlinkApp` retains `ProgressPercent`, `ProgressPacketsSent`, and
