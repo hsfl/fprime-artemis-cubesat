@@ -219,6 +219,7 @@ LeptonCamera::Status LeptonCamera::open(char* reason, U32 reasonSize) {
     uvc_stream_handle_t* strmh = nullptr;
     uvc_stream_ctrl_t* ctrl = new uvc_stream_ctrl_t();
     uvc_error_t res = UVC_SUCCESS;
+    bool streamStarted = false;
     char buf[96] = {};
 
     res = uvc_init(&ctx, nullptr);
@@ -250,6 +251,7 @@ LeptonCamera::Status LeptonCamera::open(char* reason, U32 reasonSize) {
         std::snprintf(buf, sizeof(buf), "stream_start: %s", uvc_strerror(res));
         goto fail;
     }
+    streamStarted = true;
 
     this->m_ctx = ctx;
     this->m_dev = dev;
@@ -262,6 +264,9 @@ LeptonCamera::Status LeptonCamera::open(char* reason, U32 reasonSize) {
 fail:
     writeReason(reason, reasonSize, buf);
     if (strmh != nullptr) {
+        if (streamStarted) {
+            (void)uvc_stream_stop(strmh);
+        }
         uvc_stream_close(strmh);
     }
     if (devh != nullptr) {
@@ -278,8 +283,11 @@ fail:
 }
 
 void LeptonCamera::close() {
+    this->m_streaming = false;
     if (this->m_strmh != nullptr) {
-        uvc_stream_close(static_cast<uvc_stream_handle_t*>(this->m_strmh));
+        uvc_stream_handle_t* strmh = static_cast<uvc_stream_handle_t*>(this->m_strmh);
+        (void)uvc_stream_stop(strmh);
+        uvc_stream_close(strmh);
         this->m_strmh = nullptr;
     }
     if (this->m_devh != nullptr) {

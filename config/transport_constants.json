@@ -66,7 +66,7 @@
     "magic_0": 78,
     "magic_1": 50,
     "packet_data_bytes": 35,
-    "cache_max_bytes": 65536,
+    "cache_max_bytes": 196608,
     "cache_chunk_bytes": 200,
     "cache_rf_gap_ms": 2,
     "cache_op_begin": 1,

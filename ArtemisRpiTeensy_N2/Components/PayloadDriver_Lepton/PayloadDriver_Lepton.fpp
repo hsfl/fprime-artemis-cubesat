@@ -15,17 +15,11 @@ module Components {
         @ Health ping output
         output port pingOut: Svc.Ping
 
-        @ Bring the Lepton camera up and start its stream.
-        async command ENABLE opcode 1
-
-        @ Stop the Lepton stream and release the camera.
-        async command DISABLE opcode 2
-
-        @ Capture one thermal image and write it as a data product.
-        async command CAPTURE_IMAGE opcode 0
-
-        @ Scheduled collection request from PayloadManager.
+        @ Scheduled collection request from the payload-driver selector.
         async input port requestIn: Components.PayloadCaptureRequest
+
+        @ Release this camera when another payload driver is selected.
+        sync input port deactivateIn: Fw.Signal
 
         @ Data-product write notification from DpWriter.
         async input port dpWrittenIn: Svc.DpWritten
@@ -91,9 +85,6 @@ module Components {
 
         @ Port for requesting the current time
         time get port timeCaller
-
-        @ Enables command handling
-        import Fw.Command
 
         @ Enables event handling
         import Fw.Event

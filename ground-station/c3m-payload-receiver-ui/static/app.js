@@ -79,11 +79,38 @@ function formatTimestamp(value) {
   return `${date.toLocaleString([], { dateStyle: "medium", timeStyle: "medium", timeZone: "UTC" })} UTC`;
 }
 
+function decodePresentation(decode) {
+  const rawCounts = decode?.product === "boson" || decode?.units === "raw_counts";
+  return rawCounts
+    ? {
+        rawCounts: true,
+        unitLabel: "raw counts",
+        min: decode?.min_raw_counts,
+        max: decode?.max_raw_counts,
+        mean: decode?.mean_raw_counts,
+        productLabel: "Boson raw-count",
+      }
+    : {
+        rawCounts: false,
+        unitLabel: "°C",
+        min: decode?.min_c,
+        max: decode?.max_c,
+        mean: decode?.mean_c,
+        productLabel: "Lepton thermal",
+      };
+}
+
+function outputLabel(key) {
+  return { fdp: ".fdp" }[key] || key.toUpperCase();
+}
+
 function headingFor(current) {
   if (current.status === "failed") {
     if (current.crc_ok === false) return "CRC failed";
     return current.message || "Payload failed";
   }
+  if (current.status === "decoding" && current.product_kind === "boson") return "Decoding Boson raw-count image";
+  if (current.status === "complete" && current.product_kind === "boson") return "Boson payload complete";
   const headings = {
     starting: "Starting payload receiver",
     select_port: "Select payload port",
@@ -105,7 +132,11 @@ function supportingFor(current) {
   if (current.status === "receiving") return `${formatNumber(current.received_packets)} / ${formatNumber(current.total_packets)} packets`;
   if (current.status === "retrying") return `${formatNumber(current.missing_packets)} packets missing · Retry round ${formatNumber(current.retry_rounds)}`;
   if (current.status === "cancelling") return "Preserving received packets; satellite transmission continues";
-  if (current.status === "complete") return "CRC passed · Current thermal product decoded";
+  if (current.status === "complete") {
+    return current.product_kind === "boson"
+      ? "CRC passed · Current Boson raw-count image decoded"
+      : "CRC passed · Current thermal product decoded";
+  }
   if (current.status === "partial") {
     const prefix = current.completion_reason === "operator_cancelled" ? "Stopped by operator · " : "";
     return `${prefix}${formatNumber(current.missing_packets)} packets missing · Unknown pixels shown in white`;
@@ -176,12 +207,12 @@ function renderTiming(current) {
     timingBanner.hidden = false;
     timingBanner.className = "timing-banner";
     timingBanner.textContent = Number(current.elapsed_seconds || 0) >= 90
-      ? "Longer than target — transfer remains inside the 120 s live-demo cutoff."
-      : "Past the 75 s nominal target — transfer remains within the live-demo window.";
+      ? "Long transfer — reception will continue until complete or manually stopped."
+      : "Past the 75 s nominal target — reception is still progressing.";
   } else if (current.timing_band === "delayed") {
     timingBanner.hidden = false;
     timingBanner.className = "timing-banner is-delayed";
-    timingBanner.textContent = "120 s cutoff reached — operator attention. The receiver will preserve best-effort partial data if CRC repair cannot finish.";
+    timingBanner.textContent = "Long transfer — reception will continue until complete or manually stopped.";
   } else {
     timingBanner.hidden = true;
   }
@@ -212,6 +243,7 @@ function renderPreview(current) {
     current.run_id,
     current.crc_ok,
     current.failure_reason,
+    current.product_kind,
     current.outputs || {},
     current.decode || {},
   ]);
@@ -220,16 +252,17 @@ function renderPreview(current) {
   const png = current.outputs?.png;
   if (png && ["complete", "partial"].includes(current.status)) {
     const decode = current.decode || {};
+    const presentation = decodePresentation(decode);
     previewContent.innerHTML = `
       <div class="thermal-inspector">
-        <img id="thermalImage" src="${escapeHtml(png)}" alt="Current Lepton thermal image for product ${escapeHtml(current.product_id)}, transfer ${escapeHtml(current.transfer_id)}">
-        <output id="thermalHover" class="thermal-hover">Move over image to inspect temperature</output>
+        <img id="thermalImage" src="${escapeHtml(png)}" alt="Current ${presentation.productLabel} image for product ${escapeHtml(current.product_id)}, transfer ${escapeHtml(current.transfer_id)}">
+        <output id="thermalHover" class="thermal-hover">Move over image to inspect ${presentation.unitLabel}</output>
       </div>
       <div class="thermal-stats">
-        <span>Min <strong>${decode.min_c ?? "—"}°C</strong></span>
-        <span>Max <strong>${decode.max_c ?? "—"}°C</strong></span>
-        <span>Mean <strong>${decode.mean_c ?? "—"}°C</strong></span>
-        <span>Range <strong>${decode.min_c ?? "—"}–${decode.max_c ?? "—"}°C</strong></span>
+        <span>Min <strong>${presentation.min ?? "—"} ${presentation.unitLabel}</strong></span>
+        <span>Max <strong>${presentation.max ?? "—"} ${presentation.unitLabel}</strong></span>
+        <span>Mean <strong>${presentation.mean ?? "—"} ${presentation.unitLabel}</strong></span>
+        <span>Range <strong>${presentation.min ?? "—"}–${presentation.max ?? "—"} ${presentation.unitLabel}</strong></span>
       </div>`;
     attachThermalInspection({
       csvUrl: current.outputs?.csv,
@@ -237,30 +270,31 @@ function renderPreview(current) {
       height: decode.height || 120,
       imageId: "thermalImage",
       outputId: "thermalHover",
+      unitLabel: presentation.unitLabel,
     });
   } else {
     let message = "Available after CRC verification";
-    if (current.crc_ok === false) message = "Thermal preview unavailable because integrity verification failed.";
-    else if (current.status === "failed") message = current.failure_reason || "Thermal preview unavailable.";
+    if (current.crc_ok === false) message = "Preview unavailable because integrity verification failed.";
+    else if (current.status === "failed") message = current.failure_reason || "Preview unavailable.";
     previewContent.innerHTML = `<div class="preview-empty"><span class="thermometer" aria-hidden="true"></span><p>${escapeHtml(message)}</p></div>`;
   }
 
   const outputs = current.outputs || {};
   const keys = ["fdp", "json", "csv", "png"].filter((key) => outputs[key]);
   outputActions.hidden = keys.length === 0;
-  outputLinks.innerHTML = keys.map((key) => `<a href="${escapeHtml(outputs[key])}" target="_blank" rel="noopener">${key === "fdp" ? ".fdp" : key.toUpperCase()}</a>`).join("");
+  outputLinks.innerHTML = keys.map((key) => `<a href="${escapeHtml(outputs[key])}" target="_blank" rel="noopener">${outputLabel(key)}</a>`).join("");
   openFolderButton.hidden = !current.run_id;
   openFolderButton.dataset.runId = current.run_id || "";
 }
 
-async function attachThermalInspection({ csvUrl, width, height, imageId, outputId, overlay = false }) {
+async function attachThermalInspection({ csvUrl, width, height, imageId, outputId, unitLabel = "°C", overlay = false }) {
   const image = document.getElementById(imageId);
   const hover = document.getElementById(outputId);
   if (!image || !hover || !csvUrl) return;
   let grid;
   try {
     const response = await fetch(csvUrl, { cache: "no-store" });
-    if (!response.ok) throw new Error(`Temperature CSV unavailable: ${response.status}`);
+    if (!response.ok) throw new Error(`Image CSV unavailable: ${response.status}`);
     const text = await response.text();
     grid = text.split(/\r?\n/)
       .filter((line) => line && !line.startsWith("#"))
@@ -269,7 +303,7 @@ async function attachThermalInspection({ csvUrl, width, height, imageId, outputI
         return normalized === "" || normalized === "NaN" ? null : Number(normalized);
       }));
   } catch (_error) {
-    hover.textContent = "Temperature data unavailable";
+    hover.textContent = `${unitLabel} data unavailable`;
     if (overlay) hover.classList.add("is-visible");
     return;
   }
@@ -280,11 +314,11 @@ async function attachThermalInspection({ csvUrl, width, height, imageId, outputI
     const value = grid?.[row]?.[column];
     hover.textContent = value === null || !Number.isFinite(value)
       ? `Column ${column}, row ${row} · No data`
-      : `Column ${column}, row ${row} · ${value.toFixed(2)}°C`;
+      : `Column ${column}, row ${row} · ${value.toFixed(2)} ${unitLabel}`;
     if (overlay) hover.classList.add("is-visible");
   });
   image.addEventListener("mouseleave", () => {
-    hover.textContent = "Move over image to inspect temperature";
+    hover.textContent = `Move over image to inspect ${unitLabel}`;
     if (overlay) hover.classList.remove("is-visible");
   });
 }
@@ -294,6 +328,7 @@ function runResult(run) {
   if (run.result === "partial" && run.completion_reason === "operator_cancelled") return ["Partial · stopped", "run-partial"];
   if (run.result === "partial") return ["Partial", "run-partial"];
   if (run.result === "decode_failed") return ["Decode failed", "run-failed"];
+  if (run.result === "unknown_product") return ["Unknown product · archived", "run-failed"];
   if (run.result === "crc_failed") return ["CRC failed", "run-failed"];
   return run.crc_ok ? ["Complete", "run-complete"] : ["CRC failed", "run-failed"];
 }
@@ -365,9 +400,10 @@ function renderHistory(history) {
   }
   const png = selected.output_urls?.png;
   const [resultLabel, resultClass] = runResult(selected);
-  const links = Object.entries(selected.output_urls || {}).map(([key, value]) => `<a href="${escapeHtml(value)}" target="_blank" rel="noopener">${key === "fdp" ? ".fdp" : key.toUpperCase()}</a>`).join(" · ");
+  const presentation = decodePresentation(selected.decode || {});
+  const links = Object.entries(selected.output_urls || {}).map(([key, value]) => `<a href="${escapeHtml(value)}" target="_blank" rel="noopener">${outputLabel(key)}</a>`).join(" · ");
   archivedContent.innerHTML = `
-    <h2>Product ${escapeHtml(selected.product_id ?? "—")}</h2>
+    <h2>${presentation.productLabel} · Product ${escapeHtml(selected.product_id ?? "—")}</h2>
     <p class="archived-result ${resultClass}">${resultLabel}</p>
     <div class="archived-meta">
       <div><span>Transfer</span><strong>${escapeHtml(selected.transfer_id ?? "—")}</strong></div>
@@ -377,8 +413,8 @@ function renderHistory(history) {
     </div>
     ${png ? `
       <div class="thermal-inspector archived-thermal-inspector">
-        <img id="archivedThermalImage" src="${escapeHtml(png)}" alt="Archived Lepton thermal image for product ${escapeHtml(selected.product_id)}, transfer ${escapeHtml(selected.transfer_id)}">
-        <output id="archivedThermalHover" class="thermal-tooltip" aria-live="polite">Move over image to inspect temperature</output>
+        <img id="archivedThermalImage" src="${escapeHtml(png)}" alt="Archived ${presentation.productLabel} image for product ${escapeHtml(selected.product_id)}, transfer ${escapeHtml(selected.transfer_id)}">
+        <output id="archivedThermalHover" class="thermal-tooltip" aria-live="polite">Move over image to inspect ${presentation.unitLabel}</output>
       </div>` : ""}
     <p>${links || "No output files available."}</p>`;
   if (png && selected.output_urls?.csv) {
@@ -388,6 +424,7 @@ function renderHistory(history) {
       height: selected.decode?.height || 120,
       imageId: "archivedThermalImage",
       outputId: "archivedThermalHover",
+      unitLabel: presentation.unitLabel,
       overlay: true,
     });
   }

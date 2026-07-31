@@ -202,6 +202,225 @@ class RadioRpcEmulatorTests(unittest.TestCase):
         self.assertIsNone(radio.handle(bytes([1, 4, 1, 0, 1]), 4.0))
 
 
+class PayloadCacheEmulatorTests(unittest.TestCase):
+    TRANSFER_ID = 7
+    PRODUCT_ID = 0x1002A000
+
+    @staticmethod
+    def request(request_id: int, body: bytes) -> bytes:
+        return bytes(
+            [
+                loop.TEENSY_TARGET_PAYLOAD_CACHE,
+                request_id,
+                len(body),
+                0,
+            ]
+        ) + body
+
+    def begin_request(self, request_id: int, payload: bytes) -> bytes:
+        body = (
+            bytes([loop.PAYLOAD_CACHE_OP_BEGIN, self.TRANSFER_ID])
+            + self.PRODUCT_ID.to_bytes(4, "little")
+            + len(payload).to_bytes(4, "little")
+            + loop.crc16_ccitt(payload).to_bytes(2, "little")
+        )
+        return self.request(request_id, body)
+
+    def chunk_request(
+        self, request_id: int, offset: int, payload: bytes
+    ) -> bytes:
+        body = (
+            bytes([loop.PAYLOAD_CACHE_OP_CHUNK, self.TRANSFER_ID])
+            + offset.to_bytes(4, "little")
+            + bytes([len(payload)])
+            + payload
+        )
+        return self.request(request_id, body)
+
+    def load_and_commit(
+        self, cache: loop.PayloadCacheEmulator, payload: bytes
+    ) -> bytes:
+        response = cache.handle(self.begin_request(1, payload))
+        self.assertEqual((response or b"")[6], loop.PAYLOAD_CACHE_STATE_RECEIVING)
+        for request_id, offset in enumerate(
+            range(0, len(payload), loop.PAYLOAD_CACHE_CHUNK_BYTES),
+            start=2,
+        ):
+            chunk = payload[offset : offset + loop.PAYLOAD_CACHE_CHUNK_BYTES]
+            response = cache.handle(self.chunk_request(request_id, offset, chunk))
+            self.assertEqual((response or b"")[2], loop.TEENSY_STATUS_OK)
+            self.assertEqual(
+                int.from_bytes((response or b"")[8:12], "little"),
+                offset + len(chunk),
+            )
+        commit_id = 99
+        commit = self.request(
+            commit_id,
+            bytes([loop.PAYLOAD_CACHE_OP_COMMIT_AND_SEND, self.TRANSFER_ID]),
+        )
+        response = cache.handle(commit)
+        self.assertEqual((response or b"")[6], loop.PAYLOAD_CACHE_STATE_SENDING)
+        return response or b""
+
+    def test_cache_constants_match_transport_manifest(self) -> None:
+        repo_root = Path(__file__).resolve().parents[3]
+        manifest = json.loads(
+            (repo_root / "config" / "transport_constants.json").read_text()
+        )
+        rpc = manifest["teensy_rpc"]
+        payload = manifest["payload"]
+
+        self.assertEqual(
+            loop.TEENSY_TARGET_PAYLOAD_CACHE, rpc["target_payload_cache"]
+        )
+        self.assertEqual(loop.TEENSY_STATUS_BUSY, rpc["status_busy"])
+        self.assertEqual(
+            loop.PAYLOAD_CACHE_MAX_BYTES, payload["cache_max_bytes"]
+        )
+        self.assertEqual(
+            loop.PAYLOAD_CACHE_CHUNK_BYTES, payload["cache_chunk_bytes"]
+        )
+        self.assertEqual(
+            loop.PAYLOAD_PACKET_DATA_BYTES, payload["packet_data_bytes"]
+        )
+        self.assertEqual(
+            [
+                loop.PAYLOAD_CACHE_OP_BEGIN,
+                loop.PAYLOAD_CACHE_OP_CHUNK,
+                loop.PAYLOAD_CACHE_OP_COMMIT_AND_SEND,
+                loop.PAYLOAD_CACHE_OP_ABORT,
+            ],
+            [
+                payload["cache_op_begin"],
+                payload["cache_op_chunk"],
+                payload["cache_op_commit_and_send"],
+                payload["cache_op_abort"],
+            ],
+        )
+        self.assertEqual(
+            [
+                loop.PAYLOAD_CACHE_STATE_EMPTY,
+                loop.PAYLOAD_CACHE_STATE_RECEIVING,
+                loop.PAYLOAD_CACHE_STATE_READY,
+                loop.PAYLOAD_CACHE_STATE_SENDING,
+                loop.PAYLOAD_CACHE_STATE_ERROR,
+            ],
+            [
+                payload["cache_state_empty"],
+                payload["cache_state_receiving"],
+                payload["cache_state_ready"],
+                payload["cache_state_sending"],
+                payload["cache_state_error"],
+            ],
+        )
+
+    def test_begin_chunk_commit_emits_exact_n2_product(self) -> None:
+        payload = bytes((index * 17 + 3) & 0xFF for index in range(83))
+        cache = loop.PayloadCacheEmulator()
+
+        commit_response = self.load_and_commit(cache, payload)
+        self.assertEqual(commit_response[2], loop.TEENSY_STATUS_OK)
+        self.assertEqual(
+            int.from_bytes(commit_response[8:12], "little"), len(payload)
+        )
+
+        packets: list[bytes] = []
+        while True:
+            packet = cache.next_payload_packet()
+            if packet is None:
+                break
+            packets.append(packet)
+
+        total_packets = (
+            len(payload) + loop.PAYLOAD_PACKET_DATA_BYTES - 1
+        ) // loop.PAYLOAD_PACKET_DATA_BYTES
+        self.assertEqual(
+            [packet[2] for packet in packets],
+            [loop.N2_TYPE_HEADER] * loop.PAYLOAD_CACHE_HEADER_REPEATS
+            + [loop.N2_TYPE_DATA] * total_packets
+            + [loop.N2_TYPE_END],
+        )
+        self.assertEqual(
+            packets[0],
+            b"N2"
+            + bytes([loop.N2_TYPE_HEADER, self.TRANSFER_ID])
+            + self.PRODUCT_ID.to_bytes(4, "little")
+            + len(payload).to_bytes(4, "little")
+            + total_packets.to_bytes(2, "little")
+            + bytes([loop.PAYLOAD_PACKET_DATA_BYTES])
+            + loop.crc16_ccitt(payload).to_bytes(2, "little"),
+        )
+
+        reconstructed = bytearray()
+        for packet_index, packet in enumerate(
+            packets[
+                loop.PAYLOAD_CACHE_HEADER_REPEATS :
+                loop.PAYLOAD_CACHE_HEADER_REPEATS + total_packets
+            ]
+        ):
+            self.assertEqual(
+                int.from_bytes(packet[4:6], "little"), packet_index
+            )
+            valid_bytes = packet[6]
+            crc_offset = 7 + valid_bytes
+            self.assertEqual(
+                int.from_bytes(packet[crc_offset : crc_offset + 2], "little"),
+                loop.crc16_ccitt(packet[:crc_offset]),
+            )
+            reconstructed.extend(packet[7:crc_offset])
+        self.assertEqual(bytes(reconstructed), payload)
+
+        completion = cache.take_completion_response()
+        self.assertEqual((completion or b"")[1], 99)
+        self.assertEqual((completion or b"")[6], loop.PAYLOAD_CACHE_STATE_READY)
+        self.assertEqual(cache.state, loop.PAYLOAD_CACHE_STATE_READY)
+
+    def test_oversized_begin_is_rejected_without_allocating_cache(self) -> None:
+        cache = loop.PayloadCacheEmulator()
+        body = (
+            bytes([loop.PAYLOAD_CACHE_OP_BEGIN, self.TRANSFER_ID])
+            + self.PRODUCT_ID.to_bytes(4, "little")
+            + (loop.PAYLOAD_CACHE_MAX_BYTES + 1).to_bytes(4, "little")
+            + b"\x00\x00"
+        )
+        response = cache.handle(self.request(1, body))
+
+        self.assertEqual((response or b"")[2], loop.TEENSY_STATUS_BAD_REQUEST)
+        self.assertEqual(cache.state, loop.PAYLOAD_CACHE_STATE_EMPTY)
+        self.assertEqual(cache.cache, bytearray())
+
+    def test_retry_request_emits_only_requested_data_then_end(self) -> None:
+        payload = bytes(index & 0xFF for index in range(150))
+        cache = loop.PayloadCacheEmulator()
+        self.load_and_commit(cache, payload)
+        while cache.next_payload_packet() is not None:
+            pass
+        self.assertIsNotNone(cache.take_completion_response())
+
+        retry = (
+            b"N2"
+            + bytes([loop.N2_TYPE_RETRY_REQUEST, self.TRANSFER_ID])
+            + (1).to_bytes(2, "little")
+            + bytes([1, 0b00000101])
+        )
+        self.assertTrue(cache.handle_payload_control(retry))
+        repair_packets = []
+        while True:
+            packet = cache.next_payload_packet()
+            if packet is None:
+                break
+            repair_packets.append(packet)
+
+        self.assertEqual(
+            [packet[2] for packet in repair_packets],
+            [loop.N2_TYPE_DATA, loop.N2_TYPE_DATA, loop.N2_TYPE_END],
+        )
+        self.assertEqual(
+            [int.from_bytes(packet[4:6], "little") for packet in repair_packets[:2]],
+            [1, 3],
+        )
+
+
 class EmulationLoopPayloadPtyTests(unittest.TestCase):
     def make_emulator(
         self,
@@ -257,6 +476,44 @@ class EmulationLoopPayloadPtyTests(unittest.TestCase):
         self.assertTrue(emulator.radio.ready)
         self.assertEqual(emulator.stats.local_frames_observed, 1)
         self.assertEqual(emulator.stats.local_responses_sent, 1)
+
+    def test_channel_two_target_three_routes_to_single_payload_cache(self) -> None:
+        emulator = self.make_emulator(radio_ready=False)
+        writes: list[tuple[int, bytes]] = []
+
+        def record_write(fd: int, data: bytes | bytearray) -> int:
+            writes.append((fd, bytes(data)))
+            return len(data)
+
+        payload = b"one-standard-fdp"
+        body = (
+            bytes([loop.PAYLOAD_CACHE_OP_BEGIN, 4])
+            + (0x1002A000).to_bytes(4, "little")
+            + len(payload).to_bytes(4, "little")
+            + loop.crc16_ccitt(payload).to_bytes(2, "little")
+        )
+        request = bytes(
+            [loop.TEENSY_TARGET_PAYLOAD_CACHE, 9, len(body), 0]
+        ) + body
+        app_bytes = loop.build_uart_frame(loop.CHANNEL_TEENSY_LOCAL, request)
+
+        with mock.patch.object(loop.os, "write", side_effect=record_write):
+            emulator._process_app_to_gds(app_bytes, 0.0)
+
+        self.assertEqual(len(writes), 1)
+        parser = loop.UartFrameParser()
+        responses = parser.feed(writes[0][1], 0.0)
+        self.assertEqual(len(responses), 1)
+        channel, response = responses[0]
+        self.assertEqual(channel, loop.CHANNEL_TEENSY_LOCAL)
+        self.assertEqual(response[0], loop.TEENSY_TARGET_PAYLOAD_CACHE)
+        self.assertEqual(response[1], 9)
+        self.assertEqual(response[2], loop.TEENSY_STATUS_OK)
+        self.assertEqual(response[4], loop.PAYLOAD_CACHE_OP_BEGIN)
+        self.assertEqual(response[5], 4)
+        self.assertEqual(response[6], loop.PAYLOAD_CACHE_STATE_RECEIVING)
+        self.assertEqual(emulator.payload_cache.total_bytes, len(payload))
+        self.assertFalse(emulator.radio.ready)
 
     def test_radio_off_drops_both_rf_directions_but_not_local_rpc(self) -> None:
         emulator = self.make_emulator(radio_ready=False)
@@ -402,7 +659,7 @@ class EmulationLoopPayloadPtyTests(unittest.TestCase):
         self.assertEqual(writes, [(12, second)])
         self.assertEqual(emulator.stats.payload_data_packets_dropped, 2)
 
-    def test_payload_uplink_returns_channel_one_without_affecting_channel_zero(self) -> None:
+    def test_non_cache_payload_uplink_returns_channel_one_without_affecting_channel_zero(self) -> None:
         emulator = self.make_emulator()
         writes: list[tuple[int, bytes]] = []
 
@@ -410,11 +667,11 @@ class EmulationLoopPayloadPtyTests(unittest.TestCase):
             writes.append((fd, bytes(data)))
             return len(data)
 
-        retry_request = b"N2\x03\x07\x01\x00"
+        control_message = b"N2\x03\x07\x01\x00"
         with mock.patch.object(loop.os, "write", side_effect=record_write):
-            emulator._process_payload_to_app(retry_request, 0.0)
+            emulator._process_payload_to_app(control_message, 0.0)
             message = emulator.payload_burst_aggregator.poll(1.0)
-            self.assertEqual(message, retry_request)
+            self.assertEqual(message, control_message)
             emulator._process_payload_message_to_app(message, 1.0)  # type: ignore[arg-type]
 
         self.assertEqual(len(writes), 1)
@@ -422,7 +679,7 @@ class EmulationLoopPayloadPtyTests(unittest.TestCase):
         parser = loop.UartFrameParser()
         self.assertEqual(
             parser.feed(writes[0][1], 1.0),
-            [(loop.CHANNEL_PAYLOAD, retry_request)],
+            [(loop.CHANNEL_PAYLOAD, control_message)],
         )
         self.assertEqual(emulator.stats.payload_messages_in, 1)
         self.assertEqual(emulator.stats.gds_messages_in, 0)

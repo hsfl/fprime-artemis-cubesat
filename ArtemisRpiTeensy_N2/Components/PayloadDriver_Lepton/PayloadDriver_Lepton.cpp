@@ -43,6 +43,11 @@ void PayloadDriver_Lepton::requestIn_handler(FwIndexType portNum, U32 durationSe
     }
 }
 
+void PayloadDriver_Lepton::deactivateIn_handler(FwIndexType portNum) {
+    static_cast<void>(portNum);
+    this->m_camera.close();
+}
+
 void PayloadDriver_Lepton::dpWrittenIn_handler(FwIndexType portNum,
                                                const Fw::StringBase& fileName,
                                                FwDpPriorityType priority,
@@ -85,28 +90,6 @@ void PayloadDriver_Lepton::dpWrittenIn_handler(FwIndexType portNum,
     this->m_pendingPath.clear();
     this->m_pendingProductId = 0U;
     this->writeTelemetry();
-}
-
-void PayloadDriver_Lepton::ENABLE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    char reason[96] = {};
-    if (!this->ensureCameraOpen(reason, sizeof(reason))) {
-        this->log_WARNING_HI_ImageCaptureFailed(Fw::LogStringArg(reason));
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
-        return;
-    }
-    this->log_ACTIVITY_LO_LeptonBackendSelected(Fw::LogStringArg(this->m_camera.backendName()));
-    this->log_ACTIVITY_LO_LeptonReady();
-    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
-}
-
-void PayloadDriver_Lepton::DISABLE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    this->m_camera.close();
-    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
-}
-
-void PayloadDriver_Lepton::CAPTURE_IMAGE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    const bool captured = this->captureThermalImage(this->m_lastDurationSeconds);
-    this->cmdResponse_out(opCode, cmdSeq, captured ? Fw::CmdResponse::OK : Fw::CmdResponse::EXECUTION_ERROR);
 }
 
 bool PayloadDriver_Lepton::captureThermalImage(U32 durationSeconds) {

@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Start the two existing C3M laptop operator tools for one ground Triple-Serial Teensy.
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+FPRIME_DIR="$ROOT_DIR/ArtemisRpiTeensy_N2"
+PYTHON="$FPRIME_DIR/fprime-venv/bin/python3"
+PAYLOAD_UI="$ROOT_DIR/ground-station/c3m-payload-receiver-ui/c3m_payload_receiver_ui.py"
+DICTIONARY="$FPRIME_DIR/build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json"
+
+fail() {
+  echo "c3m: $*" >&2
+  exit 1
+}
+
+[[ -x "$PYTHON" ]] || fail "missing F' venv: $PYTHON"
+[[ -f "$PAYLOAD_UI" ]] || fail "missing payload UI: $PAYLOAD_UI"
+[[ -f "$DICTIONARY" ]] || fail "missing Pi-release dictionary: $DICTIONARY"
+
+# The three interfaces are one physical ground Teensy. Refuse to guess if the
+# connected devices do not form exactly one complete Triple-Serial group.
+read -r GDS_PORT DEBUG_PORT PAYLOAD_PORT < <("$PYTHON" - <<'PY'
+import re
+from serial.tools import list_ports
+
+rows = []
+for item in list_ports.comports():
+    device = item.device
+    if not device.startswith(("/dev/cu.usbmodem", "/dev/tty.usbmodem", "/dev/ttyACM", "/dev/ttyUSB")):
+        continue
+    rows.append((device, item.description or "", item.serial_number or ""))
+
+groups = {}
+for device, description, serial_number in rows:
+    if serial_number:
+        key = f"serial:{serial_number}"
+    elif "Triple Serial" in description:
+        match = re.match(r"^(.*usbmodem\d+)(?:01|03|05)$", device)
+        if not match:
+            continue
+        key = f"mac:{match.group(1)}"
+    else:
+        continue
+    groups.setdefault(key, []).append(device)
+
+candidates = [sorted(group) for group in groups.values() if len(group) == 3]
+if len(candidates) != 1:
+    raise SystemExit("need exactly one complete ground Triple-Serial Teensy")
+print(*candidates[0])
+PY
+) || fail "need exactly one complete ground Triple-Serial Teensy"
+
+echo "Ground Teensy: GDS=$GDS_PORT  debug=$DEBUG_PORT  payload=$PAYLOAD_PORT"
+echo "Starting payload receiver, then F' GDS. Press Ctrl-C to stop both."
+
+PAYLOAD_PID=""
+GDS_PID=""
+cleanup() {
+  trap - EXIT INT TERM
+  [[ -z "$GDS_PID" ]] || kill "$GDS_PID" 2>/dev/null || true
+  [[ -z "$PAYLOAD_PID" ]] || kill "$PAYLOAD_PID" 2>/dev/null || true
+  wait 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+cd "$ROOT_DIR"
+"$PYTHON" "$PAYLOAD_UI" --port "$PAYLOAD_PORT" --dictionary "$DICTIONARY" &
+PAYLOAD_PID=$!
+
+cd "$FPRIME_DIR"
+./tools/run_gds_uart.sh --port "$GDS_PORT" --baud 115200 --gui-port 5050 --dictionary "$DICTIONARY" &
+GDS_PID=$!
+wait "$GDS_PID"

@@ -21,8 +21,31 @@ from typing import Any
 WIDTH = 160
 HEIGHT = 120
 NUM_PIXELS = WIDTH * HEIGHT
-PIXEL_DATA_OFFSET = 76
+PIXEL_DATA_OFFSET = 78
 PIXEL_DATA_BYTES = NUM_PIXELS * 2
+FW_PACKET_DP = 5
+LEPTON_CONTAINER_ID = 0x10027000
+LEPTON_FDP_SIGNATURE = struct.pack(">HI", FW_PACKET_DP, LEPTON_CONTAINER_ID)
+
+
+def read_fdp_container_id(path: Path) -> int | None:
+    """Return the verified standard-FDP container ID, if present."""
+
+    try:
+        with path.open("rb") as stream:
+            header = stream.read(struct.calcsize(">HI"))
+    except OSError:
+        return None
+    if len(header) != struct.calcsize(">HI"):
+        return None
+    packet_descriptor, container_id = struct.unpack(">HI", header)
+    return container_id if packet_descriptor == FW_PACKET_DP else None
+
+
+def has_lepton_fdp_signature(path: Path) -> bool:
+    """Verify the F Prime DP packet descriptor and Lepton container ID."""
+
+    return read_fdp_container_id(path) == LEPTON_CONTAINER_ID
 
 
 def find_repo_root(start: Path) -> Path:
@@ -267,6 +290,8 @@ def decode_partial_product(
     """
 
     blob = bin_file.read_bytes()
+    if not has_lepton_fdp_signature(bin_file):
+        raise ValueError("partial Lepton product does not have the standard Lepton FDP signature")
     if len(blob) < PIXEL_DATA_OFFSET + PIXEL_DATA_BYTES:
         raise ValueError(f"partial Lepton product has unsafe size {len(blob)}")
     missing = {int(index) for index in missing_packet_indices}
@@ -337,6 +362,8 @@ def decode_product(args: argparse.Namespace) -> dict[str, Any]:
     bin_file = args.bin_file.resolve()
     if not bin_file.exists():
         raise SystemExit(f"file not found: {bin_file}")
+    if not has_lepton_fdp_signature(bin_file):
+        raise SystemExit("input is not a standard Lepton FDP")
 
     dictionary = args.dictionary or find_dictionary(Path(__file__).resolve())
     if dictionary is None or not dictionary.exists():

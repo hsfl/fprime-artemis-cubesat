@@ -23,7 +23,8 @@ module ArtemisDataProductsConfig {
     }
 
     module BuffMgr {
-        constant dpBufferStoreSize = 49152
+        @ One working buffer can hold either a Lepton or a full 320x256 Boson FDP.
+        constant dpBufferStoreSize = 192 * 1024
         constant dpBufferStoreCount = 4
         constant dpBufferManagerId = 300
     }

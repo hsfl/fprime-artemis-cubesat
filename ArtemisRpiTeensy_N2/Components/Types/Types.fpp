@@ -72,6 +72,13 @@ module Components {
     NEUTRON_SIM = 1
     REAL_PAYLOAD = 2
     TEST = 3
+    BOSON = 4
+  }
+
+  @ Selectable payload driver behind the mission-facing payload manager.
+  enum PayloadDriverKind : U8 {
+    LEPTON = 0
+    BOSON = 1
   }
 
   @ Science product descriptor handoff. The source path is a driver-owned local file path.

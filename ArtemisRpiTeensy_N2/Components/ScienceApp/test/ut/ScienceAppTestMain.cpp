@@ -40,6 +40,11 @@ TEST(Nominal, InvalidParamFallsBackToThirty) {
     tester.testInvalidParamFallsBackToThirty();
 }
 
+TEST(Guard, FailedCaptureDoesNotReachStorage) {
+    Components::ScienceAppTester tester;
+    tester.testFailedCaptureDoesNotReachStorage();
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

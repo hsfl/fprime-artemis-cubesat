@@ -252,12 +252,13 @@ New here? Read these roughly in order to fully understand the project:
 6. `EMULATION.md` and `docs/NEUTRON2_LOCAL_EMULATION_RUNBOOK.md` — laptop-only closed-loop emulation (no hardware).
 7. `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md` — the real hardware-in-the-loop (HIL) demo flow.
 8. `docs/C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md` — Pi-owned RFM23BP lifecycle, bounded autonomous recovery, HIL evidence, and remaining electrical gates.
-9. `docs/HARDWARE_PORT_MAP_AND_POWER.md` — which USB/serial device is which, and how to power the bench safely.
-10. `docs/MISSION_OPS_QUICK_RUN.md` — one-page local rehearsal and FlatSat/HIL operator checklist.
-11. `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md` — Windows laptop setup for student developers and viewer users.
-12. `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md` and `docs/RPI_BUILD.md` — building the Pi Zero W flight binary (cross-compile preferred; native is the manual fallback).
-13. `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` — where to look first when commands, telemetry, payload downlink, or EPS/PDU behavior fails.
-14. `docs/agents_notes.md` — current implementation status and next-agent guidance.
+9. `docs/EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md` — EPSCoR C3M Lepton/Boson local and HIL operator flow.
+10. `docs/HARDWARE_PORT_MAP_AND_POWER.md` — which USB/serial device is which, and how to power the bench safely.
+11. `docs/MISSION_OPS_QUICK_RUN.md` — one-page local rehearsal and FlatSat/HIL operator checklist.
+12. `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md` — Windows laptop setup for student developers and viewer users.
+13. `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md` and `docs/RPI_BUILD.md` — building the Pi Zero W flight binary (cross-compile preferred; native is the manual fallback).
+14. `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` — where to look first when commands, telemetry, payload downlink, or EPS/PDU behavior fails.
+15. `docs/agents_notes.md` — current implementation status and next-agent guidance.
 
 ## Build and run (local emulation)
 
@@ -364,6 +365,11 @@ real hardware** — RPi UART, satellite Teensy, RFM23BP pair, ground Teensy,
 `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`, with `docs/MISSION_OPS_QUICK_RUN.md` as
 the operator checklist.
 
+For the EPSCoR C3M Lepton/Boson bench, follow
+`docs/EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md`. With one complete ground
+Triple-Serial Teensy connected, `./tools/c3m` starts both GDS and the C3M
+payload receiver using the matching Pi-release dictionary.
+
 ## Status
 
 Implemented:
@@ -381,6 +387,10 @@ Implemented:
 - HIL proof of the shortened demo story over the real RPi UART, satellite
   Teensy, RFM23BP pair, ground Teensy, `fprime-gds`, payload receiver, and
   payload viewer path. See `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md`.
+- EPSCoR C3M HIL proof with both real Lepton and Boson captures, standard
+  `.fdp` products, the one-product Teensy cache, RF reconstruction, and the
+  shared C3M payload viewer. A full 163,922-byte Boson transfer completed in
+  about 3 minutes 13 seconds with retries under current lab conditions.
 
 Not implemented yet:
 - HIL validation of channel 2 against the real PDU.

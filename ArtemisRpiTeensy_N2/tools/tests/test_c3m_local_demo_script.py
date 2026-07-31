@@ -7,6 +7,7 @@ import unittest
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "run_c3m_local_demo.sh"
+BOSON_SCRIPT = PROJECT_ROOT / "tools" / "run_boson_local_demo.sh"
 
 
 class C3mLocalDemoScriptTest(unittest.TestCase):
@@ -33,6 +34,21 @@ class C3mLocalDemoScriptTest(unittest.TestCase):
         self.assertIn("--captures <count>", result.stdout)
         self.assertIn("ground payload receiver", result.stdout)
         self.assertNotIn("--capture-seconds", result.stdout)
+
+    def test_camera_selection_is_bounded_and_boson_wrapper_is_thin(self) -> None:
+        invalid = self.run_script("--camera", "invalid", "--exit-after-sequence")
+        self.assertNotEqual(invalid.returncode, 0)
+        self.assertIn("--camera must be lepton or boson", invalid.stderr)
+
+        wrapper_source = BOSON_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('run_c3m_local_demo.sh" --camera boson "$@"', wrapper_source)
+        syntax = subprocess.run(
+            ["bash", "-n", str(BOSON_SCRIPT)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(syntax.returncode, 0, syntax.stderr)
 
     def test_capture_count_must_be_positive(self) -> None:
         result = self.run_script("--captures", "0", "--exit-after-sequence")
@@ -97,6 +113,8 @@ class C3mLocalDemoScriptTest(unittest.TestCase):
         self.assertNotIn('send_command "storageManager.REPORT_STORAGE_HISTORY"', source)
         self.assertIn('send_command "missionApp.SCHEDULE_COLLECTION"', source)
         self.assertIn('send_command "commsApp.REQUEST_SCIENCE_DOWNLINK"', source)
+        self.assertIn('send_command "payloadDriverSelector.SELECT_PAYLOAD_DRIVER"', source)
+        self.assertIn('cmp -s "$FDP_FILE" "$GROUND_FDP_FILE"', source)
         self.assertIn('tools/payload_receiver.py', source)
         self.assertIn('--drop-payload-data-index', source)
         self.assertIn('--checkpoint-dir', source)
