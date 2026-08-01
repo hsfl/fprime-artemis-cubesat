@@ -63,6 +63,26 @@ static constexpr uint8_t PAYLOAD_CACHE_STATE_READY = 2;
 static constexpr uint8_t PAYLOAD_CACHE_STATE_SENDING = 3;
 static constexpr uint8_t PAYLOAD_CACHE_STATE_ERROR = 4;
 
+static constexpr uint16_t LEPTON_PREVIEW_MAX_FRAME_BYTES = 4800;
+static constexpr uint16_t LEPTON_PREVIEW_CHUNK_BYTES = 200;
+static constexpr uint8_t LEPTON_PREVIEW_RF_GAP_MS = 2;
+static constexpr uint8_t LEPTON_PREVIEW_WIDTH = 80;
+static constexpr uint8_t LEPTON_PREVIEW_HEIGHT = 60;
+static constexpr uint8_t LEPTON_PREVIEW_PIXEL_FORMAT_U8 = 1;
+static constexpr uint8_t LEPTON_PREVIEW_OP_BEGIN = 1;
+static constexpr uint8_t LEPTON_PREVIEW_OP_CHUNK = 2;
+static constexpr uint8_t LEPTON_PREVIEW_OP_COMMIT_AND_SEND = 3;
+static constexpr uint8_t LEPTON_PREVIEW_OP_ABORT = 4;
+static constexpr uint8_t LEPTON_PREVIEW_STATE_EMPTY = 0;
+static constexpr uint8_t LEPTON_PREVIEW_STATE_RECEIVING = 1;
+static constexpr uint8_t LEPTON_PREVIEW_STATE_READY = 2;
+static constexpr uint8_t LEPTON_PREVIEW_STATE_SENDING = 3;
+static constexpr uint8_t LEPTON_PREVIEW_STATE_ERROR = 4;
+static constexpr uint8_t LEPTON_PREVIEW_WIRE_MAGIC_0 = 0x50;
+static constexpr uint8_t LEPTON_PREVIEW_WIRE_MAGIC_1 = 0x56;
+static constexpr uint8_t LEPTON_PREVIEW_WIRE_VERSION = 1;
+static constexpr uint8_t LEPTON_PREVIEW_WIRE_TYPE_FRAGMENT = 1;
+
 static constexpr char COMMAND_PREFIX = '#';
 static constexpr size_t COMMAND_MAX_LEN = 64;
 

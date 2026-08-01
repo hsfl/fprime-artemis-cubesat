@@ -11,6 +11,8 @@ class PayloadCache : public PayloadChannelHandler {
 
   bool beginLocalFrame(const uint8_t* payload, uint16_t length);
   bool pollLocalResponse(uint8_t* payload, uint16_t& length);
+  bool isTransferActive() const;
+  void rejectBusy(uint8_t requestId, uint8_t operation);
 
   bool handlePayloadControl(const uint8_t* payload, uint16_t length) override;
   bool nextPayloadPacket(uint8_t* payload, uint16_t& length) override;

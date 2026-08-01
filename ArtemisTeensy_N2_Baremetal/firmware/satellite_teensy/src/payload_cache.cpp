@@ -68,6 +68,17 @@ bool PayloadCache::pollLocalResponse(uint8_t* payload, uint16_t& length) {
   return true;
 }
 
+bool PayloadCache::isTransferActive() const {
+  return m_state == link_protocol::PAYLOAD_CACHE_STATE_RECEIVING ||
+         m_state == link_protocol::PAYLOAD_CACHE_STATE_SENDING;
+}
+
+void PayloadCache::rejectBusy(uint8_t requestId, uint8_t operation) {
+  // Keep the normal target-specific response shape so the Pi can correlate a
+  // rejected request exactly like every other payload-cache response.
+  prepareResponse(requestId, link_protocol::TEENSY_STATUS_BUSY, operation);
+}
+
 void PayloadCache::handleBegin(uint8_t requestId, const uint8_t* body, uint8_t bodyLen) {
   if (bodyLen != 12U) {
     prepareResponse(requestId, link_protocol::TEENSY_STATUS_BAD_REQUEST, body[0]);

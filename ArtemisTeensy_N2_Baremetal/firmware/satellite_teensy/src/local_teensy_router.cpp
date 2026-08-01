@@ -5,11 +5,13 @@
 LocalTeensyRouter::LocalTeensyRouter(PduProxy& pduProxy,
                                      Rf23Driver& rfDriver,
                                      LinkCounters& counters,
-                                     PayloadCache& payloadCache)
+                                     PayloadCache& payloadCache,
+                                     LeptonPreview& leptonPreview)
     : m_pduProxy(pduProxy),
       m_rfDriver(rfDriver),
       m_counters(counters),
       m_payloadCache(payloadCache),
+      m_leptonPreview(leptonPreview),
       m_rfResponseLen(0) {
   memset(m_rfResponse, 0, sizeof(m_rfResponse));
 }
@@ -21,14 +23,27 @@ bool LocalTeensyRouter::beginLocalFrame(const uint8_t* payload, uint16_t length)
   }
 
   const uint8_t target = payload[0];
+  const uint8_t requestId = payload[1];
+  const uint8_t requestOperation =
+      length > LOCAL_HEADER_LEN ? payload[LOCAL_HEADER_LEN] : 0U;
   if (target == link_protocol::TEENSY_TARGET_PDU) {
     return m_pduProxy.beginLocalFrame(payload, length);
   }
   if (target == link_protocol::TEENSY_TARGET_PAYLOAD_CACHE) {
+    if (m_leptonPreview.isTransferActive()) {
+      m_payloadCache.rejectBusy(requestId, requestOperation);
+      return true;
+    }
     return m_payloadCache.beginLocalFrame(payload, length);
   }
+  if (target == link_protocol::TEENSY_TARGET_LEPTON_PREVIEW) {
+    if (m_payloadCache.isTransferActive()) {
+      m_leptonPreview.rejectBusy(requestId, requestOperation);
+      return true;
+    }
+    return m_leptonPreview.beginLocalFrame(payload, length);
+  }
 
-  const uint8_t requestId = payload[1];
   const uint8_t payloadLen = payload[2];
   if (target != link_protocol::TEENSY_TARGET_RF_STATUS ||
       payload[3] != 0U ||
@@ -70,11 +85,14 @@ bool LocalTeensyRouter::pollLocalResponse(uint8_t* payload, uint16_t& length) {
   if (m_payloadCache.pollLocalResponse(payload, length)) {
     return true;
   }
+  if (m_leptonPreview.pollLocalResponse(payload, length)) {
+    return true;
+  }
   return m_pduProxy.pollLocalResponse(payload, length);
 }
 
-void LocalTeensyRouter::prepareErrorResponse(uint8_t requestId, uint8_t status) {
-  m_rfResponse[0] = link_protocol::TEENSY_TARGET_RF_STATUS;
+void LocalTeensyRouter::prepareErrorResponse(uint8_t requestId, uint8_t status, uint8_t target) {
+  m_rfResponse[0] = target;
   m_rfResponse[1] = requestId;
   m_rfResponse[2] = status;
   m_rfResponse[3] = 0;

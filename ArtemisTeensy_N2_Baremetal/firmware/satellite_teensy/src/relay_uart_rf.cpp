@@ -12,11 +12,13 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
                          const RelayConfig& config,
                          Stream* payloadIo,
                          LocalChannelHandler* localHandler,
-                         PayloadChannelHandler* payloadHandler)
+                         PayloadChannelHandler* payloadHandler,
+                         PreviewChannelHandler* previewHandler)
     : m_linkIo(linkIo),
       m_payloadIo(payloadIo),
       m_localHandler(localHandler),
       m_payloadHandler(payloadHandler),
+      m_previewHandler(previewHandler),
       m_rf(rfDriver),
       m_counters(counters),
       m_config(config),
@@ -111,6 +113,12 @@ void RelayUartRf::poll() {
     serviceCachedPayload();
   }
   serviceDownlinkQueue();
+  // Preview is deliberately lowest priority: do not let it jump ahead of
+  // queued channel-0 traffic in either direction. At most one PV record is
+  // attempted in an otherwise-idle poll.
+  if (!m_rf.receiveInProgress() && m_uplinkCount == 0 && m_downlinkCount == 0) {
+    servicePreview();
+  }
 }
 
 void RelayUartRf::handleRadioStateTransition() {
@@ -219,7 +227,9 @@ void RelayUartRf::flushLocalResponseToUart() {
   uint8_t response[link_protocol::FRAME_MAX_PAYLOAD] = {0};
   uint16_t responseLen = 0;
   if (m_localHandler->pollLocalResponse(response, responseLen)) {
-    sendUartFrame(link_protocol::CHANNEL_TEENSY_LOCAL, response, responseLen);
+    if (sendUartFrame(link_protocol::CHANNEL_TEENSY_LOCAL, response, responseLen)) {
+      m_counters.localResponsesTx += 1U;
+    }
   }
 }
 
@@ -370,6 +380,13 @@ void RelayUartRf::handleCompletedFrame() {
   if (m_frameChannel == link_protocol::CHANNEL_TEENSY_LOCAL) {
     if (m_localHandler == nullptr || !m_localHandler->beginLocalFrame(m_framePayload, m_frameLength)) {
       m_counters.framingDrops += 1;
+    } else {
+      // Drain synchronously while this request's identity is still current.
+      // The normal end-of-poll drain remains for asynchronous PDU and preview
+      // commit-completion responses. Without this, consecutive complete local
+      // frames read in one UART batch can overwrite a one-slot response before
+      // the next poll has emitted it.
+      flushLocalResponseToUart();
     }
     return;
   }
@@ -494,6 +511,42 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel,
   if (channel == link_protocol::CHANNEL_PAYLOAD) {
     m_counters.payloadRfTxMessages += 1;
   }
+  return true;
+}
+
+bool RelayUartRf::sendPreviewPacketBestEffort(const uint8_t* payload, uint16_t length) {
+  // PV records are intentionally constrained to one RF segment. Unlike the
+  // science cache path, do not ACK, retry, or repair a preview fragment.
+  if (payload == nullptr || length == 0U || length > link_protocol::RF_SEGMENT_MAX_DATA) {
+    m_counters.rfOversizeDrops += 1;
+    return false;
+  }
+
+  const uint8_t msgId = m_nextMsgId[link_protocol::CHANNEL_PAYLOAD]++;
+  uint8_t rfPacket[link_protocol::RF_PACKET_MAX_LEN] = {0};
+  rfPacket[0] = link_protocol::magicForChannel(link_protocol::CHANNEL_PAYLOAD);
+  rfPacket[1] = msgId;
+  rfPacket[2] = 0U;
+  rfPacket[3] = 1U;
+  rfPacket[4] = static_cast<uint8_t>(length);
+  memcpy(&rfPacket[link_protocol::RF_SEGMENT_HEADER_LEN], payload, length);
+
+  const Rf23SendResult result =
+      m_rf.send(rfPacket, static_cast<uint8_t>(link_protocol::RF_SEGMENT_HEADER_LEN + length));
+  if (result != Rf23SendResult::SENT) {
+    m_counters.rfTxDrops += 1;
+    if (result == Rf23SendResult::TX_TIMEOUT) {
+      m_counters.rfTxTimeouts += 1;
+    }
+    return false;
+  }
+
+  m_counters.rfTxPackets += 1;
+  m_counters.rfTxSegments += 1;
+  m_counters.rfTxMessages += 1;
+  m_counters.payloadRfTxSegments += 1;
+  m_counters.payloadRfTxMessages += 1;
+  delay(link_protocol::LEPTON_PREVIEW_RF_GAP_MS);
   return true;
 }
 
@@ -904,6 +957,20 @@ void RelayUartRf::serviceCachedPayload() {
   const bool sent =
       sendPayloadOverRf(link_protocol::CHANNEL_PAYLOAD, packet, length, true);
   m_payloadHandler->payloadPacketSent(sent);
+}
+
+void RelayUartRf::servicePreview() {
+  if (m_previewHandler == nullptr || !m_rf.isReady()) {
+    return;
+  }
+  uint8_t packet[link_protocol::RF_SEGMENT_MAX_DATA] = {0};
+  uint16_t length = 0U;
+  if (!m_previewHandler->nextPreviewPacket(packet, length)) {
+    return;
+  }
+  // Always advance after the one TX attempt. A failed PV fragment is allowed;
+  // the wire format supports partial reconstruction and never requests repair.
+  m_previewHandler->previewPacketAttempted(sendPreviewPacketBestEffort(packet, length));
 }
 
 void RelayUartRf::serviceDownlinkQueue() {

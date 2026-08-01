@@ -20,6 +20,14 @@ class PayloadChannelHandler {
   virtual void payloadPacketSent(bool sent) = 0;
 };
 
+// Preview records use the existing channel-1 transport but are deliberately
+// independent from the reliable science cache and its N2 repair protocol.
+class PreviewChannelHandler {
+ public:
+  virtual bool nextPreviewPacket(uint8_t* payload, uint16_t& length) = 0;
+  virtual void previewPacketAttempted(bool sent) = 0;
+};
+
 struct RelayConfig {
   bool enableUartToRf = true;
   bool uartOutputFramed = true;
@@ -40,7 +48,8 @@ class RelayUartRf {
               const RelayConfig& config = RelayConfig{},
               Stream* payloadIo = nullptr,
               LocalChannelHandler* localHandler = nullptr,
-              PayloadChannelHandler* payloadHandler = nullptr);
+              PayloadChannelHandler* payloadHandler = nullptr,
+              PreviewChannelHandler* previewHandler = nullptr);
 
   void begin();
   void poll();
@@ -77,6 +86,7 @@ class RelayUartRf {
                          const uint8_t* payload,
                          uint16_t length,
                          bool cachedPayload = false);
+  bool sendPreviewPacketBestEffort(const uint8_t* payload, uint16_t length);
   bool sendRfPacket(const uint8_t* packet, uint8_t packetLen);
   bool sendRfPacketWithAck(const uint8_t* packet, uint8_t packetLen, uint8_t channel, uint8_t msgId, uint8_t segIdx);
   bool waitForAck(uint8_t channel, uint8_t msgId, uint8_t segIdx);
@@ -92,6 +102,7 @@ class RelayUartRf {
   bool enqueueDownlinkMessage(uint8_t channel, const uint8_t* payload, uint16_t length);
   void serviceUplinkQueue();
   void serviceCachedPayload();
+  void servicePreview();
   void serviceDownlinkQueue();
 
   static constexpr uint8_t MAX_QUEUE_DEPTH = 32;
@@ -118,6 +129,7 @@ class RelayUartRf {
   Stream* m_payloadIo;
   LocalChannelHandler* m_localHandler;
   PayloadChannelHandler* m_payloadHandler;
+  PreviewChannelHandler* m_previewHandler;
   Rf23Driver& m_rf;
   LinkCounters& m_counters;
   RelayConfig m_config;

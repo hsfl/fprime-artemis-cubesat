@@ -17,6 +17,7 @@ static constexpr U8 CHANNEL_COUNT = 3;
 static constexpr U8 TEENSY_TARGET_PDU = 1;
 static constexpr U8 TEENSY_TARGET_RF_STATUS = 2;
 static constexpr U8 TEENSY_TARGET_PAYLOAD_CACHE = 3;
+static constexpr U8 TEENSY_TARGET_LEPTON_PREVIEW = 4;
 static constexpr U8 TEENSY_STATUS_OK = 0;
 static constexpr U8 TEENSY_STATUS_BAD_REQUEST = 1;
 static constexpr U8 TEENSY_STATUS_BUSY = 2;
@@ -78,6 +79,26 @@ static constexpr U32 PAYLOAD_PACKETS_PER_RUN = 18;
 static constexpr U32 PAYLOAD_RETRY_PACKETS_PER_RUN = 18;
 static constexpr U8 PAYLOAD_MAGIC_0 = 0x4E;  // 'N'
 static constexpr U8 PAYLOAD_MAGIC_1 = 0x32;  // '2'
+
+static constexpr U32 LEPTON_PREVIEW_MAX_FRAME_BYTES = 4800;
+static constexpr FwSizeType LEPTON_PREVIEW_CHUNK_BYTES = 200;
+static constexpr U8 LEPTON_PREVIEW_RF_GAP_MS = 2;
+static constexpr U8 LEPTON_PREVIEW_WIDTH = 80;
+static constexpr U8 LEPTON_PREVIEW_HEIGHT = 60;
+static constexpr U8 LEPTON_PREVIEW_PIXEL_FORMAT_U8 = 1;
+static constexpr U8 LEPTON_PREVIEW_OP_BEGIN = 1;
+static constexpr U8 LEPTON_PREVIEW_OP_CHUNK = 2;
+static constexpr U8 LEPTON_PREVIEW_OP_COMMIT_AND_SEND = 3;
+static constexpr U8 LEPTON_PREVIEW_OP_ABORT = 4;
+static constexpr U8 LEPTON_PREVIEW_STATE_EMPTY = 0;
+static constexpr U8 LEPTON_PREVIEW_STATE_RECEIVING = 1;
+static constexpr U8 LEPTON_PREVIEW_STATE_READY = 2;
+static constexpr U8 LEPTON_PREVIEW_STATE_SENDING = 3;
+static constexpr U8 LEPTON_PREVIEW_STATE_ERROR = 4;
+static constexpr U8 LEPTON_PREVIEW_WIRE_MAGIC_0 = 0x50;
+static constexpr U8 LEPTON_PREVIEW_WIRE_MAGIC_1 = 0x56;
+static constexpr U8 LEPTON_PREVIEW_WIRE_VERSION = 1;
+static constexpr U8 LEPTON_PREVIEW_WIRE_TYPE_FRAGMENT = 1;
 
 inline bool isValidChannel(const U8 channel) {
     return channel < CHANNEL_COUNT;

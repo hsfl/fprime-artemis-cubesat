@@ -87,6 +87,7 @@ def render_fprime(cfg: dict, identity: dict) -> str:
     ground_ack = rf["ack_directions"]["ground_to_satellite"]
     satellite_ack = rf["ack_directions"]["satellite_to_ground"]
     payload = cfg["payload"]
+    preview = cfg["lepton_preview"]
     return f"""#ifndef Components_LinkCfg_HPP
 #define Components_LinkCfg_HPP
 
@@ -103,6 +104,7 @@ static constexpr U8 CHANNEL_COUNT = {channels["satellite_count"]};
 static constexpr U8 TEENSY_TARGET_PDU = {rpc["target_pdu"]};
 static constexpr U8 TEENSY_TARGET_RF_STATUS = {rpc["target_rf_status"]};
 static constexpr U8 TEENSY_TARGET_PAYLOAD_CACHE = {rpc["target_payload_cache"]};
+static constexpr U8 TEENSY_TARGET_LEPTON_PREVIEW = {rpc["target_lepton_preview"]};
 static constexpr U8 TEENSY_STATUS_OK = {rpc["status_ok"]};
 static constexpr U8 TEENSY_STATUS_BAD_REQUEST = {rpc["status_bad_request"]};
 static constexpr U8 TEENSY_STATUS_BUSY = {rpc["status_busy"]};
@@ -165,6 +167,26 @@ static constexpr U32 PAYLOAD_RETRY_PACKETS_PER_RUN = {payload["retry_packets_per
 static constexpr U8 PAYLOAD_MAGIC_0 = {hex_byte(payload["magic_0"])};  // 'N'
 static constexpr U8 PAYLOAD_MAGIC_1 = {hex_byte(payload["magic_1"])};  // '2'
 
+static constexpr U32 LEPTON_PREVIEW_MAX_FRAME_BYTES = {preview["max_frame_bytes"]};
+static constexpr FwSizeType LEPTON_PREVIEW_CHUNK_BYTES = {preview["chunk_bytes"]};
+static constexpr U8 LEPTON_PREVIEW_RF_GAP_MS = {preview["rf_gap_ms"]};
+static constexpr U8 LEPTON_PREVIEW_WIDTH = {preview["width"]};
+static constexpr U8 LEPTON_PREVIEW_HEIGHT = {preview["height"]};
+static constexpr U8 LEPTON_PREVIEW_PIXEL_FORMAT_U8 = {preview["pixel_format_u8"]};
+static constexpr U8 LEPTON_PREVIEW_OP_BEGIN = {preview["op_begin"]};
+static constexpr U8 LEPTON_PREVIEW_OP_CHUNK = {preview["op_chunk"]};
+static constexpr U8 LEPTON_PREVIEW_OP_COMMIT_AND_SEND = {preview["op_commit_and_send"]};
+static constexpr U8 LEPTON_PREVIEW_OP_ABORT = {preview["op_abort"]};
+static constexpr U8 LEPTON_PREVIEW_STATE_EMPTY = {preview["state_empty"]};
+static constexpr U8 LEPTON_PREVIEW_STATE_RECEIVING = {preview["state_receiving"]};
+static constexpr U8 LEPTON_PREVIEW_STATE_READY = {preview["state_ready"]};
+static constexpr U8 LEPTON_PREVIEW_STATE_SENDING = {preview["state_sending"]};
+static constexpr U8 LEPTON_PREVIEW_STATE_ERROR = {preview["state_error"]};
+static constexpr U8 LEPTON_PREVIEW_WIRE_MAGIC_0 = {hex_byte(preview["wire_magic_0"])};
+static constexpr U8 LEPTON_PREVIEW_WIRE_MAGIC_1 = {hex_byte(preview["wire_magic_1"])};
+static constexpr U8 LEPTON_PREVIEW_WIRE_VERSION = {preview["wire_version"]};
+static constexpr U8 LEPTON_PREVIEW_WIRE_TYPE_FRAGMENT = {preview["wire_type_fragment"]};
+
 inline bool isValidChannel(const U8 channel) {{
     return channel < CHANNEL_COUNT;
 }}
@@ -198,6 +220,7 @@ def render_teensy(cfg: dict, identity: dict, *, satellite: bool) -> str:
     tx_ack = satellite_ack if satellite else ground_ack
     rx_ack = ground_ack if satellite else satellite_ack
     payload = cfg["payload"]
+    preview = cfg["lepton_preview"]
     command = cfg["command"]
     count = channels["satellite_count"] if satellite else channels["ground_count"]
     local_address = identity["satellite_address"] if satellite else identity["ground_address"]
@@ -210,6 +233,7 @@ def render_teensy(cfg: dict, identity: dict, *, satellite: bool) -> str:
 static constexpr uint8_t TEENSY_TARGET_PDU = {rpc["target_pdu"]};
 static constexpr uint8_t TEENSY_TARGET_RF_STATUS = {rpc["target_rf_status"]};
 static constexpr uint8_t TEENSY_TARGET_PAYLOAD_CACHE = {rpc["target_payload_cache"]};
+static constexpr uint8_t TEENSY_TARGET_LEPTON_PREVIEW = {rpc["target_lepton_preview"]};
 static constexpr uint8_t TEENSY_STATUS_OK = {rpc["status_ok"]};
 static constexpr uint8_t TEENSY_STATUS_BAD_REQUEST = {rpc["status_bad_request"]};
 static constexpr uint8_t TEENSY_STATUS_BUSY = {rpc["status_busy"]};
@@ -289,6 +313,26 @@ static constexpr uint8_t PAYLOAD_CACHE_STATE_RECEIVING = {payload["cache_state_r
 static constexpr uint8_t PAYLOAD_CACHE_STATE_READY = {payload["cache_state_ready"]};
 static constexpr uint8_t PAYLOAD_CACHE_STATE_SENDING = {payload["cache_state_sending"]};
 static constexpr uint8_t PAYLOAD_CACHE_STATE_ERROR = {payload["cache_state_error"]};
+
+static constexpr uint16_t LEPTON_PREVIEW_MAX_FRAME_BYTES = {preview["max_frame_bytes"]};
+static constexpr uint16_t LEPTON_PREVIEW_CHUNK_BYTES = {preview["chunk_bytes"]};
+static constexpr uint8_t LEPTON_PREVIEW_RF_GAP_MS = {preview["rf_gap_ms"]};
+static constexpr uint8_t LEPTON_PREVIEW_WIDTH = {preview["width"]};
+static constexpr uint8_t LEPTON_PREVIEW_HEIGHT = {preview["height"]};
+static constexpr uint8_t LEPTON_PREVIEW_PIXEL_FORMAT_U8 = {preview["pixel_format_u8"]};
+static constexpr uint8_t LEPTON_PREVIEW_OP_BEGIN = {preview["op_begin"]};
+static constexpr uint8_t LEPTON_PREVIEW_OP_CHUNK = {preview["op_chunk"]};
+static constexpr uint8_t LEPTON_PREVIEW_OP_COMMIT_AND_SEND = {preview["op_commit_and_send"]};
+static constexpr uint8_t LEPTON_PREVIEW_OP_ABORT = {preview["op_abort"]};
+static constexpr uint8_t LEPTON_PREVIEW_STATE_EMPTY = {preview["state_empty"]};
+static constexpr uint8_t LEPTON_PREVIEW_STATE_RECEIVING = {preview["state_receiving"]};
+static constexpr uint8_t LEPTON_PREVIEW_STATE_READY = {preview["state_ready"]};
+static constexpr uint8_t LEPTON_PREVIEW_STATE_SENDING = {preview["state_sending"]};
+static constexpr uint8_t LEPTON_PREVIEW_STATE_ERROR = {preview["state_error"]};
+static constexpr uint8_t LEPTON_PREVIEW_WIRE_MAGIC_0 = {hex_byte(preview["wire_magic_0"])};
+static constexpr uint8_t LEPTON_PREVIEW_WIRE_MAGIC_1 = {hex_byte(preview["wire_magic_1"])};
+static constexpr uint8_t LEPTON_PREVIEW_WIRE_VERSION = {preview["wire_version"]};
+static constexpr uint8_t LEPTON_PREVIEW_WIRE_TYPE_FRAGMENT = {preview["wire_type_fragment"]};
 
 static constexpr char COMMAND_PREFIX = {cpp_char(command["prefix"])};
 static constexpr size_t COMMAND_MAX_LEN = {command["max_len"]};

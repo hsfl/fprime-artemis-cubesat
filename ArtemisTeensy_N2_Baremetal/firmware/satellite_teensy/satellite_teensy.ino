@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #include "src/link_counters.hpp"
+#include "src/lepton_preview.hpp"
 #include "src/local_teensy_router.hpp"
 #include "src/pdu_proxy.hpp"
 #include "src/payload_cache.hpp"
@@ -35,7 +36,9 @@ PduProxy g_pduProxy(Serial1);
 // One cache serves whichever payload camera is selected. Place the 192 KiB
 // backing store in Teensy 4.1 RAM2 so normal stack/data remain in DTCM.
 DMAMEM PayloadCache g_payloadCache;
-LocalTeensyRouter g_localRouter(g_pduProxy, g_rfDriver, g_linkCounters, g_payloadCache);
+DMAMEM LeptonPreview g_leptonPreview(g_linkCounters);
+LocalTeensyRouter g_localRouter(
+    g_pduProxy, g_rfDriver, g_linkCounters, g_payloadCache, g_leptonPreview);
 static uint8_t g_rpiUartRxBuffer[RPI_UART_RX_BUFFER_SIZE];
 // Channelized bridge mode:
 // - channel 0: CCSDS/GDS bytes forwarded over RF
@@ -52,7 +55,14 @@ RelayConfig g_relayConfig{
     CCSDS_TM_FRAME_BYTES,
     link_protocol::CHANNEL_CCSDS};
 RelayUartRf g_relay(
-    Serial2, g_rfDriver, g_linkCounters, g_relayConfig, nullptr, &g_localRouter, &g_payloadCache);
+    Serial2,
+    g_rfDriver,
+    g_linkCounters,
+    g_relayConfig,
+    nullptr,
+    &g_localRouter,
+    &g_payloadCache,
+    &g_leptonPreview);
 static uint32_t g_radioTrafficLedUntilMs = 0;
 
 struct RadioTrafficSnapshot {
@@ -131,6 +141,14 @@ void debugPrintCounters(const char* prefix) {
   Serial.print(g_linkCounters.payloadRfRxSegments);
   Serial.print(" payload_rf_tx_seg=");
   Serial.print(g_linkCounters.payloadRfTxSegments);
+  Serial.print(" preview_commits=");
+  Serial.print(g_linkCounters.previewFramesCommitted);
+  Serial.print(" preview_frag_attempts=");
+  Serial.print(g_linkCounters.previewFragmentsAttempted);
+  Serial.print(" preview_frag_failures=");
+  Serial.print(g_linkCounters.previewFragmentFailures);
+  Serial.print(" local_resp_tx=");
+  Serial.print(g_linkCounters.localResponsesTx);
   Serial.print(" rf_tx_drops=");
   Serial.print(g_linkCounters.rfTxDrops);
   Serial.print(" rf_tx_timeouts=");
