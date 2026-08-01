@@ -27,12 +27,22 @@ import serial
 
 
 MAGIC = b"N2"
+PREVIEW_MAGIC = b"PV"
 TYPE_HEADER = 1
 TYPE_DATA = 2
 TYPE_END = 3
 TYPE_RETRY_REQUEST = 4
 MAX_PACKET = 44
 DATA_BYTES = 35
+PREVIEW_VERSION = 1
+PREVIEW_TYPE_FRAGMENT = 1
+PREVIEW_WIDTH = 80
+PREVIEW_HEIGHT = 60
+PREVIEW_PIXEL_FORMAT_U8 = 1
+PREVIEW_TOTAL_BYTES = PREVIEW_WIDTH * PREVIEW_HEIGHT
+PREVIEW_HEADER_BYTES = 20
+PREVIEW_FRAGMENT_DATA_BYTES = 24
+PREVIEW_FINALIZE_DEADLINE_S = 0.75
 RETRY_INTERVAL_S = 5.0
 RETRY_AFTER_SILENCE_S = 8.0
 RETRY_AFTER_REPAIR_QUIET_S = 0.5
@@ -74,6 +84,34 @@ class ReceiverEvent:
     packet_data_bytes: int = DATA_BYTES
     missing_map_path: str | None = None
     transfer_started_at_s: float | None = None
+    preview_session_id: int | None = None
+    preview_frame_sequence: int | None = None
+    preview_width: int | None = None
+    preview_height: int | None = None
+    preview_total_bytes: int | None = None
+    preview_received_bytes: int | None = None
+    preview_fragment_count: int | None = None
+    preview_received_fragments: int | None = None
+    preview_percent: float | None = None
+    preview_complete: bool | None = None
+    preview_crc_ok: bool | None = None
+    preview_finalize_reason: str | None = None
+    preview_pixels: bytes | None = None
+
+
+@dataclass
+class PreviewFrame:
+    session_id: int
+    frame_sequence: int
+    width: int
+    height: int
+    total_bytes: int
+    fragment_count: int
+    expected_crc: int
+    pixels: bytearray
+    fragments: dict[int, bytes]
+    started_s: float
+    last_fragment_s: float
 
 
 def crc16_ccitt(data: bytes) -> int:
@@ -169,6 +207,9 @@ class PayloadReceiver:
         self.next_retry_request_wall_s = 0.0
         self.checkpoint_rejection_reason: str | None = None
         self.ignored_transfer_id: int | None = None
+        # Preview traffic is intentionally transient: it never enters the N2
+        # checkpoint, retry, or science-file reconstruction paths.
+        self.preview_frame: PreviewFrame | None = None
 
     @property
     def received_bytes(self) -> int:
@@ -424,6 +465,19 @@ class PayloadReceiver:
         timeout_reason: str | None = None,
         completion_reason: str | None = None,
         missing_map_path: pathlib.Path | None = None,
+        preview_session_id: int | None = None,
+        preview_frame_sequence: int | None = None,
+        preview_width: int | None = None,
+        preview_height: int | None = None,
+        preview_total_bytes: int | None = None,
+        preview_received_bytes: int | None = None,
+        preview_fragment_count: int | None = None,
+        preview_received_fragments: int | None = None,
+        preview_percent: float | None = None,
+        preview_complete: bool | None = None,
+        preview_crc_ok: bool | None = None,
+        preview_finalize_reason: str | None = None,
+        preview_pixels: bytes | None = None,
     ) -> None:
         if self.on_event is None:
             return
@@ -460,6 +514,19 @@ class PayloadReceiver:
                 transfer_started_at_s=(
                     self.transfer_started_wall_s if self.transfer_started_wall_s > 0.0 else None
                 ),
+                preview_session_id=preview_session_id,
+                preview_frame_sequence=preview_frame_sequence,
+                preview_width=preview_width,
+                preview_height=preview_height,
+                preview_total_bytes=preview_total_bytes,
+                preview_received_bytes=preview_received_bytes,
+                preview_fragment_count=preview_fragment_count,
+                preview_received_fragments=preview_received_fragments,
+                preview_percent=preview_percent,
+                preview_complete=preview_complete,
+                preview_crc_ok=preview_crc_ok,
+                preview_finalize_reason=preview_finalize_reason,
+                preview_pixels=preview_pixels,
             )
         )
 
@@ -479,6 +546,7 @@ class PayloadReceiver:
                             break
                         continue
                     self.handle_packet(packet, ser)
+                    self.finalize_preview_if_due()
                     self.request_retries_if_due(ser)
                     if self.complete:
                         break
@@ -490,6 +558,7 @@ class PayloadReceiver:
                         packet = self.read_packet(ser)
                         if packet:
                             self.handle_packet(packet, ser)
+                        self.finalize_preview_if_due()
                         self.request_retries_if_due(ser)
         except serial.SerialException as exc:
             phase = "io" if opened else "open"
@@ -581,9 +650,16 @@ class PayloadReceiver:
 
     def try_extract_packet(self) -> bytes:
         while True:
-            magic_index = self.rx_buffer.find(MAGIC)
+            n2_index = self.rx_buffer.find(MAGIC)
+            preview_index = self.rx_buffer.find(PREVIEW_MAGIC)
+            candidates = [index for index in (n2_index, preview_index) if index >= 0]
+            magic_index = min(candidates) if candidates else -1
             if magic_index < 0:
-                trailing_magic_prefix = self.rx_buffer[-1:] if self.rx_buffer.endswith(MAGIC[:1]) else b""
+                trailing_magic_prefix = (
+                    self.rx_buffer[-1:]
+                    if self.rx_buffer.endswith((MAGIC[:1], PREVIEW_MAGIC[:1]))
+                    else b""
+                )
                 self.rx_buffer.clear()
                 self.rx_buffer += trailing_magic_prefix
                 return b""
@@ -592,26 +668,38 @@ class PayloadReceiver:
             if len(self.rx_buffer) < 4:
                 return b""
 
-            packet_type = self.rx_buffer[2]
-            if packet_type == TYPE_HEADER:
-                needed = 17
-            elif packet_type == TYPE_END:
-                needed = 8
-            elif packet_type == TYPE_DATA:
-                if len(self.rx_buffer) < 7:
+            if self.rx_buffer[:2] == PREVIEW_MAGIC:
+                if len(self.rx_buffer) < PREVIEW_HEADER_BYTES:
                     return b""
-                valid_len = self.rx_buffer[6]
-                if valid_len > self.packet_data_bytes:
+                if (
+                    self.rx_buffer[2] != PREVIEW_VERSION
+                    or self.rx_buffer[3] != PREVIEW_TYPE_FRAGMENT
+                    or not 1 <= self.rx_buffer[15] <= PREVIEW_FRAGMENT_DATA_BYTES
+                ):
                     del self.rx_buffer[0]
                     continue
-                needed = 7 + valid_len + 2
-            elif packet_type == TYPE_RETRY_REQUEST:
-                if len(self.rx_buffer) < 7:
-                    return b""
-                needed = 7 + self.rx_buffer[6]
+                needed = PREVIEW_HEADER_BYTES + self.rx_buffer[15]
             else:
-                del self.rx_buffer[0]
-                continue
+                packet_type = self.rx_buffer[2]
+                if packet_type == TYPE_HEADER:
+                    needed = 17
+                elif packet_type == TYPE_END:
+                    needed = 8
+                elif packet_type == TYPE_DATA:
+                    if len(self.rx_buffer) < 7:
+                        return b""
+                    valid_len = self.rx_buffer[6]
+                    if valid_len > self.packet_data_bytes:
+                        del self.rx_buffer[0]
+                        continue
+                    needed = 7 + valid_len + 2
+                elif packet_type == TYPE_RETRY_REQUEST:
+                    if len(self.rx_buffer) < 7:
+                        return b""
+                    needed = 7 + self.rx_buffer[6]
+                else:
+                    del self.rx_buffer[0]
+                    continue
 
             if needed > MAX_PACKET:
                 del self.rx_buffer[0]
@@ -623,6 +711,9 @@ class PayloadReceiver:
             return packet
 
     def handle_packet(self, packet: bytes, ser: serial.Serial) -> None:
+        if len(packet) >= 2 and packet[:2] == PREVIEW_MAGIC:
+            self.handle_preview_fragment(packet)
+            return
         if len(packet) < 4 or packet[0:2] != MAGIC:
             return
         packet_type = packet[2]
@@ -644,6 +735,142 @@ class PayloadReceiver:
             self.end_seen = True
             self.last_end_s = time.monotonic()
             self.persist_checkpoint(reason="end packet accepted")
+
+    def handle_preview_fragment(self, packet: bytes) -> None:
+        """Accept a best-effort, downsampled preview fragment without N2 side effects."""
+
+        if len(packet) < PREVIEW_HEADER_BYTES or packet[:2] != PREVIEW_MAGIC:
+            return
+        (
+            version,
+            packet_type,
+            session_id,
+            frame_sequence,
+            width,
+            height,
+            pixel_format,
+            fragment_index,
+            fragment_count,
+            data_length,
+            total_bytes,
+            expected_crc,
+        ) = (
+            packet[2],
+            packet[3],
+            struct.unpack_from("<H", packet, 4)[0],
+            struct.unpack_from("<I", packet, 6)[0],
+            packet[10],
+            packet[11],
+            packet[12],
+            packet[13],
+            packet[14],
+            packet[15],
+            struct.unpack_from("<H", packet, 16)[0],
+            struct.unpack_from("<H", packet, 18)[0],
+        )
+        if (
+            version != PREVIEW_VERSION
+            or packet_type != PREVIEW_TYPE_FRAGMENT
+            or width != PREVIEW_WIDTH
+            or height != PREVIEW_HEIGHT
+            or pixel_format != PREVIEW_PIXEL_FORMAT_U8
+            or total_bytes != PREVIEW_TOTAL_BYTES
+            or not 1 <= fragment_count <= 200
+            or fragment_index >= fragment_count
+            or not 1 <= data_length <= PREVIEW_FRAGMENT_DATA_BYTES
+            or len(packet) != PREVIEW_HEADER_BYTES + data_length
+            or fragment_count != (total_bytes + PREVIEW_FRAGMENT_DATA_BYTES - 1) // PREVIEW_FRAGMENT_DATA_BYTES
+        ):
+            return
+        offset = fragment_index * PREVIEW_FRAGMENT_DATA_BYTES
+        expected_length = min(PREVIEW_FRAGMENT_DATA_BYTES, total_bytes - offset)
+        if data_length != expected_length:
+            return
+        chunk = packet[PREVIEW_HEADER_BYTES:]
+        now = time.monotonic()
+        active = self.preview_frame
+        identity = (session_id, frame_sequence)
+        if active is not None and identity != (active.session_id, active.frame_sequence):
+            self.finalize_preview("next_frame", now=now)
+            active = None
+        if active is None:
+            active = PreviewFrame(
+                session_id=session_id,
+                frame_sequence=frame_sequence,
+                width=width,
+                height=height,
+                total_bytes=total_bytes,
+                fragment_count=fragment_count,
+                expected_crc=expected_crc,
+                pixels=bytearray(b"\xff" * total_bytes),
+                fragments={},
+                started_s=now,
+                last_fragment_s=now,
+            )
+            self.preview_frame = active
+        elif (
+            active.width != width
+            or active.height != height
+            or active.total_bytes != total_bytes
+            or active.fragment_count != fragment_count
+            or active.expected_crc != expected_crc
+        ):
+            # Same identity with incompatible metadata is malformed and cannot
+            # be allowed to contaminate the displayed frame.
+            return
+        existing = active.fragments.get(fragment_index)
+        if existing is not None and existing != chunk:
+            return
+        if existing is None:
+            active.fragments[fragment_index] = chunk
+            active.pixels[offset : offset + data_length] = chunk
+        active.last_fragment_s = now
+        if len(active.fragments) == active.fragment_count:
+            self.finalize_preview("all_fragments", now=now)
+
+    def finalize_preview_if_due(self, now: float | None = None) -> bool:
+        active = self.preview_frame
+        if active is None:
+            return False
+        now = time.monotonic() if now is None else now
+        if now - active.last_fragment_s < PREVIEW_FINALIZE_DEADLINE_S:
+            return False
+        self.finalize_preview("deadline", now=now)
+        return True
+
+    def finalize_preview(self, reason: str, *, now: float | None = None) -> None:
+        active = self.preview_frame
+        if active is None:
+            return
+        now = time.monotonic() if now is None else now
+        complete = len(active.fragments) == active.fragment_count
+        received_bytes = sum(len(chunk) for chunk in active.fragments.values())
+        pixels = bytes(active.pixels)
+        actual_crc = crc16_ccitt(pixels) if complete else None
+        percent = round(100.0 * received_bytes / active.total_bytes, 1)
+        status = "complete" if complete else "partial"
+        message = (
+            f"preview {status}: session={active.session_id} frame={active.frame_sequence} "
+            f"received={len(active.fragments)}/{active.fragment_count} ({percent:.1f}%) reason={reason}"
+        )
+        self.emit(
+            "preview_frame",
+            message,
+            preview_session_id=active.session_id,
+            preview_frame_sequence=active.frame_sequence,
+            preview_width=active.width,
+            preview_height=active.height,
+            preview_total_bytes=active.total_bytes,
+            preview_received_bytes=received_bytes,
+            preview_fragment_count=active.fragment_count,
+            preview_received_fragments=len(active.fragments),
+            preview_percent=percent,
+            preview_complete=complete,
+            preview_crc_ok=(actual_crc == active.expected_crc) if complete else None,
+            preview_finalize_reason=reason,
+            preview_pixels=pixels,
+        )
+        self.preview_frame = None
 
     def request_retries_if_due(self, ser: serial.Serial, force: bool = False) -> None:
         now = time.monotonic()
@@ -963,8 +1190,9 @@ class PayloadReceiver:
                             if packet:
                                 recovery_deadline_s = None
                                 self.handle_packet(packet, ser)
-                                force_retry = packet[2] == TYPE_END
+                                force_retry = packet[:2] == MAGIC and packet[2] == TYPE_END
                                 last_activity = time.monotonic()
+                            self.finalize_preview_if_due()
                             if self.complete:
                                 self.finalize_to_dir()
                                 self.reset_transfer(

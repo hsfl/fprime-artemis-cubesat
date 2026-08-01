@@ -20,6 +20,7 @@ import sys
 import threading
 import time
 import webbrowser
+import zlib
 from collections import deque
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -46,6 +47,7 @@ REPO_ROOT = find_repo_root(APP_DIR)
 DEFAULT_DATA_DIR = REPO_ROOT / "data"
 NOMINAL_TRANSFER_TARGET_S = 75.0
 SERIAL_RECONNECT_TIMEOUT_S = 120.0
+PREVIEW_STALE_AFTER_S = 3.0
 PAYLOAD_RECEIVER_PATH = REPO_ROOT / "ArtemisRpiTeensy_N2" / "tools" / "payload_receiver.py"
 LEPTON_VIEWER_PATH = REPO_ROOT / "ground-station" / "lepton-dp-viewer" / "lepton_dp_viewer.py"
 BOSON_VIEWER_PATH = REPO_ROOT / "ground-station" / "boson-viewer" / "boson_viewer.py"
@@ -88,6 +90,55 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _thermal_color(value: int) -> tuple[int, int, int]:
+    """Map a normalized U8 value onto a compact ironbow-style palette."""
+
+    stops = (
+        (0, (3, 0, 18)),
+        (48, (45, 8, 84)),
+        (96, (116, 18, 101)),
+        (144, (190, 45, 65)),
+        (192, (244, 105, 22)),
+        (224, (252, 190, 35)),
+        (255, (255, 255, 235)),
+    )
+    for index in range(1, len(stops)):
+        upper_value, upper_color = stops[index]
+        if value <= upper_value:
+            lower_value, lower_color = stops[index - 1]
+            span = upper_value - lower_value
+            weight = (value - lower_value) / span
+            return tuple(
+                round(lower + (upper - lower) * weight)
+                for lower, upper in zip(lower_color, upper_color)
+            )
+    return stops[-1][1]
+
+
+def thermal_png(width: int, height: int, pixels: bytes, *, partial: bool = False) -> bytes:
+    """Encode an auto-ranged thermal preview with no third-party dependency."""
+
+    if width <= 0 or height <= 0 or len(pixels) != width * height:
+        raise ValueError("preview dimensions do not match thermal pixels")
+    valid = [value for value in pixels if not (partial and value == 0xFF)]
+    low = min(valid) if valid else 0
+    high = max(valid) if valid else 255
+    span = max(1, high - low)
+    rows = []
+    for row in range(height):
+        rgb = bytearray()
+        for value in pixels[row * width : (row + 1) * width]:
+            if partial and value == 0xFF:
+                rgb.extend((255, 255, 255))
+            else:
+                normalized = max(0, min(255, round((value - low) * 255 / span)))
+                rgb.extend(_thermal_color(normalized))
+        rows.append(b"\x00" + bytes(rgb))
+    raw = b"".join(rows)
+    chunk = lambda kind, body: struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
 
 
 def safe_relative_url(run_id: str, filename: str) -> str:
@@ -316,6 +367,9 @@ def default_current_state() -> dict[str, Any]:
         "timeout_reason": None,
         "completion_reason": None,
         "missing_packet_indices": [],
+        # A preview is deliberately independent of a science transfer. Keep
+        # the last frame visible while a newer N2 product is received.
+        "preview": None,
     }
 
 
@@ -372,6 +426,7 @@ class ReceiverController:
         self.transfer_sequence = 0
         self.finalize_lock = threading.Lock()
         self.port_identity: dict[str, object] | None = None
+        self.live_preview_path = self.data_dir / ".live-preview.png"
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
     def _decode_lepton(self, fdp_path: Path, outdir: Path, dictionary: Path | None) -> dict[str, Any]:
@@ -674,6 +729,46 @@ class ReceiverController:
             if generation is not None and generation != self.worker_generation:
                 return
             self.current["port"] = event.port
+            if event.kind == "preview_frame":
+                pixels = event.preview_pixels
+                if (
+                    pixels is None
+                    or event.preview_width is None
+                    or event.preview_height is None
+                    or event.preview_session_id is None
+                    or event.preview_frame_sequence is None
+                ):
+                    return
+                png = thermal_png(
+                    event.preview_width,
+                    event.preview_height,
+                    pixels,
+                    partial=not bool(event.preview_complete),
+                )
+                payload_receiver.PayloadReceiver._atomic_write(self.live_preview_path, png)
+                self.current["preview"] = {
+                    "session_id": event.preview_session_id,
+                    "frame_sequence": event.preview_frame_sequence,
+                    "width": event.preview_width,
+                    "height": event.preview_height,
+                    "total_bytes": event.preview_total_bytes,
+                    "received_bytes": event.preview_received_bytes,
+                    "fragment_count": event.preview_fragment_count,
+                    "received_fragments": event.preview_received_fragments,
+                    "percent": event.preview_percent,
+                    "complete": event.preview_complete,
+                    "crc_ok": event.preview_crc_ok,
+                    "finalize_reason": event.preview_finalize_reason,
+                    "received_at_s": event.timestamp_s,
+                    "png": "/preview/latest.png",
+                }
+                state = "Complete" if event.preview_complete else "Partial"
+                self._append_log(
+                    f"Preview {state.lower()}: {event.preview_percent:.1f}% frame {event.preview_frame_sequence}",
+                    event.timestamp_s,
+                    level="info" if event.preview_complete else "warning",
+                )
+                return
             if event.kind in {
                 "transfer_started",
                 "transfer_resumed",
@@ -1156,6 +1251,13 @@ class ReceiverController:
             if int(current.get("total_packets") or 0) > 0
             else 0.0
         )
+        preview = current.get("preview")
+        if isinstance(preview, dict):
+            received_at = preview.get("received_at_s")
+            preview["stale"] = (
+                isinstance(received_at, (int, float))
+                and time.time() - float(received_at) >= PREVIEW_STALE_AFTER_S
+            )
         return {
             "current": current,
             "logs": logs,
@@ -1209,6 +1311,8 @@ class ReceiverHandler(BaseHTTPRequestHandler):
                 self.send_path(STATIC_DIR / "app.js")
             elif parsed.path == "/api/state":
                 self.send_json(self.server.controller.snapshot())
+            elif parsed.path == "/preview/latest.png":
+                self.send_path(self.server.controller.live_preview_path)
             elif parsed.path.startswith("/files/"):
                 relative = unquote(parsed.path.removeprefix("/files/"))
                 self.send_path(resolve_under(self.server.controller.data_dir, relative))

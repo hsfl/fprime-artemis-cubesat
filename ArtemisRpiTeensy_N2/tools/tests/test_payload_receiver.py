@@ -97,7 +97,112 @@ def make_end(transfer_id: int, total_packets: int, blob: bytes) -> bytes:
     return bytes(packet)
 
 
+def make_preview_fragment(
+    pixels: bytes,
+    fragment_index: int,
+    *,
+    session_id: int = 7,
+    frame_sequence: int = 11,
+) -> bytes:
+    fragment_count = (len(pixels) + payload_receiver.PREVIEW_FRAGMENT_DATA_BYTES - 1) // payload_receiver.PREVIEW_FRAGMENT_DATA_BYTES
+    offset = fragment_index * payload_receiver.PREVIEW_FRAGMENT_DATA_BYTES
+    chunk = pixels[offset : offset + payload_receiver.PREVIEW_FRAGMENT_DATA_BYTES]
+    return (
+        payload_receiver.PREVIEW_MAGIC
+        + bytes([payload_receiver.PREVIEW_VERSION, payload_receiver.PREVIEW_TYPE_FRAGMENT])
+        + struct.pack("<H", session_id)
+        + struct.pack("<I", frame_sequence)
+        + bytes([
+            payload_receiver.PREVIEW_WIDTH,
+            payload_receiver.PREVIEW_HEIGHT,
+            payload_receiver.PREVIEW_PIXEL_FORMAT_U8,
+            fragment_index,
+            fragment_count,
+            len(chunk),
+        ])
+        + struct.pack("<H", len(pixels))
+        + struct.pack("<H", payload_receiver.crc16_ccitt(pixels))
+        + chunk
+    )
+
+
 class PayloadReceiverTests(unittest.TestCase):
+    def test_preview_complete_reassembles_out_of_order_and_ignores_duplicate(self) -> None:
+        pixels = bytes(index % 256 for index in range(payload_receiver.PREVIEW_TOTAL_BYTES))
+        events: list[payload_receiver.ReceiverEvent] = []
+        receiver = payload_receiver.PayloadReceiver(
+            "unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0, on_event=events.append
+        )
+        order = list(range(1, 200, 2)) + list(range(0, 200, 2))
+        for index in order:
+            receiver.handle_preview_fragment(make_preview_fragment(pixels, index))
+        # A duplicate after the completed frame must not produce another frame.
+        receiver.handle_preview_fragment(make_preview_fragment(pixels, 0))
+
+        previews = [event for event in events if event.kind == "preview_frame"]
+        self.assertEqual(len(previews), 1)
+        event = previews[0]
+        self.assertTrue(event.preview_complete)
+        self.assertEqual(event.preview_percent, 100.0)
+        self.assertTrue(event.preview_crc_ok)
+        self.assertEqual(event.preview_pixels, pixels)
+        self.assertEqual(event.preview_finalize_reason, "all_fragments")
+
+    def test_preview_partial_finalizes_on_deadline_with_missing_pixels_white_and_no_repair(self) -> None:
+        pixels = bytes(index % 256 for index in range(payload_receiver.PREVIEW_TOTAL_BYTES))
+        events: list[payload_receiver.ReceiverEvent] = []
+        receiver = payload_receiver.PayloadReceiver(
+            "unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0, on_event=events.append
+        )
+        receiver.handle_preview_fragment(make_preview_fragment(pixels, 0))
+        receiver.handle_preview_fragment(make_preview_fragment(pixels, 2))
+        assert receiver.preview_frame is not None
+        self.assertTrue(
+            receiver.finalize_preview_if_due(
+                now=receiver.preview_frame.last_fragment_s + payload_receiver.PREVIEW_FINALIZE_DEADLINE_S
+            )
+        )
+
+        event = next(event for event in events if event.kind == "preview_frame")
+        self.assertFalse(event.preview_complete)
+        self.assertEqual(event.preview_finalize_reason, "deadline")
+        self.assertEqual(event.preview_pixels[:24], pixels[:24])
+        self.assertEqual(event.preview_pixels[24:48], b"\xff" * 24)
+        self.assertEqual(event.preview_pixels[48:72], pixels[48:72])
+        serial = DummySerial()
+        self.assertFalse(receiver.request_retries(serial))
+        self.assertEqual(serial.writes, [])
+
+    def test_preview_next_frame_finalizes_previous_as_partial(self) -> None:
+        pixels = bytes(index % 256 for index in range(payload_receiver.PREVIEW_TOTAL_BYTES))
+        events: list[payload_receiver.ReceiverEvent] = []
+        receiver = payload_receiver.PayloadReceiver(
+            "unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0, on_event=events.append
+        )
+        receiver.handle_preview_fragment(make_preview_fragment(pixels, 0, frame_sequence=11))
+        receiver.handle_preview_fragment(make_preview_fragment(pixels, 0, frame_sequence=12))
+
+        event = next(event for event in events if event.kind == "preview_frame")
+        self.assertEqual(event.preview_frame_sequence, 11)
+        self.assertFalse(event.preview_complete)
+        self.assertEqual(event.preview_finalize_reason, "next_frame")
+
+    def test_preview_demux_rejects_malformed_records_and_leaves_n2_behavior_intact(self) -> None:
+        pixels = bytes(index % 256 for index in range(payload_receiver.PREVIEW_TOTAL_BYTES))
+        n2_blob = b"science"
+        header = make_header(42, 3, n2_blob)
+        data = make_data(3, 0, n2_blob)
+        malformed = bytearray(make_preview_fragment(pixels, 0))
+        malformed[10] = 79  # wrong width
+        receiver = payload_receiver.PayloadReceiver("unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0)
+        receiver.rx_buffer += bytes(malformed) + header + data
+
+        packets = [receiver.try_extract_packet(), receiver.try_extract_packet(), receiver.try_extract_packet()]
+        self.assertEqual(packets[1:], [header, data])
+        for packet in packets:
+            receiver.handle_packet(packet, DummySerial())  # type: ignore[arg-type]
+        self.assertEqual(receiver.reconstruct(), n2_blob)
+        self.assertIsNone(receiver.preview_frame)
     def test_extracts_variable_length_packets_and_reconstructs_arbitrary_bytes(self) -> None:
         blob = b"\x00N2\xffpayload,csv\n1,2,3\n"
         transfer_id = 9

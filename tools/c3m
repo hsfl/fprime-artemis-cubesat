@@ -17,6 +17,11 @@ fail() {
 [[ -f "$PAYLOAD_UI" ]] || fail "missing payload UI: $PAYLOAD_UI"
 [[ -f "$DICTIONARY" ]] || fail "missing Pi-release dictionary: $DICTIONARY"
 
+# The receiver invokes F Prime helpers such as fprime-dp as subprocesses.
+# Keep those helpers on PATH even though this launcher calls the venv's Python
+# by absolute path instead of sourcing activate.
+export PATH="$FPRIME_DIR/fprime-venv/bin:$PATH"
+
 # The three interfaces are one physical ground Teensy. Refuse to guess if the
 # connected devices do not form exactly one complete Triple-Serial group.
 read -r GDS_PORT DEBUG_PORT PAYLOAD_PORT < <("$PYTHON" - <<'PY'
@@ -55,10 +60,18 @@ echo "Starting payload receiver, then F' GDS. Press Ctrl-C to stop both."
 
 PAYLOAD_PID=""
 GDS_PID=""
+terminate_tree() {
+  local parent_pid="$1"
+  local child_pid
+  while IFS= read -r child_pid; do
+    [[ -z "$child_pid" ]] || terminate_tree "$child_pid"
+  done < <(pgrep -P "$parent_pid" 2>/dev/null || true)
+  kill "$parent_pid" 2>/dev/null || true
+}
 cleanup() {
   trap - EXIT INT TERM
-  [[ -z "$GDS_PID" ]] || kill "$GDS_PID" 2>/dev/null || true
-  [[ -z "$PAYLOAD_PID" ]] || kill "$PAYLOAD_PID" 2>/dev/null || true
+  [[ -z "$GDS_PID" ]] || terminate_tree "$GDS_PID"
+  [[ -z "$PAYLOAD_PID" ]] || terminate_tree "$PAYLOAD_PID"
   wait 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM

@@ -1,7 +1,11 @@
 const currentTab = document.getElementById("currentTab");
 const historyTab = document.getElementById("historyTab");
+const livestreamTab = document.getElementById("livestreamTab");
 const currentView = document.getElementById("currentView");
 const historyView = document.getElementById("historyView");
+const livestreamView = document.getElementById("livestreamView");
+const livestreamContent = document.getElementById("livestreamContent");
+const livestreamBadge = document.getElementById("livestreamBadge");
 const currentPanel = document.querySelector(".current-panel");
 const stateHeading = document.getElementById("stateHeading");
 const stateSupporting = document.getElementById("stateSupporting");
@@ -50,6 +54,7 @@ let logSignature = "";
 let previewSignature = "";
 let historySignature = "";
 let stateSignature = "";
+let livestreamSignature = "";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -156,16 +161,50 @@ function integrityFor(current) {
 
 function showTab(tab) {
   activeTab = tab;
-  const currentSelected = tab === "current";
-  currentTab.classList.toggle("is-selected", currentSelected);
-  currentTab.setAttribute("aria-selected", String(currentSelected));
-  currentTab.tabIndex = currentSelected ? 0 : -1;
-  historyTab.classList.toggle("is-selected", !currentSelected);
-  historyTab.setAttribute("aria-selected", String(!currentSelected));
-  historyTab.tabIndex = currentSelected ? -1 : 0;
-  currentView.hidden = !currentSelected;
-  historyView.hidden = currentSelected;
+  const entries = [
+    ["current", currentTab, currentView],
+    ["history", historyTab, historyView],
+    ["livestream", livestreamTab, livestreamView],
+  ];
+  entries.forEach(([name, button, view]) => {
+    const selected = tab === name;
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-selected", String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    view.hidden = !selected;
+  });
   if (latestState) renderHistory(latestState.history || []);
+}
+
+function renderLivestream(current) {
+  const preview = current.preview;
+  const nextSignature = JSON.stringify(preview || {});
+  if (nextSignature === livestreamSignature) return;
+  livestreamSignature = nextSignature;
+  if (!preview?.png) {
+    livestreamBadge.textContent = "Waiting";
+    livestreamBadge.className = "livestream-badge";
+    livestreamContent.innerHTML = `
+      <div class="preview-empty livestream-empty">
+        <span class="thermometer" aria-hidden="true"></span>
+        <p>Start <strong>payloadStreamApp.START_STREAM</strong> in GDS.</p>
+      </div>`;
+    return;
+  }
+  const state = preview.complete ? "Complete" : "Partial";
+  const freshness = preview.stale ? "Stale" : "Live";
+  livestreamBadge.textContent = `${state} · ${freshness}`;
+  livestreamBadge.className = `livestream-badge ${preview.stale ? "is-stale" : "is-live"}`;
+  livestreamContent.innerHTML = `
+    <div class="livestream-stage">
+      <img src="${escapeHtml(preview.png)}?frame=${escapeHtml(preview.session_id)}-${escapeHtml(preview.frame_sequence)}" alt="${state} thermal livestream frame ${escapeHtml(preview.frame_sequence)}">
+    </div>
+    <div class="livestream-stats">
+      <span><small>Frame</small><strong>${escapeHtml(preview.frame_sequence)}</strong></span>
+      <span><small>Received</small><strong>${Number(preview.percent || 0).toFixed(1)}%</strong></span>
+      <span><small>Fragments</small><strong>${escapeHtml(preview.received_fragments)} / ${escapeHtml(preview.fragment_count)}</strong></span>
+      <span><small>Integrity</small><strong>${preview.crc_ok === false ? "CRC mismatch" : (preview.complete ? "CRC valid" : "Best effort")}</strong></span>
+    </div>`;
 }
 
 function renderPorts(ports, current) {
@@ -246,9 +285,24 @@ function renderPreview(current) {
     current.product_kind,
     current.outputs || {},
     current.decode || {},
+    current.preview || {},
   ]);
   if (nextSignature === previewSignature) return;
   previewSignature = nextSignature;
+  const livePreview = current.preview;
+  if (livePreview?.png) {
+    const state = livePreview.complete ? "Complete" : "Partial";
+    const stale = livePreview.stale ? " · Stale" : " · Live";
+    const integrity = livePreview.crc_ok === false ? " · CRC mismatch" : "";
+    previewContent.innerHTML = `
+      <div class="thermal-inspector preview-live">
+        <img src="${escapeHtml(livePreview.png)}?frame=${escapeHtml(livePreview.session_id)}-${escapeHtml(livePreview.frame_sequence)}" alt="${state} thermal preview frame ${escapeHtml(livePreview.frame_sequence)}">
+      </div>
+      <div class="thermal-stats preview-live-stats">
+        <span><strong>${state} ${Number(livePreview.percent || 0).toFixed(1)}%</strong>${stale}${integrity}</span>
+        <span>Frame <strong>${escapeHtml(livePreview.frame_sequence)}</strong> · ${escapeHtml(livePreview.received_fragments)} / ${escapeHtml(livePreview.fragment_count)} fragments</span>
+      </div>`;
+  } else {
   const png = current.outputs?.png;
   if (png && ["complete", "partial"].includes(current.status)) {
     const decode = current.decode || {};
@@ -277,6 +331,7 @@ function renderPreview(current) {
     if (current.crc_ok === false) message = "Preview unavailable because integrity verification failed.";
     else if (current.status === "failed") message = current.failure_reason || "Preview unavailable.";
     previewContent.innerHTML = `<div class="preview-empty"><span class="thermometer" aria-hidden="true"></span><p>${escapeHtml(message)}</p></div>`;
+  }
   }
 
   const outputs = current.outputs || {};
@@ -477,6 +532,7 @@ function render(data) {
 
   renderLogs(data.logs || []);
   renderPreview(current);
+  renderLivestream(current);
   renderHistory(data.history || []);
 }
 
@@ -507,7 +563,9 @@ async function refresh() {
 
 currentTab.addEventListener("click", () => showTab("current"));
 historyTab.addEventListener("click", () => showTab("history"));
-const tabs = [currentTab, historyTab];
+livestreamTab.addEventListener("click", () => showTab("livestream"));
+const tabs = [currentTab, historyTab, livestreamTab];
+const tabNames = ["current", "history", "livestream"];
 tabs.forEach((tab, index) => {
   tab.addEventListener("keydown", (event) => {
     let nextIndex = null;
@@ -518,7 +576,7 @@ tabs.forEach((tab, index) => {
     if (nextIndex === null) return;
     event.preventDefault();
     tabs[nextIndex].focus();
-    showTab(nextIndex === 0 ? "current" : "history");
+    showTab(tabNames[nextIndex]);
   });
 });
 viewAllHistoryButton.addEventListener("click", () => showTab("history"));

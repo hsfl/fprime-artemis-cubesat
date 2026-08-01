@@ -1,12 +1,14 @@
 import importlib.util
 import json
 import pathlib
+import struct
 import sys
 import tempfile
 import threading
 import time
 import types
 import unittest
+import zlib
 from unittest import mock
 
 
@@ -128,6 +130,37 @@ def receiver_event(
 
 
 class C3mPayloadReceiverUiTests(unittest.TestCase):
+    def test_livestream_tab_uses_large_thermal_preview(self) -> None:
+        index_html = INDEX_PATH.read_text(encoding="utf-8")
+        app_js = APP_JS_PATH.read_text(encoding="utf-8")
+        styles = STYLES_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('id="livestreamTab"', index_html)
+        self.assertIn('id="livestreamView"', index_html)
+        self.assertIn('id="livestreamContent"', index_html)
+        self.assertIn('renderLivestream(current)', app_js)
+        self.assertIn('const tabs = [currentTab, historyTab, livestreamTab]', app_js)
+        self.assertIn(".livestream-stage", styles)
+        self.assertIn("image-rendering: pixelated", styles)
+
+    def test_thermal_preview_png_is_rgb_and_keeps_missing_pixels_white(self) -> None:
+        png = ui.thermal_png(2, 1, bytes((10, 255)), partial=True)
+        self.assertEqual(png[:8], b"\x89PNG\r\n\x1a\n")
+        self.assertEqual(png[25], 2)  # RGB color type, not grayscale.
+
+        position = 8
+        compressed = bytearray()
+        while position < len(png):
+            length = struct.unpack(">I", png[position : position + 4])[0]
+            kind = png[position + 4 : position + 8]
+            body = png[position + 8 : position + 8 + length]
+            if kind == b"IDAT":
+                compressed.extend(body)
+            position += 12 + length
+        raw = zlib.decompress(bytes(compressed))
+        self.assertEqual(raw[:4], bytes((0, 3, 0, 18)))
+        self.assertEqual(raw[-3:], bytes((255, 255, 255)))
+
     def test_timing_target_has_no_automatic_cutoff(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             controller = ui.ReceiverController(pathlib.Path(tmp))
@@ -653,6 +686,53 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
                 json.loads(run_json.read_text(encoding="utf-8"))["completion_reason"],
                 "operator_cancelled",
             )
+
+    def test_live_preview_persists_latest_partial_frame_and_reports_staleness(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            controller = ui.ReceiverController(root)
+            now = 1_000.0
+            pixels = bytes([12]) * 24 + bytes([255]) * (80 * 60 - 24)
+            event = ui.payload_receiver.ReceiverEvent(
+                kind="preview_frame",
+                timestamp_s=now,
+                message="preview partial",
+                port="test-channel-1",
+                product_id=0,
+                transfer_id=None,
+                total_bytes=0,
+                received_bytes=0,
+                total_packets=0,
+                received_packets=0,
+                missing_packets=0,
+                retry_rounds=0,
+                expected_crc=None,
+                preview_session_id=9,
+                preview_frame_sequence=4,
+                preview_width=80,
+                preview_height=60,
+                preview_total_bytes=4_800,
+                preview_received_bytes=24,
+                preview_fragment_count=200,
+                preview_received_fragments=1,
+                preview_percent=0.5,
+                preview_complete=False,
+                preview_crc_ok=None,
+                preview_finalize_reason="deadline",
+                preview_pixels=pixels,
+            )
+            controller.on_receiver_event(event)
+            with mock.patch.object(ui.time, "time", return_value=now + 4.0):
+                snapshot = controller.snapshot()["current"]
+
+            self.assertEqual(snapshot["preview"]["percent"], 0.5)
+            self.assertTrue(snapshot["preview"]["stale"])
+            self.assertEqual(snapshot["preview"]["png"], "/preview/latest.png")
+            self.assertTrue(controller.live_preview_path.is_file())
+            self.assertTrue(controller.live_preview_path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"))
+            app_js = APP_JS_PATH.read_text(encoding="utf-8")
+            self.assertIn("Complete", app_js)
+            self.assertIn("Stale", app_js)
 
 
 if __name__ == "__main__":

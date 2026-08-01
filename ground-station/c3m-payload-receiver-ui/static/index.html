@@ -22,6 +22,7 @@
   <nav class="tabs" role="tablist" aria-label="Payload views">
     <button id="currentTab" class="tab is-selected" type="button" role="tab" aria-selected="true" aria-controls="currentView" tabindex="0">Current</button>
     <button id="historyTab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="historyView" tabindex="-1">History</button>
+    <button id="livestreamTab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="livestreamView" tabindex="-1">Livestream</button>
   </nav>
 
   <main>
@@ -135,6 +136,25 @@
           <p>Select a run to view archived payload data.</p>
         </div>
       </section>
+    </section>
+
+    <section id="livestreamView" class="livestream-view" role="tabpanel" aria-labelledby="livestreamTab" hidden>
+      <article class="livestream-panel">
+        <div class="livestream-heading">
+          <div>
+            <p class="eyebrow">Best-effort RF preview</p>
+            <h2>Lepton livestream</h2>
+            <p>Newest 80×60 frame · thermal palette · missing pixels stay white</p>
+          </div>
+          <span id="livestreamBadge" class="livestream-badge">Waiting</span>
+        </div>
+        <div id="livestreamContent" class="livestream-content">
+          <div class="preview-empty livestream-empty">
+            <span class="thermometer" aria-hidden="true"></span>
+            <p>Start <strong>payloadStreamApp.START_STREAM</strong> in GDS.</p>
+          </div>
+        </div>
+      </article>
     </section>
   </main>
 
