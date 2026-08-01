@@ -67,8 +67,8 @@ void UartChannelMux::localSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuff
 
 void UartChannelMux::rfLocalSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) {
     static_cast<void>(portNum);
-    const Drv::ByteStreamStatus status =
-        this->sendWrapped(LinkCfg::CHANNEL_TEENSY_LOCAL, fwBuffer.getData(), fwBuffer.getSize());
+    const Drv::ByteStreamStatus status = this->sendWrapped(
+        LinkCfg::CHANNEL_TEENSY_LOCAL, fwBuffer.getData(), fwBuffer.getSize());
     if (status != Drv::ByteStreamStatus::OP_OK) {
         this->m_frameDrops++;
         this->tlmWrite_FrameDrops(this->m_frameDrops);
@@ -90,6 +90,23 @@ Components::PayloadSendStatus UartChannelMux::payloadCacheSendIn_handler(FwIndex
     this->m_frameDrops++;
     this->tlmWrite_FrameDrops(this->m_frameDrops);
     this->log_WARNING_LO_FrameDropped(13);
+    return Components::PayloadSendStatus::LOCAL_ERROR;
+}
+
+Components::PayloadSendStatus UartChannelMux::previewSendIn_handler(FwIndexType portNum,
+                                                                    Fw::Buffer& fwBuffer) {
+    static_cast<void>(portNum);
+    const Drv::ByteStreamStatus status = this->sendWrapped(
+        LinkCfg::CHANNEL_TEENSY_LOCAL, fwBuffer.getData(), fwBuffer.getSize(), true);
+    if (status == Drv::ByteStreamStatus::OP_OK) {
+        return Components::PayloadSendStatus::LOCAL_ACCEPTED;
+    }
+    if (status == Drv::ByteStreamStatus::SEND_RETRY) {
+        return Components::PayloadSendStatus::LOCAL_RETRY;
+    }
+    this->m_frameDrops++;
+    this->tlmWrite_FrameDrops(this->m_frameDrops);
+    this->log_WARNING_LO_FrameDropped(14);
     return Components::PayloadSendStatus::LOCAL_ERROR;
 }
 
@@ -270,6 +287,9 @@ void UartChannelMux::handleFrame() {
         } else if ((target == LinkCfg::TEENSY_TARGET_PAYLOAD_CACHE) &&
                    this->isConnected_payloadCacheRecvOut_OutputPort(0)) {
             this->payloadCacheRecvOut_out(0, frame);
+        } else if ((target == LinkCfg::TEENSY_TARGET_LEPTON_PREVIEW) &&
+                   this->isConnected_previewRecvOut_OutputPort(0)) {
+            this->previewRecvOut_out(0, frame);
         } else if (this->isConnected_localRecvOut_OutputPort(0)) {
             this->localRecvOut_out(0, frame);
         }

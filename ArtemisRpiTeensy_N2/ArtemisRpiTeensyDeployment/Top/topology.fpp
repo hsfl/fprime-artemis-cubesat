@@ -44,6 +44,7 @@ module ArtemisRpiTeensyDeployment {
     instance storageManager
     instance thermalManager
     instance payloadDownlinkApp
+    instance payloadStreamApp
     instance epsDriverArtemis
     instance payloadDriverSelector
     instance payloadDriverLepton
@@ -120,6 +121,9 @@ module ArtemisRpiTeensyDeployment {
       payloadDownlinkApp.packetOut -> uartChannelMux.payloadSendIn
       payloadDownlinkApp.cacheRequestOut -> uartChannelMux.payloadCacheSendIn
       uartChannelMux.payloadCacheRecvOut -> payloadDownlinkApp.cacheResponseIn
+      payloadStreamApp.previewPacketOut -> uartChannelMux.previewSendIn
+      uartChannelMux.previewRecvOut -> payloadStreamApp.previewResponseIn
+      payloadStreamApp.responseAdvanceOut -> payloadStreamApp.responseAdvanceIn
     }
 
     connections FileHandling_DataProducts {
@@ -153,7 +157,7 @@ module ArtemisRpiTeensyDeployment {
       rateGroup1.RateGroupMemberOut[7] -> payloadDownlinkApp.run
       # RF MVP: tick the scheduled science path; keep higher-volume demo status loops off.
       rateGroup1.RateGroupMemberOut[8] -> scienceApp.run
-      # rateGroup1.RateGroupMemberOut[9] -> sohApp.run
+      rateGroup1.RateGroupMemberOut[9] -> payloadStreamApp.run
 
       # Rate group 2
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup2] -> rateGroup2.CycleIn
@@ -212,6 +216,8 @@ module ArtemisRpiTeensyDeployment {
 
       payloadDriverLepton.productGetOut -> ArtemisDataProducts.dpMgr.productGetIn
       payloadDriverLepton.productSendOut -> ArtemisDataProducts.dpMgr.productSendIn
+      payloadStreamApp.previewRequestOut -> payloadDriverLepton.previewRequestIn
+      payloadDriverLepton.previewOut -> payloadStreamApp.previewIn
       payloadDriverBoson.productGetOut -> ArtemisDataProducts.dpMgr.productGetIn
       payloadDriverBoson.productSendOut -> ArtemisDataProducts.dpMgr.productSendIn
 

@@ -106,6 +106,11 @@ module ArtemisRpiTeensyDeployment {
     stack size Default.STACK_SIZE \
     priority 28
 
+  instance payloadStreamApp: Components.PayloadStreamApp base id 0x10031000 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 28
+
   instance payloadDriverSelector: Components.PayloadDriverSelector base id 0x10029000 \
     queue size Default.QUEUE_SIZE \
     stack size Default.STACK_SIZE \

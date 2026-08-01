@@ -61,6 +61,7 @@ namespace PingEntries {
     namespace ArtemisRpiTeensyDeployment_storageManager {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_thermalManager {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_payloadDownlinkApp {enum { WARN = 3, FATAL = 5 };}
+    namespace ArtemisRpiTeensyDeployment_payloadStreamApp {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_epsDriverArtemis {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_payloadDriverSelector {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_payloadDriverLepton {enum { WARN = 3, FATAL = 5 };}

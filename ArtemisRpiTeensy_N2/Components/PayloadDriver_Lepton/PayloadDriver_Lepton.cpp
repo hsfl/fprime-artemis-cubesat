@@ -13,12 +13,20 @@ namespace Components {
 namespace {
 
 constexpr U32 CAPTURE_TIMEOUT_MS = 5000U;
+constexpr U32 PREVIEW_WIDTH = 80U;
+constexpr U32 PREVIEW_HEIGHT = 60U;
+constexpr U16 PREVIEW_MIN_CENTIKELVIN = 27315U;
+constexpr U16 PREVIEW_MAX_CENTIKELVIN = 37315U;
+constexpr U32 PREVIEW_WINDOW_CENTIKELVIN =
+    static_cast<U32>(PREVIEW_MAX_CENTIKELVIN - PREVIEW_MIN_CENTIKELVIN);
 
 }  // namespace
 
 PayloadDriver_Lepton::PayloadDriver_Lepton(const char* const compName)
     : PayloadDriver_LeptonComponentBase(compName),
       m_camera(),
+      m_latestPreviewSource{},
+      m_previewBuffer{},
       m_lastDurationSeconds(0),
       m_lastProductId(0),
       m_lastDataBytes(0),
@@ -46,6 +54,11 @@ void PayloadDriver_Lepton::requestIn_handler(FwIndexType portNum, U32 durationSe
 void PayloadDriver_Lepton::deactivateIn_handler(FwIndexType portNum) {
     static_cast<void>(portNum);
     this->m_camera.close();
+}
+
+void PayloadDriver_Lepton::previewRequestIn_handler(FwIndexType portNum) {
+    static_cast<void>(portNum);
+    (void)this->publishLatestPreview();
 }
 
 void PayloadDriver_Lepton::dpWrittenIn_handler(FwIndexType portNum,
@@ -158,6 +171,65 @@ bool PayloadDriver_Lepton::captureThermalImage(U32 durationSeconds) {
     this->log_ACTIVITY_HI_ImageCaptureQueued(dpSize);
     this->writeTelemetry();
     return true;
+}
+
+bool PayloadDriver_Lepton::publishLatestPreview() {
+    if (!this->isConnected_previewOut_OutputPort(0)) {
+        return false;
+    }
+
+    char reason[96] = {};
+    if (!this->ensureCameraOpen(reason, sizeof(reason))) {
+        this->publishFailure(CAPTURE_CAMERA_ERROR, reason);
+        this->writeTelemetry();
+        return false;
+    }
+
+    // getLatestFrame snapshots the camera's validated source while its mutex
+    // is held. Conversion happens after that lock has been released, so UVC
+    // callbacks can continue publishing the newest source frame.
+    const LeptonCamera::Status status = this->m_camera.getLatestFrame(
+        this->m_latestPreviewSource,
+        LeptonCamera::NUM_PIXELS,
+        CAPTURE_TIMEOUT_MS,
+        reason,
+        sizeof(reason));
+    if (status != LeptonCamera::OK) {
+        this->publishFailure(CAPTURE_CAMERA_ERROR, reason);
+        this->writeTelemetry();
+        return false;
+    }
+
+    this->downsampleLatestPreview();
+    Fw::Buffer preview(this->m_previewBuffer, sizeof(this->m_previewBuffer));
+    this->previewOut_out(0, preview);
+    return true;
+}
+
+void PayloadDriver_Lepton::downsampleLatestPreview() {
+    for (U32 y = 0U; y < PREVIEW_HEIGHT; ++y) {
+        for (U32 x = 0U; x < PREVIEW_WIDTH; ++x) {
+            const U32 sourceX = x * 2U;
+            const U32 sourceY = y * 2U;
+            const U32 sourceIndex = sourceY * LeptonCamera::WIDTH + sourceX;
+            const U32 average =
+                (static_cast<U32>(this->m_latestPreviewSource[sourceIndex]) +
+                 static_cast<U32>(this->m_latestPreviewSource[sourceIndex + 1U]) +
+                 static_cast<U32>(this->m_latestPreviewSource[sourceIndex + LeptonCamera::WIDTH]) +
+                 static_cast<U32>(this->m_latestPreviewSource[sourceIndex + LeptonCamera::WIDTH + 1U]) +
+                 2U) /
+                4U;
+            U8 value = 0U;
+            if (average >= PREVIEW_MAX_CENTIKELVIN) {
+                value = 255U;
+            } else if (average > PREVIEW_MIN_CENTIKELVIN) {
+                const U32 scaled = (average - PREVIEW_MIN_CENTIKELVIN) * 255U;
+                value = static_cast<U8>((scaled + (PREVIEW_WINDOW_CENTIKELVIN / 2U)) /
+                                        PREVIEW_WINDOW_CENTIKELVIN);
+            }
+            this->m_previewBuffer[y * PREVIEW_WIDTH + x] = value;
+        }
+    }
 }
 
 bool PayloadDriver_Lepton::ensureCameraOpen(char* reason, U32 reasonSize) {

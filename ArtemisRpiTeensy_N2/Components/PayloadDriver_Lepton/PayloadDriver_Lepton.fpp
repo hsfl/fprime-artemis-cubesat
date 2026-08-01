@@ -21,11 +21,18 @@ module Components {
         @ Release this camera when another payload driver is selected.
         sync input port deactivateIn: Fw.Signal
 
+        @ Request a fresh 80x60 U8 preview derived from the newest validated Lepton frame.
+        @ Queued on this driver's task so camera lifecycle access is serialized with science capture.
+        async input port previewRequestIn: Fw.Signal
+
         @ Data-product write notification from DpWriter.
         async input port dpWrittenIn: Svc.DpWritten
 
         @ Captured product descriptor/status output
         output port statusOut: Components.ScienceProductDescriptor
+
+        @ One fixed 80x60 U8 preview buffer. It stays valid until the stream app requests another preview.
+        output port previewOut: Fw.BufferSend
 
         @ Data product record holding one thermal image.
         product record ThermalImageRecord: ThermalImageRecordType id 0

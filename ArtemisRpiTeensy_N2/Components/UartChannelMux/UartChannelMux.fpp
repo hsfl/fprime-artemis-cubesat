@@ -17,6 +17,9 @@ module Components {
         @ Payload-cache RPC packets, wrapped as channel 2 with ACK-paced timing.
         guarded input port payloadCacheSendIn: Components.PayloadPacketSend
 
+        @ Lepton-preview RPC packets, wrapped as channel 2.
+        guarded input port previewSendIn: Components.PayloadPacketSend
+
         @ Wrapped bytes received from the UART driver.
         sync input port drvReceiveIn: Drv.ByteStreamData
 
@@ -40,6 +43,9 @@ module Components {
 
         @ Unwrapped channel 2 payload-cache responses.
         output port payloadCacheRecvOut: Fw.BufferSend
+
+        @ Unwrapped channel 2 Lepton-preview responses.
+        output port previewRecvOut: Fw.BufferSend
 
         @ Original UART receive buffer returned to the UART driver.
         output port drvReceiveReturnOut: Fw.BufferSend

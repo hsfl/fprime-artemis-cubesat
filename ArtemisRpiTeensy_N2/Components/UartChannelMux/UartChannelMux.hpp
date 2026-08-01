@@ -31,6 +31,8 @@ class UartChannelMux final : public UartChannelMuxComponentBase {
     void rfLocalSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
     Components::PayloadSendStatus payloadCacheSendIn_handler(FwIndexType portNum,
                                                              Fw::Buffer& fwBuffer) override;
+    Components::PayloadSendStatus previewSendIn_handler(FwIndexType portNum,
+                                                        Fw::Buffer& fwBuffer) override;
     void drvReceiveIn_handler(FwIndexType portNum,
                               Fw::Buffer& buffer,
                               const Drv::ByteStreamStatus& status) override;
