@@ -253,12 +253,13 @@ New here? Read these roughly in order to fully understand the project:
 7. `docs/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md` — the real hardware-in-the-loop (HIL) demo flow.
 8. `docs/C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md` — Pi-owned RFM23BP lifecycle, bounded autonomous recovery, HIL evidence, and remaining electrical gates.
 9. `docs/EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md` — EPSCoR C3M Lepton/Boson local and HIL operator flow.
-10. `docs/HARDWARE_PORT_MAP_AND_POWER.md` — which USB/serial device is which, and how to power the bench safely.
-11. `docs/MISSION_OPS_QUICK_RUN.md` — one-page local rehearsal and FlatSat/HIL operator checklist.
-12. `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md` — Windows laptop setup for student developers and viewer users.
-13. `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md` and `docs/RPI_BUILD.md` — building the Pi Zero W flight binary (cross-compile preferred; native is the manual fallback).
-14. `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` — where to look first when commands, telemetry, payload downlink, or EPS/PDU behavior fails.
-15. `docs/agents_notes.md` — current implementation status and next-agent guidance.
+10. `docs/C3M_LEPTON_PREVIEW_STREAM_MVP.md` — separate Lepton-first `80x60` best-effort preview-stream contract and one-run HIL gate.
+11. `docs/HARDWARE_PORT_MAP_AND_POWER.md` — which USB/serial device is which, and how to power the bench safely.
+12. `docs/MISSION_OPS_QUICK_RUN.md` — one-page local rehearsal and FlatSat/HIL operator checklist.
+13. `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md` — Windows laptop setup for student developers and viewer users.
+14. `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md` and `docs/RPI_BUILD.md` — building the Pi Zero W flight binary (cross-compile preferred; native is the manual fallback).
+15. `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` — where to look first when commands, telemetry, payload downlink, or EPS/PDU behavior fails.
+16. `docs/agents_notes.md` — current implementation status and next-agent guidance.
 
 ## Build and run (local emulation)
 

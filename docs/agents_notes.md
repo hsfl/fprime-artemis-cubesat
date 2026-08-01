@@ -1342,3 +1342,31 @@ Driver tier, formerly repo "Adapter":
   independently powered USB hub may be qualified separately; do not assume a
   powered USB camera swap is safe merely because logical driver selection is
   supported.
+
+## C3M Lepton Preview Stream MVP (2026-07-31)
+
+- Documentation contract: a connected Lepton produces a separate `80x60` U8
+  newest-frame preview, held in one replaceable slot rather than a ring or
+  backlog. The ground may show a complete or partial frame; missing pixels are
+  white and preview never requests retries.
+- This is deliberately not a Neutron 2 science product or a C3M `.fdp`
+  science/downlink operation. Preview and science are mutually exclusive.
+- MVP acceptance is one real HIL preview run with the Lepton connected. Confirm
+  visible `80x60` output, white loss markers if applicable, no preview retry,
+  no concurrent science transfer, and science allowed only after preview stops.
+- Bench IDs: ground upload is `usb:100000`; re-enumerate the satellite before
+  upload instead of trusting the historical `usb:2100000` / `usb:200` shorthand.
+  Details: `docs/C3M_LEPTON_PREVIEW_STREAM_MVP.md`.
+- HIL passed on the real Lepton. Consecutive `80x60` U8 previews arrived at
+  roughly two-second intervals; complete frames contained 4,800 bytes in 200
+  fragments with valid CRCs. Missing local RPC responses now abandon only the
+  affected frame after five ticks and continue with a new session, without RF
+  preview retry or repair.
+- PING and SOH commands completed during preview. After STOP_STREAM, the normal
+  science path completed 38,482/38,482 bytes, 1,100/1,100 packets, CRC OK, zero
+  retry rounds, 11.2 seconds, and decoded as a 160x120 Lepton image under
+  `data/c3m_20260801_002926_transfer_1/`.
+- Active Pi release:
+  `/home/pi/artemis/releases/lepton-preview-mvp-final-20260801T002651Z`,
+  SHA-256
+  `ed443c037020228d6959d7261b99f97d93c12013b7ad787a49f2fe86f20062da`.

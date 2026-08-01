@@ -126,6 +126,16 @@ Do not fork the application/manager stack for payload identity. Swap the driver
 wiring and keep `PayloadManager`, `StorageManager`, `CommsApp`, and
 `PayloadDownlinkApp` generic.
 
+### C3M preview stream MVP
+
+The Lepton preview stream is a separate, Lepton-first operator aid: newest
+`80x60` U8 frame only, one replaceable frame slot, best-effort full or partial
+ground rendering, and white missing pixels. It has no preview retry/repair and
+is not a Neutron 2 science product or the C3M `.fdp` science path. Preview and
+science are mutually exclusive so their transport and operator contracts stay
+unambiguous. See
+[`C3M_LEPTON_PREVIEW_STREAM_MVP.md`](C3M_LEPTON_PREVIEW_STREAM_MVP.md).
+
 ### Implementation notes (use the framework, don't fight it)
 
 Two notes to keep drivers aligned with stock F´ rather than reinventing it:
