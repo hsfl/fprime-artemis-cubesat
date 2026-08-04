@@ -367,6 +367,10 @@ def default_current_state() -> dict[str, Any]:
         "timeout_reason": None,
         "completion_reason": None,
         "missing_packet_indices": [],
+        # The Current tab keeps showing the last decoded science product while
+        # a newer transfer is in progress. A completed/partial finalization
+        # replaces this snapshot atomically.
+        "display_payload": None,
         # A preview is deliberately independent of a science transfer. Keep
         # the last frame visible while a newer N2 product is received.
         "preview": None,
@@ -1175,6 +1179,16 @@ class ReceiverController:
                     "completion_reason": event.get("completion_reason"),
                 }
             )
+            if result in {"complete", "partial"} and summary is not None and output_urls.get("png"):
+                self.current["display_payload"] = {
+                    "status": "partial" if result == "partial" else "complete",
+                    "product_id": event.get("product_id"),
+                    "product_kind": product_kind,
+                    "transfer_id": event.get("transfer_id"),
+                    "run_id": run_dir.name,
+                    "outputs": output_urls,
+                    "decode": summary,
+                }
             if result == "complete":
                 self._append_log("Decode complete", completed_at)
             elif result == "partial":

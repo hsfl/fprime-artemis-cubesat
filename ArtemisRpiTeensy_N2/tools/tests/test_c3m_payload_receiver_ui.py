@@ -143,6 +143,27 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
         self.assertIn(".livestream-stage", styles)
         self.assertIn("image-rendering: pixelated", styles)
 
+    def test_current_tab_uses_science_payload_and_only_mentions_livestream(self) -> None:
+        app_js = APP_JS_PATH.read_text(encoding="utf-8")
+        styles = STYLES_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("const displayPayload = current.display_payload", app_js)
+        self.assertIn("Livestream frame available in the Livestream tab", app_js)
+        self.assertNotIn('class="thermal-inspector preview-live"', app_js)
+        self.assertIn('id="thermalHotspot"', app_js)
+        self.assertIn("hottest.column", app_js)
+        self.assertIn("positionHotspotMarker", app_js)
+        self.assertIn("offsetX +", app_js)
+        self.assertIn("ResizeObserver", app_js)
+        self.assertIn(".hotspot-marker", styles)
+
+    def test_history_detail_includes_thermal_statistics_and_hotspot(self) -> None:
+        app_js = APP_JS_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('class="thermal-stats archived-thermal-stats"', app_js)
+        self.assertIn('id="archivedThermalHotspot"', app_js)
+        self.assertIn('hotspotId: "archivedThermalHotspot"', app_js)
+
     def test_thermal_preview_png_is_rgb_and_keeps_missing_pixels_white(self) -> None:
         png = ui.thermal_png(2, 1, bytes((10, 255)), partial=True)
         self.assertEqual(png[:8], b"\x89PNG\r\n\x1a\n")
@@ -497,6 +518,9 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
             self.assertEqual(current["received_packets"], current["total_packets"])
             self.assertEqual(current["received_bytes"], len(b"deterministic-fdp-bytes"))
             self.assertEqual(set(current["outputs"]), {"fdp", "json", "csv", "png"})
+            self.assertEqual(current["display_payload"]["run_id"], current["run_id"])
+            self.assertEqual(current["display_payload"]["status"], "complete")
+            self.assertEqual(current["display_payload"]["outputs"], current["outputs"])
             self.assertEqual(len(snapshot["history"]), 1)
             run = snapshot["history"][0]
             self.assertEqual(run["result"], "complete")
@@ -519,6 +543,40 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
             self.assertEqual(len(snapshot["history"]), 2)
             self.assertEqual(len({run["run_id"] for run in snapshot["history"]}), 2)
             self.assertTrue(all(run["output_urls"]["png"].startswith("/files/") for run in snapshot["history"]))
+
+    def test_previous_payload_display_persists_until_new_transfer_finishes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            controller = ui.ReceiverController(root, decode_fn=fake_decode)
+            livestream = {"session_id": 9, "frame_sequence": 4, "png": "/preview/latest.png"}
+            controller.current["preview"] = livestream
+            first_source = root / ".incoming" / "first" / "payload.fdp"
+            first_source.parent.mkdir(parents=True)
+            first_source.write_bytes(b"first")
+
+            controller.on_receiver_event(receiver_event("transfer_started", product_id=1, transfer_id=1))
+            controller.on_receiver_event(
+                receiver_event("transfer_saved", product_id=1, transfer_id=1, output_path=first_source)
+            )
+            first = wait_for_status(controller, "complete")["current"]["display_payload"]
+
+            controller.on_receiver_event(receiver_event("transfer_started", product_id=2, transfer_id=2))
+            receiving = controller.snapshot()["current"]
+            self.assertEqual(receiving["status"], "receiving")
+            self.assertEqual(receiving["product_id"], 2)
+            self.assertEqual(receiving["display_payload"], first)
+            self.assertEqual(receiving["preview"], {**livestream, "stale": False})
+
+            second_source = root / ".incoming" / "second" / "payload.fdp"
+            second_source.parent.mkdir(parents=True)
+            second_source.write_bytes(b"second")
+            controller.on_receiver_event(
+                receiver_event("transfer_saved", product_id=2, transfer_id=2, output_path=second_source)
+            )
+            completed = wait_for_status(controller, "complete")["current"]
+            self.assertEqual(completed["display_payload"]["product_id"], 2)
+            self.assertNotEqual(completed["display_payload"]["run_id"], first["run_id"])
+            self.assertEqual(completed["preview"], {**livestream, "stale": False})
 
     def test_decode_runs_off_receiver_callback_and_cannot_replace_new_transfer(self) -> None:
         decode_started = threading.Event()
@@ -640,6 +698,8 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
             self.assertEqual(current["missing_packets"], 1)
             self.assertEqual(current["missing_packet_indices"], [100])
             self.assertIn("png", current["outputs"])
+            self.assertEqual(current["display_payload"]["status"], "partial")
+            self.assertEqual(current["display_payload"]["outputs"], current["outputs"])
             run = snapshot["history"][0]
             self.assertEqual(run["result"], "partial")
             self.assertFalse(run["crc_ok"])

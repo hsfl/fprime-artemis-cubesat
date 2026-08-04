@@ -396,8 +396,9 @@ progress::-moz-progress-bar { background: var(--primary); border-radius: 8px; }
 .preview-content {
   display: grid;
   min-height: 248px;
+  gap: 18px;
   place-items: center;
-  padding: 12px;
+  padding: 20px;
 }
 
 .preview-content img {
@@ -409,12 +410,14 @@ progress::-moz-progress-bar { background: var(--primary); border-radius: 8px; }
   background: #060733;
 }
 
-.preview-live img {
-  image-rendering: pixelated;
-}
-
-.preview-live-stats span:first-child {
-  color: var(--ink);
+.preview-stream-notice {
+  width: 100%;
+  margin: 2px 0 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--divider);
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.86rem;
 }
 
 .preview-empty {
@@ -472,6 +475,33 @@ progress::-moz-progress-bar { background: var(--primary); border-radius: 8px; }
 
 .thermal-inspector { position: relative; width: 100%; }
 .thermal-inspector img { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+.hotspot-marker {
+  position: absolute;
+  z-index: 1;
+  width: clamp(22px, 6%, 38px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  border: 3px solid #ff334f;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+.hotspot-marker::after {
+  content: "HOT";
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 5px;
+  color: white;
+  background: #c81431;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 850;
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+.hotspot-marker[hidden] { display: none; }
 .thermal-hover {
   display: block;
   margin-top: 0.45rem;
@@ -504,12 +534,18 @@ progress::-moz-progress-bar { background: var(--primary); border-radius: 8px; }
 .thermal-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.5rem;
-  margin-top: 0.75rem;
+  width: 100%;
+  gap: 0.75rem;
+  margin-top: 0;
+  padding: 14px 12px;
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  background: #fbfcfe;
   font-size: 0.78rem;
 }
 .thermal-stats span { color: var(--muted, #536273); }
 .thermal-stats strong { display: block; color: var(--ink, #10243e); margin-top: 0.15rem; }
+.archived-thermal-stats { margin-bottom: 18px; }
 .run-partial { color: #9a6700; }
 .current-panel[data-state="partial"] .state-icon { background: #d99a00; }
 

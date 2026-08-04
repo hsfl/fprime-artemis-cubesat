@@ -55,6 +55,7 @@ let previewSignature = "";
 let historySignature = "";
 let stateSignature = "";
 let livestreamSignature = "";
+const hotspotObservers = new Map();
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -275,41 +276,28 @@ function renderLogs(logs) {
 }
 
 function renderPreview(current) {
+  const displayPayload = current.display_payload;
   const nextSignature = JSON.stringify([
     current.status,
-    current.product_id,
-    current.transfer_id,
-    current.run_id,
     current.crc_ok,
     current.failure_reason,
-    current.product_kind,
-    current.outputs || {},
-    current.decode || {},
+    displayPayload || {},
     current.preview || {},
   ]);
   if (nextSignature === previewSignature) return;
   previewSignature = nextSignature;
   const livePreview = current.preview;
-  if (livePreview?.png) {
-    const state = livePreview.complete ? "Complete" : "Partial";
-    const stale = livePreview.stale ? " · Stale" : " · Live";
-    const integrity = livePreview.crc_ok === false ? " · CRC mismatch" : "";
-    previewContent.innerHTML = `
-      <div class="thermal-inspector preview-live">
-        <img src="${escapeHtml(livePreview.png)}?frame=${escapeHtml(livePreview.session_id)}-${escapeHtml(livePreview.frame_sequence)}" alt="${state} thermal preview frame ${escapeHtml(livePreview.frame_sequence)}">
-      </div>
-      <div class="thermal-stats preview-live-stats">
-        <span><strong>${state} ${Number(livePreview.percent || 0).toFixed(1)}%</strong>${stale}${integrity}</span>
-        <span>Frame <strong>${escapeHtml(livePreview.frame_sequence)}</strong> · ${escapeHtml(livePreview.received_fragments)} / ${escapeHtml(livePreview.fragment_count)} fragments</span>
-      </div>`;
-  } else {
-  const png = current.outputs?.png;
-  if (png && ["complete", "partial"].includes(current.status)) {
-    const decode = current.decode || {};
+  const livestreamNotice = livePreview?.png
+    ? `<p class="preview-stream-notice">Livestream frame available in the Livestream tab · ${livePreview.stale ? "Stale" : "Live"}</p>`
+    : "";
+  const png = displayPayload?.outputs?.png;
+  if (png) {
+    const decode = displayPayload.decode || {};
     const presentation = decodePresentation(decode);
     previewContent.innerHTML = `
       <div class="thermal-inspector">
-        <img id="thermalImage" src="${escapeHtml(png)}" alt="Current ${presentation.productLabel} image for product ${escapeHtml(current.product_id)}, transfer ${escapeHtml(current.transfer_id)}">
+        <img id="thermalImage" src="${escapeHtml(png)}" alt="Current ${presentation.productLabel} image for product ${escapeHtml(displayPayload.product_id)}, transfer ${escapeHtml(displayPayload.transfer_id)}">
+        <span id="thermalHotspot" class="hotspot-marker" aria-label="Hottest pixel"></span>
         <output id="thermalHover" class="thermal-hover">Move over image to inspect ${presentation.unitLabel}</output>
       </div>
       <div class="thermal-stats">
@@ -317,34 +305,47 @@ function renderPreview(current) {
         <span>Max <strong>${presentation.max ?? "—"} ${presentation.unitLabel}</strong></span>
         <span>Mean <strong>${presentation.mean ?? "—"} ${presentation.unitLabel}</strong></span>
         <span>Range <strong>${presentation.min ?? "—"}–${presentation.max ?? "—"} ${presentation.unitLabel}</strong></span>
-      </div>`;
+      </div>
+      ${livestreamNotice}`;
     attachThermalInspection({
-      csvUrl: current.outputs?.csv,
+      csvUrl: displayPayload.outputs?.csv,
       width: decode.width || 160,
       height: decode.height || 120,
       imageId: "thermalImage",
       outputId: "thermalHover",
+      hotspotId: "thermalHotspot",
       unitLabel: presentation.unitLabel,
     });
   } else {
     let message = "Available after CRC verification";
     if (current.crc_ok === false) message = "Preview unavailable because integrity verification failed.";
     else if (current.status === "failed") message = current.failure_reason || "Preview unavailable.";
-    previewContent.innerHTML = `<div class="preview-empty"><span class="thermometer" aria-hidden="true"></span><p>${escapeHtml(message)}</p></div>`;
-  }
+    previewContent.innerHTML = `<div class="preview-empty"><span class="thermometer" aria-hidden="true"></span><p>${escapeHtml(message)}</p>${livestreamNotice}</div>`;
   }
 
-  const outputs = current.outputs || {};
+  const outputs = displayPayload?.outputs || {};
   const keys = ["fdp", "json", "csv", "png"].filter((key) => outputs[key]);
   outputActions.hidden = keys.length === 0;
   outputLinks.innerHTML = keys.map((key) => `<a href="${escapeHtml(outputs[key])}" target="_blank" rel="noopener">${outputLabel(key)}</a>`).join("");
-  openFolderButton.hidden = !current.run_id;
-  openFolderButton.dataset.runId = current.run_id || "";
+  openFolderButton.hidden = !displayPayload?.run_id;
+  openFolderButton.dataset.runId = displayPayload?.run_id || "";
 }
 
-async function attachThermalInspection({ csvUrl, width, height, imageId, outputId, unitLabel = "°C", overlay = false }) {
+function positionHotspotMarker(image, marker, hottest, gridWidth, gridHeight) {
+  if (!image.naturalWidth || !image.naturalHeight || !image.clientWidth || !image.clientHeight) return;
+  const scale = Math.min(image.clientWidth / image.naturalWidth, image.clientHeight / image.naturalHeight);
+  const renderedWidth = image.naturalWidth * scale;
+  const renderedHeight = image.naturalHeight * scale;
+  const offsetX = (image.clientWidth - renderedWidth) / 2;
+  const offsetY = (image.clientHeight - renderedHeight) / 2;
+  marker.style.left = `${offsetX + ((hottest.column + 0.5) / gridWidth) * renderedWidth}px`;
+  marker.style.top = `${offsetY + ((hottest.row + 0.5) / gridHeight) * renderedHeight}px`;
+}
+
+async function attachThermalInspection({ csvUrl, width, height, imageId, outputId, hotspotId, unitLabel = "°C", overlay = false }) {
   const image = document.getElementById(imageId);
   const hover = document.getElementById(outputId);
+  const hotspot = hotspotId ? document.getElementById(hotspotId) : null;
   if (!image || !hover || !csvUrl) return;
   let grid;
   try {
@@ -359,8 +360,30 @@ async function attachThermalInspection({ csvUrl, width, height, imageId, outputI
       }));
   } catch (_error) {
     hover.textContent = `${unitLabel} data unavailable`;
+    if (hotspot) hotspot.hidden = true;
     if (overlay) hover.classList.add("is-visible");
     return;
+  }
+  let hottest = null;
+  grid.forEach((row, rowIndex) => row.forEach((value, columnIndex) => {
+    if (Number.isFinite(value) && (hottest === null || value > hottest.value)) {
+      hottest = { value, row: rowIndex, column: columnIndex };
+    }
+  }));
+  if (hotspot && hottest) {
+    hotspot.hidden = false;
+    hotspot.title = `Hotspot · column ${hottest.column}, row ${hottest.row} · ${hottest.value.toFixed(2)} ${unitLabel}`;
+    const updateHotspot = () => positionHotspotMarker(image, hotspot, hottest, width, height);
+    if (image.complete) updateHotspot();
+    else image.addEventListener("load", updateHotspot, { once: true });
+    hotspotObservers.get(hotspotId)?.disconnect();
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(updateHotspot);
+      observer.observe(image);
+      hotspotObservers.set(hotspotId, observer);
+    }
+  } else if (hotspot) {
+    hotspot.hidden = true;
   }
   image.addEventListener("mousemove", (event) => {
     const rect = image.getBoundingClientRect();
@@ -436,6 +459,7 @@ function renderHistory(history) {
       run.total_bytes,
       run.total_packets,
       run.output_urls || {},
+      run.decode || {},
     ]),
   ]);
   if (nextSignature === historySignature) return;
@@ -469,7 +493,14 @@ function renderHistory(history) {
     ${png ? `
       <div class="thermal-inspector archived-thermal-inspector">
         <img id="archivedThermalImage" src="${escapeHtml(png)}" alt="Archived ${presentation.productLabel} image for product ${escapeHtml(selected.product_id)}, transfer ${escapeHtml(selected.transfer_id)}">
+        <span id="archivedThermalHotspot" class="hotspot-marker" aria-label="Hottest pixel"></span>
         <output id="archivedThermalHover" class="thermal-tooltip" aria-live="polite">Move over image to inspect ${presentation.unitLabel}</output>
+      </div>
+      <div class="thermal-stats archived-thermal-stats">
+        <span>Min <strong>${presentation.min ?? "—"} ${presentation.unitLabel}</strong></span>
+        <span>Max <strong>${presentation.max ?? "—"} ${presentation.unitLabel}</strong></span>
+        <span>Mean <strong>${presentation.mean ?? "—"} ${presentation.unitLabel}</strong></span>
+        <span>Range <strong>${presentation.min ?? "—"}–${presentation.max ?? "—"} ${presentation.unitLabel}</strong></span>
       </div>` : ""}
     <p>${links || "No output files available."}</p>`;
   if (png && selected.output_urls?.csv) {
@@ -479,6 +510,7 @@ function renderHistory(history) {
       height: selected.decode?.height || 120,
       imageId: "archivedThermalImage",
       outputId: "archivedThermalHover",
+      hotspotId: "archivedThermalHotspot",
       unitLabel: presentation.unitLabel,
       overlay: true,
     });
