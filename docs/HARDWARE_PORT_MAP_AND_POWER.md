@@ -47,7 +47,7 @@ From the RF debug session in [`archive/RF_CHAIN_ROOT_CAUSE_ANALYSIS_2026-04-24.m
 | Satellite Teensy | `/dev/cu.usbmodem115502201` | USB debug console |
 | Ground Teensy | `/dev/cu.usbmodem115551201` | GDS data stream (port 0) |
 | Ground Teensy | `/dev/cu.usbmodem115551203` | debug console (port 1) |
-| Raspberry Pi | `192.168.0.152` (`artemis-pi`) | F´ flight target over SSH |
+| Raspberry Pi | `192.168.0.234` (`artemis-pi`, `artemis-pi-c3m`) | F´ flight target over SSH |
 
 The Pi runs the deployment as a systemd service (`artemis-fprime.service`) executing `ArtemisRpiTeensyDeployment -d /dev/serial0`. Stop the service before re-deploying a new binary (it holds the file open).
 
