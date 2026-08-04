@@ -17,6 +17,21 @@ static constexpr uint16_t TX_COMPLETE_TIMEOUT_MS = 500;
 static constexpr uint32_t STATUS_PERIOD_MS = 1000;
 static constexpr uint32_t TX_LED_TOGGLE_MS = 250;
 
+// RadioHead's RF23BP PA data sheet defines 28/29/30 dBm at codes 5/6/7.
+// Lower codes are retained for controlled threshold diagnostics but are not
+// calibrated RF23BP output-power claims.  The build helper supplies this
+// value as -DGDS_TX_SOAK_POWER_CODE=<0..7>.
+#ifndef GDS_TX_SOAK_POWER_CODE
+#define GDS_TX_SOAK_POWER_CODE RH_RF22_RF23BP_TXPOW_30DBM
+#endif
+
+#define GDS_TX_SOAK_STRINGIFY_INNER(value) #value
+#define GDS_TX_SOAK_STRINGIFY(value) GDS_TX_SOAK_STRINGIFY_INNER(value)
+
+static constexpr uint8_t TX_POWER_CODE = GDS_TX_SOAK_POWER_CODE;
+static constexpr char TX_POWER_CODE_BUILD_MARKER[] =
+    "GDS_TX_SOAK_POWER_CODE=" GDS_TX_SOAK_STRINGIFY(GDS_TX_SOAK_POWER_CODE);
+
 artemis::rf23bp::RadioPins g_pins;
 artemis::rf23bp::RadioProfile g_profile;
 artemis::rf23bp::BoundedRf22 g_radio(RADIO_CS, RADIO_INT, hardware_spi1);
@@ -65,6 +80,8 @@ void printStatus() {
   SerialUSB1.print(g_txTimeouts);
   SerialUSB1.print(F(" recoveries="));
   SerialUSB1.print(g_recoveries);
+  SerialUSB1.print(F(" tx_power_code="));
+  SerialUSB1.print(TX_POWER_CODE);
   SerialUSB1.print(F(" rh_mode="));
   SerialUSB1.print(static_cast<unsigned int>(g_radio.mode()));
   SerialUSB1.print(F(" nirq="));
@@ -110,12 +127,15 @@ void setup() {
   g_pins.sdn_pin = RADIO_SDN_PIN;
   g_profile.frequency_mhz = 433.0f;
   g_profile.modem = RH_RF22::GFSK_Rb125Fd125;
-  g_profile.tx_power = RH_RF22_RF23BP_TXPOW_30DBM;
+  g_profile.tx_power = TX_POWER_CODE;
   g_profile.start_in_receive = false;
   g_profile.settle_us = 300;
 
   SerialUSB1.println(F("[GDS_TX_SOAK] standalone autonomous TX-only thermal-soak image"));
-  SerialUSB1.println(F("[GDS_TX_SOAK] 30 dBm, full 49-byte packets, zero intentional inter-packet delay"));
+  SerialUSB1.println(TX_POWER_CODE_BUILD_MARKER);
+  SerialUSB1.print(F("[GDS_TX_SOAK] tx_power_code="));
+  SerialUSB1.print(TX_POWER_CODE);
+  SerialUSB1.println(F(", full 49-byte packets, zero intentional inter-packet delay"));
   initializeRadio();
 }
 

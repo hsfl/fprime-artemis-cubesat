@@ -54,6 +54,21 @@ arduino-cli board list
 ./tools/arduino-cli/upload_tx_thermal_soak.sh usb:100000
 ```
 
+## PA threshold sweep
+
+The default power code is `7` (+30 dBm). For a ground-only threshold test,
+build and upload matching raw power codes from `0` through `7`:
+
+```bash
+./tools/arduino-cli/build_tx_thermal_soak.sh 0
+./tools/arduino-cli/upload_tx_thermal_soak.sh 0 usb:100000
+```
+
+Codes `5`, `6`, and `7` are the RF23BP's specified +28, +29, and +30 dBm
+settings. Codes `0` through `4` deliberately provide lower-drive diagnostics,
+but are not calibrated RF23BP dBm levels. Record the status-line
+`tx_power_code` with each window.
+
 Restore normal GDS firmware:
 
 ```bash

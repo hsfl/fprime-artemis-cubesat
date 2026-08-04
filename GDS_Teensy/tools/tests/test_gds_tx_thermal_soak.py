@@ -12,7 +12,9 @@ SOAK_SKETCH = (
 class GdsTxThermalSoakTests(unittest.TestCase):
     def test_autonomous_soak_is_tx_only_at_full_test_packet_size(self) -> None:
         sketch = SOAK_SKETCH.read_text()
-        self.assertIn("RH_RF22_RF23BP_TXPOW_30DBM", sketch)
+        self.assertIn("GDS_TX_SOAK_POWER_CODE", sketch)
+        self.assertIn("TX_POWER_CODE", sketch)
+        self.assertIn("TX_POWER_CODE_BUILD_MARKER", sketch)
         self.assertIn("RF_PACKET_BYTES = 49", sketch)
         self.assertIn("g_profile.start_in_receive = false", sketch)
         self.assertIn("artemis::rf23bp::sendPacket", sketch)
