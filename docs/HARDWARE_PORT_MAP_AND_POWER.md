@@ -11,6 +11,30 @@ See [`SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHITECTURE.md) for why the link is built
 | Satellite Raspberry Pi Zero W | Hosts the F´ flight-software deployment | SSH over the network; talks to the satellite Teensy on its own `/dev/serial0` UART |
 | Satellite Teensy 4.1 | UART↔RF relay + local subsystem RPC | One USB serial (debug console) when plugged into a laptop |
 | Ground Teensy 4.1 | RF↔USB bridge for the ground laptop | **Three** USB serial ports (triple-serial), see below |
+| HackRF One ground alternative | Software RF22/GFSK ground adapter replacing the ground OBC/Teensy/RFM23BP | One USB SDR discovered by `hackrf_info`; software exposes channel-0 and channel-1 PTYs |
+
+## HackRF ground alternative
+
+Use `./tools/c3m-sdr` when the ground radio is the HackRF. The indoor-proven
+RF path is:
+
+```text
+HackRF One -> SMA male -> 3 m RG174 -> POBADY 433 MHz magnetic-base antenna
+```
+
+The antenna path is identified by profile; geometry may change. Startup automatically
+selects RX from clean CRC-valid C3M frames and TX from an exact F Prime
+PING/Pong across the HackRF-supported gain ranges, then freezes the selection.
+The RF amplifier starts off for each direction; only a complete normal-gain
+failure enables that direction's amplifier and restarts its search from minimum
+gain. Antenna bias always remains off for the passive POBADY. The bridge exposes `/tmp/c3m-sdr/gds-port` and
+`/tmp/c3m-sdr/payload-port`; it does not create a debug serial port. Use
+`/tmp/c3m-sdr/latest/bridge-status.json` for SDR/link counters.
+
+An outdoor move ends the indoor qualification, but the operator command stays
+the same: restart and let calibration run at the new geometry. Follow
+[`HACKRF_GROUND_STATION_RUNBOOK.md`](HACKRF_GROUND_STATION_RUNBOOK.md) for the
+required outdoor end-to-end evidence.
 
 ## USB serial enumeration (varies by OS and USB port)
 

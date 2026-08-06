@@ -16,9 +16,22 @@ the operator and connected to the Mac.
 
 ### 1. Start the two laptop operator tools
 
-The preferred launcher finds exactly one complete ground Triple-Serial Teensy,
-maps its GDS/debug/payload interfaces, and starts both GDS and the payload web
-app with the matching Pi-release dictionary:
+Choose exactly one ground adapter:
+
+```bash
+cd ~/Developer/fprime-artemis-cubesat
+./tools/c3m       # ground OBC/Teensy + RFM23BP
+./tools/c3m-sdr   # self-calibrating HackRF + POBADY antenna
+```
+
+Do not run both at once. `c3m-sdr` opens GDS on port `5057`; `c3m` normally
+uses `5050`. Both use the same payload/livestream UI on `8064` and the same
+mission commands below. For SDR physical checks and outdoor work, follow
+[`HACKRF_GROUND_STATION_RUNBOOK.md`](HACKRF_GROUND_STATION_RUNBOOK.md).
+
+For the ground OBC/RFM23BP path, the preferred launcher finds exactly one
+complete ground Triple-Serial Teensy, maps its GDS/debug/payload interfaces,
+and starts both applications with the matching Pi-release dictionary:
 
 ```bash
 cd ~/Developer/fprime-artemis-cubesat
@@ -29,8 +42,8 @@ Leave this terminal running. Open `http://127.0.0.1:5050` for GDS and
 `http://127.0.0.1:8064` for the payload receiver. Wait for the receiver to show
 **Ready - awaiting downlink**.
 
-If the launcher cannot identify exactly one Triple-Serial group, use the manual
-port mapping and two-terminal commands below.
+If the ground-OBC launcher cannot identify exactly one Triple-Serial group, use
+the manual port mapping and two-terminal commands below.
 
 ### 1a. Manual fallback: find the three ground Teensy ports
 

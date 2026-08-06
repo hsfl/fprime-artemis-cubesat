@@ -75,13 +75,19 @@ panels are not yet integrated into the bring-up.
 [Artemis CubeSat Kit](https://sites.google.com/hawaii.edu/artemiscubesatkit) bus
 instead of USB power.
 
-### Future direction: stay on the RFM23BP radio head for now
+### Ground-radio choices: RFM23BP or plug-and-play HackRF
 
-A longer-term option is to move the ground station **away from a carbon-copy of
-the satellite** and toward a **Software Defined Radio (SDR)**. We are
-intentionally **not** doing that right now.
+A ground station may use either the mirrored OBC/Teensy/RFM23BP node via
+`./tools/c3m` or the HackRF RF22 adapter via `./tools/c3m-sdr`. Both present the
+same F Prime GDS and payload/livestream operator surfaces.
 
-Reasons to stay on the current RFM23BP radio for now:
+The RFM23BP ground node remains the cold fallback because it provides the
+radio's native modem and automatic gain behavior. The HackRF path now hides SDR
+gain tuning from operators by identifying the known C3M RF22 frames, selecting
+RX gain from clean CRC-valid reception, selecting TX gain from an end-to-end
+F Prime PING/Pong, and freezing the settings for the session.
+
+The fallback still has practical advantages:
 
 - **Lower maintenance:** Going SDR means someone has to learn and maintain the
   SDR stack, and effectively relearn how RF comms works at a lower level.
@@ -91,11 +97,12 @@ Reasons to stay on the current RFM23BP radio for now:
 - **Two identical nodes are simpler:** Building the ground station from the same
   kit as the satellite means one bring-up procedure and one radio codebase.
 
-In short: an SDR is a "someday" upgrade, not a near-term need. Until the benefit
-clearly outweighs the added learning and maintenance burden, we keep the
-RFM23BP + RadioHead path on both the ground station and the satellite. See
+The HackRF path was proven indoors on 2026-08-06; outdoor geometry remains to
+be qualified even though the launcher recalibrates automatically. See
+[`docs/HACKRF_GROUND_STATION_RUNBOOK.md`](docs/HACKRF_GROUND_STATION_RUNBOOK.md)
+for the operator and outdoor flow, and
 [`docs/archive/HACKRF_SDR_GROUND_STATION_INVESTIGATION_2026-06-30.md`](docs/archive/HACKRF_SDR_GROUND_STATION_INVESTIGATION_2026-06-30.md)
-for the HackRF/SDR packet-compatibility investigation.
+for the original compatibility investigation.
 
 ## Target demo
 
@@ -254,6 +261,9 @@ New here? Read these roughly in order to fully understand the project:
 8. `docs/C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md` — Pi-owned RFM23BP lifecycle, bounded autonomous recovery, HIL evidence, and remaining electrical gates.
 9. `docs/EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md` — EPSCoR C3M Lepton/Boson local and HIL operator flow.
 10. `docs/C3M_LEPTON_PREVIEW_STREAM_MVP.md` — separate Lepton-first `80x60` best-effort preview-stream contract and one-run HIL gate.
+11. `docs/HACKRF_GROUND_STATION_RUNBOOK.md` — plug-and-play HackRF operator flow, POBADY antenna contract, automatic gain/amp fallback, and outdoor requalification gates.
+12. `docs/C3M_FULL_STACK_ONBOARDING.html` — interactive end-to-end C3M architecture and operator onboarding.
+13. `docs/C3M_SDR_FUNDAMENTALS.html` — interactive SDR/RF22 fundamentals grounded in the checked-in HackRF implementation.
 11. `docs/HARDWARE_PORT_MAP_AND_POWER.md` — which USB/serial device is which, and how to power the bench safely.
 12. `docs/MISSION_OPS_QUICK_RUN.md` — one-page local rehearsal and FlatSat/HIL operator checklist.
 13. `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md` — Windows laptop setup for student developers and viewer users.
@@ -370,6 +380,13 @@ For the EPSCoR C3M Lepton/Boson bench, follow
 `docs/EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md`. With one complete ground
 Triple-Serial Teensy connected, `./tools/c3m` starts both GDS and the C3M
 payload receiver using the matching Pi-release dictionary.
+
+When the ground radio is the HackRF instead of the ground OBC/RFM23BP, attach
+the qualified POBADY 433 MHz magnetic-base antenna and run `./tools/c3m-sdr`.
+It provides the same operator surfaces—GDS plus the payload/livestream UI—at
+`http://127.0.0.1:5057` and `http://127.0.0.1:8064`. The fixed indoor SDR
+configuration and outdoor requalification procedure are in
+`docs/HACKRF_GROUND_STATION_RUNBOOK.md`.
 
 ## Status
 
