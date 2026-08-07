@@ -1,10 +1,20 @@
 # HackRF C3M Ground Station Runbook
 
-BLUF: attach the POBADY antenna and run `./tools/c3m-sdr`. The launcher finds
-the known C3M RF22 signal, selects working RX and TX gains, freezes them, and
-opens GDS plus the payload/livestream UI. Operators do not enter RF settings.
+> **Archived status — research/diagnostic path, not normal mission operations:** The
+> accepted 2026-08-06 engineering decision makes the ground
+> Teensy/RFM23BP and `./tools/c3m` the primary C3M path. Bidirectional HackRF
+> development and outdoor qualification are stopped. Read
+> [`C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md`](C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md)
+> before reproducing this work. The procedure below is preserved for research,
+> RX diagnosis, education, and evidence review.
 
-## Normal operator flow
+BLUF: for a deliberate HackRF reproduction, attach the POBADY antenna and run
+`./tools/c3m-sdr`. The launcher finds
+the known C3M RF22 signal, selects working RX and TX gains, opens GDS plus the
+payload/livestream UI, and keeps adapting while the geometry changes. Operators
+do not enter RF settings or restart GDS to reacquire the link.
+
+## Preserved reproduction flow
 
 ### 1. Physical preflight
 
@@ -37,13 +47,20 @@ Calibration does this before declaring ready:
 3. sends unique, valid F Prime `missionApp.PING` commands over the supported
    HackRF TX VGA range;
 4. accepts TX only when the exact generated token returns in channel 0;
-5. freezes the selected RX/TX gains for the session.
+5. starts continuous link maintenance after the startup selections pass.
 
 For each direction, the complete normal-gain range is tried with HackRF's RF
 amplifier off. Only if that direction cannot prove the link does calibration
 enable the amplifier and restart from its lowest gain. RX and TX selections
 are independent. Antenna-port bias power always stays off because the POBADY
 antenna is passive.
+
+During operation, short fades and individual missed ACKs are ignored. Sustained
+CRC-valid frame silence advances RX through the normal presets with a dwell
+between changes. Two clipped I/Q blocks step RX downward. Only after all normal
+RX settings fail does the RX amplifier stage begin from minimum gain. Repeated
+ACK timeouts advance TX; sustained ACK success cautiously backs TX down. GDS
+and the payload receiver stay connected throughout.
 
 Immediate RF22 ACK alone is not the TX oracle because HackRF's half-duplex
 USB turnaround can miss that short response. The delayed Pong proves uplink,
@@ -56,7 +73,11 @@ GROUND_STATION_READY run=/tmp/c3m-sdr/runs/<timestamp>
 RF_AUTO_SELECTED rx_lna=<dB> rx_vga=<dB> rx_amp=<off|on> tx=<dB> tx_amp=<off|on>
 GDS_URL http://127.0.0.1:5057
 PAYLOAD_URL http://127.0.0.1:8064
+SDR STATUS | link tracking | RX LNA <dB>, VGA <dB>, amp <off|on> | TX gain <dB>, amp <off|on> | frames <count>, last frame <age> | reason <reason>
 ```
+
+`SDR STATUS` prints every 10 seconds and immediately after an RF-state change,
+so the operator can see adaptation without reading JSON or restarting GDS.
 
 If calibration cannot prove both paths, the launcher fails closed and does not
 start GDS. Fix the physical path or use the RFM23BP fallback; do not ask the
@@ -66,7 +87,7 @@ operator to guess gains.
 
 ```bash
 jq '{
-  radio_state, network, gain_control, calibration,
+  radio_state, network, gain_control, calibration, adaptive_link,
   rx_lna_gain, rx_vga_gain, tx_gain,
   rf_amp_enabled, rx_rf_amp_enabled, tx_rf_amp_enabled,
   antenna_power_enabled,
@@ -79,6 +100,7 @@ Require:
 
 - `radio_state = receiving`, `network = epscorc3m`;
 - `gain_control = automatic`, `calibration.state = complete`;
+- `adaptive_link.enabled = true`, normally `adaptive_link.state = tracking`;
 - selected RX window has `passed = true`;
 - selected TX probe has `pong = true`;
 - RX/TX amplifier selections match the calibration proof; normally both are
@@ -146,11 +168,16 @@ available. A CRC-complete decoded `.fdp` is science proof; preview alone is not.
 Press `Ctrl-C` once in the launcher terminal. The supervisor stops payload UI,
 GDS, and bridge, then writes the final manifest state. Completed data remains.
 
-## What changes outside the lab?
+## Historical outdoor procedure
 
-The operator command does not change: stop the stack, place the antennas, and
-run `./tools/c3m-sdr` again. Calibration searches the supported gain ranges at
-the new geometry.
+Outdoor qualification is no longer scheduled under the accepted stop-work
+decision. The procedure below is retained only to make the investigation
+reproducible if that decision is formally reopened.
+
+The operator command does not change. Start `./tools/c3m-sdr` at the initial
+geometry and leave it running as the satellite moves. The bridge tracks valid
+frames, clipping, and ACK outcomes; it adjusts and reacquires without restarting
+GDS or the payload receiver.
 
 What does change is the evidence requirement. Automatic gain selection is not
 outdoor qualification. Record location, distance, antenna height/orientation,
@@ -159,22 +186,43 @@ PING/Pong, preview results, and science CRC/decode. Run three consecutive fresh
 science cycles at the intended outdoor geometry before calling that setup
 demo-qualified.
 
-If the link changes materially during a long session, restart the launcher to
-recalibrate. Gains deliberately do not move continuously during commands or
-payload transfer; freezing them avoids AGC-induced behavior changes mid-demo.
+For qualification, pause at each planned distance long enough for
+`adaptive_link.state` to return to `tracking`, then collect the required proof.
+The half-second adjustment dwell and multi-sample clipping hysteresis prevent
+rapid RX gain thrashing during brief motion or multipath fades.
 
 ## Automatic range and limits
 
 - RX search spans HackRF-supported LNA `0..40` and VGA `0..62` presets.
 - TX search spans the complete HackRF TX VGA range `0..47`.
+- RX adjustment begins after 1.5 seconds without a valid C3M frame, then changes
+  at most once per half-second until a CRC-valid frame returns.
+- One missed command ACK advances TX by one state. The command retry budget is
+  expanded automatically so that one command can traverse every remaining
+  stronger state instead of waiting for another operator command.
+- Six consecutive command ACKs permit one cautious TX step down.
 - The RF amplifier starts off. It is enabled for RX or TX only after that
   direction exhausts its normal gain range, then the search restarts low to
   avoid throwing maximum VGA gain and broadband amplifier gain together.
+- At the strongest amplifier-assisted state, RX and TX hold maximum instead of
+  wrapping to minimum and dropping a marginal link.
 - Antenna-port DC bias stays off because this antenna is passive.
 - Frequency, modulation, headers, packet format, and C3M identity come from the
   known RFM23BP/transport configuration and are not learned from arbitrary RF.
 
 These are hardware/profile invariants, not the old indoor 0/8/16 observation.
+
+On every start, the launcher terminates prior repo-owned SDR supervisors and
+their bridge/GDS/payload children, including processes still holding the
+runtime PTYs or selected listening ports. It never takes over an unrelated
+listener: if a selected port remains occupied after cleanup, startup stops and
+reports that port. Recently released TCP connections in `TIME_WAIT` do not
+block a restart.
+
+The bridge creates its two PTYs first, then GDS and the payload viewer start
+concurrently while automatic RF calibration continues. Each browser surface
+opens as soon as its own HTTP server is ready; telemetry and commanding become
+live after calibration completes and `GROUND_STATION_READY` is printed.
 
 ## Indoor evidence, 2026-08-06 HST
 

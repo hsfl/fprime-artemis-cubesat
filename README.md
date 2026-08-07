@@ -75,19 +75,15 @@ panels are not yet integrated into the bring-up.
 [Artemis CubeSat Kit](https://sites.google.com/hawaii.edu/artemiscubesatkit) bus
 instead of USB power.
 
-### Ground-radio choices: RFM23BP or plug-and-play HackRF
+### Ground-radio decision: RFM23BP primary; HackRF research only
 
-A ground station may use either the mirrored OBC/Teensy/RFM23BP node via
-`./tools/c3m` or the HackRF RF22 adapter via `./tools/c3m-sdr`. Both present the
-same F Prime GDS and payload/livestream operator surfaces.
+The mirrored OBC/Teensy/RFM23BP node via `./tools/c3m` is the primary C3M HIL
+and mission-operations ground radio. The completed HackRF RF22 adapter is
+preserved via `./tools/c3m-sdr` for receive diagnosis, teaching, captures, and
+reproducing its indoor qualification, but it is no longer a normal operator,
+fallback, or future-development path.
 
-The RFM23BP ground node remains the cold fallback because it provides the
-radio's native modem and automatic gain behavior. The HackRF path now hides SDR
-gain tuning from operators by identifying the known C3M RF22 frames, selecting
-RX gain from clean CRC-valid reception, selecting TX gain from an end-to-end
-F Prime PING/Pong, and freezing the settings for the session.
-
-The fallback still has practical advantages:
+The RFM23BP path has practical advantages:
 
 - **Lower maintenance:** Going SDR means someone has to learn and maintain the
   SDR stack, and effectively relearn how RF comms works at a lower level.
@@ -97,12 +93,18 @@ The fallback still has practical advantages:
 - **Two identical nodes are simpler:** Building the ground station from the same
   kit as the satellite means one bring-up procedure and one radio codebase.
 
-The HackRF path was proven indoors on 2026-08-06; outdoor geometry remains to
-be qualified even though the launcher recalibrates automatically. See
-[`docs/HACKRF_GROUND_STATION_RUNBOOK.md`](docs/HACKRF_GROUND_STATION_RUNBOOK.md)
-for the operator and outdoor flow, and
-[`docs/archive/HACKRF_SDR_GROUND_STATION_INVESTIGATION_2026-06-30.md`](docs/archive/HACKRF_SDR_GROUND_STATION_INVESTIGATION_2026-06-30.md)
-for the original compatibility investigation.
+The HackRF implementation was proven indoors, then evaluated in a moving
+hallway test on 2026-08-06. It continued receiving valid telemetry but produced
+unreliable commands and frequent ACK timeouts after exhausting its TX gain
+search. Its lower TX capability and host/USB-controlled half-duplex turnaround
+do not justify more mission work or a satellite-protocol change. The accepted
+decision, measurements, datasheet comparison, limitations, and reopening gate
+are in
+[`docs/archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md`](docs/archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md).
+The preserved reproduction procedure remains in
+[`docs/archive/HACKRF_GROUND_STATION_RUNBOOK.md`](docs/archive/HACKRF_GROUND_STATION_RUNBOOK.md),
+and the original compatibility investigation is
+[`docs/archive/HACKRF_SDR_GROUND_STATION_INVESTIGATION_2026-06-30.md`](docs/archive/HACKRF_SDR_GROUND_STATION_INVESTIGATION_2026-06-30.md).
 
 ## Target demo
 
@@ -261,15 +263,13 @@ New here? Read these roughly in order to fully understand the project:
 8. `docs/C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md` — Pi-owned RFM23BP lifecycle, bounded autonomous recovery, HIL evidence, and remaining electrical gates.
 9. `docs/EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md` — EPSCoR C3M Lepton/Boson local and HIL operator flow.
 10. `docs/C3M_LEPTON_PREVIEW_STREAM_MVP.md` — separate Lepton-first `80x60` best-effort preview-stream contract and one-run HIL gate.
-11. `docs/HACKRF_GROUND_STATION_RUNBOOK.md` — plug-and-play HackRF operator flow, POBADY antenna contract, automatic gain/amp fallback, and outdoor requalification gates.
-12. `docs/C3M_FULL_STACK_ONBOARDING.html` — interactive end-to-end C3M architecture and operator onboarding.
-13. `docs/C3M_SDR_FUNDAMENTALS.html` — interactive SDR/RF22 fundamentals grounded in the checked-in HackRF implementation.
-11. `docs/HARDWARE_PORT_MAP_AND_POWER.md` — which USB/serial device is which, and how to power the bench safely.
-12. `docs/MISSION_OPS_QUICK_RUN.md` — one-page local rehearsal and FlatSat/HIL operator checklist.
-13. `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md` — Windows laptop setup for student developers and viewer users.
-14. `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md` and `docs/RPI_BUILD.md` — building the Pi Zero W flight binary (cross-compile preferred; native is the manual fallback).
-15. `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` — where to look first when commands, telemetry, payload downlink, or EPS/PDU behavior fails.
-16. `docs/agents_notes.md` — current implementation status and next-agent guidance.
+11. `docs/C3M_FULL_STACK_ONBOARDING.html` — interactive end-to-end C3M architecture and operator onboarding.
+12. `docs/HARDWARE_PORT_MAP_AND_POWER.md` — which USB/serial device is which, and how to power the bench safely.
+13. `docs/MISSION_OPS_QUICK_RUN.md` — one-page local rehearsal and FlatSat/HIL operator checklist.
+14. `docs/STUDENT_WINDOWS_LAPTOP_SETUP.md` — Windows laptop setup for student developers and viewer users.
+15. `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md` and `docs/RPI_BUILD.md` — building the Pi Zero W flight binary (cross-compile preferred; native is the manual fallback).
+16. `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` — where to look first when commands, telemetry, payload downlink, or EPS/PDU behavior fails.
+17. `docs/agents_notes.md` — current implementation status and next-agent guidance.
 
 ## Build and run (local emulation)
 
@@ -381,12 +381,11 @@ For the EPSCoR C3M Lepton/Boson bench, follow
 Triple-Serial Teensy connected, `./tools/c3m` starts both GDS and the C3M
 payload receiver using the matching Pi-release dictionary.
 
-When the ground radio is the HackRF instead of the ground OBC/RFM23BP, attach
-the qualified POBADY 433 MHz magnetic-base antenna and run `./tools/c3m-sdr`.
-It provides the same operator surfaces—GDS plus the payload/livestream UI—at
-`http://127.0.0.1:5057` and `http://127.0.0.1:8064`. The fixed indoor SDR
-configuration and outdoor requalification procedure are in
-`docs/HACKRF_GROUND_STATION_RUNBOOK.md`.
+The HackRF adapter is preserved for deliberate research and receive-diagnostic
+use through `./tools/c3m-sdr`; it is not the normal HIL path and is not outdoor
+qualified. See
+`docs/archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md` before using its
+reproduction runbook.
 
 ## Status
 

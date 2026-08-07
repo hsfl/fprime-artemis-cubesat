@@ -16,18 +16,19 @@ the operator and connected to the Mac.
 
 ### 1. Start the two laptop operator tools
 
-Choose exactly one ground adapter:
+Use the primary ground adapter:
 
 ```bash
 cd ~/Developer/fprime-artemis-cubesat
 ./tools/c3m       # ground OBC/Teensy + RFM23BP
-./tools/c3m-sdr   # self-calibrating HackRF + POBADY antenna
 ```
 
-Do not run both at once. `c3m-sdr` opens GDS on port `5057`; `c3m` normally
-uses `5050`. Both use the same payload/livestream UI on `8064` and the same
-mission commands below. For SDR physical checks and outdoor work, follow
-[`HACKRF_GROUND_STATION_RUNBOOK.md`](HACKRF_GROUND_STATION_RUNBOOK.md).
+The self-calibrating HackRF adapter remains available through `./tools/c3m-sdr`
+for deliberate research or receive diagnosis, but it is not the normal or
+fallback mission path and must not run alongside `./tools/c3m`. See the
+accepted
+[`C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md`](archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md)
+before using the preserved HackRF runbook.
 
 For the ground OBC/RFM23BP path, the preferred launcher finds exactly one
 complete ground Triple-Serial Teensy, maps its GDS/debug/payload interfaces,

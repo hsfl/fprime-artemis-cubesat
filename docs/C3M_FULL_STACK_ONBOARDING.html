@@ -727,11 +727,10 @@
           <div>
             <article class="step-panel" id="step-panel-0" role="tabpanel" aria-labelledby="step-tab-0" tabindex="0">
               <div class="eyebrow">Ground segment</div><h3>Start the two operator surfaces</h3>
-              <p>Choose one ground adapter. <code>./tools/c3m</code> maps one complete Triple-Serial Teensy/RFM23BP node. <code>./tools/c3m-sdr</code> starts the HackRF RF22 adapter and automatically proves RX/TX gain before opening the same operator surfaces. Both use the dictionary from the exact deployed Pi build.</p>
-              <div class="step-meta"><span class="mini-pill">RFM GDS · :5050</span><span class="mini-pill">SDR GDS · :5057</span><span class="mini-pill">Receiver · :8064</span><span class="mini-pill">Run one adapter only</span></div>
+              <p>Use <code>./tools/c3m</code> with one complete Triple-Serial Teensy/RFM23BP node. It is the accepted primary C3M ground radio and uses the dictionary from the exact deployed Pi build. The preserved <code>./tools/c3m-sdr</code> path is for deliberate research and receive diagnosis, not normal operations; see the <a href="archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md">2026-08-06 engineering decision</a>.</p>
+              <div class="step-meta"><span class="mini-pill">Primary RFM GDS · :5050</span><span class="mini-pill">Receiver · :8064</span><span class="mini-pill">HackRF · research only</span></div>
               <pre><button class="copy-button" type="button">Copy</button>cd ~/Developer/fprime-artemis-cubesat
-./tools/c3m       # ground Teensy + RFM23BP
-./tools/c3m-sdr   # HackRF + POBADY antenna</pre>
+./tools/c3m       # primary ground Teensy + RFM23BP</pre>
               <div class="signal-grid"><div class="signal"><span>Ready signal</span><strong>Receiver says “Ready — awaiting downlink”</strong></div><div class="signal"><span>Control surface</span><strong>GDS Commanding / Events / Channels</strong></div><div class="signal"><span>Why first?</span><strong>Nothing should transmit before its consumer is listening</strong></div></div>
             </article>
 
@@ -806,7 +805,7 @@
 
         <div class="system-map">
           <div class="map-lane">
-            <div class="callout info"><strong>Ground-adapter choice:</strong> the nodes below show the RFM23BP path. With <code>c3m-sdr</code>, the Python RF22/GFSK bridge and HackRF replace the ground Triple-Serial Teensy and ground RFM23BP only; the satellite path and both operator applications stay the same.</div>
+            <div class="callout info"><strong>Ground-radio decision:</strong> the nodes below show the primary RFM23BP path. The preserved <code>c3m-sdr</code> research adapter can replace the ground Triple-Serial Teensy and ground RFM23BP without changing the satellite, but it is not the normal or fallback mission path.</div>
             <button class="map-node" type="button" data-paths="control science preview" data-owner="Ground software" data-evidence="GDS events, telemetry, receiver CRC, and decoded files" data-source="tools/c3m, tools/c3m-sdr + ground-station/"><span class="node-type">Ground laptop</span><strong>GDS + receiver UI</strong><small>Human intent and final evidence</small></button>
             <button class="map-node" type="button" data-paths="control science preview" data-owner="Ground Teensy USB stack" data-evidence="One complete three-interface USB group" data-source="GDS_Teensy/firmware/gds_teensy/"><span class="node-type">USB</span><strong>Triple-Serial ports</strong><small>0 GDS · 1 debug · 2 payload</small></button>
             <button class="map-node" type="button" data-paths="control science preview" data-owner="Ground Teensy firmware" data-evidence="Directional UART and RF counters" data-source="GDS_Teensy/.../relay_uart_rf.cpp"><span class="node-type">Ground MCU</span><strong>Ground Teensy 4.1</strong><small>USB↔RF segmentation bridge</small></button>
@@ -1045,8 +1044,8 @@
 
         <div class="repo-grid">
           <a class="repo-card" href="../tools/c3m"><span class="path">tools/c3m</span><strong>Operator launcher</strong><p>Maps one Triple-Serial Teensy and starts the two ground surfaces.</p></a>
-          <a class="repo-card" href="../tools/c3m-sdr"><span class="path">tools/c3m-sdr</span><strong>HackRF operator launcher</strong><p>Proves the known C3M link automatically, then starts GDS and the payload receiver.</p></a>
-          <a class="repo-card" href="../ground-station/hackrf-rf22"><span class="path">ground-station/hackrf-rf22/</span><strong>SDR RF22 adapter</strong><p>Raw-I/Q modem, packet bridge, automatic gain/amp fallback, metrics, and proof collection.</p></a>
+          <a class="repo-card" href="archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md"><span class="path">docs/archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md</span><strong>HackRF stop-work decision</strong><p>Field evidence, RFM23BP comparison, accepted mission posture, and reopening gate.</p></a>
+          <a class="repo-card" href="../ground-station/hackrf-rf22"><span class="path">ground-station/hackrf-rf22/</span><strong>Preserved SDR RF22 adapter</strong><p>Research and receive-diagnostic raw-I/Q modem, packet bridge, gain control, metrics, and proof collection.</p></a>
           <a class="repo-card" href="../ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Top/topology.fpp"><span class="path">.../Top/topology.fpp</span><strong>System wiring graph</strong><p>Imports F´ services and connects mission, driver, transport, Data Product, and rate-group ports.</p></a>
           <a class="repo-card" href="../ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Top/instances.fpp"><span class="path">.../Top/instances.fpp</span><strong>Runtime instances</strong><p>Active/passive types, queues, stacks, priorities, and base IDs.</p></a>
           <a class="repo-card" href="../ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Main.cpp"><span class="path">.../Deployment/Main.cpp</span><strong>Process entrypoint</strong><p>Starts the Linux deployment and its UART-facing runtime.</p></a>

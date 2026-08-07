@@ -43,6 +43,29 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 
 ## Current State
 
+### C3M ground-radio decision (2026-08-06)
+
+- The ground Teensy/RFM23BP through `./tools/c3m` is the primary C3M HIL and
+  mission-operations radio.
+- The completed HackRF RF22 adapter remains available through
+  `./tools/c3m-sdr` for research, teaching, captures, and receive diagnosis. It
+  is not the normal or fallback operator path, is not outdoor qualified, and
+  has no scheduled bidirectional mission-development work.
+- Controlled indoor HackRF qualification proved real RF22 interoperability,
+  PING/Pong, preview, and exact science downlink. The later hallway run retained
+  2,915 valid RF22 frames and 951 complete channel-0 messages, but recorded 43
+  ACK timeouts versus 26 received ACKs, three TX failures, and 34 holds after
+  reaching TX gain 47 with the RF amplifier enabled.
+- Datasheet/implementation review found the RFM23BP specifies 200 microsecond
+  RX/TX transitions, while HackRF has no deterministic system-turnaround
+  specification and must stop/start separate host-controlled USB streams. The
+  weaker TX capability and ACK blind interval make additional mission work a
+  poor trade against SpaSat priorities.
+- Do not change satellite ACK timing, packet format, modem, or validated flight
+  code for HackRF compatibility. The full evidence, proof limits, rejected
+  options, RFM23BP electrical follow-up, and reopening gate are in
+  `docs/archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md`.
+
 ### C3M on-demand cached downlink acceptance (2026-07-29)
 
 - `REQUEST_SCIENCE_DOWNLINK` now performs one on-demand Pi-to-satellite-Teensy

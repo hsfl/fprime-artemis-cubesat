@@ -514,6 +514,11 @@ and `CommsApp.DownlinkFinished` are the lifecycle completion signals.
 Unless the user says otherwise, agents should assume the following:
 
 - `RFM23BP` is the default communications path for the MVP demo.
+- The ground Teensy/RFM23BP is the primary C3M operator path. The implemented
+  HackRF RF22 adapter is retained for research and receive diagnosis, but
+  bidirectional mission development stopped after the 2026-08-06 hallway
+  evaluation. See
+  [`C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md`](archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md).
 - `SatNOGS` is an alternate or future communications path, not the default assumption.
 - `D2S2` provides simulated `ADCS` behavior.
 - The payload source is the **Neutron 2 payload simulator**, with the loaned **Neutron 2 development payload board** as the future real source; simulation is acceptable until the dev board is integrated and stable.
@@ -538,6 +543,10 @@ Authoritative hardware/protocol references that back this architecture. Read the
 
 - **Artemis CubeSat User's Manual (April 2026)** — prototype hardware reference (OBC, EPS, GPS, structure). The repo file [`docs/Artemis User's Manual - April 2026.txt`](<Artemis User's Manual - April 2026.txt>) is a **local snapshot**; the full, up-to-date manual is the public Google Doc: <https://docs.google.com/document/d/1rWuh5gqnNprtgiNfhd3HfEG-Midq0QqxDkGm_KqfT8Y/edit?tab=t.0>
 - **RFM23BP datasheet** — radio packet/FIFO limits that drive the RF segmentation budget. The repo file [`docs/rfm23bp/RFM23BP_datasheet.txt`](rfm23bp/RFM23BP_datasheet.txt) is a **local copy**; the online datasheet is: <https://www.hoperf.com/uploads/RFM23BPdatasheet_1695351296.pdf>
+- **C3M HackRF ground-station decision** — implementation results, hallway
+  evidence, RFM23BP/HackRF power and turnaround comparison, and the accepted
+  stop-work/reopening gate:
+  [`docs/archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md`](archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md)
 - **RF chain root-cause analysis** — why the RF link forced the 128-byte frame and telemetry throttling decisions: [`docs/archive/RF_CHAIN_ROOT_CAUSE_ANALYSIS_2026-04-24.md`](archive/RF_CHAIN_ROOT_CAUSE_ANALYSIS_2026-04-24.md)
 - **iOBC 1 MB NOR fit & boot architecture** — why the 1 MB NOR is the bootloader budget (not the F´ app budget), the SD→SDRAM boot chain, and the recommended golden-image/A-B failover memory map: [`docs/archive/IOBC_NOR_FIT_AND_BOOT_ARCHITECTURE.md`](archive/IOBC_NOR_FIT_AND_BOOT_ARCHITECTURE.md)
 - **Artemis PDU Protocol ICD** — PDU v2 command/telemetry wire format used by `EpsDriver_Artemis` over channel 2: [`external/artemis-pdu/PDU_PROTOCOL_ICD.md`](../external/artemis-pdu/PDU_PROTOCOL_ICD.md) ([PDF](../external/artemis-pdu/docs/PDU_PROTOCOL_ICD.pdf))
