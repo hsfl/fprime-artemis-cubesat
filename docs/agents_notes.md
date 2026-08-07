@@ -20,6 +20,7 @@ This repo is the Neutron 2 team F' integration workspace:
 - Hardware watchdog arming was removed from both relay sketches. Bounded radio operations and explicit SDN recovery keep USB/debug state observable instead of resetting the entire Teensy during RF diagnosis.
 - Neutron 2 retains ACK/retry behavior on channel 0 and channel 1 in both directions.
 - RF RadioHead headers now enforce the Neutron 2 network ID (`0xD2`), ground/satellite addresses, and protocol version before forwarding.
+- Named build profiles now cover C3M plus N2-A/N2-B. Teensy artifacts are isolated by profile, N2-A/N2-B use CCSDS spacecraft IDs `0x044`/`0x045`, payload directories are node-scoped through Pi environment files, and `run_gds_uart.sh --session` separates ground logs/files. The two-pair HIL rejection matrix remains deferred until a second FlatSat set is available; see `docs/NEUTRON2_DUAL_GDS_RADIO_ADDRESSING.md`.
 - Message IDs advance independently per channel and completed-message retries are re-ACKed without duplicate delivery.
 - The 2026-07-30 bench smoke delivered `missionApp.PING(7502)` end to end and decoded `MissionApp pong token=7502 count=2` with a matching current dictionary.
 - A separate C3 transmitter was present on 433 MHz at about -56 to -62 dBm (`network=C3`, `from=A2`, `to=A1`). A 434 MHz diagnostic eliminated those rejects, but satellite local TX-completion wedges persisted, so the co-channel transmitter is real interference but not the sole fault.
@@ -917,7 +918,7 @@ section:
 ### Demo freeze cleanup
 
 - Added project-owned RF MVP F Prime config overrides:
-  - `ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/RfMvpConfig/ComCfg.fpp`
+  - `ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/RfMvpConfig/ComCfg.<spacecraft-profile>.fpp`
   - `ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/RfMvpConfig/FpConstants.fpp`
 - Restored `ArtemisRpiTeensy_N2/lib/fprime/default/config` to upstream defaults so the F Prime submodule is clean.
 - Added runbook:

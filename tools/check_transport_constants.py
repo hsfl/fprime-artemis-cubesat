@@ -11,6 +11,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from generate_transport_constants import resolve_endpoint_profile, resolve_rf_identity
+
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "config/transport_constants.json"
@@ -92,7 +94,7 @@ def main() -> int:
     fp = constants["fprime"]
     sat = constants["satellite_teensy"]
     gnd = constants["ground_teensy"]
-    selected_network = registry["networks"][manifest["rf"]["network"]]
+    identity = resolve_rf_identity(manifest, registry)
 
     common_pairs = [
         ("frame magic 0", ("fprime", fp["UART_FRAME_MAGIC_0"]), ("satellite", sat["FRAME_MAGIC_0"]), ("ground", gnd["FRAME_MAGIC_0"])),
@@ -101,10 +103,10 @@ def main() -> int:
         ("channel payload", ("fprime", fp["CHANNEL_PAYLOAD"]), ("satellite", sat["CHANNEL_PAYLOAD"]), ("ground", gnd["CHANNEL_PAYLOAD"])),
         ("UART max payload", ("fprime", fp["UART_FRAME_MAX_PAYLOAD"]), ("satellite", sat["FRAME_MAX_PAYLOAD"]), ("ground", gnd["FRAME_MAX_PAYLOAD"])),
         ("RF payload segment data", ("fprime", fp["RF_SEGMENT_MAX_DATA_BYTES"]), ("satellite", sat["RF_SEGMENT_MAX_DATA"]), ("ground", gnd["RF_SEGMENT_MAX_DATA"])),
-        ("RF network ID", ("registry", selected_network["id"]), ("fprime", fp["RF_NETWORK_ID"]), ("satellite", sat["RF_NETWORK_ID"]), ("ground", gnd["RF_NETWORK_ID"])),
-        ("RF protocol version", ("registry", registry["protocol_version"]), ("fprime", fp["RF_PROTOCOL_VERSION"]), ("satellite", sat["RF_PROTOCOL_VERSION"]), ("ground", gnd["RF_PROTOCOL_VERSION"])),
-        ("RF ground address", ("registry", registry["addresses"]["ground"]), ("fprime", fp["RF_GROUND_ADDRESS"]), ("ground local", gnd["RF_LOCAL_ADDRESS"]), ("satellite remote", sat["RF_REMOTE_ADDRESS"])),
-        ("RF satellite address", ("registry", registry["addresses"]["satellite"]), ("fprime", fp["RF_SATELLITE_ADDRESS"]), ("satellite local", sat["RF_LOCAL_ADDRESS"]), ("ground remote", gnd["RF_REMOTE_ADDRESS"])),
+        ("default RF network ID", ("registry", identity["network_id"]), ("fprime", fp["RF_NETWORK_ID"])),
+        ("RF protocol version", ("registry", identity["protocol_version"]), ("fprime", fp["RF_PROTOCOL_VERSION"])),
+        ("default RF ground address", ("registry", identity["ground_address"]), ("fprime", fp["RF_GROUND_ADDRESS"])),
+        ("default RF satellite address", ("registry", identity["satellite_address"]), ("fprime", fp["RF_SATELLITE_ADDRESS"])),
         ("RF TX completion timeout", ("manifest", manifest["rf"]["tx_complete_timeout_ms"]), ("fprime", fp["RF_TX_COMPLETE_TIMEOUT_MS"]), ("satellite", sat["RF_TX_COMPLETE_TIMEOUT_MS"]), ("ground", gnd["RF_TX_COMPLETE_TIMEOUT_MS"])),
         ("ground TX CCSDS ACK", ("fprime", fp["RF_GROUND_TX_ACK_REQUIRED_CCSDS"]), ("ground TX", gnd["RF_TX_ACK_REQUIRED_CCSDS"]), ("satellite RX", sat["RF_RX_ACK_REQUIRED_CCSDS"])),
         ("ground TX payload ACK", ("fprime", fp["RF_GROUND_TX_ACK_REQUIRED_PAYLOAD"]), ("ground TX", gnd["RF_TX_ACK_REQUIRED_PAYLOAD"]), ("satellite RX", sat["RF_RX_ACK_REQUIRED_PAYLOAD"])),
@@ -141,6 +143,15 @@ def main() -> int:
         return 1
 
     print("transport constants OK")
+    print(
+        f"- default RF pair: {identity['ground_profile']} <-> {identity['spacecraft_profile']}"
+    )
+    for profile_key in registry["endpoint_profiles"]:
+        endpoint = resolve_endpoint_profile(registry, profile_key)
+        print(
+            f"- RF profile {profile_key}: network=0x{endpoint['network_id']:02X} "
+            f"local=0x{endpoint['local_address']:02X} remote=0x{endpoint['remote_address']:02X}"
+        )
     for name, path in SOURCES.items():
         print(f"- {name}: {path.relative_to(ROOT)}")
     return 0

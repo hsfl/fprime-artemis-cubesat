@@ -4,5 +4,6 @@ register_fprime_library(
     SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/StorageManager.cpp
     DEPENDS
+        Components_LinkCfg
         Components_Types
 )

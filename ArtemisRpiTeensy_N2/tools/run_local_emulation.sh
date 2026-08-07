@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV_ACTIVATE="$ROOT_DIR/fprime-venv/bin/activate"
+VENV_ACTIVATE="${FPRIME_VENV_ACTIVATE:-$ROOT_DIR/fprime-venv/bin/activate}"
 EMU_SCRIPT="$ROOT_DIR/tools/local_emulation_loop.py"
 
 if [[ ! -f "$VENV_ACTIVATE" ]]; then

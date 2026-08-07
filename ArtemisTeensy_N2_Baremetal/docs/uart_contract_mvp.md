@@ -74,6 +74,15 @@ Channel 2 response payload:
 
 Only channels 0 and 1 are RF forwarded. Each RF packet has:
 
+1. RadioHead header: `TO`, `FROM`, network `ID`, protocol-version `FLAGS`
+2. Artemis segment payload described below
+
+The compiled endpoint accepts only the complete expected RadioHead tuple before
+ACK or reassembly. Named profiles and assigned tuples are documented in
+[`../../docs/NEUTRON2_DUAL_GDS_RADIO_ADDRESSING.md`](../../docs/NEUTRON2_DUAL_GDS_RADIO_ADDRESSING.md).
+
+The Artemis segment payload has:
+
 1. `seg_magic` (1 byte): `0xA5` for channel 0, `0xA6` for channel 1
 2. `msg_id` (1 byte): rolling message ID
 3. `seg_idx` (1 byte): segment index

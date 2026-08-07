@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FPRIME_ROOT="$ROOT_DIR/ArtemisRpiTeensy_N2"
-VENV_ACTIVATE="$FPRIME_ROOT/fprime-venv/bin/activate"
+VENV_ACTIVATE="${FPRIME_VENV_ACTIVATE:-$FPRIME_ROOT/fprime-venv/bin/activate}"
 
 RUN_DEMO="true"
 RUN_BUILD="true"

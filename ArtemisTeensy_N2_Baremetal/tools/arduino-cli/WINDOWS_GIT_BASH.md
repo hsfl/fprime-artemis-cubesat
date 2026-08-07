@@ -26,7 +26,7 @@ From Git Bash:
 
 ```bash
 cd /c/path/to/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
-./tools/arduino-cli/build_windows_git_bash.sh
+./tools/arduino-cli/build_windows_git_bash.sh --profile n2-spacecraft-a
 ```
 
 List connected Teensy upload IDs:
@@ -38,7 +38,7 @@ arduino-cli board list
 Upload by the physical `usb:` ID, not by `COMx`:
 
 ```bash
-./tools/arduino-cli/upload_windows_git_bash.sh usb:0/140000/0/2
+./tools/arduino-cli/upload_windows_git_bash.sh --profile n2-spacecraft-a usb:0/140000/0/2
 ```
 
 Use the `usb:` ID shown on your machine. The current HIL bench satellite Teensy
@@ -47,6 +47,9 @@ is usually `usb:2100000`, but Windows host enumeration can differ.
 The normal macOS/Linux/WSL scripts remain:
 
 ```bash
-./tools/arduino-cli/build.sh
-./tools/arduino-cli/upload.sh usb:2100000
+./tools/arduino-cli/build.sh --profile n2-spacecraft-a
+./tools/arduino-cli/upload.sh --profile n2-spacecraft-a usb:2100000
 ```
+
+Use `n2-spacecraft-b` only for the second spacecraft. Profile artifacts are
+kept in separate build subdirectories.

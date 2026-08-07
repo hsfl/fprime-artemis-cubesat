@@ -183,6 +183,16 @@ void setup() {
   const bool radioOk = g_rfDriver.begin();
   g_relay.begin();
 
+  Serial.print("[ArtemisTeensy] RF identity profile=");
+  Serial.print(RF_ENDPOINT_PROFILE_NAME);
+  Serial.print(" to=");
+  Serial.print(link_protocol::RF_REMOTE_ADDRESS, HEX);
+  Serial.print(" from=");
+  Serial.print(link_protocol::RF_LOCAL_ADDRESS, HEX);
+  Serial.print(" network=");
+  Serial.print(link_protocol::RF_NETWORK_ID, HEX);
+  Serial.print(" version=");
+  Serial.println(link_protocol::RF_PROTOCOL_VERSION, HEX);
   if (radioOk) {
     Serial.println("[ArtemisTeensy] RF23 bridge ready; radio auto-enabled for v1 Pi compatibility");
   } else {

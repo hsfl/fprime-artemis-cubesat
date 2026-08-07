@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -12,12 +13,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "config/transport_constants.json"
 RF_NETWORKS = ROOT / "config/rf_networks.json"
+COMCFG_TEMPLATE = (
+    ROOT / "ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/RfMvpConfig/ComCfg.fpp.in"
+)
+COMCFG_OUTPUT_DIR = ROOT / "ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/RfMvpConfig"
 
 OUTPUTS = {
     "fprime": ROOT / "ArtemisRpiTeensy_N2/Components/LinkCfg/LinkCfg.hpp",
     "satellite": ROOT / "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/link_protocol.hpp",
     "ground": ROOT / "GDS_Teensy/firmware/gds_teensy/src/link_protocol.hpp",
 }
+
+PROFILE_NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
 def hex_byte(value: int) -> str:
@@ -50,32 +57,158 @@ def generated_notice() -> str:
     )
 
 
-def resolve_rf_identity(cfg: dict, registry: dict) -> dict:
+def profile_macro(profile_key: str) -> str:
+    return "RF_PROFILE_" + profile_key.upper().replace("-", "_")
+
+
+def validate_rf_registry(registry: dict) -> None:
     networks = registry.get("networks", {})
-    network_key = cfg["rf"].get("network")
-    if network_key not in networks:
-        raise ValueError(f"rf.network {network_key!r} is not defined in config/rf_networks.json")
+    if not networks:
+        raise ValueError("RF network registry must define at least one network")
     ids = [entry.get("id") for entry in networks.values()]
     if any(not isinstance(value, int) or not 1 <= value <= 254 for value in ids):
         raise ValueError("RF network IDs must be unique integers in the range 1..254")
     if len(ids) != len(set(ids)):
         raise ValueError("RF network IDs must be unique")
-    addresses = registry.get("addresses", {})
-    ground = addresses.get("ground")
-    satellite = addresses.get("satellite")
-    if not all(isinstance(value, int) and 1 <= value <= 254 for value in (ground, satellite)):
-        raise ValueError("RF role addresses must be integers in the range 1..254")
-    if ground == satellite:
-        raise ValueError("RF ground and satellite role addresses must differ")
     version = registry.get("protocol_version")
     if not isinstance(version, int) or not 1 <= version <= 255:
         raise ValueError("RF protocol version must be an integer in the range 1..255")
+
+    profiles = registry.get("endpoint_profiles", {})
+    if not profiles:
+        raise ValueError("RF network registry must define endpoint_profiles")
+
+    local_addresses: set[tuple[str, int]] = set()
+    spacecraft_ids: set[int] = set()
+    payload_namespaces: set[str] = set()
+    gds_sessions: set[str] = set()
+    for profile_key, endpoint in profiles.items():
+        if not PROFILE_NAME_RE.fullmatch(profile_key):
+            raise ValueError(f"invalid RF endpoint profile name {profile_key!r}")
+        network_key = endpoint.get("network")
+        if network_key not in networks:
+            raise ValueError(
+                f"RF endpoint profile {profile_key!r} uses unknown network {network_key!r}"
+            )
+        role = endpoint.get("role")
+        if role not in ("ground", "spacecraft"):
+            raise ValueError(
+                f"RF endpoint profile {profile_key!r} role must be 'ground' or 'spacecraft'"
+            )
+        local_address = endpoint.get("local_address")
+        if not isinstance(local_address, int) or not 1 <= local_address <= 254:
+            raise ValueError(
+                f"RF endpoint profile {profile_key!r} local_address must be in the range 1..254"
+            )
+        address_key = (network_key, local_address)
+        if address_key in local_addresses:
+            raise ValueError(
+                f"RF endpoint local addresses must be unique within network {network_key!r}"
+            )
+        local_addresses.add(address_key)
+
+        spacecraft_id = endpoint.get("ccsds_spacecraft_id")
+        if spacecraft_id is not None:
+            if role != "spacecraft" or not isinstance(spacecraft_id, int) or not 0 <= spacecraft_id <= 0x03FF:
+                raise ValueError(
+                    f"RF endpoint profile {profile_key!r} has an invalid CCSDS spacecraft ID"
+                )
+            if spacecraft_id in spacecraft_ids:
+                raise ValueError("CCSDS spacecraft IDs must be unique")
+            spacecraft_ids.add(spacecraft_id)
+
+        payload_namespace = endpoint.get("payload_namespace")
+        if payload_namespace is not None:
+            if role != "spacecraft" or not PROFILE_NAME_RE.fullmatch(payload_namespace):
+                raise ValueError(
+                    f"RF endpoint profile {profile_key!r} has an invalid payload namespace"
+                )
+            if payload_namespace in payload_namespaces:
+                raise ValueError("payload namespaces must be unique")
+            payload_namespaces.add(payload_namespace)
+
+        gds_session = endpoint.get("gds_session")
+        if gds_session is not None:
+            if role != "ground" or not PROFILE_NAME_RE.fullmatch(gds_session):
+                raise ValueError(
+                    f"RF endpoint profile {profile_key!r} has an invalid GDS session"
+                )
+            if gds_session in gds_sessions:
+                raise ValueError("GDS sessions must be unique")
+            gds_sessions.add(gds_session)
+
+    for profile_key, endpoint in profiles.items():
+        remote_key = endpoint.get("remote_profile")
+        if remote_key not in profiles:
+            raise ValueError(
+                f"RF endpoint profile {profile_key!r} uses unknown remote_profile {remote_key!r}"
+            )
+        remote = profiles[remote_key]
+        if remote.get("remote_profile") != profile_key:
+            raise ValueError(
+                f"RF endpoint profiles {profile_key!r} and {remote_key!r} must pair reciprocally"
+            )
+        if remote.get("network") != endpoint.get("network"):
+            raise ValueError(
+                f"RF endpoint profiles {profile_key!r} and {remote_key!r} must use the same network"
+            )
+        if remote.get("role") == endpoint.get("role"):
+            raise ValueError(
+                f"RF endpoint profiles {profile_key!r} and {remote_key!r} must use opposite roles"
+            )
+
+
+def resolve_endpoint_profile(
+    registry: dict, profile_key: str, *, expected_role: str = None
+) -> dict:
+    validate_rf_registry(registry)
+    profiles = registry["endpoint_profiles"]
+    if profile_key not in profiles:
+        raise ValueError(
+            f"RF endpoint profile {profile_key!r} is not defined in config/rf_networks.json"
+        )
+    endpoint = profiles[profile_key]
+    role = endpoint["role"]
+    if expected_role is not None and role != expected_role:
+        raise ValueError(
+            f"RF endpoint profile {profile_key!r} has role {role!r}, expected {expected_role!r}"
+        )
+    remote_key = endpoint["remote_profile"]
+    remote = profiles[remote_key]
+    network_key = endpoint["network"]
     return {
+        "profile_key": profile_key,
+        "profile_macro": profile_macro(profile_key),
+        "role": role,
         "network_key": network_key,
-        "network_id": networks[network_key]["id"],
-        "protocol_version": version,
-        "ground_address": ground,
-        "satellite_address": satellite,
+        "network_id": registry["networks"][network_key]["id"],
+        "protocol_version": registry["protocol_version"],
+        "local_address": endpoint["local_address"],
+        "remote_profile": remote_key,
+        "remote_address": remote["local_address"],
+        "ccsds_spacecraft_id": endpoint.get("ccsds_spacecraft_id"),
+        "payload_namespace": endpoint.get("payload_namespace"),
+        "gds_session": endpoint.get("gds_session"),
+        "gds_gui_port": endpoint.get("gds_gui_port"),
+    }
+
+
+def resolve_rf_identity(cfg: dict, registry: dict) -> dict:
+    selections = cfg["rf"].get("endpoint_profiles", {})
+    ground_key = selections.get("ground")
+    spacecraft_key = selections.get("spacecraft")
+    ground = resolve_endpoint_profile(registry, ground_key, expected_role="ground")
+    spacecraft = resolve_endpoint_profile(registry, spacecraft_key, expected_role="spacecraft")
+    if ground["remote_profile"] != spacecraft_key or spacecraft["remote_profile"] != ground_key:
+        raise ValueError("selected RF ground and spacecraft endpoint profiles must be a paired tuple")
+    return {
+        "network_key": ground["network_key"],
+        "network_id": ground["network_id"],
+        "protocol_version": ground["protocol_version"],
+        "ground_profile": ground_key,
+        "spacecraft_profile": spacecraft_key,
+        "ground_address": ground["local_address"],
+        "satellite_address": spacecraft["local_address"],
     }
 
 
@@ -167,7 +300,43 @@ inline bool rfSatelliteTxAckRequiredForChannel(const U8 channel) {{
 """
 
 
-def render_teensy(cfg: dict, identity: dict, *, satellite: bool) -> str:
+def render_profile_selector(registry: dict, *, role: str, default_profile: str) -> str:
+    endpoints = [
+        resolve_endpoint_profile(registry, key, expected_role=role)
+        for key, value in registry["endpoint_profiles"].items()
+        if value["role"] == role
+    ]
+    macro_lines = [
+        f"#define {profile_macro(key)} {index}"
+        for index, key in enumerate(registry["endpoint_profiles"], start=1)
+    ]
+    branches = []
+    for index, endpoint in enumerate(endpoints):
+        directive = "#if" if index == 0 else "#elif"
+        branches.append(
+            f"""{directive} RF_ENDPOINT_PROFILE == {endpoint['profile_macro']}
+#define RF_ENDPOINT_PROFILE_NAME {cpp_string(endpoint['profile_key'])}
+static constexpr uint8_t RF_NETWORK_ID = {hex_byte(endpoint['network_id'])};
+static constexpr uint8_t RF_PROTOCOL_VERSION = {hex_byte(endpoint['protocol_version'])};
+static constexpr uint8_t RF_LOCAL_ADDRESS = {hex_byte(endpoint['local_address'])};
+static constexpr uint8_t RF_REMOTE_ADDRESS = {hex_byte(endpoint['remote_address'])};"""
+        )
+    role_label = "ground/GDS" if role == "ground" else "spacecraft"
+    return f"""// Named RF endpoint profiles. Select one with compiler.cpp.extra_flags,
+// for example -DRF_ENDPOINT_PROFILE={profile_macro(default_profile)}.
+{chr(10).join(macro_lines)}
+
+#ifndef RF_ENDPOINT_PROFILE
+#define RF_ENDPOINT_PROFILE {profile_macro(default_profile)}
+#endif
+
+{chr(10).join(branches)}
+#else
+#error "Unknown or wrong-role RF_ENDPOINT_PROFILE for this {role_label} firmware"
+#endif"""
+
+
+def render_teensy(cfg: dict, registry: dict, *, satellite: bool) -> str:
     frame = cfg["frame"]
     channels = cfg["channels"]
     rpc = cfg["teensy_rpc"]
@@ -178,8 +347,9 @@ def render_teensy(cfg: dict, identity: dict, *, satellite: bool) -> str:
     rx_ack = ground_ack if satellite else satellite_ack
     command = cfg["command"]
     count = channels["satellite_count"] if satellite else channels["ground_count"]
-    local_address = identity["satellite_address"] if satellite else identity["ground_address"]
-    remote_address = identity["ground_address"] if satellite else identity["satellite_address"]
+    role = "spacecraft" if satellite else "ground"
+    default_profile = cfg["rf"]["endpoint_profiles"][role]
+    profile_selector = render_profile_selector(registry, role=role, default_profile=default_profile)
     local_channel = ""
     local_rpc = ""
     if satellite:
@@ -224,10 +394,7 @@ static constexpr uint16_t FRAME_MAX_PAYLOAD = {frame["max_payload"]};
 static constexpr uint32_t FRAME_TIMEOUT_MS = {frame["timeout_ms"]};
 
 // RF segmentation parameters.
-static constexpr uint8_t RF_NETWORK_ID = {hex_byte(identity["network_id"])};
-static constexpr uint8_t RF_PROTOCOL_VERSION = {hex_byte(identity["protocol_version"])};
-static constexpr uint8_t RF_LOCAL_ADDRESS = {hex_byte(local_address)};
-static constexpr uint8_t RF_REMOTE_ADDRESS = {hex_byte(remote_address)};
+{profile_selector}
 static constexpr uint8_t RF_SEGMENT_MAGIC_CCSDS = {hex_byte(rf["segment_magic_ccsds"])};
 static constexpr uint8_t RF_SEGMENT_MAGIC_PAYLOAD = {hex_byte(rf["segment_magic_payload"])};
 static constexpr uint8_t RF_ACK_SEGMENT_INDEX = {hex_byte(rf["ack_segment_index"])};
@@ -316,13 +483,35 @@ inline bool channelForMagic(uint8_t magic, uint8_t& channel) {{
 """
 
 
+def render_comcfg(template: str, endpoint: dict) -> str:
+    spacecraft_id = endpoint["ccsds_spacecraft_id"]
+    if spacecraft_id is None:
+        raise ValueError(
+            f"spacecraft profile {endpoint['profile_key']!r} must define ccsds_spacecraft_id"
+        )
+    notice = (
+        "# Generated from config/rf_networks.json and ComCfg.fpp.in by "
+        "tools/generate_transport_constants.py.\n"
+        "# Do not hand-edit; update the registry/template and regenerate.\n\n"
+    )
+    return notice + template.replace("@SPACECRAFT_ID@", f"0x{spacecraft_id:04X}")
+
+
 def render_all(cfg: dict, registry: dict) -> dict[Path, str]:
     identity = resolve_rf_identity(cfg, registry)
-    return {
+    generated = {
         OUTPUTS["fprime"]: render_fprime(cfg, identity),
-        OUTPUTS["satellite"]: render_teensy(cfg, identity, satellite=True),
-        OUTPUTS["ground"]: render_teensy(cfg, identity, satellite=False),
+        OUTPUTS["satellite"]: render_teensy(cfg, registry, satellite=True),
+        OUTPUTS["ground"]: render_teensy(cfg, registry, satellite=False),
     }
+    template = COMCFG_TEMPLATE.read_text()
+    for profile_key, value in registry["endpoint_profiles"].items():
+        if value["role"] != "spacecraft" or value.get("ccsds_spacecraft_id") is None:
+            continue
+        endpoint = resolve_endpoint_profile(registry, profile_key, expected_role="spacecraft")
+        path = COMCFG_OUTPUT_DIR / f"ComCfg.{profile_key}.fpp"
+        generated[path] = render_comcfg(template, endpoint)
+    return generated
 
 
 def main() -> int:

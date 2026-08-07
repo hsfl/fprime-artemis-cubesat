@@ -228,6 +228,16 @@ void setup() {
 #if ARTEMIS_HAS_DEBUG_USB
   delay(200);
   SerialUSB1.println("[GDS_Teensy] debug port ready; data port is USB Serial");
+  SerialUSB1.print("[GDS_Teensy] RF identity profile=");
+  SerialUSB1.print(RF_ENDPOINT_PROFILE_NAME);
+  SerialUSB1.print(" to=");
+  SerialUSB1.print(link_protocol::RF_REMOTE_ADDRESS, HEX);
+  SerialUSB1.print(" from=");
+  SerialUSB1.print(link_protocol::RF_LOCAL_ADDRESS, HEX);
+  SerialUSB1.print(" network=");
+  SerialUSB1.print(link_protocol::RF_NETWORK_ID, HEX);
+  SerialUSB1.print(" version=");
+  SerialUSB1.println(link_protocol::RF_PROTOCOL_VERSION, HEX);
   if (radioOk) {
     SerialUSB1.println("[GDS_Teensy] RF23 bridge ready (raw GDS channel + payload channel + RF segmentation)");
   } else {

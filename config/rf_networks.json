@@ -1,9 +1,5 @@
 {
   "protocol_version": 1,
-  "addresses": {
-    "ground": 161,
-    "satellite": 162
-  },
   "networks": {
     "epscorc3m": {
       "id": 195,
@@ -12,6 +8,52 @@
     "neutron2": {
       "id": 210,
       "label": "Neutron 2"
+    }
+  },
+  "endpoint_profiles": {
+    "c3m-gds": {
+      "network": "epscorc3m",
+      "role": "ground",
+      "local_address": 161,
+      "remote_profile": "c3m-spacecraft"
+    },
+    "c3m-spacecraft": {
+      "network": "epscorc3m",
+      "role": "spacecraft",
+      "local_address": 162,
+      "remote_profile": "c3m-gds"
+    },
+    "n2-gds-a": {
+      "network": "neutron2",
+      "role": "ground",
+      "local_address": 161,
+      "remote_profile": "n2-spacecraft-a",
+      "gds_session": "n2-a",
+      "gds_gui_port": 5050
+    },
+    "n2-spacecraft-a": {
+      "network": "neutron2",
+      "role": "spacecraft",
+      "local_address": 162,
+      "remote_profile": "n2-gds-a",
+      "ccsds_spacecraft_id": 68,
+      "payload_namespace": "n2-a"
+    },
+    "n2-gds-b": {
+      "network": "neutron2",
+      "role": "ground",
+      "local_address": 164,
+      "remote_profile": "n2-spacecraft-b",
+      "gds_session": "n2-b",
+      "gds_gui_port": 5051
+    },
+    "n2-spacecraft-b": {
+      "network": "neutron2",
+      "role": "spacecraft",
+      "local_address": 163,
+      "remote_profile": "n2-gds-b",
+      "ccsds_spacecraft_id": 69,
+      "payload_namespace": "n2-b"
     }
   }
 }

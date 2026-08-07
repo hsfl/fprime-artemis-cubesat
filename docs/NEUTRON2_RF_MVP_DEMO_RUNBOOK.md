@@ -79,9 +79,9 @@ cable before attributing the remaining fault to software.
 Keep these paths straight during the demo:
 
 - Pi latest payload:
-  `/tmp/neutron_payload_captures/latest_payload.bin`
+  `/tmp/neutron_payload_captures/n2-a/latest_payload.bin`
 - Pi latest payload target:
-  `ssh artemis-pi 'readlink -f /tmp/neutron_payload_captures/latest_payload.bin'`
+  `ssh artemis-pi 'readlink -f /tmp/neutron_payload_captures/n2-a/latest_payload.bin'`
 - ground reconstructed payload:
   `/tmp/neutron_hil/<run-name>/payload_30s.bin`
 - payload receiver proof:
@@ -198,6 +198,7 @@ cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 GDS_DATA_PORT=/dev/cu.usbmodem115551201
 
 ./tools/run_gds_uart.sh \
+  --session n2-a \
   --port "$GDS_DATA_PORT" \
   --baud 115200 \
   --gui-port 5050 \
@@ -212,6 +213,7 @@ cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
 GDS_DATA_PORT=/dev/ttyACM0
 
 ./tools/run_gds_uart.sh \
+  --session n2-a \
   --port "$GDS_DATA_PORT" \
   --baud 115200 \
   --gui-port 5050 \
@@ -574,8 +576,8 @@ RUN_DIR="$(cat /tmp/neutron_hil/latest_rf_demo_dir)"
 LOCAL="$RUN_DIR/payload_30s.bin"
 
 printf 'local  '; shasum -a 256 "$LOCAL"
-printf 'remote '; ssh artemis-pi 'sha256sum /tmp/neutron_payload_captures/latest_payload.bin'
-ssh artemis-pi 'readlink -f /tmp/neutron_payload_captures/latest_payload.bin; wc -c /tmp/neutron_payload_captures/latest_payload.bin'
+printf 'remote '; ssh artemis-pi 'sha256sum /tmp/neutron_payload_captures/n2-a/latest_payload.bin'
+ssh artemis-pi 'readlink -f /tmp/neutron_payload_captures/n2-a/latest_payload.bin; wc -c /tmp/neutron_payload_captures/n2-a/latest_payload.bin'
 python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py --summary "$LOCAL"
 ```
 
@@ -587,8 +589,8 @@ RUN_DIR="$(cat /tmp/neutron_hil/latest_rf_demo_dir)"
 LOCAL="$RUN_DIR/payload_30s.bin"
 
 printf 'local  '; sha256sum "$LOCAL"
-printf 'remote '; ssh artemis-pi 'sha256sum /tmp/neutron_payload_captures/latest_payload.bin'
-ssh artemis-pi 'readlink -f /tmp/neutron_payload_captures/latest_payload.bin; wc -c /tmp/neutron_payload_captures/latest_payload.bin'
+printf 'remote '; ssh artemis-pi 'sha256sum /tmp/neutron_payload_captures/n2-a/latest_payload.bin'
+ssh artemis-pi 'readlink -f /tmp/neutron_payload_captures/n2-a/latest_payload.bin; wc -c /tmp/neutron_payload_captures/n2-a/latest_payload.bin'
 python3 ground-station/neutron2-payload-viewer/neutron2_payload_viewer.py --summary "$LOCAL"
 ```
 
@@ -679,7 +681,7 @@ If payload receiver prints `incomplete`:
 - for a direct retry of the same Pi latest payload, use:
 
 ```bash
-BYTES="$(ssh artemis-pi 'wc -c < /tmp/neutron_payload_captures/latest_payload.bin')"
+BYTES="$(ssh artemis-pi 'wc -c < /tmp/neutron_payload_captures/n2-a/latest_payload.bin')"
 fprime-cli command-send ArtemisRpiTeensyDeployment.payloadDownlinkApp.START_PAYLOAD_DOWNLINK \
   --arguments 99 "$BYTES" \
   --dictionary "$DICT" --log-level-gds ERROR
@@ -688,7 +690,7 @@ fprime-cli command-send ArtemisRpiTeensyDeployment.payloadDownlinkApp.START_PAYL
 That uses the current byte count from:
 
 ```bash
-ssh artemis-pi 'wc -c /tmp/neutron_payload_captures/latest_payload.bin'
+ssh artemis-pi 'wc -c /tmp/neutron_payload_captures/n2-a/latest_payload.bin'
 ```
 
 If the viewer shows the wrong file:

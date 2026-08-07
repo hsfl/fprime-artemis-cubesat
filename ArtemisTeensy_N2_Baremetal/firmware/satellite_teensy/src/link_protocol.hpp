@@ -40,10 +40,40 @@ static constexpr uint16_t FRAME_MAX_PAYLOAD = 220;
 static constexpr uint32_t FRAME_TIMEOUT_MS = 250;
 
 // RF segmentation parameters.
+// Named RF endpoint profiles. Select one with compiler.cpp.extra_flags,
+// for example -DRF_ENDPOINT_PROFILE=RF_PROFILE_N2_SPACECRAFT_A.
+#define RF_PROFILE_C3M_GDS 1
+#define RF_PROFILE_C3M_SPACECRAFT 2
+#define RF_PROFILE_N2_GDS_A 3
+#define RF_PROFILE_N2_SPACECRAFT_A 4
+#define RF_PROFILE_N2_GDS_B 5
+#define RF_PROFILE_N2_SPACECRAFT_B 6
+
+#ifndef RF_ENDPOINT_PROFILE
+#define RF_ENDPOINT_PROFILE RF_PROFILE_N2_SPACECRAFT_A
+#endif
+
+#if RF_ENDPOINT_PROFILE == RF_PROFILE_C3M_SPACECRAFT
+#define RF_ENDPOINT_PROFILE_NAME "c3m-spacecraft"
+static constexpr uint8_t RF_NETWORK_ID = 0xC3;
+static constexpr uint8_t RF_PROTOCOL_VERSION = 0x01;
+static constexpr uint8_t RF_LOCAL_ADDRESS = 0xA2;
+static constexpr uint8_t RF_REMOTE_ADDRESS = 0xA1;
+#elif RF_ENDPOINT_PROFILE == RF_PROFILE_N2_SPACECRAFT_A
+#define RF_ENDPOINT_PROFILE_NAME "n2-spacecraft-a"
 static constexpr uint8_t RF_NETWORK_ID = 0xD2;
 static constexpr uint8_t RF_PROTOCOL_VERSION = 0x01;
 static constexpr uint8_t RF_LOCAL_ADDRESS = 0xA2;
 static constexpr uint8_t RF_REMOTE_ADDRESS = 0xA1;
+#elif RF_ENDPOINT_PROFILE == RF_PROFILE_N2_SPACECRAFT_B
+#define RF_ENDPOINT_PROFILE_NAME "n2-spacecraft-b"
+static constexpr uint8_t RF_NETWORK_ID = 0xD2;
+static constexpr uint8_t RF_PROTOCOL_VERSION = 0x01;
+static constexpr uint8_t RF_LOCAL_ADDRESS = 0xA3;
+static constexpr uint8_t RF_REMOTE_ADDRESS = 0xA4;
+#else
+#error "Unknown or wrong-role RF_ENDPOINT_PROFILE for this spacecraft firmware"
+#endif
 static constexpr uint8_t RF_SEGMENT_MAGIC_CCSDS = 0xA5;
 static constexpr uint8_t RF_SEGMENT_MAGIC_PAYLOAD = 0xA6;
 static constexpr uint8_t RF_ACK_SEGMENT_INDEX = 0xFF;

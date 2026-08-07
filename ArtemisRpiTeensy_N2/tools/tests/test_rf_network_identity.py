@@ -37,19 +37,59 @@ class RfNetworkIdentityTests(unittest.TestCase):
         self.assertEqual(identity["network_key"], "neutron2")
         self.assertNotEqual(identity["network_id"], self.registry["networks"]["epscorc3m"]["id"])
         self.assertNotEqual(identity["ground_address"], identity["satellite_address"])
+        self.assertEqual(identity["ground_profile"], "n2-gds-a")
+        self.assertEqual(identity["spacecraft_profile"], "n2-spacecraft-a")
         self.assertEqual(self.transport["rf"]["packet_max_len"], 49)
         self.assertEqual(self.transport["rf"]["segment_header_len"], 5)
 
-        ground = generator.render_teensy(self.transport, identity, satellite=False)
-        satellite = generator.render_teensy(self.transport, identity, satellite=True)
+        ground = generator.render_teensy(self.transport, self.registry, satellite=False)
+        satellite = generator.render_teensy(self.transport, self.registry, satellite=True)
         self.assertIn("classifyRfHeader", ground)
         self.assertIn("WRONG_NETWORK", ground)
         self.assertIn("WRONG_ADDRESS", ground)
         self.assertIn("WRONG_VERSION", ground)
+        self.assertIn("RF_ENDPOINT_PROFILE == RF_PROFILE_N2_GDS_B", ground)
+        self.assertIn("RF_ENDPOINT_PROFILE == RF_PROFILE_N2_SPACECRAFT_B", satellite)
         self.assertIn("RF_LOCAL_ADDRESS = 0xA1", ground)
         self.assertIn("RF_REMOTE_ADDRESS = 0xA2", ground)
         self.assertIn("RF_LOCAL_ADDRESS = 0xA2", satellite)
         self.assertIn("RF_REMOTE_ADDRESS = 0xA1", satellite)
+
+    def test_all_named_endpoint_profiles_match_the_allocated_tuples(self) -> None:
+        expected = {
+            "c3m-gds": ("ground", 0xC3, 0xA1, 0xA2),
+            "c3m-spacecraft": ("spacecraft", 0xC3, 0xA2, 0xA1),
+            "n2-gds-a": ("ground", 0xD2, 0xA1, 0xA2),
+            "n2-spacecraft-a": ("spacecraft", 0xD2, 0xA2, 0xA1),
+            "n2-gds-b": ("ground", 0xD2, 0xA4, 0xA3),
+            "n2-spacecraft-b": ("spacecraft", 0xD2, 0xA3, 0xA4),
+        }
+        self.assertEqual(set(self.registry["endpoint_profiles"]), set(expected))
+        for profile_key, values in expected.items():
+            with self.subTest(profile=profile_key):
+                endpoint = generator.resolve_endpoint_profile(self.registry, profile_key)
+                self.assertEqual(
+                    (
+                        endpoint["role"],
+                        endpoint["network_id"],
+                        endpoint["local_address"],
+                        endpoint["remote_address"],
+                    ),
+                    values,
+                )
+
+        spacecraft_a = generator.resolve_endpoint_profile(self.registry, "n2-spacecraft-a")
+        spacecraft_b = generator.resolve_endpoint_profile(self.registry, "n2-spacecraft-b")
+        self.assertEqual(spacecraft_a["ccsds_spacecraft_id"], 0x44)
+        self.assertEqual(spacecraft_b["ccsds_spacecraft_id"], 0x45)
+        self.assertEqual(spacecraft_a["payload_namespace"], "n2-a")
+        self.assertEqual(spacecraft_b["payload_namespace"], "n2-b")
+        self.assertNotEqual(spacecraft_a["ccsds_spacecraft_id"], spacecraft_b["ccsds_spacecraft_id"])
+
+        gds_a = generator.resolve_endpoint_profile(self.registry, "n2-gds-a")
+        gds_b = generator.resolve_endpoint_profile(self.registry, "n2-gds-b")
+        self.assertEqual((gds_a["gds_session"], gds_a["gds_gui_port"]), ("n2-a", 5050))
+        self.assertEqual((gds_b["gds_session"], gds_b["gds_gui_port"]), ("n2-b", 5051))
 
     def test_channel_2_extended_status_preserves_legacy_develop_contract(self) -> None:
         rpc = self.transport["teensy_rpc"]
@@ -79,17 +119,84 @@ class RfNetworkIdentityTests(unittest.TestCase):
 
     def test_unknown_selected_network_is_rejected(self) -> None:
         transport = copy.deepcopy(self.transport)
-        transport["rf"]["network"] = "unknown"
-        with self.assertRaisesRegex(ValueError, "not defined"):
+        transport["rf"]["endpoint_profiles"]["ground"] = "unknown"
+        with self.assertRaisesRegex(ValueError, "endpoint profile"):
             generator.resolve_rf_identity(transport, self.registry)
 
-    def test_generated_classifier_executes_all_strict_cases_for_both_roles(self) -> None:
-        for relative in (
-            "GDS_Teensy/firmware/gds_teensy/src/link_protocol.hpp",
-            "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/link_protocol.hpp",
-        ):
-            header = REPO_ROOT / relative
-            with self.subTest(header=relative), tempfile.TemporaryDirectory() as tmp:
+    def test_cross_pair_selection_is_rejected(self) -> None:
+        transport = copy.deepcopy(self.transport)
+        transport["rf"]["endpoint_profiles"]["spacecraft"] = "n2-spacecraft-b"
+        with self.assertRaisesRegex(ValueError, "paired tuple"):
+            generator.resolve_rf_identity(transport, self.registry)
+
+    def test_duplicate_address_within_one_network_is_rejected(self) -> None:
+        registry = copy.deepcopy(self.registry)
+        registry["endpoint_profiles"]["n2-gds-b"]["local_address"] = 0xA1
+        with self.assertRaisesRegex(ValueError, "unique within network"):
+            generator.validate_rf_registry(registry)
+
+    def test_generated_fprime_configs_assign_unique_spacecraft_ids(self) -> None:
+        generated = generator.render_all(self.transport, self.registry)
+        configs = {
+            path.name: content
+            for path, content in generated.items()
+            if path.name.startswith("ComCfg.n2-spacecraft-")
+        }
+        self.assertIn("dictionary constant SpacecraftId = 0x0044", configs["ComCfg.n2-spacecraft-a.fpp"])
+        self.assertIn("dictionary constant SpacecraftId = 0x0045", configs["ComCfg.n2-spacecraft-b.fpp"])
+
+        cmake = (
+            REPO_ROOT
+            / "ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/RfMvpConfig/CMakeLists.txt"
+        ).read_text()
+        self.assertIn('NEUTRON2_SPACECRAFT_PROFILE "n2-spacecraft-a"', cmake)
+        self.assertIn("ComCfg.n2-spacecraft-a.fpp", cmake)
+        self.assertIn("ComCfg.n2-spacecraft-b.fpp", cmake)
+
+    def test_build_and_runtime_tools_keep_node_profiles_isolated(self) -> None:
+        script_expectations = {
+            "GDS_Teensy/tools/arduino-cli/build.sh": ("n2-gds-a", "RF_ENDPOINT_PROFILE", "/$RF_PROFILE"),
+            "GDS_Teensy/tools/arduino-cli/upload.sh": ("n2-gds-a", "--profile", "/$RF_PROFILE"),
+            "ArtemisTeensy_N2_Baremetal/tools/arduino-cli/build.sh": (
+                "n2-spacecraft-a",
+                "RF_ENDPOINT_PROFILE",
+                "/$RF_PROFILE",
+            ),
+            "ArtemisTeensy_N2_Baremetal/tools/arduino-cli/upload.sh": (
+                "n2-spacecraft-a",
+                "--profile",
+                "/$RF_PROFILE",
+            ),
+        }
+        for relative, needles in script_expectations.items():
+            with self.subTest(script=relative):
+                content = (REPO_ROOT / relative).read_text()
+                for needle in needles:
+                    self.assertIn(needle, content)
+
+        payload_paths = (
+            REPO_ROOT / "ArtemisRpiTeensy_N2/Components/LinkCfg/PayloadPaths.hpp"
+        ).read_text()
+        self.assertIn("NEUTRON_PAYLOAD_CAPTURE_DIR", payload_paths)
+        self.assertIn("NEUTRON_PAYLOAD_SIM_CURSOR", payload_paths)
+        for profile, namespace in (("n2-spacecraft-a", "n2-a"), ("n2-spacecraft-b", "n2-b")):
+            env_file = (REPO_ROOT / f"deploy/pi/profiles/{profile}.env").read_text()
+            self.assertIn(f"NEUTRON_SPACECRAFT_PROFILE={profile}", env_file)
+            self.assertIn(f"/tmp/neutron_payload_captures/{namespace}", env_file)
+
+        gds_launcher = (REPO_ROOT / "ArtemisRpiTeensy_N2/tools/run_gds_uart.sh").read_text()
+        self.assertIn("--session", gds_launcher)
+        self.assertIn("logs/gds/$SESSION", gds_launcher)
+
+    def test_generated_classifier_executes_all_strict_cases_for_every_profile(self) -> None:
+        headers = {
+            "ground": REPO_ROOT / "GDS_Teensy/firmware/gds_teensy/src/link_protocol.hpp",
+            "spacecraft": REPO_ROOT / "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/link_protocol.hpp",
+        }
+        for profile_key, profile in self.registry["endpoint_profiles"].items():
+            endpoint = generator.resolve_endpoint_profile(self.registry, profile_key)
+            header = headers[profile["role"]]
+            with self.subTest(profile=profile_key), tempfile.TemporaryDirectory() as tmp:
                 root = pathlib.Path(tmp)
                 (root / "Arduino.h").write_text(
                     "#include <cstddef>\n#include <cstdint>\nusing std::size_t;\n",
@@ -120,6 +227,9 @@ int main() {{
           link_protocol::RF_REMOTE_ADDRESS,
           link_protocol::RF_NETWORK_ID,
           static_cast<uint8_t>(link_protocol::RF_PROTOCOL_VERSION + 1U)) != RfHeaderStatus::WRONG_VERSION) return 4;
+  if (link_protocol::RF_NETWORK_ID != {endpoint['network_id']}) return 5;
+  if (link_protocol::RF_LOCAL_ADDRESS != {endpoint['local_address']}) return 6;
+  if (link_protocol::RF_REMOTE_ADDRESS != {endpoint['remote_address']}) return 7;
   return 0;
 }}
 ''',
@@ -127,7 +237,18 @@ int main() {{
                 )
                 executable = root / "identity_test"
                 subprocess.run(
-                    ["c++", "-std=c++17", "-I", str(root), "-I", str(header.parent), str(source), "-o", str(executable)],
+                    [
+                        "c++",
+                        "-std=c++17",
+                        f"-DRF_ENDPOINT_PROFILE={endpoint['profile_macro']}",
+                        "-I",
+                        str(root),
+                        "-I",
+                        str(header.parent),
+                        str(source),
+                        "-o",
+                        str(executable),
+                    ],
                     check=True,
                     capture_output=True,
                     text=True,
@@ -169,7 +290,7 @@ int main() {{
         for satellite in (False, True):
             self.assertIn(
                 "RF_TX_COMPLETE_TIMEOUT_MS = 500",
-                generator.render_teensy(self.transport, identity, satellite=satellite),
+                generator.render_teensy(self.transport, self.registry, satellite=satellite),
             )
 
         helper_paths = (

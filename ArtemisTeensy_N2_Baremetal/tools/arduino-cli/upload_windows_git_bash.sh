@@ -25,9 +25,9 @@ fi
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SKETCH_DIR="$ROOT_DIR/firmware/satellite_teensy"
 FQBN="teensy:avr:teensy41"
-BUILD_DIR="$ROOT_DIR/build/arduino-cli-windows"
 CONFIG_DIR="$ROOT_DIR/build/arduino-cli-windows-config"
 CONFIG_FILE="$CONFIG_DIR/arduino-cli.windows.generated.yaml"
+RF_PROFILE="${RF_ENDPOINT_PROFILE:-n2-spacecraft-a}"
 
 LOCAL_APPDATA_WIN="$(cygpath -m "${LOCALAPPDATA:-$HOME/AppData/Local}")"
 ARDUINO_DATA_DIR="${ARDUINO_WINDOWS_DATA_DIR:-$LOCAL_APPDATA_WIN/Arduino15-n2}"
@@ -43,7 +43,51 @@ directories:
 EOF
 export ARDUINO_CONFIG_FILE="$CONFIG_FILE"
 
-REQUESTED_PORT="${1:-}"
+usage() {
+  cat <<'EOF'
+Usage: upload_windows_git_bash.sh [--profile <endpoint-profile>] [usb:<upload-id>]
+
+Upload a previously built satellite endpoint artifact.
+Default profile: n2-spacecraft-a
+EOF
+}
+
+REQUESTED_PORT=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --profile)
+      RF_PROFILE="${2:-}"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --*)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+    *)
+      if [[ -n "$REQUESTED_PORT" ]]; then
+        echo "Only one upload ID may be supplied" >&2
+        exit 2
+      fi
+      REQUESTED_PORT="$1"
+      shift
+      ;;
+  esac
+done
+
+case "$RF_PROFILE" in
+  *-spacecraft|*-spacecraft-*) ;;
+  *)
+    echo "Satellite firmware requires a spacecraft endpoint profile, got: $RF_PROFILE" >&2
+    exit 2
+    ;;
+esac
+
+BUILD_DIR="$ROOT_DIR/build/arduino-cli-windows/$RF_PROFILE"
 
 TEENSY_PORTS="$(arduino-cli board list 2>/dev/null | awk '$1 ~ /^usb:/ {print $1}')"
 TEENSY_COUNT="$(printf '%s\n' "$TEENSY_PORTS" | sed '/^$/d' | wc -l | tr -d ' ')"
@@ -81,4 +125,11 @@ EOF
   exit 2
 fi
 
+if [[ ! -d "$BUILD_DIR" ]]; then
+  echo "Missing satellite build for profile $RF_PROFILE: $BUILD_DIR" >&2
+  echo "Run: ./tools/arduino-cli/build_windows_git_bash.sh --profile $RF_PROFILE" >&2
+  exit 2
+fi
+
+echo "Uploading satellite Teensy RF profile: $RF_PROFILE"
 arduino-cli upload --fqbn "$FQBN" -p "$PORT" --input-dir "$BUILD_DIR" "$SKETCH_DIR"

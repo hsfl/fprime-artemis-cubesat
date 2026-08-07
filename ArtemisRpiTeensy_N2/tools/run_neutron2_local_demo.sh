@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO_ROOT="$(cd "$ROOT_DIR/.." && pwd)"
-VENV_ACTIVATE="$ROOT_DIR/fprime-venv/bin/activate"
+VENV_ACTIVATE="${FPRIME_VENV_ACTIVATE:-$ROOT_DIR/fprime-venv/bin/activate}"
 DEPLOYMENT_NAME="ArtemisRpiTeensyDeployment"
 DICT_BASENAME="${DEPLOYMENT_NAME}TopologyDictionary.json"
 CAPTURE_DIR="${CAPTURE_DIR:-/tmp/neutron_payload_captures}"

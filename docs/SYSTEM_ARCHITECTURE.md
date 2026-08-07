@@ -184,6 +184,7 @@ The RFM23BP has a small packet budget, so each cross-RF channel is segmented:
 
 - RF packet max `49` bytes, `5`-byte segment header, per-segment magic (`165` CCSDS / `166` payload).
 - ACK/retry with `4` retries and `80 ms` ACK timeout; `500 ms` reassembly timeout; `8 ms` inter-segment gap.
+- RadioHead prepends a CRC-protected `TO/FROM/ID/FLAGS` header. Named N2-A/N2-B endpoint profiles reject wrong network, peer, destination, or protocol version before ACK/reassembly; see [`NEUTRON2_DUAL_GDS_RADIO_ADDRESSING.md`](NEUTRON2_DUAL_GDS_RADIO_ADDRESSING.md).
 
 See the [RFM23BP datasheet](#reference-documents) for the radio's packet/FIFO limits that drive these numbers.
 
@@ -285,7 +286,7 @@ This is exactly why the architecture treats **RFM23BP as the MVP comms path and 
 
 To survive the RFM23BP link, this deployment shrinks several **global F´ framework limits**. These are **project-local overrides** — *not* edits inside `lib/fprime` — which is the correct, update-safe way to do it. They live in:
 
-- [`ArtemisRpiTeensyDeployment/RfMvpConfig/ComCfg.fpp`](../ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/RfMvpConfig/ComCfg.fpp)
+- [`ArtemisRpiTeensyDeployment/RfMvpConfig/ComCfg.n2-spacecraft-a.fpp`](../ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/RfMvpConfig/ComCfg.n2-spacecraft-a.fpp) (generated; N2-B has a matching profile file)
 - [`ArtemisRpiTeensyDeployment/RfMvpConfig/FpConstants.fpp`](../ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/RfMvpConfig/FpConstants.fpp)
 
 and are wired into the build by `ArtemisRpiTeensyDeployment/CMakeLists.txt` (`add_fprime_subdirectory(.../RfMvpConfig/)`), which overrides the framework defaults in `lib/fprime/default/config/`.

@@ -9,7 +9,14 @@ Bridge RF23BP segmented transport into laptop-side streams:
 The ground Teensy does not handle channel 2. Channel 2 is the satellite-local Teensy/PDU RPC path on the Pi <-> satellite UART only.
 
 ## RF Segment Packet
-Each RF packet carries one segment:
+
+RadioHead prepends `TO`, `FROM`, network `ID`, and protocol-version `FLAGS`.
+The ground endpoint accepts only its paired complete tuple before ACK,
+reassembly, or USB forwarding. See
+[`../../docs/NEUTRON2_DUAL_GDS_RADIO_ADDRESSING.md`](../../docs/NEUTRON2_DUAL_GDS_RADIO_ADDRESSING.md)
+for named build profiles and address assignments.
+
+After the RadioHead header, each RF packet carries one segment:
 
 1. `seg_magic` (1 byte): `0xA5` for channel 0, `0xA6` for channel 1
 2. `msg_id` (1 byte): rolling message identifier

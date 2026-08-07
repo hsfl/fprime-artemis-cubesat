@@ -1,4 +1,5 @@
 #include "Components/PayloadDownlinkApp/PayloadDownlinkApp.hpp"
+#include "Components/LinkCfg/PayloadPaths.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -14,8 +15,6 @@ constexpr U32 PACKETS_PER_RUN = 1;
 constexpr U32 RETRY_PACKETS_PER_RUN = 1;
 constexpr U32 COMPLETION_SUMMARY_EVENT_REPEATS = 3;
 constexpr const char* PAYLOAD_SOURCE_ENV = "NEUTRON_PAYLOAD_DOWNLINK_FILE";
-constexpr const char* DEFAULT_PAYLOAD_SOURCE = "/tmp/neutron_payload_captures/latest_payload.bin";
-constexpr const char* CAPTURE_DIR = "/tmp/neutron_payload_captures";
 constexpr const char* CAPTURE_PREFIX = "neutron_capture_";
 constexpr const char* CAPTURE_SUFFIX = ".csv";
 
@@ -45,7 +44,8 @@ bool fileSizeBytes(const std::string& path, U32& bytes) {
 }
 
 std::string latestCapturePath() {
-    DIR* directory = ::opendir(CAPTURE_DIR);
+    const std::string captureDir = Components::LinkCfg::payloadCaptureDir();
+    DIR* directory = ::opendir(captureDir.c_str());
     if (directory == nullptr) {
         return std::string();
     }
@@ -56,7 +56,7 @@ std::string latestCapturePath() {
         if (!hasPrefix(name, CAPTURE_PREFIX) || !hasSuffix(name, CAPTURE_SUFFIX)) {
             continue;
         }
-        const std::string candidate = std::string(CAPTURE_DIR) + "/" + name;
+        const std::string candidate = captureDir + "/" + name;
         if (candidate > latest) {
             latest = candidate;
         }
@@ -75,7 +75,7 @@ std::string resolvePayloadSource(U32& sourceBytes) {
         return std::string();
     }
 
-    const std::string defaultPath(DEFAULT_PAYLOAD_SOURCE);
+    const std::string defaultPath = Components::LinkCfg::payloadLatestPath();
     if (fileSizeBytes(defaultPath, sourceBytes)) {
         return defaultPath;
     }

@@ -1,4 +1,5 @@
 #include "Components/StorageManager/StorageManager.hpp"
+#include "Components/LinkCfg/PayloadPaths.hpp"
 
 #include <cstring>
 #include <dirent.h>
@@ -9,7 +10,6 @@ namespace Components {
 
 namespace {
 
-constexpr const char* CAPTURE_DIR = "/tmp/neutron_payload_captures";
 constexpr const char* CAPTURE_PREFIX = "neutron_capture_";
 constexpr const char* CAPTURE_SUFFIX = ".csv";
 
@@ -204,7 +204,8 @@ void StorageManager::removeCaptureFiles(U32& removedFiles, U32& failedFiles) con
     removedFiles = 0;
     failedFiles = 0;
 
-    DIR* directory = ::opendir(CAPTURE_DIR);
+    const std::string captureDir = Components::LinkCfg::payloadCaptureDir();
+    DIR* directory = ::opendir(captureDir.c_str());
     if (directory == nullptr) {
         return;
     }
@@ -215,7 +216,7 @@ void StorageManager::removeCaptureFiles(U32& removedFiles, U32& failedFiles) con
             continue;
         }
 
-        const std::string path = std::string(CAPTURE_DIR) + "/" + name;
+        const std::string path = captureDir + "/" + name;
         if (::unlink(path.c_str()) == 0) {
             removedFiles += 1;
         } else {

@@ -1,5 +1,5 @@
 # ======================================================================
-# FPP file for configuration of the communications stack
+# FPP template for configuration of the communications stack
 # ======================================================================
 
 @ The width of packet descriptors when they are serialized by the framework
@@ -8,7 +8,7 @@ dictionary type FwPacketDescriptorType = U16
 module ComCfg {
 
     @ Spacecraft ID (10 bits) for CCSDS Data Link layer
-    dictionary constant SpacecraftId = 0x0044
+    dictionary constant SpacecraftId = @SPACECRAFT_ID@
 
     @ Fixed size of CCSDS TM frames
     dictionary constant TmFrameFixedSize = 128  # RF MVP: keep TM frames small enough for low-rate Teensy/RF bridge

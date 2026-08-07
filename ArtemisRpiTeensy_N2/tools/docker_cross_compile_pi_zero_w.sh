@@ -13,6 +13,7 @@ SYNC_SYSROOT="auto"
 BUILD_IMAGE="auto"
 CLEAN="false"
 LOCAL_ONLY="false"
+SPACECRAFT_PROFILE="${NEUTRON2_SPACECRAFT_PROFILE:-n2-spacecraft-a}"
 
 usage() {
   cat <<'EOF'
@@ -32,7 +33,10 @@ Examples:
   ./tools/docker_cross_compile_pi_zero_w.sh
 
   # Fast local build + ARMv6 verification only.
-  ./tools/docker_cross_compile_pi_zero_w.sh --local-only
+  ./tools/docker_cross_compile_pi_zero_w.sh --local-only --spacecraft-profile n2-spacecraft-a
+
+  # Build the distinct N2-B CCSDS identity.
+  ./tools/docker_cross_compile_pi_zero_w.sh --local-only --spacecraft-profile n2-spacecraft-b
 
   # Full rebuild: refresh sysroot, rebuild image, recreate Python venv,
   # and force-regenerate the F Prime build cache.
@@ -52,6 +56,9 @@ Options:
   --skip-sync           Reuse an existing sysroot without rsync
   --skip-image-build    Reuse the existing Docker image tag
   --local-only          Build + verify locally only (skip SSH deploy/smoke)
+  --spacecraft-profile <name>
+                        F Prime/CCSDS identity: n2-spacecraft-a (default) or
+                        n2-spacecraft-b
   -h, --help            Show this help text
 EOF
 }
@@ -86,6 +93,10 @@ while [[ $# -gt 0 ]]; do
       LOCAL_ONLY="true"
       shift
       ;;
+    --spacecraft-profile)
+      SPACECRAFT_PROFILE="${2:-}"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -98,6 +109,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+case "$SPACECRAFT_PROFILE" in
+  n2-spacecraft-a|n2-spacecraft-b) ;;
+  *)
+    echo "Unsupported spacecraft profile: $SPACECRAFT_PROFILE" >&2
+    exit 2
+    ;;
+esac
+
 mkdir -p "$VERIFY_DIR"
 
 echo "Cross-build target configuration"
@@ -107,6 +126,7 @@ echo "  remote dir: $REMOTE_DIR"
 echo "  docker image: $IMAGE_TAG"
 echo "  clean: $CLEAN"
 echo "  local only: $LOCAL_ONLY"
+echo "  spacecraft profile: $SPACECRAFT_PROFILE"
 echo
 
 if [[ "$CLEAN" == "true" ]]; then
@@ -184,6 +204,7 @@ TOOLCHAIN="pi-zero-w-armv6hf"
 BUILD_DIR="$ROOT_DIR/build-fprime-automatic-$TOOLCHAIN"
 BUILD_VENV="$ROOT_DIR/.cross-venv-linux"
 DEPLOYMENT_NAME="ArtemisRpiTeensyDeployment"
+SPACECRAFT_PROFILE="${NEUTRON2_SPACECRAFT_PROFILE:?}"
 
 if [[ "${CLEAN_VENV:-false}" == "true" ]]; then
   rm -rf "$BUILD_VENV"
@@ -204,19 +225,24 @@ fi
 export ARM_TOOLS_PATH=/usr
 
 cd "$ROOT_DIR"
-if [[ "${CLEAN_BUILD:-false}" == "true" || ! -d "$BUILD_DIR" ]]; then
+CACHED_PROFILE=""
+if [[ -f "$BUILD_DIR/CMakeCache.txt" ]]; then
+  CACHED_PROFILE="$(sed -n 's/^NEUTRON2_SPACECRAFT_PROFILE:STRING=//p' "$BUILD_DIR/CMakeCache.txt" | head -n 1)"
+fi
+if [[ "${CLEAN_BUILD:-false}" == "true" || ! -d "$BUILD_DIR" || "$CACHED_PROFILE" != "$SPACECRAFT_PROFILE" ]]; then
   GENERATE_ARGS=("$TOOLCHAIN")
-  if [[ "${CLEAN_BUILD:-false}" == "true" ]]; then
+  if [[ -d "$BUILD_DIR" ]]; then
     GENERATE_ARGS+=("-f")
   fi
   GENERATE_ARGS+=(
     "-DCMAKE_BUILD_TYPE=Release"
     "-DCMAKE_SYSROOT=$SYSROOT_DIR"
     "-DCMAKE_VERBOSE_MAKEFILE=ON"
+    "-DNEUTRON2_SPACECRAFT_PROFILE=$SPACECRAFT_PROFILE"
   )
   fprime-util generate "${GENERATE_ARGS[@]}"
 else
-  echo "Reusing existing F Prime build cache: $BUILD_DIR"
+  echo "Reusing existing F Prime build cache for $SPACECRAFT_PROFILE: $BUILD_DIR"
 fi
 fprime-util build "$TOOLCHAIN"
 
@@ -240,12 +266,14 @@ fi
 
 printf '%s\n' "$BIN_PATH" > "$VERIFY_DIR/binary-path.txt"
 printf '%s\n' "$DICT_PATH" > "$VERIFY_DIR/dictionary-path.txt"
+printf '%s\n' "$SPACECRAFT_PROFILE" > "$VERIFY_DIR/spacecraft-profile.txt"
 EOF
 chmod +x "$CONTAINER_SCRIPT"
 
 docker run --rm \
   -e CLEAN_BUILD="$CLEAN" \
   -e CLEAN_VENV="$CLEAN" \
+  -e NEUTRON2_SPACECRAFT_PROFILE="$SPACECRAFT_PROFILE" \
   -v "$REPO_ROOT:/repo" \
   -v "$CONTAINER_SCRIPT:/tmp/run-build.sh:ro" \
   -w /repo/ArtemisRpiTeensy_N2 \
@@ -270,12 +298,14 @@ if [[ "$LOCAL_ONLY" == "true" ]]; then
   echo
   echo "Local-only cross compile + verification completed successfully"
   echo "  binary: $BIN_PATH"
+  echo "  spacecraft profile: $SPACECRAFT_PROFILE"
   echo "  verify dir: $VERIFY_DIR"
   exit 0
 fi
 
 ssh "$HOST" "mkdir -p '$REMOTE_DIR'"
 scp "$BIN_PATH" "$HOST:$REMOTE_DIR/$DEPLOYMENT_NAME"
+scp "$REPO_ROOT/deploy/pi/profiles/$SPACECRAFT_PROFILE.env" "$HOST:$REMOTE_DIR/node.env"
 
 ssh "$HOST" "
   set -euo pipefail
@@ -303,3 +333,4 @@ echo
 echo "Smoke test completed successfully on $HOST"
 echo "  binary: $BIN_PATH"
 echo "  remote: $REMOTE_DIR/$DEPLOYMENT_NAME"
+echo "  node env: $REMOTE_DIR/node.env"

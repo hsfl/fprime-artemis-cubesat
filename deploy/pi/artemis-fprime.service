@@ -20,6 +20,9 @@ Group=pi
 # Keep relative paths, future dictionary references, and generated files anchored
 # next to the current release binary and dictionary symlinks.
 WorkingDirectory=/home/pi/artemis/current
+# Optional per-spacecraft runtime namespace. Release installation should copy
+# deploy/pi/profiles/<profile>.env to /home/pi/artemis/current/node.env.
+EnvironmentFile=-/home/pi/artemis/current/node.env
 # /dev/serial0 is the Pi-to-satellite-Teensy UART used by the Artemis OBC bench.
 ExecStart=/home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0
 # Demo hardening: bring the flight app back if it crashes or exits unexpectedly.

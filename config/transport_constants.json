@@ -34,7 +34,10 @@
     "rf_rssi_age_unknown_ms": 4294967295
   },
   "rf": {
-    "network": "neutron2",
+    "endpoint_profiles": {
+      "ground": "n2-gds-a",
+      "spacecraft": "n2-spacecraft-a"
+    },
     "segment_magic_ccsds": 165,
     "segment_magic_payload": 166,
     "ack_segment_index": 255,

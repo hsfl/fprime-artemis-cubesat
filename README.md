@@ -258,6 +258,7 @@ New here? Read these roughly in order to fully understand the project:
 11. `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md` and `docs/RPI_BUILD.md` — building the Pi Zero W flight binary (cross-compile preferred; native is the manual fallback).
 12. `docs/SOFTWARE_DEBUGGING_TROUBLESHOOTING.md` — where to look first when commands, telemetry, payload downlink, or EPS/PDU behavior fails.
 13. `docs/agents_notes.md` — current implementation status and next-agent guidance.
+14. `docs/NEUTRON2_DUAL_GDS_RADIO_ADDRESSING.md` — named A/B RF endpoint profiles, isolated F Prime/GDS identities, build/flash commands, and the deferred two-pair qualification matrix.
 
 ## Build and run (local emulation)
 

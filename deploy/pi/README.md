@@ -17,7 +17,12 @@ you are in a bench session and intend to change the Pi.
 /home/pi/artemis/current/
   ArtemisRpiTeensyDeployment -> release or build artifact binary
   ArtemisRpiTeensyDeploymentTopologyDictionary.json -> matching dictionary
+  node.env -> deploy/pi/profiles/n2-spacecraft-a.env or n2-spacecraft-b.env
 ```
+
+N2-A and N2-B must use matching F Prime builds and runtime namespaces. N2-A
+uses CCSDS spacecraft ID `0x044` plus payload namespace `n2-a`; N2-B uses
+`0x045` plus `n2-b`. See `docs/NEUTRON2_DUAL_GDS_RADIO_ADDRESSING.md`.
 
 ## Team Access And Wi-Fi Priority
 
@@ -70,6 +75,18 @@ the cross-compile landmine and verification flow, use the existing docs:
 - `docs/CROSS_COMPILE_PI_ZERO_W_STUDENT_GUIDE.md`
 - `docs/CROSS_COMPILE_HANDOFF_PI_ZERO_W.md`
 - `docs/RPI_BUILD.md` for the slow native fallback
+
+Select the node identity during the cross-build:
+
+```bash
+cd ArtemisRpiTeensy_N2
+./tools/docker_cross_compile_pi_zero_w.sh \
+  --local-only \
+  --spacecraft-profile n2-spacecraft-a
+```
+
+Use `n2-spacecraft-b` only for the second spacecraft. The selected binary and
+dictionary must stay together.
 
 ## Parameter Persistence Note
 
@@ -190,6 +207,16 @@ test -f "$DICT"
 ln -sfn "$APP" /home/pi/artemis/current/ArtemisRpiTeensyDeployment
 ln -sfn "$DICT" /home/pi/artemis/current/ArtemisRpiTeensyDeploymentTopologyDictionary.json
 ```
+
+Install the matching runtime namespace from the repo (shown for N2-A):
+
+```bash
+scp deploy/pi/profiles/n2-spacecraft-a.env pi@artemis-pi.local:/tmp/node.env
+ssh pi@artemis-pi.local 'install -m 0644 /tmp/node.env /home/pi/artemis/current/node.env'
+```
+
+For N2-B, copy `n2-spacecraft-b.env` instead. The service reads this file and
+keeps simulated payload products under the node-specific capture directory.
 
 Windows/WSL2 note: run the same `gh`, `scp`, and `ssh` commands from WSL2 with
 the repo at `~/fprime-artemis-cubesat`.

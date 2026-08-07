@@ -1,4 +1,5 @@
 #include "Components/PayloadDriver_NeutronSim/PayloadDriver_NeutronSim.hpp"
+#include "Components/LinkCfg/PayloadPaths.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -12,9 +13,6 @@ namespace {
 
 constexpr const char* DEFAULT_SIM_ROOT = "../external/payload-neutron-simulation";
 constexpr const char* REPO_ROOT_SIM_ROOT = "external/payload-neutron-simulation";
-constexpr const char* DEFAULT_CURSOR = "/tmp/neutron_payload_sim_cursor.json";
-constexpr const char* DEFAULT_OUTPUT_DIR = "/tmp/neutron_payload_captures";
-constexpr const char* DEFAULT_LATEST_PAYLOAD = "/tmp/neutron_payload_captures/latest_payload.bin";
 constexpr U32 DEFAULT_CAPTURE_SECONDS = 600;
 
 }  // namespace
@@ -92,11 +90,13 @@ PayloadDriver_NeutronSim::CaptureSummary PayloadDriver_NeutronSim::runCapture(U3
     const std::string root = getSimRoot();
     const std::string script = root + "/neutron_payload_sim.py";
     const std::string dataset = root + "/neutron_data.csv";
+    const std::string cursor = Components::LinkCfg::payloadSimCursorPath();
+    const std::string outputDir = Components::LinkCfg::payloadCaptureDir();
     const std::string command = "python3 " + shellQuote(script) +
                                 " capture --duration-seconds " + std::to_string(durationSeconds) +
                                 " --dataset " + shellQuote(dataset) +
-                                " --cursor " + shellQuote(DEFAULT_CURSOR) +
-                                " --output-dir " + shellQuote(DEFAULT_OUTPUT_DIR) +
+                                " --cursor " + shellQuote(cursor) +
+                                " --output-dir " + shellQuote(outputDir) +
                                 " --end-policy wrap --format kv 2>&1";
 
     FILE* pipe = ::popen(command.c_str(), "r");
@@ -179,8 +179,9 @@ bool PayloadDriver_NeutronSim::publishLatestCapture(const std::string& outputPat
     if (::access(outputPath.c_str(), R_OK) != 0) {
         return false;
     }
-    (void)::unlink(DEFAULT_LATEST_PAYLOAD);
-    return (::symlink(outputPath.c_str(), DEFAULT_LATEST_PAYLOAD) == 0);
+    const std::string latestPayload = Components::LinkCfg::payloadLatestPath();
+    (void)::unlink(latestPayload.c_str());
+    return (::symlink(outputPath.c_str(), latestPayload.c_str()) == 0);
 }
 
 bool PayloadDriver_NeutronSim::computeFileCrc16(const std::string& outputPath, U32& crcOut) {
