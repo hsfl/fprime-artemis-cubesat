@@ -36,6 +36,92 @@ TX_CANDIDATES: tuple[int, ...] = (0, 8, 16, 24, 32, 40, 47)
 # the lowest candidate with the amplifier enabled.
 RF_AMP_SEARCH_STATES: tuple[bool, ...] = (False, True)
 
+# Runtime adaptation is slower than packet timing but fast enough to follow a
+# walking test.  CRC-valid frames remain the RX oracle.
+ADAPT_RX_SILENCE_S = 1.5
+ADAPT_RX_DWELL_S = 0.5
+ADAPT_RX_CLIP_FRACTION = 0.001
+ADAPT_RX_CLIP_BLOCKS = 2
+ADAPT_TX_TIMEOUTS_PER_STEP = 1
+ADAPT_TX_SUCCESSES_PER_STEP_DOWN = 6
+
+
+@dataclass(frozen=True)
+class GainState:
+    gain: int | tuple[int, int]
+    rf_amp_enabled: bool
+
+
+def _next_state(
+    candidates: tuple[int, ...] | tuple[tuple[int, int], ...],
+    current: int | tuple[int, int],
+    rf_amp_enabled: bool,
+) -> tuple[GainState, bool, bool]:
+    """Return next state, whether amp fallback began, and whether max was held."""
+
+    index = candidates.index(current)
+    if index + 1 < len(candidates):
+        return GainState(candidates[index + 1], rf_amp_enabled), False, False
+    if not rf_amp_enabled:
+        return GainState(candidates[0], True), True, False
+    # Never wrap a marginal live link from maximum gain back to minimum.  Hold
+    # the strongest state until evidence-backed successes permit backoff.
+    return GainState(candidates[-1], True), False, True
+
+
+def tx_search_attempt_budget(
+    current: int, rf_amp_enabled: bool, base_attempts: int
+) -> int:
+    """Cover every remaining stronger TX state in one operator command."""
+
+    if base_attempts < 1:
+        raise ValueError("base_attempts must be at least one")
+    states = tuple(
+        (gain, amp)
+        for amp in RF_AMP_SEARCH_STATES
+        for gain in TX_CANDIDATES
+    )
+    index = states.index((current, rf_amp_enabled))
+    attempts_through_maximum = len(states) - index
+    return max(base_attempts, attempts_through_maximum)
+
+
+def _previous_state(
+    candidates: tuple[int, ...] | tuple[tuple[int, int], ...],
+    current: int | tuple[int, int],
+    rf_amp_enabled: bool,
+) -> GainState:
+    """Return one lower state for overload recovery without crossing upward."""
+
+    index = candidates.index(current)
+    if index > 0:
+        return GainState(candidates[index - 1], rf_amp_enabled)
+    if rf_amp_enabled:
+        return GainState(candidates[0], False)
+    return GainState(candidates[0], False)
+
+
+def next_rx_state(
+    current: tuple[int, int], rf_amp_enabled: bool
+) -> tuple[GainState, bool, bool]:
+    return _next_state(RX_CANDIDATES, current, rf_amp_enabled)
+
+
+def previous_rx_state(
+    current: tuple[int, int], rf_amp_enabled: bool
+) -> GainState:
+    return _previous_state(RX_CANDIDATES, current, rf_amp_enabled)
+
+
+def next_tx_state(
+    current: int, rf_amp_enabled: bool
+) -> tuple[GainState, bool, bool]:
+    return _next_state(TX_CANDIDATES, current, rf_amp_enabled)
+
+
+def previous_tx_state(current: int, rf_amp_enabled: bool) -> GainState:
+    return _previous_state(TX_CANDIDATES, current, rf_amp_enabled)
+
 
 @dataclass(frozen=True)
 class RxWindow:

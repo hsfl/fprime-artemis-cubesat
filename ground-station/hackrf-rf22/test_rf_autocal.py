@@ -10,7 +10,12 @@ from rf_autocal import (
     TX_CANDIDATES,
     RxWindow,
     build_fprime_ping_command,
+    next_rx_state,
+    next_tx_state,
+    previous_rx_state,
+    previous_tx_state,
     select_rx_window,
+    tx_search_attempt_budget,
 )
 
 
@@ -29,6 +34,38 @@ class AutomaticGainPolicyTests(unittest.TestCase):
         )
         self.assertEqual(rx_order[len(RX_CANDIDATES)], (True, (0, 0)))
         self.assertEqual(tx_order[len(TX_CANDIDATES)], (True, 0))
+
+    def test_runtime_rx_search_exhausts_normal_gain_then_restarts_with_amp(self) -> None:
+        state, amp_started, wrapped = next_rx_state(RX_CANDIDATES[-1], False)
+        self.assertEqual(state.gain, RX_CANDIDATES[0])
+        self.assertTrue(state.rf_amp_enabled)
+        self.assertTrue(amp_started)
+        self.assertFalse(wrapped)
+
+        state, amp_started, held = next_rx_state(RX_CANDIDATES[-1], True)
+        self.assertEqual(state.gain, RX_CANDIDATES[-1])
+        self.assertTrue(state.rf_amp_enabled)
+        self.assertFalse(amp_started)
+        self.assertTrue(held)
+
+    def test_runtime_tx_search_and_overload_backoff_are_bounded(self) -> None:
+        state, amp_started, wrapped = next_tx_state(TX_CANDIDATES[-1], False)
+        self.assertEqual((state.gain, state.rf_amp_enabled), (0, True))
+        self.assertTrue(amp_started)
+        self.assertFalse(wrapped)
+        self.assertEqual(previous_tx_state(0, True).rf_amp_enabled, False)
+        self.assertEqual(previous_rx_state((0, 0), True).rf_amp_enabled, False)
+
+    def test_runtime_search_holds_maximum_instead_of_wrapping_to_zero(self) -> None:
+        state, amp_started, held = next_tx_state(TX_CANDIDATES[-1], True)
+        self.assertEqual((state.gain, state.rf_amp_enabled), (47, True))
+        self.assertFalse(amp_started)
+        self.assertTrue(held)
+
+    def test_tx_attempt_budget_covers_remaining_stronger_states(self) -> None:
+        self.assertEqual(tx_search_attempt_budget(40, False, 5), 9)
+        self.assertEqual(tx_search_attempt_budget(0, True, 5), 7)
+        self.assertEqual(tx_search_attempt_budget(47, True, 5), 5)
 
     def test_tx_search_is_increasing_and_covers_the_hardware_range(self) -> None:
         self.assertEqual(tuple(sorted(set(TX_CANDIDATES))), TX_CANDIDATES)

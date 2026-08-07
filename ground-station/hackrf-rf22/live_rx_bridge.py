@@ -23,12 +23,23 @@ from bridge_core import (
 )
 from hackrf_device import HackRFConfig, HackRFDevice, HackRFError, HackRFTimeoutError
 from rf_autocal import (
+    ADAPT_RX_CLIP_BLOCKS,
+    ADAPT_RX_CLIP_FRACTION,
+    ADAPT_RX_DWELL_S,
+    ADAPT_RX_SILENCE_S,
+    ADAPT_TX_SUCCESSES_PER_STEP_DOWN,
+    ADAPT_TX_TIMEOUTS_PER_STEP,
     RF_AMP_SEARCH_STATES,
     RX_CANDIDATES,
     TX_CANDIDATES,
     RxWindow,
     build_fprime_ping_command,
+    next_rx_state,
+    next_tx_state,
+    previous_rx_state,
+    previous_tx_state,
     select_rx_window,
+    tx_search_attempt_budget,
 )
 from rf22_iq_decoder import SegmentReassembler, StreamingCs8Decoder
 from rf22_protocol import (
@@ -108,6 +119,15 @@ class HackRfGroundBridge:
         self._fprime_probe_response = False
         self._rx_rf_amp_enabled = False
         self._tx_rf_amp_enabled = False
+        self._adaptive_enabled = False
+        self._last_valid_frame_s: float | None = None
+        self._last_rx_adjustment_s = time.monotonic()
+        self._last_tx_s = self._last_rx_adjustment_s
+        self._last_adaptive_rx_block = 0
+        self._consecutive_clipped_blocks = 0
+        self._consecutive_ack_timeouts = 0
+        self._consecutive_ack_successes = 0
+        self._last_proven_tx_state: tuple[int, bool] | None = None
         self._last_metrics_write = 0.0
         self._started_wall_s = time.time()
         self._started_monotonic_s = time.monotonic()
@@ -148,6 +168,22 @@ class HackRfGroundBridge:
             "rx_rf_amp_enabled": False,
             "tx_rf_amp_enabled": False,
             "antenna_power_enabled": False,
+            "adaptive_link": {
+                "enabled": False,
+                "state": "pending",
+                "last_valid_frame_age_s": None,
+                "rx_adjustments": 0,
+                "rx_reacquisitions": 0,
+                "rx_search_wraps": 0,
+                "rx_max_holds": 0,
+                "tx_adjustments": 0,
+                "tx_search_wraps": 0,
+                "tx_max_holds": 0,
+                "consecutive_ack_timeouts": 0,
+                "consecutive_ack_successes": 0,
+                "last_adjustment_reason": None,
+                "history": [],
+            },
             "started_at_s": self._started_wall_s,
             "radio_state": "starting",
             "reconnects": 0,
@@ -237,6 +273,13 @@ class HackRfGroundBridge:
         if not force and now - self._last_metrics_write < 1.0:
             return
         self._last_metrics_write = now
+        adaptive = self.metrics["adaptive_link"]
+        assert isinstance(adaptive, dict)
+        adaptive["last_valid_frame_age_s"] = (
+            None
+            if self._last_valid_frame_s is None
+            else round(max(0.0, now - self._last_valid_frame_s), 3)
+        )
         device = self.device
         self.metrics.update(
             {
@@ -269,6 +312,7 @@ class HackRfGroundBridge:
 
     def _handle_frames(self, frames) -> None:
         for frame in frames:
+            self._note_valid_frame()
             self.metrics["rf22_frames"] = int(self.metrics["rf22_frames"]) + 1
             if self._ack_target is not None and matches_ack(
                 frame.payload,
@@ -450,6 +494,7 @@ class HackRfGroundBridge:
                 self.decoder.reset()
                 self.reassembler.reset()
                 device.start_rx()
+            self._last_tx_s = time.monotonic()
         return time.monotonic() - started if "result" not in locals() else result.elapsed_s
 
     def _wait_for_ack(self, channel: int, msg_id: int, segment_index: int) -> bool:
@@ -477,7 +522,19 @@ class HackRfGroundBridge:
         *,
         max_attempts: int | None = None,
     ) -> bool:
-        attempts = self.profile.ack_retries + 1 if max_attempts is None else max_attempts
+        if max_attempts is None:
+            base_attempts = self.profile.ack_retries + 1
+            attempts = (
+                tx_search_attempt_budget(
+                    self.args.tx_gain,
+                    self._tx_rf_amp_enabled,
+                    base_attempts,
+                )
+                if self._adaptive_enabled
+                else base_attempts
+            )
+        else:
+            attempts = max_attempts
         if attempts < 1:
             raise ValueError("max_attempts must be at least one")
         for attempt in range(attempts):
@@ -501,8 +558,10 @@ class HackRfGroundBridge:
                 switch_tx_s=f"{elapsed:.4f}",
             )
             if self._wait_for_ack(channel, msg_id, segment_index):
+                self._note_ack_result(True)
                 return True
             self.metrics["ack_timeouts"] = int(self.metrics["ack_timeouts"]) + 1
+            self._note_ack_result(False)
             self.log(
                 "ACK_TIMEOUT",
                 channel=channel,
@@ -531,6 +590,281 @@ class HackRfGroundBridge:
         self.metrics["rf_amp_enabled"] = enabled or self._tx_rf_amp_enabled
         self._reset_rx_measurement_pipeline()
         self.device.start_rx()
+
+    def _adaptive_metrics(self) -> dict[str, object]:
+        adaptive = self.metrics["adaptive_link"]
+        assert isinstance(adaptive, dict)
+        return adaptive
+
+    def _record_adaptive_event(self, event: str, reason: str) -> None:
+        adaptive = self._adaptive_metrics()
+        history = adaptive["history"]
+        assert isinstance(history, list)
+        history.append(
+            {
+                "at_s": time.time(),
+                "event": event,
+                "reason": reason,
+                "rx_lna_gain_db": self.args.rx_lna_gain,
+                "rx_vga_gain_db": self.args.rx_vga_gain,
+                "rx_rf_amp_enabled": self._rx_rf_amp_enabled,
+                "tx_gain_db": self.args.tx_gain,
+                "tx_rf_amp_enabled": self._tx_rf_amp_enabled,
+            }
+        )
+        del history[:-100]
+        adaptive["last_adjustment_reason"] = reason
+
+    def _initialize_adaptive_link(self) -> None:
+        self._adaptive_enabled = bool(getattr(self.args, "auto_calibrate", False))
+        now = time.monotonic()
+        self._last_valid_frame_s = now
+        self._last_rx_adjustment_s = now
+        self._last_tx_s = now
+        self._last_adaptive_rx_block = int(self.metrics["rx_blocks"])
+        self._consecutive_clipped_blocks = 0
+        self._consecutive_ack_timeouts = 0
+        self._consecutive_ack_successes = 0
+        self._last_proven_tx_state = (
+            self.args.tx_gain,
+            self._tx_rf_amp_enabled,
+        )
+        adaptive = self._adaptive_metrics()
+        adaptive.update(
+            {
+                "enabled": self._adaptive_enabled,
+                "state": "tracking" if self._adaptive_enabled else "disabled",
+                "consecutive_ack_timeouts": 0,
+                "consecutive_ack_successes": 0,
+            }
+        )
+        if self._adaptive_enabled:
+            self._record_adaptive_event("initialized", "startup_calibration")
+            self.log(
+                "ADAPTIVE_LINK_READY",
+                rx_lna=self.args.rx_lna_gain,
+                rx_vga=self.args.rx_vga_gain,
+                rx_amp=str(self._rx_rf_amp_enabled).lower(),
+                tx=self.args.tx_gain,
+                tx_amp=str(self._tx_rf_amp_enabled).lower(),
+            )
+
+    def _note_valid_frame(self, now: float | None = None) -> None:
+        now = time.monotonic() if now is None else now
+        self._last_valid_frame_s = now
+        if not self._adaptive_enabled:
+            return
+        adaptive = self._adaptive_metrics()
+        if adaptive["state"] in {"searching", "overload_recovery"}:
+            adaptive["state"] = "tracking"
+            adaptive["rx_reacquisitions"] = int(adaptive["rx_reacquisitions"]) + 1
+            self._record_adaptive_event("rx_reacquired", "valid_crc_frame")
+            self.log(
+                "ADAPT_RX_REACQUIRED",
+                lna=self.args.rx_lna_gain,
+                vga=self.args.rx_vga_gain,
+                amp=str(self._rx_rf_amp_enabled).lower(),
+            )
+
+    def _apply_rx_state(
+        self,
+        lna_gain_db: int,
+        vga_gain_db: int,
+        rf_amp_enabled: bool,
+        *,
+        reason: str,
+    ) -> bool:
+        assert self.device is not None
+        old = (
+            self.args.rx_lna_gain,
+            self.args.rx_vga_gain,
+            self._rx_rf_amp_enabled,
+        )
+        new = (lna_gain_db, vga_gain_db, rf_amp_enabled)
+        if new == old:
+            return False
+        self._set_rx_amp(rf_amp_enabled)
+        self.device.set_rx_gains(lna_gain_db, vga_gain_db)
+        self._reset_rx_measurement_pipeline()
+        self.args.rx_lna_gain = lna_gain_db
+        self.args.rx_vga_gain = vga_gain_db
+        self.metrics["rx_lna_gain"] = lna_gain_db
+        self.metrics["rx_vga_gain"] = vga_gain_db
+        self.metrics["rx_rf_amp_enabled"] = rf_amp_enabled
+        self.metrics["rf_amp_enabled"] = (
+            rf_amp_enabled or self._tx_rf_amp_enabled
+        )
+        self._last_rx_adjustment_s = time.monotonic()
+        adaptive = self._adaptive_metrics()
+        adaptive["state"] = (
+            "overload_recovery" if reason == "iq_clipping" else "searching"
+        )
+        adaptive["rx_adjustments"] = int(adaptive["rx_adjustments"]) + 1
+        self._record_adaptive_event("rx_adjusted", reason)
+        self.log(
+            "ADAPT_RX_GAIN",
+            reason=reason,
+            old=f"{old[0]}/{old[1]}/{'on' if old[2] else 'off'}",
+            new=f"{lna_gain_db}/{vga_gain_db}/{'on' if rf_amp_enabled else 'off'}",
+        )
+        self._write_metrics(force=True)
+        return True
+
+    def _apply_tx_state(
+        self, gain_db: int, rf_amp_enabled: bool, *, reason: str
+    ) -> bool:
+        assert self.device is not None
+        old = (self.args.tx_gain, self._tx_rf_amp_enabled)
+        new = (gain_db, rf_amp_enabled)
+        if new == old:
+            return False
+        self.device.set_tx_gain(gain_db)
+        self.args.tx_gain = gain_db
+        self._tx_rf_amp_enabled = rf_amp_enabled
+        self.metrics["tx_gain"] = gain_db
+        self.metrics["tx_rf_amp_enabled"] = rf_amp_enabled
+        self.metrics["rf_amp_enabled"] = (
+            self._rx_rf_amp_enabled or rf_amp_enabled
+        )
+        adaptive = self._adaptive_metrics()
+        adaptive["tx_adjustments"] = int(adaptive["tx_adjustments"]) + 1
+        self._record_adaptive_event("tx_adjusted", reason)
+        self.log(
+            "ADAPT_TX_GAIN",
+            reason=reason,
+            old=f"{old[0]}/{'on' if old[1] else 'off'}",
+            new=f"{gain_db}/{'on' if rf_amp_enabled else 'off'}",
+        )
+        self._write_metrics(force=True)
+        return True
+
+    def _note_ack_result(self, received: bool) -> None:
+        if not self._adaptive_enabled:
+            return
+        adaptive = self._adaptive_metrics()
+        if received:
+            self._consecutive_ack_timeouts = 0
+            self._consecutive_ack_successes += 1
+            current_tx_state = (self.args.tx_gain, self._tx_rf_amp_enabled)
+            if current_tx_state != self._last_proven_tx_state:
+                self._last_proven_tx_state = current_tx_state
+                self._record_adaptive_event("tx_proven", "ack_received")
+            if (
+                self._consecutive_ack_successes
+                >= ADAPT_TX_SUCCESSES_PER_STEP_DOWN
+            ):
+                lower = previous_tx_state(
+                    self.args.tx_gain, self._tx_rf_amp_enabled
+                )
+                assert isinstance(lower.gain, int)
+                self._apply_tx_state(
+                    lower.gain,
+                    lower.rf_amp_enabled,
+                    reason="stable_ack_headroom",
+                )
+                self._consecutive_ack_successes = 0
+        else:
+            self._consecutive_ack_successes = 0
+            self._consecutive_ack_timeouts += 1
+            if self._consecutive_ack_timeouts >= ADAPT_TX_TIMEOUTS_PER_STEP:
+                higher, amp_started, wrapped = next_tx_state(
+                    self.args.tx_gain, self._tx_rf_amp_enabled
+                )
+                assert isinstance(higher.gain, int)
+                if amp_started:
+                    self.log(
+                        "ADAPT_TX_AMP_FALLBACK",
+                        reason="normal_gain_search_failed",
+                    )
+                if wrapped:
+                    adaptive["tx_max_holds"] = int(adaptive["tx_max_holds"]) + 1
+                    self.log(
+                        "ADAPT_TX_MAX_HOLD",
+                        reason="gain_search_exhausted",
+                        gain=higher.gain,
+                        amp="on",
+                    )
+                self._apply_tx_state(
+                    higher.gain,
+                    higher.rf_amp_enabled,
+                    reason="ack_timeouts",
+                )
+                self._consecutive_ack_timeouts = 0
+        adaptive["consecutive_ack_timeouts"] = self._consecutive_ack_timeouts
+        adaptive["consecutive_ack_successes"] = self._consecutive_ack_successes
+
+    def _maintain_adaptive_link(self, now: float | None = None) -> None:
+        if not self._adaptive_enabled or self.device is None:
+            return
+        now = time.monotonic() if now is None else now
+        if (
+            self._ack_target is not None
+            or self._fprime_probe_token is not None
+            or now - self._last_tx_s < 0.75
+        ):
+            self._consecutive_clipped_blocks = 0
+            self._last_adaptive_rx_block = int(self.metrics["rx_blocks"])
+            return
+
+        rx_blocks = int(self.metrics["rx_blocks"])
+        if rx_blocks != self._last_adaptive_rx_block:
+            self._last_adaptive_rx_block = rx_blocks
+            iq = self.metrics["rx_iq"]
+            assert isinstance(iq, dict)
+            if float(iq["last_block_clipped_fraction"]) >= ADAPT_RX_CLIP_FRACTION:
+                self._consecutive_clipped_blocks += 1
+            else:
+                self._consecutive_clipped_blocks = 0
+
+        if (
+            self._consecutive_clipped_blocks >= ADAPT_RX_CLIP_BLOCKS
+            and now - self._last_rx_adjustment_s >= ADAPT_RX_DWELL_S
+        ):
+            lower = previous_rx_state(
+                (self.args.rx_lna_gain, self.args.rx_vga_gain),
+                self._rx_rf_amp_enabled,
+            )
+            assert isinstance(lower.gain, tuple)
+            self._apply_rx_state(
+                lower.gain[0],
+                lower.gain[1],
+                lower.rf_amp_enabled,
+                reason="iq_clipping",
+            )
+            self._consecutive_clipped_blocks = 0
+            return
+
+        if (
+            self._last_valid_frame_s is not None
+            and now - self._last_valid_frame_s >= ADAPT_RX_SILENCE_S
+            and now - self._last_rx_adjustment_s >= ADAPT_RX_DWELL_S
+        ):
+            higher, amp_started, wrapped = next_rx_state(
+                (self.args.rx_lna_gain, self.args.rx_vga_gain),
+                self._rx_rf_amp_enabled,
+            )
+            assert isinstance(higher.gain, tuple)
+            adaptive = self._adaptive_metrics()
+            if amp_started:
+                self.log(
+                    "ADAPT_RX_AMP_FALLBACK",
+                    reason="normal_gain_search_failed",
+                )
+            if wrapped:
+                adaptive["rx_max_holds"] = int(adaptive["rx_max_holds"]) + 1
+                self.log(
+                    "ADAPT_RX_MAX_HOLD",
+                    reason="gain_search_exhausted",
+                    lna=higher.gain[0],
+                    vga=higher.gain[1],
+                    amp="on",
+                )
+            self._apply_rx_state(
+                higher.gain[0],
+                higher.gain[1],
+                higher.rf_amp_enabled,
+                reason="frame_silence",
+            )
 
     def _measure_rx_candidate(
         self, lna_gain_db: int, vga_gain_db: int, rf_amp_enabled: bool
@@ -713,6 +1047,7 @@ class HackRfGroundBridge:
             tx=selected_tx,
             tx_amp=str(selected_tx_amp).lower(),
         )
+        self._initialize_adaptive_link()
 
     def _send_packet_unacknowledged(
         self, packet: bytes, channel: int, msg_id: int, segment_index: int
@@ -796,6 +1131,7 @@ class HackRfGroundBridge:
             if self.tx_queue:
                 channel, message = self._dequeue_tx()
                 self._transmit_message(channel, message)
+            self._maintain_adaptive_link()
             self._write_metrics()
 
     def run(self) -> int:
@@ -821,6 +1157,8 @@ class HackRfGroundBridge:
                         device.start_rx()
                         if getattr(self.args, "auto_calibrate", False):
                             self._auto_calibrate()
+                        else:
+                            self._initialize_adaptive_link()
                         self.metrics["radio_state"] = "receiving"
                         self.metrics["last_error"] = None
                         self.log("HACKRF_READY", serial=self.args.serial, center=RX_CENTER_HZ)

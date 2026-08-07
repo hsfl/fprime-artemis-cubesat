@@ -731,6 +731,7 @@ def collect_proof(
             "rx_lna_gain": bridge.get("rx_lna_gain"),
             "rx_vga_gain": bridge.get("rx_vga_gain"),
             "gain_control": bridge.get("gain_control"),
+            "adaptive_link": _mapping(bridge.get("adaptive_link")),
             "rf_path_label": bridge.get("rf_path_label"),
             "tx_safety_confirmed": bridge.get("tx_safety_confirmed"),
             "elevated_tx_gain_confirmed": bridge.get(
@@ -921,23 +922,98 @@ def collect_proof(
                 selected = _mapping(calibration.get("selected"))
                 rx_windows = calibration.get("rx_windows")
                 tx_probes = calibration.get("tx_probes")
-                selected_rx_proven = isinstance(rx_windows, list) and any(
+                selected_rx_lna = _integer(selected.get("rx_lna_gain_db"))
+                selected_rx_vga = _integer(selected.get("rx_vga_gain_db"))
+                selected_rx_amp = selected.get("rx_rf_amp_enabled")
+                selected_tx_gain = _integer(selected.get("tx_gain_db"))
+                selected_tx_amp = selected.get("tx_rf_amp_enabled")
+                startup_rx_proven = isinstance(rx_windows, list) and any(
                     isinstance(window, dict)
                     and window.get("passed") is True
-                    and _integer(window.get("lna_gain_db")) == manifest_rx_lna
-                    and _integer(window.get("vga_gain_db")) == manifest_rx_vga
-                    and window.get("rf_amp_enabled") == manifest_rx_amp
+                    and _integer(window.get("lna_gain_db")) == selected_rx_lna
+                    and _integer(window.get("vga_gain_db")) == selected_rx_vga
+                    and window.get("rf_amp_enabled") == selected_rx_amp
                     for window in rx_windows
                 )
-                selected_tx_proven = isinstance(tx_probes, list) and any(
+                startup_tx_proven = isinstance(tx_probes, list) and any(
                     isinstance(probe, dict)
                     and probe.get("pong") is True
-                    and _integer(probe.get("gain_db")) == manifest_tx_gain
-                    and probe.get("rf_amp_enabled") == manifest_tx_amp
+                    and _integer(probe.get("gain_db")) == selected_tx_gain
+                    and probe.get("rf_amp_enabled") == selected_tx_amp
                     for probe in tx_probes
                 )
-                rx_normal_search_exhausted = (
-                    manifest_rx_amp is False
+                adaptive = _mapping(bridge.get("adaptive_link"))
+                manifest_adaptive = _mapping(manifest.get("adaptive_link"))
+                adaptive_history = adaptive.get("history")
+                history = adaptive_history if isinstance(adaptive_history, list) else []
+                adaptive_enabled = adaptive.get("enabled") is True
+                current_rx_is_startup = (
+                    manifest_rx_lna == selected_rx_lna
+                    and manifest_rx_vga == selected_rx_vga
+                    and manifest_rx_amp == selected_rx_amp
+                )
+                current_tx_is_startup = (
+                    manifest_tx_gain == selected_tx_gain
+                    and manifest_tx_amp == selected_tx_amp
+                )
+                current_rx_reacquired = any(
+                    isinstance(event, dict)
+                    and event.get("event") == "rx_reacquired"
+                    and _integer(event.get("rx_lna_gain_db")) == manifest_rx_lna
+                    and _integer(event.get("rx_vga_gain_db")) == manifest_rx_vga
+                    and event.get("rx_rf_amp_enabled") == manifest_rx_amp
+                    for event in history
+                )
+                current_tx_proven = any(
+                    isinstance(event, dict)
+                    and event.get("event") == "tx_proven"
+                    and _integer(event.get("tx_gain_db")) == manifest_tx_gain
+                    and event.get("tx_rf_amp_enabled") == manifest_tx_amp
+                    for event in history
+                )
+                adaptive_current_proven = (
+                    (not adaptive_enabled and current_rx_is_startup and current_tx_is_startup)
+                    or (
+                        adaptive_enabled
+                        and adaptive.get("state") == "tracking"
+                        and manifest_adaptive.get("enabled") is True
+                        and manifest_adaptive.get("state") == adaptive.get("state")
+                        and (current_rx_is_startup or current_rx_reacquired)
+                        and (current_tx_is_startup or current_tx_proven)
+                    )
+                )
+                tested_normal_rx = {
+                    (
+                        _integer(window.get("lna_gain_db")),
+                        _integer(window.get("vga_gain_db")),
+                    )
+                    for window in rx_windows or []
+                    if isinstance(window, dict)
+                    and window.get("rf_amp_enabled") is False
+                } | {
+                    (
+                        _integer(event.get("rx_lna_gain_db")),
+                        _integer(event.get("rx_vga_gain_db")),
+                    )
+                    for event in history
+                    if isinstance(event, dict)
+                    and event.get("event") == "rx_adjusted"
+                    and event.get("rx_rf_amp_enabled") is False
+                }
+                tested_normal_tx = {
+                    _integer(probe.get("gain_db"))
+                    for probe in tx_probes or []
+                    if isinstance(probe, dict)
+                    and probe.get("rf_amp_enabled") is False
+                } | {
+                    _integer(event.get("tx_gain_db"))
+                    for event in history
+                    if isinstance(event, dict)
+                    and event.get("event") == "tx_adjusted"
+                    and event.get("tx_rf_amp_enabled") is False
+                }
+                startup_rx_amp_policy_ok = (
+                    selected_rx_amp is False
                     or (
                         isinstance(rx_windows, list)
                         and {
@@ -953,8 +1029,8 @@ def collect_proof(
                         == set(RX_CANDIDATES)
                     )
                 )
-                tx_normal_search_exhausted = (
-                    manifest_tx_amp is False
+                startup_tx_amp_policy_ok = (
+                    selected_tx_amp is False
                     or (
                         isinstance(tx_probes, list)
                         and {
@@ -966,6 +1042,12 @@ def collect_proof(
                         }
                         == set(TX_CANDIDATES)
                     )
+                )
+                current_rx_amp_policy_ok = (
+                    manifest_rx_amp is False or tested_normal_rx == set(RX_CANDIDATES)
+                )
+                current_tx_amp_policy_ok = (
+                    manifest_tx_amp is False or tested_normal_tx == set(TX_CANDIDATES)
                 )
                 automatic_ok = (
                     manifest_tx_enabled is True
@@ -980,20 +1062,21 @@ def collect_proof(
                     and bridge.get("gain_control") == "automatic"
                     and calibration.get("enabled") is True
                     and calibration.get("state") == "complete"
-                    and _integer(selected.get("tx_gain_db")) == manifest_tx_gain
-                    and _integer(selected.get("rx_lna_gain_db")) == manifest_rx_lna
-                    and _integer(selected.get("rx_vga_gain_db")) == manifest_rx_vga
-                    and selected.get("rx_rf_amp_enabled") == manifest_rx_amp
-                    and selected.get("tx_rf_amp_enabled") == manifest_tx_amp
+                    and selected_tx_gain is not None
+                    and selected_rx_lna in range(0, 41, 8)
+                    and selected_rx_vga in range(0, 63, 2)
                     and manifest_tx_gain is not None
                     and 0 <= manifest_tx_gain <= 47
                     and manifest_rx_lna in range(0, 41, 8)
                     and manifest_rx_vga in range(0, 63, 2)
-                    and selected_rx_proven
-                    and selected_tx_proven
+                    and startup_rx_proven
+                    and startup_tx_proven
+                    and startup_rx_amp_policy_ok
+                    and startup_tx_amp_policy_ok
+                    and adaptive_current_proven
                     and directional_amp_match
-                    and rx_normal_search_exhausted
-                    and tx_normal_search_exhausted
+                    and current_rx_amp_policy_ok
+                    and current_tx_amp_policy_ok
                     and manifest.get("antenna_power_enabled") is False
                     and bridge.get("antenna_power_enabled") is False
                 )
@@ -1433,6 +1516,7 @@ def render_markdown(summary: dict[str, Any]) -> str:
     decode = _mapping(payload.get("decode"))
     ordered_chain = _mapping(payload.get("ordered_demo_chain"))
     rx_iq = _mapping(bridge.get("rx_iq"))
+    adaptive = _mapping(bridge.get("adaptive_link"))
 
     status = "PASS" if overall.get("passed") is True else "FAIL"
     lines = [
@@ -1450,6 +1534,7 @@ def render_markdown(summary: dict[str, Any]) -> str:
         f"| RF path | {_markdown_cell(supervisor.get('rf_path_label'))} |",
         f"| TX / RX LNA / RX VGA gain (dB) | {_markdown_cell(bridge.get('tx_gain'))} / {_markdown_cell(bridge.get('rx_lna_gain'))} / {_markdown_cell(bridge.get('rx_vga_gain'))} |",
         f"| RF amp / antenna bias power | {_markdown_cell(bridge.get('rf_amp_enabled'))} / {_markdown_cell(bridge.get('antenna_power_enabled'))} |",
+        f"| Adaptive link state / RX adjustments / TX adjustments | {_markdown_cell(adaptive.get('state'))} / {_markdown_cell(adaptive.get('rx_adjustments'))} / {_markdown_cell(adaptive.get('tx_adjustments'))} |",
         f"| IQ clipped / sampled | {_markdown_cell(rx_iq.get('clipped_complex_samples'))} / {_markdown_cell(rx_iq.get('sampled_complex_samples'))} |",
         f"| IQ peak abs / RMS dBFS | {_markdown_cell(rx_iq.get('peak_abs'))} / {_markdown_cell(rx_iq.get('last_block_complex_rms_dbfs'))} |",
         f"| TX mode | {_markdown_cell(ack.get('tx_mode'))} |",

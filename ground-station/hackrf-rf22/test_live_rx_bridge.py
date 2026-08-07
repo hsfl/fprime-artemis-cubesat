@@ -40,6 +40,7 @@ def bridge_args(
         rf_path_label="unit-test-load",
         tx_mode="ack",
         tx_leading_ms=100.0,
+        stop_timeout=1.0,
         max_tx_queue_messages=max_tx_queue_messages,
         max_tx_queue_bytes=max_tx_queue_bytes,
         uplink_capture_dir=directory / "capture",
@@ -177,6 +178,105 @@ class TxQueueTests(unittest.TestCase):
             self.assertEqual(list(byte_limited.tx_queue), [(0, b"abc")])
             self.assertEqual(byte_limited.tx_queue_bytes, 3)
             self.assertEqual(byte_limited.metrics["tx_queue"]["rejections"], 1)
+
+
+class AdaptiveLinkTests(unittest.TestCase):
+    def make_bridge(self, directory: str) -> HackRfGroundBridge:
+        args = bridge_args(Path(directory))
+        args.auto_calibrate = True
+        bridge = HackRfGroundBridge(args)
+        bridge.device = mock.MagicMock(mode="rx", rx_dropped_blocks=0)
+        bridge._write_metrics = mock.MagicMock()
+        bridge.log = mock.MagicMock()
+        bridge._initialize_adaptive_link()
+        bridge._last_tx_s = 0.0
+        bridge._last_rx_adjustment_s = 0.0
+        return bridge
+
+    def test_frame_silence_steps_rx_gain_without_restarting_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            bridge = self.make_bridge(directory)
+            bridge.args.rx_lna_gain = 0
+            bridge.args.rx_vga_gain = 0
+            bridge.metrics["rx_lna_gain"] = 0
+            bridge.metrics["rx_vga_gain"] = 0
+            bridge._last_valid_frame_s = 0.0
+
+            bridge._maintain_adaptive_link(now=10.0)
+
+            self.assertEqual((bridge.args.rx_lna_gain, bridge.args.rx_vga_gain), (0, 4))
+            bridge.device.set_rx_gains.assert_called_with(0, 4)
+            self.assertEqual(bridge.metrics["adaptive_link"]["state"], "searching")
+
+    def test_live_rx_amp_starts_only_after_normal_range_is_exhausted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            bridge = self.make_bridge(directory)
+            bridge.args.rx_lna_gain, bridge.args.rx_vga_gain = RX_CANDIDATES[-1]
+            bridge.metrics["rx_lna_gain"], bridge.metrics["rx_vga_gain"] = RX_CANDIDATES[-1]
+            bridge._last_valid_frame_s = 0.0
+
+            bridge._maintain_adaptive_link(now=10.0)
+
+            self.assertEqual((bridge.args.rx_lna_gain, bridge.args.rx_vga_gain), (0, 0))
+            self.assertTrue(bridge._rx_rf_amp_enabled)
+            self.assertTrue(bridge.metrics["rx_rf_amp_enabled"])
+            self.assertTrue(
+                any(call.args[0] == "ADAPT_RX_AMP_FALLBACK" for call in bridge.log.call_args_list)
+            )
+
+    def test_two_clipped_blocks_step_rx_down(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            bridge = self.make_bridge(directory)
+            bridge.args.rx_lna_gain = 8
+            bridge.args.rx_vga_gain = 4
+            bridge.metrics["rx_lna_gain"] = 8
+            bridge.metrics["rx_vga_gain"] = 4
+            iq = bridge.metrics["rx_iq"]
+            iq["last_block_clipped_fraction"] = 0.01
+            bridge.metrics["rx_blocks"] = 1
+            bridge._maintain_adaptive_link(now=10.0)
+            bridge.metrics["rx_blocks"] = 2
+
+            bridge._maintain_adaptive_link(now=10.1)
+
+            self.assertEqual((bridge.args.rx_lna_gain, bridge.args.rx_vga_gain), (8, 0))
+            self.assertEqual(
+                bridge.metrics["adaptive_link"]["last_adjustment_reason"],
+                "iq_clipping",
+            )
+
+    def test_ack_timeout_immediately_raises_tx_gain_and_valid_frame_reacquires(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            bridge = self.make_bridge(directory)
+            bridge.args.tx_gain = 32
+            bridge.metrics["tx_gain"] = 32
+
+            bridge._note_ack_result(False)
+            self.assertEqual(bridge.args.tx_gain, 40)
+            bridge.metrics["adaptive_link"]["state"] = "searching"
+            bridge._note_valid_frame(now=20.0)
+
+            self.assertEqual(bridge.metrics["adaptive_link"]["state"], "tracking")
+            self.assertEqual(bridge.metrics["adaptive_link"]["rx_reacquisitions"], 1)
+
+    def test_tx_maximum_is_held_after_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            bridge = self.make_bridge(directory)
+            bridge.args.tx_gain = 47
+            bridge._tx_rf_amp_enabled = True
+            bridge.metrics["tx_gain"] = 47
+            bridge.metrics["tx_rf_amp_enabled"] = True
+
+            bridge._note_ack_result(False)
+
+            self.assertEqual((bridge.args.tx_gain, bridge._tx_rf_amp_enabled), (47, True))
+            self.assertEqual(bridge.metrics["adaptive_link"]["tx_max_holds"], 1)
+            self.assertTrue(
+                any(call.args[0] == "ADAPT_TX_MAX_HOLD" for call in bridge.log.call_args_list)
+            )
+
+
+class TxQueueFailureTests(unittest.TestCase):
 
     def test_overflow_is_a_fatal_run_result_persisted_in_metrics(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

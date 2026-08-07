@@ -397,6 +397,77 @@ class PassingProofTests(unittest.TestCase):
             self.assertEqual(summary["overall"]["status"], "pass")
             self.assertTrue(summary["gates"]["rf_gain_policy"]["passed"])
 
+    def test_proven_runtime_rx_reacquisition_passes_policy_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = build_fixture(Path(directory))
+            manifest = fixture["manifest"]
+            bridge = fixture["bridge"]
+            startup = {"tx_gain": 32, "rx_lna_gain": 0, "rx_vga_gain": 0}
+            current = {"tx_gain": 32, "rx_lna_gain": 0, "rx_vga_gain": 4}
+            adaptive = {
+                "enabled": True,
+                "state": "tracking",
+                "history": [
+                    {
+                        "event": "rx_adjusted",
+                        "rx_lna_gain_db": 0,
+                        "rx_vga_gain_db": 4,
+                        "rx_rf_amp_enabled": False,
+                        "tx_gain_db": 32,
+                        "tx_rf_amp_enabled": False,
+                    },
+                    {
+                        "event": "rx_reacquired",
+                        "rx_lna_gain_db": 0,
+                        "rx_vga_gain_db": 4,
+                        "rx_rf_amp_enabled": False,
+                        "tx_gain_db": 32,
+                        "tx_rf_amp_enabled": False,
+                    },
+                ],
+            }
+            manifest.update(current | {"gain_control": "automatic", "adaptive_link": adaptive})
+            bridge.update(
+                current
+                | {
+                    "gain_control": "automatic",
+                    "adaptive_link": adaptive,
+                    "calibration": {
+                        "enabled": True,
+                        "state": "complete",
+                        "selected": {
+                            "tx_gain_db": startup["tx_gain"],
+                            "rx_lna_gain_db": startup["rx_lna_gain"],
+                            "rx_vga_gain_db": startup["rx_vga_gain"],
+                            "rx_rf_amp_enabled": False,
+                            "tx_rf_amp_enabled": False,
+                        },
+                        "rx_windows": [
+                            {
+                                "lna_gain_db": 0,
+                                "vga_gain_db": 0,
+                                "rf_amp_enabled": False,
+                                "passed": True,
+                            }
+                        ],
+                        "tx_probes": [
+                            {
+                                "gain_db": 32,
+                                "rf_amp_enabled": False,
+                                "pong": True,
+                            }
+                        ],
+                    },
+                }
+            )
+            write_json(fixture["manifest_path"], manifest)
+            write_json(fixture["bridge_path"], bridge)
+
+            summary = collect(fixture)
+
+            self.assertEqual(summary["overall"]["status"], "pass")
+            self.assertTrue(summary["gates"]["rf_gain_policy"]["passed"])
+
 
 class RejectionTests(unittest.TestCase):
     def test_rf_safety_provenance_mismatch_is_rejected(self) -> None:

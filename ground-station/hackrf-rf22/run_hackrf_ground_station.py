@@ -41,6 +41,12 @@ PAYLOAD_UI = (
     / "c3m-payload-receiver-ui"
     / "c3m_payload_receiver_ui.py"
 )
+OWNED_PROCESS_MARKERS = (
+    str(HERE / "run_hackrf_ground_station.py"),
+    str(HERE / "live_rx_bridge.py"),
+    str(FPRIME_VENV / "bin" / "fprime-gds"),
+    str(PAYLOAD_UI),
+)
 
 
 def apply_student_rf_baseline(args: argparse.Namespace) -> argparse.Namespace:
@@ -77,11 +83,21 @@ class Child:
 
 
 def port_is_available(port: int) -> bool:
+    # Reject a service actively accepting connections on the exact loopback
+    # endpoint used by the operator UIs.  A reusable bind alone is insufficient
+    # because two SO_REUSEADDR sockets can otherwise overlap on macOS.
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.1):
+            return False
+    except OSError:
+        pass
+
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as stream:
         try:
-            # Bind every interface without SO_REUSEADDR.  This is deliberately
-            # stricter than the child servers: a recently released or
-            # interface-specific listener must not produce a false READY race.
+            # The prior GDS/viewer may leave client connections in TIME_WAIT
+            # after its listener exits.  SO_REUSEADDR permits that released
+            # state while bind still rejects an active listener on the port.
+            stream.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             stream.bind(("", port))
         except OSError:
             return False
@@ -104,6 +120,141 @@ def validate_ports(ports: list[int]) -> None:
     duplicates = sorted({port for port in ports if ports.count(port) > 1})
     if duplicates:
         raise ValueError(f"ports must be unique: {duplicates}")
+
+
+def _process_table() -> dict[int, tuple[int, str]]:
+    """Return pid -> (parent pid, command) for lifecycle ownership checks."""
+
+    try:
+        result = subprocess.run(
+            ["ps", "-axo", "pid=,ppid=,command="],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return {}
+    table: dict[int, tuple[int, str]] = {}
+    for line in result.stdout.splitlines():
+        fields = line.strip().split(maxsplit=2)
+        if len(fields) < 2:
+            continue
+        try:
+            pid, parent = int(fields[0]), int(fields[1])
+        except ValueError:
+            continue
+        table[pid] = (parent, fields[2] if len(fields) == 3 else "")
+    return table
+
+
+def _lsof_pids(arguments: list[str]) -> set[int]:
+    try:
+        result = subprocess.run(
+            ["lsof", "-t", *arguments],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return set()
+    return {
+        int(line)
+        for line in result.stdout.splitlines()
+        if line.strip().isdigit()
+    }
+
+
+def _manifest_pids(runtime_dir: Path) -> set[int]:
+    pids: set[int] = set()
+    for path in runtime_dir.glob("runs/*/run-manifest.json"):
+        try:
+            manifest = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        supervisor_pid = manifest.get("supervisor_pid")
+        if isinstance(supervisor_pid, int):
+            pids.add(supervisor_pid)
+        children = manifest.get("children")
+        if isinstance(children, dict):
+            for child in children.values():
+                if isinstance(child, dict) and isinstance(child.get("pid"), int):
+                    pids.add(child["pid"])
+    return pids
+
+
+def owned_runtime_pids(runtime_dir: Path, ports: list[int]) -> set[int]:
+    """Find only processes attributable to this repository's C3M SDR stack."""
+
+    table = _process_table()
+    manifest_pids = _manifest_pids(runtime_dir)
+    resource_pids: set[int] = set()
+    for port in ports:
+        # Only the process listening on an operator port owns that resource.
+        # Browser/client connections must never become cleanup targets.
+        resource_pids.update(_lsof_pids([f"-iTCP:{port}", "-sTCP:LISTEN"]))
+    for symlink in (runtime_dir / "gds-port", runtime_dir / "payload-port"):
+        if symlink.exists() or symlink.is_symlink():
+            resource_pids.update(_lsof_pids([str(symlink)]))
+
+    roots = {
+        pid
+        for pid in manifest_pids | resource_pids
+        if pid != os.getpid()
+        and (
+            any(marker in table.get(pid, (0, ""))[1] for marker in OWNED_PROCESS_MARKERS)
+            or pid in resource_pids
+        )
+    }
+    owned = set(roots)
+    changed = True
+    while changed:
+        changed = False
+        for pid, (parent, _command) in table.items():
+            if pid != os.getpid() and parent in owned and pid not in owned:
+                owned.add(pid)
+                changed = True
+    return owned
+
+
+def reap_owned_runtime(runtime_dir: Path, ports: list[int]) -> list[int]:
+    """Stop prior repo-owned C3M SDR processes before starting a replacement."""
+
+    pids = owned_runtime_pids(runtime_dir, ports)
+    if not pids:
+        return []
+    print(
+        "STALE_RUNTIME_CLEANUP stopping=" + ",".join(map(str, sorted(pids))),
+        flush=True,
+    )
+    for pid in sorted(pids, reverse=True):
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    deadline = time.monotonic() + 5.0
+    remaining = set(pids)
+    while remaining and time.monotonic() < deadline:
+        remaining = {
+            pid
+            for pid in remaining
+            if pid in _process_table()
+        }
+        if remaining:
+            time.sleep(0.1)
+    for pid in sorted(remaining, reverse=True):
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    if remaining:
+        print(
+            "STALE_RUNTIME_CLEANUP forced="
+            + ",".join(map(str, sorted(remaining))),
+            flush=True,
+        )
+    return sorted(pids)
 
 
 def runtime_requirements(args: argparse.Namespace) -> list[Path]:
@@ -178,6 +329,11 @@ class Supervisor:
         self.bridge_metrics = self.run_dir / "bridge-status.json"
         self.manifest_path = self.run_dir / "run-manifest.json"
         self.started_at = time.time()
+        self._last_manifest_sync = 0.0
+        self._adaptive_link_status: dict[str, object] = {}
+        self._bridge_status: dict[str, object] = {}
+        self._last_diagnostic_at = 0.0
+        self._last_diagnostic_signature: tuple[object, ...] | None = None
 
     def request_stop(self, _signum: int, _frame: object) -> None:
         self.stopping = True
@@ -249,6 +405,26 @@ class Supervisor:
             f"bridge did not become ready (state={last_state})\n{tail(child.log_path)}"
         )
 
+    def _wait_bridge_runtime(self, child: Child) -> None:
+        """Wait only for the PTYs needed to start the operator surfaces."""
+
+        deadline = time.monotonic() + self.args.start_timeout
+        while time.monotonic() < deadline and not self.stopping:
+            if child.process.poll() is not None:
+                raise RuntimeError(
+                    f"bridge exited {child.process.returncode}\n{tail(child.log_path)}"
+                )
+            if (
+                self.bridge_metrics.is_file()
+                and self.gds_symlink.is_symlink()
+                and self.payload_symlink.is_symlink()
+            ):
+                return
+            time.sleep(0.05)
+        raise RuntimeError(
+            "bridge did not create its runtime PTYs\n" + tail(child.log_path)
+        )
+
     def _wait_http(self, child: Child, port: int) -> None:
         deadline = time.monotonic() + self.args.start_timeout
         while time.monotonic() < deadline and not self.stopping:
@@ -260,6 +436,117 @@ class Supervisor:
                 return
             time.sleep(0.2)
         raise RuntimeError(f"{child.name} did not open HTTP port {port}\n{tail(child.log_path)}")
+
+    def _wait_http_surfaces(
+        self, surfaces: list[tuple[Child, int, str]]
+    ) -> None:
+        """Poll concurrently started HTTP surfaces until all are available."""
+
+        deadline = time.monotonic() + self.args.start_timeout
+        pending = {child.name: (child, port, label) for child, port, label in surfaces}
+        while pending and time.monotonic() < deadline and not self.stopping:
+            for name, (child, port, label) in list(pending.items()):
+                if child.process.poll() is not None:
+                    raise RuntimeError(
+                        f"{name} exited {child.process.returncode}\n"
+                        f"{tail(child.log_path)}"
+                    )
+                if not http_ready(port):
+                    continue
+                url = f"http://127.0.0.1:{port}"
+                print(f"{label}_STARTED {url}", flush=True)
+                if not self.args.no_open:
+                    webbrowser.open(url)
+                del pending[name]
+            if pending:
+                time.sleep(0.2)
+        if pending:
+            names = ", ".join(sorted(pending))
+            details = "\n".join(
+                f"{name}: {tail(child.log_path)}"
+                for name, (child, _port, _label) in pending.items()
+            )
+            raise RuntimeError(f"HTTP surfaces did not start: {names}\n{details}")
+
+    def _sync_bridge_rf_state(self) -> bool:
+        try:
+            status = json.loads(self.bridge_metrics.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return False
+        self._bridge_status = status
+        adaptive = status.get("adaptive_link")
+        if isinstance(adaptive, dict):
+            self._adaptive_link_status = adaptive
+        before = (
+            self.args.rx_lna_gain,
+            self.args.rx_vga_gain,
+            self.args.rx_rf_amp_enabled,
+            self.args.tx_gain,
+            self.args.tx_rf_amp_enabled,
+        )
+        self.args.rx_lna_gain = int(status.get("rx_lna_gain", before[0]))
+        self.args.rx_vga_gain = int(status.get("rx_vga_gain", before[1]))
+        self.args.rx_rf_amp_enabled = bool(
+            status.get("rx_rf_amp_enabled", before[2])
+        )
+        self.args.tx_gain = int(status.get("tx_gain", before[3]))
+        self.args.tx_rf_amp_enabled = bool(
+            status.get("tx_rf_amp_enabled", before[4])
+        )
+        after = (
+            self.args.rx_lna_gain,
+            self.args.rx_vga_gain,
+            self.args.rx_rf_amp_enabled,
+            self.args.tx_gain,
+            self.args.tx_rf_amp_enabled,
+        )
+        return after != before
+
+    def _print_sdr_status(self, *, force: bool = False) -> None:
+        """Print a compact operator view of the live RF state."""
+
+        status = self._bridge_status
+        adaptive = self._adaptive_link_status
+        link_state = str(adaptive.get("state", "starting"))
+        reason = str(adaptive.get("last_adjustment_reason", "none")).replace(
+            "_", " "
+        )
+        frame_age = adaptive.get("last_valid_frame_age_s")
+        frame_age_text = (
+            f"{float(frame_age):.1f}s ago"
+            if isinstance(frame_age, (int, float))
+            else "not seen"
+        )
+        signature = (
+            link_state,
+            self.args.rx_lna_gain,
+            self.args.rx_vga_gain,
+            self.args.rx_rf_amp_enabled,
+            self.args.tx_gain,
+            self.args.tx_rf_amp_enabled,
+            reason,
+        )
+        now = time.monotonic()
+        if (
+            not force
+            and signature == self._last_diagnostic_signature
+            and now - self._last_diagnostic_at < 10.0
+        ):
+            return
+        self._last_diagnostic_signature = signature
+        self._last_diagnostic_at = now
+        print(
+            "SDR STATUS | "
+            f"link {link_state} | "
+            f"RX LNA {self.args.rx_lna_gain} dB, "
+            f"VGA {self.args.rx_vga_gain} dB, "
+            f"amp {'on' if self.args.rx_rf_amp_enabled else 'off'} | "
+            f"TX gain {self.args.tx_gain} dB, "
+            f"amp {'on' if self.args.tx_rf_amp_enabled else 'off'} | "
+            f"frames {int(status.get('rf22_frames', 0))}, "
+            f"last frame {frame_age_text} | reason {reason}",
+            flush=True,
+        )
 
     def _update_latest(self) -> None:
         latest = self.args.runtime_dir / "latest"
@@ -294,6 +581,7 @@ class Supervisor:
             {
                 "schema": 1,
                 "state": state,
+                "supervisor_pid": os.getpid(),
                 "started_at_s": self.started_at,
                 "updated_at_s": time.time(),
                 "repo": str(REPO_ROOT),
@@ -317,6 +605,7 @@ class Supervisor:
                 "rx_rf_amp_enabled": self.args.rx_rf_amp_enabled,
                 "tx_rf_amp_enabled": self.args.tx_rf_amp_enabled,
                 "antenna_power_enabled": False,
+                "adaptive_link": self._adaptive_link_status,
                 "gds_url": None if self.args.no_gds else f"http://127.0.0.1:{self.args.gui_port}",
                 "payload_url": (
                     None
@@ -403,7 +692,13 @@ class Supervisor:
                 bridge_command.append("--allow-elevated-tx-gain")
         try:
             bridge = self._spawn("bridge", bridge_command, "bridge.log")
-            self._wait_bridge(bridge)
+            # The bridge publishes both PTYs before opening/calibrating the
+            # HackRF.  Start both operator surfaces as soon as those PTYs
+            # exist so their cold starts overlap the RF search.
+            self._wait_bridge_runtime(bridge)
+
+            gds: Child | None = None
+            payload: Child | None = None
 
             if not self.args.no_gds:
                 gds_command = [
@@ -431,7 +726,6 @@ class Supervisor:
                     "space-packet-space-data-link",
                 ]
                 gds = self._spawn("gds", gds_command, "gds-console.log")
-                self._wait_http(gds, self.args.gui_port)
 
             if not self.args.no_payload_ui:
                 payload_command = [
@@ -450,7 +744,21 @@ class Supervisor:
                 payload = self._spawn(
                     "payload-ui", payload_command, "payload-ui.log"
                 )
-                self._wait_http(payload, self.args.payload_web_port)
+
+            # Both processes are now booting concurrently.  Publish/open each
+            # surface as soon as its server answers; calibration continues in
+            # the independent bridge process throughout these waits.
+            surfaces: list[tuple[Child, int, str]] = []
+            if gds is not None:
+                surfaces.append((gds, self.args.gui_port, "GDS"))
+            if payload is not None:
+                surfaces.append(
+                    (payload, self.args.payload_web_port, "PAYLOAD")
+                )
+            self._wait_http_surfaces(surfaces)
+
+            self._wait_bridge(bridge)
+            self._sync_bridge_rf_state()
 
             self._write_manifest("ready")
             print(f"GROUND_STATION_READY run={self.run_dir}", flush=True)
@@ -481,14 +789,7 @@ class Supervisor:
                     f"PAYLOAD_URL http://127.0.0.1:{self.args.payload_web_port}",
                     flush=True,
                 )
-            if not self.args.no_open:
-                if not self.args.no_gds:
-                    webbrowser.open(f"http://127.0.0.1:{self.args.gui_port}")
-                if not self.args.no_payload_ui:
-                    webbrowser.open(
-                        f"http://127.0.0.1:{self.args.payload_web_port}"
-                    )
-
+            self._print_sdr_status(force=True)
             while not self.stopping:
                 for child in self.children:
                     returncode = child.process.poll()
@@ -497,6 +798,12 @@ class Supervisor:
                             f"{child.name} exited unexpectedly with {returncode}\n"
                             f"{tail(child.log_path)}"
                         )
+                now = time.monotonic()
+                if now - self._last_manifest_sync >= 2.0:
+                    self._last_manifest_sync = now
+                    self._sync_bridge_rf_state()
+                    self._write_manifest("ready")
+                    self._print_sdr_status()
                 time.sleep(0.25)
             return 0
         finally:
@@ -591,13 +898,17 @@ def main() -> int:
         validate_ports(ports)
     except ValueError as exc:
         parser.error(str(exc))
-    occupied = [port for port in ports if not port_is_available(port)]
-    if occupied:
-        parser.error(f"ports already in use; existing processes were preserved: {occupied}")
     args.runtime_dir = args.runtime_dir.expanduser().resolve()
     args.data_dir = args.data_dir.expanduser().resolve()
     if args.dictionary is not None:
         args.dictionary = args.dictionary.expanduser().resolve()
+    reap_owned_runtime(args.runtime_dir, ports)
+    occupied = [port for port in ports if not port_is_available(port)]
+    if occupied:
+        parser.error(
+            "ports still owned by unrelated processes after C3M cleanup: "
+            f"{occupied}"
+        )
 
     supervisor = Supervisor(args)
     signal.signal(signal.SIGINT, supervisor.request_stop)

@@ -4,27 +4,42 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 import run_hackrf_ground_station as launcher
 
 
 class PortPreflightTests(unittest.TestCase):
-    def test_probe_strictly_binds_all_interfaces(self) -> None:
+    def test_probe_reuses_released_socket_and_binds_all_interfaces(self) -> None:
         context = mock.MagicMock()
         stream = context.__enter__.return_value
-        with mock.patch.object(launcher.socket, "socket", return_value=context):
+        with (
+            mock.patch.object(
+                launcher.socket,
+                "create_connection",
+                side_effect=ConnectionRefusedError,
+            ),
+            mock.patch.object(launcher.socket, "socket", return_value=context),
+        ):
             self.assertTrue(launcher.port_is_available(5057))
-        stream.setsockopt.assert_not_called()
+        stream.setsockopt.assert_called_once_with(
+            launcher.socket.SOL_SOCKET,
+            launcher.socket.SO_REUSEADDR,
+            1,
+        )
         stream.bind.assert_called_once_with(("", 5057))
 
     def test_probe_rejects_an_active_listener(self) -> None:
-        context = mock.MagicMock()
-        context.__enter__.return_value.bind.side_effect = OSError("occupied")
-        with mock.patch.object(launcher.socket, "socket", return_value=context):
+        connection = mock.MagicMock()
+        with mock.patch.object(
+            launcher.socket, "create_connection", return_value=connection
+        ):
             self.assertFalse(launcher.port_is_available(5057))
+        connection.__enter__.assert_called_once_with()
 
     def test_port_ranges_and_duplicates_are_rejected(self) -> None:
         for ports in ([0], [65_536], [5057, 5057]):
@@ -66,6 +81,44 @@ class RuntimeSelectionTests(unittest.TestCase):
             ],
         )
         self.assertEqual(launcher.selected_ports(args), [5057, 50057, 8064])
+
+
+class StaleRuntimeCleanupTests(unittest.TestCase):
+    def test_owned_runtime_includes_resources_and_descendants_only(self) -> None:
+        table = {
+            10: (1, str(launcher.HERE / "run_hackrf_ground_station.py")),
+            11: (10, "python worker"),
+            20: (1, "python stale serial reader"),
+            21: (20, "python worker"),
+            99: (1, "unrelated service"),
+        }
+        with (
+            mock.patch.object(launcher, "_process_table", return_value=table),
+            mock.patch.object(launcher, "_manifest_pids", return_value={10, 99}),
+            mock.patch.object(launcher, "_lsof_pids", return_value={20}),
+        ):
+            self.assertEqual(
+                launcher.owned_runtime_pids(Path("/unused"), [5057]),
+                {10, 11, 20, 21},
+            )
+
+    def test_reap_terminates_owned_processes(self) -> None:
+        with (
+            mock.patch.object(launcher, "owned_runtime_pids", return_value={10, 11}),
+            mock.patch.object(launcher, "_process_table", return_value={}),
+            mock.patch.object(launcher.os, "kill") as kill,
+        ):
+            self.assertEqual(
+                launcher.reap_owned_runtime(Path("/unused"), [5057]),
+                [10, 11],
+            )
+        self.assertEqual(
+            kill.call_args_list,
+            [
+                mock.call(11, launcher.signal.SIGTERM),
+                mock.call(10, launcher.signal.SIGTERM),
+            ],
+        )
 
 
 class TxSafetyCliTests(unittest.TestCase):
@@ -128,6 +181,65 @@ class TxSafetyCliTests(unittest.TestCase):
 
 
 class ChildLifecycleTests(unittest.TestCase):
+    def test_operator_surfaces_can_start_while_bridge_is_calibrating(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            supervisor = launcher.Supervisor.__new__(launcher.Supervisor)
+            supervisor.args = SimpleNamespace(start_timeout=0.2)
+            supervisor.stopping = False
+            supervisor.bridge_metrics = root / "bridge-status.json"
+            supervisor.bridge_metrics.write_text(
+                '{"radio_state":"calibrating"}', encoding="utf-8"
+            )
+            supervisor.gds_symlink = root / "gds-port"
+            supervisor.payload_symlink = root / "payload-port"
+            supervisor.gds_symlink.symlink_to(root / "gds-pty")
+            supervisor.payload_symlink.symlink_to(root / "payload-pty")
+            process = mock.MagicMock(returncode=None)
+            process.poll.return_value = None
+            child = launcher.Child(
+                "bridge", process, root / "bridge.log", mock.MagicMock()
+            )
+
+            supervisor._wait_bridge_runtime(child)
+
+            process.poll.assert_called_once_with()
+
+    def test_concurrent_http_wait_publishes_each_surface_when_ready(self) -> None:
+        supervisor = launcher.Supervisor.__new__(launcher.Supervisor)
+        supervisor.args = SimpleNamespace(start_timeout=0.2, no_open=False)
+        supervisor.stopping = False
+        gds_process = mock.MagicMock(returncode=None)
+        gds_process.poll.return_value = None
+        payload_process = mock.MagicMock(returncode=None)
+        payload_process.poll.return_value = None
+        gds = launcher.Child(
+            "gds", gds_process, Path("gds.log"), mock.MagicMock()
+        )
+        payload = launcher.Child(
+            "payload-ui",
+            payload_process,
+            Path("payload.log"),
+            mock.MagicMock(),
+        )
+
+        with (
+            mock.patch.object(launcher, "http_ready", return_value=True) as ready,
+            mock.patch.object(launcher.webbrowser, "open") as open_browser,
+        ):
+            supervisor._wait_http_surfaces(
+                [(gds, 5057, "GDS"), (payload, 8064, "PAYLOAD")]
+            )
+
+        self.assertEqual(ready.call_args_list, [mock.call(5057), mock.call(8064)])
+        self.assertEqual(
+            open_browser.call_args_list,
+            [
+                mock.call("http://127.0.0.1:5057"),
+                mock.call("http://127.0.0.1:8064"),
+            ],
+        )
+
     def test_spawn_closes_log_when_process_creation_fails(self) -> None:
         supervisor = launcher.Supervisor.__new__(launcher.Supervisor)
         supervisor.run_dir = Path("/unused")
