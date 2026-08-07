@@ -31,6 +31,11 @@ The app opens `http://127.0.0.1:8064/` and stores each run under repo-root
 `data/`. It selects the third ground Teensy serial interface only when that
 mapping is unambiguous; otherwise choose the channel-1 port in the page.
 
+The **Hotspot indicator** viewer overlay is enabled by default. Uncheck it to
+hide the computed hottest-pixel marker on current and archived thermal images;
+this only changes the browser display and never modifies the received `.fdp`,
+decoded CSV, or PNG.
+
 Do not request science downlink until the page shows
 `Ready — awaiting downlink`. Only one receiver may own the channel-1 serial
 port, so stop this app before using `payload_receiver.py` as a CLI fallback.

@@ -15,6 +15,8 @@ const portChooser = document.getElementById("portChooser");
 const portSelect = document.getElementById("portSelect");
 const connectButton = document.getElementById("connectButton");
 const connectionIndicator = document.getElementById("connectionIndicator");
+const hotspotToggle = document.getElementById("hotspotToggle");
+const hotspotToggleLabel = document.getElementById("hotspotToggleLabel");
 const systemTime = document.getElementById("systemTime");
 const productValue = document.getElementById("productValue");
 const transferValue = document.getElementById("transferValue");
@@ -56,6 +58,18 @@ let historySignature = "";
 let stateSignature = "";
 let livestreamSignature = "";
 const hotspotObservers = new Map();
+
+function applyHotspotPreference() {
+  const enabled = hotspotToggle.checked;
+  document.body.classList.toggle("hotspots-disabled", !enabled);
+  hotspotToggleLabel.textContent = `Hotspot indicator ${enabled ? "on" : "off"}`;
+  document.querySelectorAll(".hotspot-marker").forEach((marker) => {
+    marker.setAttribute("aria-hidden", String(!enabled));
+  });
+}
+
+hotspotToggle.addEventListener("change", applyHotspotPreference);
+applyHotspotPreference();
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -316,6 +330,7 @@ function renderPreview(current) {
       hotspotId: "thermalHotspot",
       unitLabel: presentation.unitLabel,
     });
+    applyHotspotPreference();
   } else {
     let message = "Available after CRC verification";
     if (current.crc_ok === false) message = "Preview unavailable because integrity verification failed.";
@@ -514,6 +529,7 @@ function renderHistory(history) {
       unitLabel: presentation.unitLabel,
       overlay: true,
     });
+    applyHotspotPreference();
   }
 }
 
