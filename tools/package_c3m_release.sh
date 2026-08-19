@@ -2,15 +2,15 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TAG="${1:-v1.0.0-epscorc3m-demo}"
+TAG="${1:-v2.0.0-epscorc3m-demo}"
 OUT_DIR="${2:-$ROOT/release-artifacts}"
-ASSET_NAME="epscorc3m-v1.0.0-demo-artifacts"
+ASSET_NAME="epscorc3m-v2.0.0-demo-artifacts"
 ZIP="$OUT_DIR/$ASSET_NAME.zip"
 
-EXPECTED_BIN_SHA="3be1a1af54c7a1f61aaf42385a603f0425794745807174cb8488a2e0212f9003"
-EXPECTED_DICT_SHA="75ba50efa91c99a2219c62753b97a2efaa65c0d8971d1f1fd340b50ee769387b"
-EXPECTED_GROUND_SHA="2d8f035173ffa4d5a8ad2348b3e5183f703c59d10be86e7e9b69a95717526b5d"
-EXPECTED_SAT_SHA="938b4c53f73c262d6bd0bafd368a4cdb3492a45a13932f9be1ea152ce95075ca"
+EXPECTED_BIN_SHA="ed443c037020228d6959d7261b99f97d93c12013b7ad787a49f2fe86f20062da"
+EXPECTED_DICT_SHA="1e8f234c16fd8af0fbe9f1fd4f08fba8aafeb5bdceb8141e9dac0df3906b0f30"
+EXPECTED_GROUND_SHA="010ebce0eb3eab1c1403c29fc17633b8d5e6094a962deaa318a9eb91342b5d78"
+EXPECTED_SAT_SHA="75f85af0df9695628848ff7dbb067b2621e5196cb15f69625f73d55bebee804e"
 
 BIN="$ROOT/ArtemisRpiTeensy_N2/build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/bin/ArtemisRpiTeensyDeployment"
 DICT="$ROOT/ArtemisRpiTeensy_N2/build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/dict/ArtemisRpiTeensyDeploymentTopologyDictionary.json"
@@ -62,6 +62,7 @@ git archive --format=tar.gz --prefix="$TAG-source/" "$TAG" \
   > "$BUNDLE/source/$TAG-source.tar.gz"
 
 cp "$SOURCE/release/epscorc3m/README.md" "$BUNDLE/README.md"
+cp "$SOURCE/release/epscorc3m/RELEASE_NOTES_V2.md" "$BUNDLE/RELEASE_NOTES.md"
 cp "$SOURCE/release/epscorc3m/requirements-ground.txt" "$BUNDLE/"
 cp "$SOURCE/release/epscorc3m/flash_ground_teensy.sh" "$BUNDLE/scripts/"
 cp "$SOURCE/release/epscorc3m/flash_satellite_teensy.sh" "$BUNDLE/scripts/"
@@ -80,13 +81,25 @@ cp "$SOURCE/ArtemisRpiTeensy_N2/tools/run_gds_uart.sh" "$BUNDLE/ArtemisRpiTeensy
 cp -R "$SOURCE/ground-station/c3m-payload-receiver-ui" "$BUNDLE/ground-station/"
 cp -R "$SOURCE/ground-station/lepton-dp-viewer" "$BUNDLE/ground-station/"
 cp -R "$SOURCE/ground-station/c3m-lepton-test-data" "$BUNDLE/ground-station/"
+cp -R "$SOURCE/ground-station/boson-viewer" "$BUNDLE/ground-station/"
+cp -R "$SOURCE/ground-station/hackrf-rf22" "$BUNDLE/ground-station/"
+cp "$SOURCE/tools/c3m" "$BUNDLE/scripts/"
+cp "$SOURCE/tools/c3m-sdr" "$BUNDLE/scripts/"
+chmod 0755 "$BUNDLE/scripts/c3m" "$BUNDLE/scripts/c3m-sdr"
 for doc in \
   C3M_DEMO_HARDENING_PLAN_2026-07-09.md \
   C3M_LEPTON_RF_HIL_SCRATCHPAD_2026-07-09.md \
   C3M_PAYLOAD_RECEIVER_WEB_UI_PLAN.md \
   EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md \
-  HIL_BENCH_HANDOFF_2026-07-09.md; do
-  cp "$SOURCE/docs/$doc" "$BUNDLE/docs/"
+  HIL_BENCH_HANDOFF_2026-07-09.md \
+  C3M_MVP_DOWNLINK_PROTOCOL.md \
+  C3M_ON_DEMAND_TEENSY_CACHE_DOWNLINK_PLAN.md \
+  C3M_LEPTON_PREVIEW_STREAM_MVP.md \
+  C3M_LIVE_QA_LOG_2026-08-03.md \
+  NEUTRON2_RADIO_ARCHITECTURE_SUMMARY.md \
+  archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md; do
+  mkdir -p "$BUNDLE/docs/$(dirname "$doc")"
+  cp "$SOURCE/docs/$doc" "$BUNDLE/docs/$doc"
 done
 
 {

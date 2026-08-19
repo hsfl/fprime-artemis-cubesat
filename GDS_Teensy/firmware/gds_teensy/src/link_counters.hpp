@@ -19,6 +19,10 @@ struct LinkCounters {
   uint32_t payloadRfTxMessages = 0;
   uint32_t payloadRfRxSegments = 0;
   uint32_t payloadRfTxSegments = 0;
+  uint32_t previewFramesCommitted = 0;
+  uint32_t previewFragmentsAttempted = 0;
+  uint32_t previewFragmentFailures = 0;
+  uint32_t localResponsesTx = 0;
 
   uint32_t crcDrops = 0;
   uint32_t framingDrops = 0;
@@ -61,6 +65,10 @@ struct LinkCounters {
     payloadRfTxMessages = 0;
     payloadRfRxSegments = 0;
     payloadRfTxSegments = 0;
+    previewFramesCommitted = 0;
+    previewFragmentsAttempted = 0;
+    previewFragmentFailures = 0;
+    localResponsesTx = 0;
 
     crcDrops = 0;
     framingDrops = 0;
