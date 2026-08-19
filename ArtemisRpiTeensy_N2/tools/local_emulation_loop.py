@@ -2,10 +2,11 @@
 """Local closed-loop emulator for ArtemisRpiTeensy_N2.
 
 This script emulates the RPi <-> satellite Teensy <-> RF <-> ground Teensy link
-on a single host. It creates two pseudo UART devices:
+on a single host. It creates three pseudo UART devices:
 
 - app UART: passed to ArtemisRpiTeensyDeployment (-d ...)
 - gds UART: passed to fprime-gds (--uart-device ...)
+- payload UART: passed to the ground payload receiver (--port ...)
 
 Supported link modes:
 - channelized: current UART channel mux plus RF segment/reassemble emulation
@@ -27,6 +28,7 @@ import subprocess
 import shutil
 import sys
 import time
+import tty
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -41,6 +43,26 @@ CHANNEL_RF_COUNT = 2
 CHANNEL_COUNT = 3
 FRAME_MAX_PAYLOAD = 220
 FRAME_TIMEOUT_S = 0.250
+
+TEENSY_TARGET_RF_STATUS = 2
+TEENSY_TARGET_PAYLOAD_CACHE = 3
+TEENSY_STATUS_OK = 0
+TEENSY_STATUS_BAD_REQUEST = 1
+TEENSY_STATUS_BUSY = 2
+TEENSY_STATUS_TARGET_ERROR = 4
+TEENSY_RF_OP_STATUS = 1
+TEENSY_RF_OP_SET_ENABLED = 2
+
+RADIO_STATE_OFF = 0
+RADIO_STATE_READY = 1
+RADIO_FAULT_NONE = 0
+RADIO_FAULT_INIT_FAILED = 1
+RADIO_FAULT_WATCHDOG_RESET = 2
+RADIO_BOOT_FLAG_WATCHDOG = 0x01
+RADIO_STATUS_PAYLOAD_LEN = 33
+RADIO_SET_ENABLED_PAYLOAD_LEN = 4
+RSSI_INVALID_DBM = 0
+RSSI_INVALID_AGE_MS = 0xFFFFFFFF
 
 RF_SEGMENT_MAGIC_CCSDS = 0xA5
 RF_SEGMENT_MAGIC_PAYLOAD = 0xA6
@@ -58,6 +80,31 @@ DICT_BASENAME = f"{DEPLOYMENT_NAME}TopologyDictionary.json"
 TIMESTAMP_DIR_RE = re.compile(
     r"^\d{4}(?:[-_])\d{2}(?:[-_])\d{2}(?:T|-)\d{2}(?:[:_])\d{2}(?:[:_])\d{2}(?:\.\d+)?$"
 )
+
+N2_MAGIC = b"N2"
+N2_TYPE_HEADER = 1
+N2_TYPE_DATA = 2
+N2_TYPE_END = 3
+N2_TYPE_RETRY_REQUEST = 4
+N2_DATA_MIN_BYTES = 6
+N2_DATA_INDEX_OFFSET = 4
+N2_MAX_DATA_INDEX = 0xFFFF
+
+PAYLOAD_PACKET_DATA_BYTES = 35
+PAYLOAD_CACHE_MAX_BYTES = 196608
+PAYLOAD_CACHE_CHUNK_BYTES = 200
+PAYLOAD_CACHE_OP_BEGIN = 1
+PAYLOAD_CACHE_OP_CHUNK = 2
+PAYLOAD_CACHE_OP_COMMIT_AND_SEND = 3
+PAYLOAD_CACHE_OP_ABORT = 4
+PAYLOAD_CACHE_STATE_EMPTY = 0
+PAYLOAD_CACHE_STATE_RECEIVING = 1
+PAYLOAD_CACHE_STATE_READY = 2
+PAYLOAD_CACHE_STATE_SENDING = 3
+PAYLOAD_CACHE_STATE_ERROR = 4
+PAYLOAD_CACHE_PACKETS_PER_POLL = 18
+PAYLOAD_CACHE_HEADER_REPEATS = 3
+PAYLOAD_CACHE_MAX_RETRY_PACKETS = 8 * 36
 
 
 def crc16_ccitt(payload: bytes) -> int:
@@ -383,14 +430,21 @@ class BurstAggregator:
 class LoopStats:
     app_uart_bytes_in: int = 0
     gds_uart_bytes_in: int = 0
+    payload_uart_bytes_in: int = 0
     app_frames_in: int = 0
     gds_messages_in: int = 0
+    payload_messages_in: int = 0
     rf_packets_app_to_gds: int = 0
     rf_packets_gds_to_app: int = 0
+    rf_packets_payload_to_app: int = 0
     gds_bytes_out: int = 0
+    payload_bytes_out: int = 0
     app_bytes_out: int = 0
     payload_bytes_observed: int = 0
+    payload_data_packets_dropped: int = 0
     local_frames_observed: int = 0
+    local_responses_sent: int = 0
+    radio_frames_dropped_off: int = 0
 
 
 def build_uart_frame(channel: int, payload: bytes) -> bytes:
@@ -411,6 +465,526 @@ def build_uart_frame(channel: int, payload: bytes) -> bytes:
     ) + payload + bytes([crc & 0xFF, (crc >> 8) & 0xFF])
 
 
+class PayloadCacheEmulator:
+    """Deterministic model of the satellite Teensy's single payload cache."""
+
+    LOCAL_HEADER_LEN = 4
+    RESPONSE_BODY_LEN = 8
+
+    TX_IDLE = 0
+    TX_HEADERS = 1
+    TX_DATA = 2
+    TX_REPAIR = 3
+    TX_END = 4
+
+    def __init__(self) -> None:
+        self.cache = bytearray()
+        self.state = PAYLOAD_CACHE_STATE_EMPTY
+        self.transfer_id = 0
+        self.product_id = 0
+        self.total_bytes = 0
+        self.received_bytes = 0
+        self.expected_crc = 0
+        self.valid = False
+
+        self.tx_phase = self.TX_IDLE
+        self.headers_remaining = 0
+        self.next_packet_index = 0
+        self.total_packets = 0
+        self.retry_packets: list[int] = []
+        self.retry_cursor = 0
+        self.commit_request_id = 0
+        self.completion_response: Optional[bytes] = None
+
+    def _response(self, request_id: int, status: int, operation: int) -> bytes:
+        return bytes(
+            [
+                TEENSY_TARGET_PAYLOAD_CACHE,
+                request_id & 0xFF,
+                status & 0xFF,
+                self.RESPONSE_BODY_LEN,
+                operation & 0xFF,
+                self.transfer_id & 0xFF,
+                self.state & 0xFF,
+                0,
+            ]
+        ) + int(self.received_bytes).to_bytes(4, "little")
+
+    def _identity_matches(
+        self,
+        transfer_id: int,
+        product_id: int,
+        total_bytes: int,
+        expected_crc: int,
+    ) -> bool:
+        return (
+            self.transfer_id == transfer_id
+            and self.product_id == product_id
+            and self.total_bytes == total_bytes
+            and self.expected_crc == expected_crc
+        )
+
+    def _invalidate(self, state: int) -> None:
+        self.cache = bytearray()
+        self.state = state
+        self.transfer_id = 0
+        self.product_id = 0
+        self.total_bytes = 0
+        self.received_bytes = 0
+        self.expected_crc = 0
+        self.valid = False
+        self.tx_phase = self.TX_IDLE
+        self.headers_remaining = 0
+        self.next_packet_index = 0
+        self.total_packets = 0
+        self.retry_packets = []
+        self.retry_cursor = 0
+        self.commit_request_id = 0
+        self.completion_response = None
+
+    def _start_transmit(self, request_id: int) -> None:
+        self.state = PAYLOAD_CACHE_STATE_SENDING
+        self.tx_phase = self.TX_HEADERS
+        self.headers_remaining = PAYLOAD_CACHE_HEADER_REPEATS
+        self.next_packet_index = 0
+        self.total_packets = (
+            self.total_bytes + PAYLOAD_PACKET_DATA_BYTES - 1
+        ) // PAYLOAD_PACKET_DATA_BYTES
+        self.retry_packets = []
+        self.retry_cursor = 0
+        self.commit_request_id = request_id
+        self.completion_response = None
+
+    def _handle_begin(self, request_id: int, body: bytes) -> bytes:
+        if len(body) != 12:
+            return self._response(request_id, TEENSY_STATUS_BAD_REQUEST, body[0])
+
+        transfer_id = body[1]
+        product_id = int.from_bytes(body[2:6], "little")
+        total_bytes = int.from_bytes(body[6:10], "little")
+        expected_crc = int.from_bytes(body[10:12], "little")
+        if (
+            transfer_id == 0
+            or total_bytes == 0
+            or total_bytes > PAYLOAD_CACHE_MAX_BYTES
+        ):
+            return self._response(request_id, TEENSY_STATUS_BAD_REQUEST, body[0])
+
+        if self.state == PAYLOAD_CACHE_STATE_SENDING:
+            status = (
+                TEENSY_STATUS_OK
+                if self._identity_matches(
+                    transfer_id, product_id, total_bytes, expected_crc
+                )
+                else TEENSY_STATUS_BUSY
+            )
+            return self._response(request_id, status, body[0])
+
+        if self.valid and self._identity_matches(
+            transfer_id, product_id, total_bytes, expected_crc
+        ):
+            self.state = PAYLOAD_CACHE_STATE_READY
+            self.received_bytes = self.total_bytes
+            return self._response(request_id, TEENSY_STATUS_OK, body[0])
+
+        self._invalidate(PAYLOAD_CACHE_STATE_RECEIVING)
+        self.cache = bytearray(total_bytes)
+        self.transfer_id = transfer_id
+        self.product_id = product_id
+        self.total_bytes = total_bytes
+        self.expected_crc = expected_crc
+        return self._response(request_id, TEENSY_STATUS_OK, body[0])
+
+    def _handle_chunk(self, request_id: int, body: bytes) -> bytes:
+        if len(body) < 8 or body[1] != self.transfer_id:
+            return self._response(request_id, TEENSY_STATUS_BAD_REQUEST, body[0])
+
+        offset = int.from_bytes(body[2:6], "little")
+        chunk_len = body[6]
+        if (
+            chunk_len == 0
+            or len(body) != 7 + chunk_len
+            or chunk_len > PAYLOAD_CACHE_CHUNK_BYTES
+            or offset + chunk_len > self.total_bytes
+        ):
+            return self._response(request_id, TEENSY_STATUS_BAD_REQUEST, body[0])
+        if self.state != PAYLOAD_CACHE_STATE_RECEIVING:
+            return self._response(request_id, TEENSY_STATUS_BUSY, body[0])
+
+        chunk = body[7:]
+        if offset < self.received_bytes:
+            duplicate_matches = (
+                offset + chunk_len <= self.received_bytes
+                and self.cache[offset : offset + chunk_len] == chunk
+            )
+            status = (
+                TEENSY_STATUS_OK
+                if duplicate_matches
+                else TEENSY_STATUS_BAD_REQUEST
+            )
+            return self._response(request_id, status, body[0])
+        if offset != self.received_bytes:
+            return self._response(request_id, TEENSY_STATUS_BAD_REQUEST, body[0])
+
+        self.cache[offset : offset + chunk_len] = chunk
+        self.received_bytes += chunk_len
+        return self._response(request_id, TEENSY_STATUS_OK, body[0])
+
+    def _handle_commit(self, request_id: int, body: bytes) -> bytes:
+        if len(body) != 2 or body[1] != self.transfer_id:
+            return self._response(request_id, TEENSY_STATUS_BAD_REQUEST, body[0])
+
+        if not self.valid:
+            if (
+                self.state != PAYLOAD_CACHE_STATE_RECEIVING
+                or self.received_bytes != self.total_bytes
+                or crc16_ccitt(bytes(self.cache)) != self.expected_crc
+            ):
+                self._invalidate(PAYLOAD_CACHE_STATE_ERROR)
+                return self._response(
+                    request_id, TEENSY_STATUS_TARGET_ERROR, body[0]
+                )
+            self.valid = True
+
+        self._start_transmit(request_id)
+        return self._response(request_id, TEENSY_STATUS_OK, body[0])
+
+    def _handle_abort(self, request_id: int, body: bytes) -> bytes:
+        if (
+            len(body) != 2
+            or (self.transfer_id != 0 and body[1] != self.transfer_id)
+        ):
+            return self._response(request_id, TEENSY_STATUS_BAD_REQUEST, body[0])
+        operation = body[0]
+        self._invalidate(PAYLOAD_CACHE_STATE_EMPTY)
+        return self._response(request_id, TEENSY_STATUS_OK, operation)
+
+    def handle(self, request: bytes) -> Optional[bytes]:
+        if not request or request[0] != TEENSY_TARGET_PAYLOAD_CACHE:
+            return None
+
+        request_id = request[1] if len(request) > 1 else 0
+        if len(request) < self.LOCAL_HEADER_LEN:
+            return self._response(request_id, TEENSY_STATUS_BAD_REQUEST, 0)
+        body_len = request[2]
+        if (
+            request[3] != 0
+            or len(request) != self.LOCAL_HEADER_LEN + body_len
+            or body_len == 0
+        ):
+            return self._response(request_id, TEENSY_STATUS_BAD_REQUEST, 0)
+
+        body = request[self.LOCAL_HEADER_LEN :]
+        operation = body[0]
+        if operation == PAYLOAD_CACHE_OP_BEGIN:
+            return self._handle_begin(request_id, body)
+        if operation == PAYLOAD_CACHE_OP_CHUNK:
+            return self._handle_chunk(request_id, body)
+        if operation == PAYLOAD_CACHE_OP_COMMIT_AND_SEND:
+            return self._handle_commit(request_id, body)
+        if operation == PAYLOAD_CACHE_OP_ABORT:
+            return self._handle_abort(request_id, body)
+        return self._response(request_id, TEENSY_STATUS_BAD_REQUEST, operation)
+
+    def handle_payload_control(self, payload: bytes) -> bool:
+        if (
+            not self.valid
+            or len(payload) < 7
+            or payload[:2] != N2_MAGIC
+            or payload[2] != N2_TYPE_RETRY_REQUEST
+            or payload[3] != self.transfer_id
+        ):
+            return False
+
+        start_index = int.from_bytes(payload[4:6], "little")
+        bitmap_bytes = payload[6]
+        if (
+            bitmap_bytes == 0
+            or bitmap_bytes > 36
+            or len(payload) != 7 + bitmap_bytes
+        ):
+            return False
+
+        retry_packets: list[int] = []
+        for byte_index, bits in enumerate(payload[7:]):
+            for bit in range(8):
+                if bits & (1 << bit):
+                    packet_index = start_index + (byte_index * 8) + bit
+                    if (
+                        packet_index < self.total_packets
+                        and len(retry_packets) < PAYLOAD_CACHE_MAX_RETRY_PACKETS
+                    ):
+                        retry_packets.append(packet_index)
+
+        self.retry_packets = retry_packets
+        self.retry_cursor = 0
+        if self.retry_packets:
+            self.state = PAYLOAD_CACHE_STATE_SENDING
+            self.tx_phase = self.TX_REPAIR
+            self.completion_response = None
+        return True
+
+    def _header_packet(self) -> bytes:
+        return (
+            N2_MAGIC
+            + bytes([N2_TYPE_HEADER, self.transfer_id])
+            + self.product_id.to_bytes(4, "little")
+            + self.total_bytes.to_bytes(4, "little")
+            + self.total_packets.to_bytes(2, "little")
+            + bytes([PAYLOAD_PACKET_DATA_BYTES])
+            + self.expected_crc.to_bytes(2, "little")
+        )
+
+    def _data_packet(self, packet_index: int) -> bytes:
+        offset = packet_index * PAYLOAD_PACKET_DATA_BYTES
+        chunk = bytes(self.cache[offset : offset + PAYLOAD_PACKET_DATA_BYTES])
+        prefix = (
+            N2_MAGIC
+            + bytes([N2_TYPE_DATA, self.transfer_id])
+            + packet_index.to_bytes(2, "little")
+            + bytes([len(chunk)])
+            + chunk
+        )
+        return prefix + crc16_ccitt(prefix).to_bytes(2, "little")
+
+    def _end_packet(self) -> bytes:
+        return (
+            N2_MAGIC
+            + bytes([N2_TYPE_END, self.transfer_id])
+            + self.total_packets.to_bytes(2, "little")
+            + self.expected_crc.to_bytes(2, "little")
+        )
+
+    def next_payload_packet(self) -> Optional[bytes]:
+        if (
+            not self.valid
+            or self.state != PAYLOAD_CACHE_STATE_SENDING
+            or self.tx_phase == self.TX_IDLE
+        ):
+            return None
+
+        if self.tx_phase == self.TX_HEADERS:
+            packet = self._header_packet()
+            self.headers_remaining -= 1
+            if self.headers_remaining == 0:
+                self.tx_phase = self.TX_DATA
+            return packet
+
+        if self.tx_phase == self.TX_DATA:
+            packet = self._data_packet(self.next_packet_index)
+            self.next_packet_index += 1
+            if self.next_packet_index >= self.total_packets:
+                self.tx_phase = self.TX_END
+            return packet
+
+        if self.tx_phase == self.TX_REPAIR:
+            packet = self._data_packet(self.retry_packets[self.retry_cursor])
+            self.retry_cursor += 1
+            if self.retry_cursor >= len(self.retry_packets):
+                self.tx_phase = self.TX_END
+            return packet
+
+        packet = self._end_packet()
+        self.tx_phase = self.TX_IDLE
+        self.state = PAYLOAD_CACHE_STATE_READY
+        self.completion_response = self._response(
+            self.commit_request_id,
+            TEENSY_STATUS_OK,
+            PAYLOAD_CACHE_OP_COMMIT_AND_SEND,
+        )
+        return packet
+
+    def take_completion_response(self) -> Optional[bytes]:
+        response = self.completion_response
+        self.completion_response = None
+        return response
+
+
+class RadioRpcEmulator:
+    """Deterministic satellite-local model for RF target-2 RPCs.
+
+    This models the software-visible Teensy contract only. A simulated watchdog
+    reset drops the current response and returns the radio model to OFF; it does
+    not emulate USB device re-enumeration or electrical reset timing.
+    """
+
+    LOCAL_HEADER_LEN = 4
+
+    def __init__(self, init_failures: int = 0, watchdog_resets: int = 0) -> None:
+        if init_failures < 0 or watchdog_resets < 0:
+            raise ValueError("radio fault counts must be non-negative")
+        if init_failures > 0 and watchdog_resets > 0:
+            raise ValueError("radio init failures and watchdog resets are mutually exclusive")
+
+        self.remaining_init_failures = init_failures
+        self.remaining_watchdog_resets = watchdog_resets
+        self.state = RADIO_STATE_OFF
+        self.fault = RADIO_FAULT_NONE
+        self.boot_flags = 0
+        self.init_attempts = 0
+        self.total_enable_attempts = 0
+        self.enable_attempt_times: list[float] = []
+
+        self.last_rssi_dbm = RSSI_INVALID_DBM
+        self.last_rssi_ts: Optional[float] = None
+        self.rx_good = 0
+        self.rx_bad = 0
+        self.tx_good = 0
+        self.rf_rx_packets = 0
+        self.rf_tx_packets = 0
+        self.rf_tx_drops = 0
+
+    @property
+    def ready(self) -> bool:
+        return self.state == RADIO_STATE_READY
+
+    @staticmethod
+    def _response(request_id: int, status: int, payload: bytes = b"") -> bytes:
+        return bytes(
+            [
+                TEENSY_TARGET_RF_STATUS,
+                request_id & 0xFF,
+                status & 0xFF,
+                len(payload) & 0xFF,
+            ]
+        ) + payload
+
+    def _status_payload(self, now: float) -> bytes:
+        if self.last_rssi_ts is None:
+            rssi_valid = 0
+            rssi_age_ms = RSSI_INVALID_AGE_MS
+        else:
+            rssi_valid = 1
+            elapsed_ms = max(0, int((now - self.last_rssi_ts) * 1000.0))
+            rssi_age_ms = min(elapsed_ms, RSSI_INVALID_AGE_MS)
+
+        payload = bytearray(RADIO_STATUS_PAYLOAD_LEN)
+        payload[0] = TEENSY_RF_OP_STATUS
+        payload[1:3] = int(self.last_rssi_dbm).to_bytes(2, "little", signed=True)
+        payload[3:5] = int(self.rx_good & 0xFFFF).to_bytes(2, "little")
+        payload[5:7] = int(self.rx_bad & 0xFFFF).to_bytes(2, "little")
+        payload[7:9] = int(self.tx_good & 0xFFFF).to_bytes(2, "little")
+        payload[9:13] = int(self.rf_rx_packets & 0xFFFFFFFF).to_bytes(4, "little")
+        payload[13:17] = int(self.rf_tx_packets & 0xFFFFFFFF).to_bytes(4, "little")
+        payload[17:21] = int(self.rf_tx_drops & 0xFFFFFFFF).to_bytes(4, "little")
+        payload[21] = self.state
+        payload[22] = self.fault
+        payload[23] = self.boot_flags
+        payload[24] = rssi_valid
+        payload[25:29] = rssi_age_ms.to_bytes(4, "little")
+        payload[29:33] = int(self.init_attempts & 0xFFFFFFFF).to_bytes(4, "little")
+        return bytes(payload)
+
+    def _set_enabled(self, enabled: bool, now: float) -> Optional[tuple[bytes, int]]:
+        requested = 1 if enabled else 0
+        if not enabled:
+            self.state = RADIO_STATE_OFF
+            self.fault = RADIO_FAULT_NONE
+            print("RADIO_STATE=OFF reason=commanded", flush=True)
+            return (
+                bytes([TEENSY_RF_OP_SET_ENABLED, requested, self.state, self.fault]),
+                TEENSY_STATUS_OK,
+            )
+
+        if self.ready:
+            return (
+                bytes([TEENSY_RF_OP_SET_ENABLED, requested, self.state, self.fault]),
+                TEENSY_STATUS_OK,
+            )
+
+        self.total_enable_attempts += 1
+        self.enable_attempt_times.append(now)
+        print(
+            f"RADIO_ENABLE_ATTEMPT={self.total_enable_attempts} T_MONOTONIC={now:.3f}",
+            flush=True,
+        )
+        self.init_attempts += 1
+        if self.remaining_watchdog_resets > 0:
+            self.remaining_watchdog_resets -= 1
+            self.state = RADIO_STATE_OFF
+            self.fault = RADIO_FAULT_WATCHDOG_RESET
+            self.boot_flags = RADIO_BOOT_FLAG_WATCHDOG
+            # A real Teensy watchdog reboot loses volatile driver counters.
+            # Keep only the reset cause and the external fault-injection budget.
+            self.init_attempts = 0
+            self.last_rssi_dbm = RSSI_INVALID_DBM
+            self.last_rssi_ts = None
+            self.rx_good = 0
+            self.rx_bad = 0
+            self.tx_good = 0
+            self.rf_rx_packets = 0
+            self.rf_tx_packets = 0
+            self.rf_tx_drops = 0
+            print(
+                "RADIO_STATE=OFF fault=WATCHDOG_RESET simulated_reboot=1",
+                flush=True,
+            )
+            return None
+
+        if self.remaining_init_failures > 0:
+            self.remaining_init_failures -= 1
+            self.state = RADIO_STATE_OFF
+            self.fault = RADIO_FAULT_INIT_FAILED
+            print(
+                f"RADIO_STATE=OFF fault=INIT_FAILED attempt={self.init_attempts}",
+                flush=True,
+            )
+            return (
+                bytes([TEENSY_RF_OP_SET_ENABLED, requested, self.state, self.fault]),
+                TEENSY_STATUS_TARGET_ERROR,
+            )
+
+        self.state = RADIO_STATE_READY
+        self.fault = RADIO_FAULT_NONE
+        print(f"RADIO_STATE=READY attempt={self.init_attempts}", flush=True)
+        return (
+            bytes([TEENSY_RF_OP_SET_ENABLED, requested, self.state, self.fault]),
+            TEENSY_STATUS_OK,
+        )
+
+    def handle(self, request: bytes, now: float) -> Optional[bytes]:
+        if not request or request[0] != TEENSY_TARGET_RF_STATUS:
+            return None
+
+        request_id = request[1] if len(request) > 1 else 0
+        if len(request) < self.LOCAL_HEADER_LEN:
+            return self._response(request_id, TEENSY_STATUS_BAD_REQUEST)
+
+        payload_len = request[2]
+        if request[3] != 0 or len(request) != self.LOCAL_HEADER_LEN + payload_len:
+            return self._response(request_id, TEENSY_STATUS_BAD_REQUEST)
+        payload = request[self.LOCAL_HEADER_LEN :]
+
+        if payload_len == 1 and payload[0] == TEENSY_RF_OP_STATUS:
+            return self._response(request_id, TEENSY_STATUS_OK, self._status_payload(now))
+
+        if (
+            payload_len == 2
+            and payload[0] == TEENSY_RF_OP_SET_ENABLED
+            and payload[1] in (0, 1)
+        ):
+            set_result = self._set_enabled(payload[1] == 1, now)
+            if set_result is None:
+                return None
+            response_payload, response_status = set_result
+            return self._response(request_id, response_status, response_payload)
+
+        return self._response(request_id, TEENSY_STATUS_BAD_REQUEST)
+
+    def note_rf_tx_packet(self) -> None:
+        self.tx_good += 1
+        self.rf_tx_packets += 1
+
+    def note_rf_rx_packet(self, now: float) -> None:
+        self.rx_good += 1
+        self.rf_rx_packets += 1
+        self.last_rssi_dbm = -75
+        self.last_rssi_ts = now
+
+    def note_rf_tx_drop(self) -> None:
+        self.rf_tx_drops += 1
+
+
 class EmulationLoop:
     def __init__(
         self,
@@ -418,11 +992,36 @@ class EmulationLoop:
         gds_cmd: Optional[list[str]],
         uplink_flush_ms: int,
         link_mode: str,
+        drop_payload_data_index: Optional[int] = None,
+        blackhole_payload_data_index_first_transfer: Optional[int] = None,
+        radio_init_failures: int = 0,
+        radio_watchdog_resets: int = 0,
     ) -> None:
         self.app_cmd = app_cmd
         self.gds_cmd = gds_cmd
         self.uplink_flush_s = uplink_flush_ms / 1000.0
         self.link_mode = link_mode
+        if drop_payload_data_index is not None and not (
+            0 <= drop_payload_data_index <= N2_MAX_DATA_INDEX
+        ):
+            raise ValueError("payload DATA packet index out of range")
+        self.drop_payload_data_index = drop_payload_data_index
+        self._payload_data_drop_injected = False
+        if blackhole_payload_data_index_first_transfer is not None and not (
+            0 <= blackhole_payload_data_index_first_transfer <= N2_MAX_DATA_INDEX
+        ):
+            raise ValueError("blackholed payload DATA packet index out of range")
+        if drop_payload_data_index is not None and blackhole_payload_data_index_first_transfer is not None:
+            raise ValueError("payload DATA one-shot drop and first-transfer blackhole are mutually exclusive")
+        self.blackhole_payload_data_index_first_transfer = blackhole_payload_data_index_first_transfer
+        self._blackhole_payload_transfer_id: Optional[int] = None
+        self._blackhole_payload_finished = False
+        self._payload_drop_mode = ""
+        self.radio = RadioRpcEmulator(
+            init_failures=radio_init_failures,
+            watchdog_resets=radio_watchdog_resets,
+        )
+        self.payload_cache = PayloadCacheEmulator()
 
         self.stop_requested = False
         self.exit_code = 0
@@ -434,9 +1033,12 @@ class EmulationLoop:
         self.app_slave_fd: Optional[int] = None
         self.gds_master_fd: Optional[int] = None
         self.gds_slave_fd: Optional[int] = None
+        self.payload_master_fd: Optional[int] = None
+        self.payload_slave_fd: Optional[int] = None
 
         self.app_uart_device = ""
         self.gds_uart_device = ""
+        self.payload_uart_device = ""
 
         self.pending_writes: dict[int, bytearray] = {}
 
@@ -445,6 +1047,7 @@ class EmulationLoop:
         self.ground_reassembler = RfReassembler()
 
         self.gds_burst_aggregator = BurstAggregator(self.uplink_flush_s)
+        self.payload_burst_aggregator = BurstAggregator(self.uplink_flush_s)
         self.ground_to_sat_segmenter = RfSegmenter()
         self.sat_reassembler = RfReassembler()
 
@@ -469,15 +1072,38 @@ class EmulationLoop:
     def setup(self) -> None:
         self.app_master_fd, self.app_slave_fd, self.app_uart_device = self._spawn_pty()
         self.gds_master_fd, self.gds_slave_fd, self.gds_uart_device = self._spawn_pty()
+        self.payload_master_fd, self.payload_slave_fd, self.payload_uart_device = self._spawn_pty()
+        # The receiver is launched after discovering the marker below. Disable
+        # PTY echo immediately so downlink bytes cannot loop back as uplink
+        # during that brief startup gap.
+        tty.setraw(self.payload_slave_fd)
 
         print(f"[emulation] app UART device: {self.app_uart_device}")
         print(f"[emulation] gds UART device: {self.gds_uart_device}")
+        print(f"[emulation] payload UART device: {self.payload_uart_device}")
+        # Machine-readable contract used by local-demo orchestration. Flush so
+        # a receiver can be launched promptly even when stdout is redirected.
+        print(f"PAYLOAD_UART_DEVICE={self.payload_uart_device}", flush=True)
 
         if self.app_cmd is not None:
-            cmd = [item.format(app_uart=self.app_uart_device, gds_uart=self.gds_uart_device) for item in self.app_cmd]
+            cmd = [
+                item.format(
+                    app_uart=self.app_uart_device,
+                    gds_uart=self.gds_uart_device,
+                    payload_uart=self.payload_uart_device,
+                )
+                for item in self.app_cmd
+            ]
             self._launch_child(cmd, "flight app")
         if self.gds_cmd is not None:
-            cmd = [item.format(app_uart=self.app_uart_device, gds_uart=self.gds_uart_device) for item in self.gds_cmd]
+            cmd = [
+                item.format(
+                    app_uart=self.app_uart_device,
+                    gds_uart=self.gds_uart_device,
+                    payload_uart=self.payload_uart_device,
+                )
+                for item in self.gds_cmd
+            ]
             self._launch_child(cmd, "gds")
 
         signal.signal(signal.SIGINT, self._handle_signal)
@@ -529,6 +1155,77 @@ class EmulationLoop:
                 if exc.errno not in (errno.EIO, errno.EBADF):
                     raise
 
+    def _send_local_response(self, response: bytes) -> None:
+        framed = build_uart_frame(CHANNEL_TEENSY_LOCAL, response)
+        self.stats.local_responses_sent += 1
+        self.stats.app_bytes_out += len(framed)
+        self._queue_write(self.app_master_fd, framed)  # type: ignore[arg-type]
+
+    def _deliver_satellite_payload(
+        self, channel: int, payload: bytes, now: float
+    ) -> bool:
+        if not self.radio.ready:
+            self.stats.radio_frames_dropped_off += 1
+            self.radio.note_rf_tx_drop()
+            return False
+
+        rf_packets = self.sat_to_ground_segmenter.segment(channel, payload)
+        self.stats.rf_packets_app_to_gds += len(rf_packets)
+        for packet in rf_packets:
+            self.radio.note_rf_tx_packet()
+            reassembled = self.ground_reassembler.feed(packet, now)
+            if reassembled is None:
+                continue
+            out_channel, out_payload = reassembled
+            if out_channel == CHANNEL_CCSDS:
+                self.stats.gds_bytes_out += len(out_payload)
+                self._queue_write(
+                    self.gds_master_fd, out_payload  # type: ignore[arg-type]
+                )
+            elif out_channel == CHANNEL_PAYLOAD:
+                self.stats.payload_bytes_observed += len(out_payload)
+                if self._should_drop_payload_data(out_payload):
+                    self.stats.payload_data_packets_dropped += 1
+                    packet_index = int.from_bytes(
+                        out_payload[
+                            N2_DATA_INDEX_OFFSET : N2_DATA_INDEX_OFFSET + 2
+                        ],
+                        byteorder="little",
+                    )
+                    if self._payload_drop_mode == "blackhole":
+                        print(
+                            "[emulation] blackholed first-transfer payload DATA: "
+                            f"transfer_id={out_payload[3]} "
+                            f"packet_index={packet_index}",
+                            flush=True,
+                        )
+                    else:
+                        print(
+                            "[emulation] injected payload DATA drop: "
+                            f"packet_index={packet_index}",
+                            flush=True,
+                        )
+                    continue
+                self.stats.payload_bytes_out += len(out_payload)
+                self._queue_write(
+                    self.payload_master_fd, out_payload  # type: ignore[arg-type]
+                )
+        return True
+
+    def _poll_payload_cache(self, now: float) -> None:
+        if not self.radio.ready:
+            return
+        for _ in range(PAYLOAD_CACHE_PACKETS_PER_POLL):
+            packet = self.payload_cache.next_payload_packet()
+            if packet is None:
+                break
+            if not self._deliver_satellite_payload(CHANNEL_PAYLOAD, packet, now):
+                break
+
+        completion = self.payload_cache.take_completion_response()
+        if completion is not None:
+            self._send_local_response(completion)
+
     def _process_app_to_gds(self, data: bytes, now: float) -> None:
         self.stats.app_uart_bytes_in += len(data)
         if self.link_mode == "direct":
@@ -541,31 +1238,80 @@ class EmulationLoop:
             self.stats.app_frames_in += 1
             if channel == CHANNEL_TEENSY_LOCAL:
                 self.stats.local_frames_observed += 1
+                if frame and frame[0] == TEENSY_TARGET_PAYLOAD_CACHE:
+                    response = self.payload_cache.handle(frame)
+                else:
+                    response = self.radio.handle(frame, now)
+                if response is not None:
+                    self._send_local_response(response)
                 continue
-            rf_packets = self.sat_to_ground_segmenter.segment(channel, frame)
-            self.stats.rf_packets_app_to_gds += len(rf_packets)
-            for packet in rf_packets:
-                reassembled = self.ground_reassembler.feed(packet, now)
-                if reassembled is None:
-                    continue
-                out_channel, payload = reassembled
-                if out_channel == CHANNEL_CCSDS:
-                    self.stats.gds_bytes_out += len(payload)
-                    self._queue_write(self.gds_master_fd, payload)  # type: ignore[arg-type]
-                elif out_channel == CHANNEL_PAYLOAD:
-                    self.stats.payload_bytes_observed += len(payload)
+            self._deliver_satellite_payload(channel, frame, now)
 
-    def _process_gds_message_to_app(self, message: bytes, now: float) -> None:
-        self.stats.gds_messages_in += 1
-        rf_packets = self.ground_to_sat_segmenter.segment(CHANNEL_CCSDS, message)
-        self.stats.rf_packets_gds_to_app += len(rf_packets)
+    def _should_drop_payload_data(self, payload: bytes) -> bool:
+        if (
+            len(payload) < N2_DATA_MIN_BYTES
+            or payload[:2] != N2_MAGIC
+            or payload[2] != N2_TYPE_DATA
+        ):
+            return False
+        packet_index = int.from_bytes(
+            payload[N2_DATA_INDEX_OFFSET : N2_DATA_INDEX_OFFSET + 2],
+            byteorder="little",
+        )
+        if self.drop_payload_data_index is not None and not self._payload_data_drop_injected:
+            if packet_index == self.drop_payload_data_index:
+                self._payload_data_drop_injected = True
+                self._payload_drop_mode = "one-shot"
+                return True
+
+        if (
+            self.blackhole_payload_data_index_first_transfer is None
+            or self._blackhole_payload_finished
+        ):
+            return False
+        transfer_id = payload[3]
+        if self._blackhole_payload_transfer_id is None:
+            self._blackhole_payload_transfer_id = transfer_id
+        elif transfer_id != self._blackhole_payload_transfer_id:
+            self._blackhole_payload_finished = True
+            return False
+        if packet_index != self.blackhole_payload_data_index_first_transfer:
+            return False
+        self._payload_drop_mode = "blackhole"
+        return True
+
+    def _process_ground_message_to_app(self, channel: int, message: bytes, now: float) -> None:
+        if channel == CHANNEL_CCSDS:
+            self.stats.gds_messages_in += 1
+        elif channel == CHANNEL_PAYLOAD:
+            self.stats.payload_messages_in += 1
+        if not self.radio.ready:
+            self.stats.radio_frames_dropped_off += 1
+            return
+        rf_packets = self.ground_to_sat_segmenter.segment(channel, message)
+        if channel == CHANNEL_CCSDS:
+            self.stats.rf_packets_gds_to_app += len(rf_packets)
+        elif channel == CHANNEL_PAYLOAD:
+            self.stats.rf_packets_payload_to_app += len(rf_packets)
         for packet in rf_packets:
+            self.radio.note_rf_rx_packet(now)
             reassembled = self.sat_reassembler.feed(packet, now)
             if reassembled is not None:
                 channel, payload = reassembled
+                if (
+                    channel == CHANNEL_PAYLOAD
+                    and self.payload_cache.handle_payload_control(payload)
+                ):
+                    continue
                 framed = build_uart_frame(channel, payload)
                 self.stats.app_bytes_out += len(framed)
                 self._queue_write(self.app_master_fd, framed)  # type: ignore[arg-type]
+
+    def _process_gds_message_to_app(self, message: bytes, now: float) -> None:
+        self._process_ground_message_to_app(CHANNEL_CCSDS, message, now)
+
+    def _process_payload_message_to_app(self, message: bytes, now: float) -> None:
+        self._process_ground_message_to_app(CHANNEL_PAYLOAD, message, now)
 
     def _process_gds_to_app(self, data: bytes, now: float) -> None:
         self.stats.gds_uart_bytes_in += len(data)
@@ -578,6 +1324,15 @@ class EmulationLoop:
         messages = self.gds_burst_aggregator.feed(data, now)
         for message in messages:
             self._process_gds_message_to_app(message, now)
+
+    def _process_payload_to_app(self, data: bytes, now: float) -> None:
+        self.stats.payload_uart_bytes_in += len(data)
+        if self.link_mode == "direct":
+            return
+
+        messages = self.payload_burst_aggregator.feed(data, now)
+        for message in messages:
+            self._process_payload_message_to_app(message, now)
 
     def _poll_children(self) -> None:
         for proc in self.children:
@@ -607,12 +1362,18 @@ class EmulationLoop:
                         self._process_app_to_gds(data, now)
                     elif fd == self.gds_master_fd:
                         self._process_gds_to_app(data, now)
+                    elif fd == self.payload_master_fd:
+                        self._process_payload_to_app(data, now)
 
                 if self.link_mode != "direct":
                     uplink_msg = self.gds_burst_aggregator.poll(now)
                     if uplink_msg is not None:
                         self._process_gds_message_to_app(uplink_msg, now)
+                    payload_uplink_msg = self.payload_burst_aggregator.poll(now)
+                    if payload_uplink_msg is not None:
+                        self._process_payload_message_to_app(payload_uplink_msg, now)
 
+                    self._poll_payload_cache(now)
                     self.app_uart_parser.poll_timeout(now)
                     self.ground_reassembler.poll_timeout(now)
                     self.sat_reassembler.poll_timeout(now)
@@ -653,7 +1414,14 @@ class EmulationLoop:
                 except Exception:
                     pass
 
-        for fd in (self.app_master_fd, self.gds_master_fd, self.app_slave_fd, self.gds_slave_fd):
+        for fd in (
+            self.app_master_fd,
+            self.gds_master_fd,
+            self.payload_master_fd,
+            self.app_slave_fd,
+            self.gds_slave_fd,
+            self.payload_slave_fd,
+        ):
             if fd is None:
                 continue
             try:
@@ -673,9 +1441,17 @@ class EmulationLoop:
         print(f"  gds_uart_bytes_in={self.stats.gds_uart_bytes_in}")
         print(f"  gds_messages_in={self.stats.gds_messages_in}")
         print(f"  rf_packets_gds_to_app={self.stats.rf_packets_gds_to_app}")
+        print(f"  payload_uart_bytes_in={self.stats.payload_uart_bytes_in}")
+        print(f"  payload_messages_in={self.stats.payload_messages_in}")
+        print(f"  rf_packets_payload_to_app={self.stats.rf_packets_payload_to_app}")
         print(f"  app_bytes_out={self.stats.app_bytes_out}")
         print(f"  payload_bytes_observed={self.stats.payload_bytes_observed}")
+        print(f"  payload_bytes_out={self.stats.payload_bytes_out}")
+        print(f"  payload_data_packets_dropped={self.stats.payload_data_packets_dropped}")
         print(f"  local_frames_observed={self.stats.local_frames_observed}")
+        print(f"  local_responses_sent={self.stats.local_responses_sent}")
+        print(f"  radio_frames_dropped_off={self.stats.radio_frames_dropped_off}")
+        print(f"  radio_init_attempts={self.radio.init_attempts}")
         print(
             "  uart_parser: "
             f"crc_drops={self.app_uart_parser.crc_drops} "
@@ -762,6 +1538,13 @@ def _resolve_default_dictionary(project_root: Path) -> Optional[Path]:
     )
 
 
+def _non_negative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be a non-negative integer")
+    return parsed
+
+
 def parse_args() -> argparse.Namespace:
     script_path = Path(__file__).resolve()
     default_project_root = script_path.parent.parent
@@ -820,6 +1603,49 @@ def parse_args() -> argparse.Namespace:
             'compatibility alias for channelized (default: channelized)'
         ),
     )
+    payload_loss_group = parser.add_mutually_exclusive_group()
+    payload_loss_group.add_argument(
+        "--drop-payload-data-index",
+        type=int,
+        choices=range(N2_MAX_DATA_INDEX + 1),
+        default=None,
+        metavar="INDEX",
+        help=(
+            "Drop the first channel-1 N2 DATA packet whose encoded packet index "
+            "matches INDEX; retransmissions pass (default: disabled)"
+        ),
+    )
+    payload_loss_group.add_argument(
+        "--blackhole-payload-data-index-first-transfer",
+        type=int,
+        choices=range(N2_MAX_DATA_INDEX + 1),
+        default=None,
+        metavar="INDEX",
+        help=(
+            "Drop every copy of matching N2 DATA INDEX for only the first "
+            "transfer; later transfer IDs pass (default: disabled)"
+        ),
+    )
+    parser.add_argument(
+        "--radio-init-failures",
+        type=_non_negative_int,
+        default=0,
+        metavar="COUNT",
+        help=(
+            "Return OFF/INIT_FAILED for the next COUNT radio enable attempts, "
+            "then allow recovery (default: 0)"
+        ),
+    )
+    parser.add_argument(
+        "--radio-watchdog-resets",
+        type=_non_negative_int,
+        default=0,
+        metavar="COUNT",
+        help=(
+            "Drop the next COUNT enable responses and reset the radio model to "
+            "OFF/WATCHDOG_RESET, then allow recovery (default: 0)"
+        ),
+    )
     parser.add_argument(
         "--no-app",
         action="store_true",
@@ -844,7 +1670,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Disable automatic pruning of old timestamped log directories",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.radio_init_failures > 0 and args.radio_watchdog_resets > 0:
+        parser.error(
+            "--radio-init-failures and --radio-watchdog-resets cannot both be nonzero"
+        )
+    return args
 
 
 def main() -> int:
@@ -915,6 +1746,10 @@ def main() -> int:
         gds_cmd=gds_cmd,
         uplink_flush_ms=args.uplink_flush_ms,
         link_mode=args.link_mode,
+        drop_payload_data_index=args.drop_payload_data_index,
+        blackhole_payload_data_index_first_transfer=args.blackhole_payload_data_index_first_transfer,
+        radio_init_failures=args.radio_init_failures,
+        radio_watchdog_resets=args.radio_watchdog_resets,
     )
 
     print("[emulation] topology:")
@@ -922,9 +1757,11 @@ def main() -> int:
         print("  app raw bytes <-> gds raw bytes (direct local bridge)")
     else:
         print("  app channel 0 wrapper -> RF segment/reassemble -> gds raw bytes")
-        print("  app channel 1 wrapper -> RF segment/reassemble -> payload stream observed locally")
-        print("  app channel 2 wrapper -> satellite-local RPC observed locally, not forwarded")
+        print("  app channel 1 wrapper -> RF segment/reassemble -> payload receiver raw bytes")
+        print("  app channel 2 wrapper -> deterministic satellite-local RF target-2 responder")
+        print("  RF channels 0/1 remain gated until target-2 SET_ENABLED reaches READY")
         print("  gds raw bytes -> burst packetization -> RF channel 0 -> channel wrapper -> app")
+        print("  payload receiver raw bytes -> burst packetization -> RF channel 1 -> channel wrapper -> app")
     if not args.no_gds:
         print(f"[emulation] open GDS at http://127.0.0.1:{args.gui_port}")
     rc = loop.run()

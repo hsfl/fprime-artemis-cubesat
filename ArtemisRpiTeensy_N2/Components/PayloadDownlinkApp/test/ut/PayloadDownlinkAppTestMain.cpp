@@ -1,23 +1,18 @@
 #include "PayloadDownlinkAppTester.hpp"
 
-TEST(Nominal, HeaderRetransmitBehavior) {
+TEST(Nominal, OnDemandCacheTransaction) {
     Components::PayloadDownlinkAppTester tester;
-    tester.testHeaderRetransmitBehavior();
+    tester.testOnDemandCacheTransaction();
 }
 
-TEST(Nominal, BurstCountSendsGeneratedPayloadPacketsPerRun) {
+TEST(Reliability, CacheRequestRetriesWithoutAdvancing) {
     Components::PayloadDownlinkAppTester tester;
-    tester.testBurstCountSendsGeneratedPayloadPacketsPerRun();
+    tester.testCacheRequestRetriesWithoutAdvancing();
 }
 
-TEST(Nominal, ProgressEventsEveryTenPercent) {
+TEST(Reliability, ConflictingRequestDoesNotRestartUpload) {
     Components::PayloadDownlinkAppTester tester;
-    tester.testProgressEventsEveryTenPercent();
-}
-
-TEST(Nominal, RetryBurstCountSendsGeneratedRetryPacketsPerRun) {
-    Components::PayloadDownlinkAppTester tester;
-    tester.testRetryBurstCountSendsGeneratedRetryPacketsPerRun();
+    tester.testConflictingRequestDoesNotRestartUpload();
 }
 
 int main(int argc, char** argv) {

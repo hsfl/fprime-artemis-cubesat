@@ -44,8 +44,11 @@ module ArtemisRpiTeensyDeployment {
     instance storageManager
     instance thermalManager
     instance payloadDownlinkApp
+    instance payloadStreamApp
     instance epsDriverArtemis
+    instance payloadDriverSelector
     instance payloadDriverLepton
+    instance payloadDriverBoson
     instance payloadDriverNeutronSim
     instance adcsDriverD2S2
     instance gpsDriverArtemis
@@ -116,6 +119,11 @@ module ArtemisRpiTeensyDeployment {
       # Channel 1 carries generic payload blob packets outside CCSDS.
       uartChannelMux.payloadRecvOut -> payloadDownlinkApp.packetIn
       payloadDownlinkApp.packetOut -> uartChannelMux.payloadSendIn
+      payloadDownlinkApp.cacheRequestOut -> uartChannelMux.payloadCacheSendIn
+      uartChannelMux.payloadCacheRecvOut -> payloadDownlinkApp.cacheResponseIn
+      payloadStreamApp.previewPacketOut -> uartChannelMux.previewSendIn
+      uartChannelMux.previewRecvOut -> payloadStreamApp.previewResponseIn
+      payloadStreamApp.responseAdvanceOut -> payloadStreamApp.responseAdvanceIn
     }
 
     connections FileHandling_DataProducts {
@@ -127,7 +135,8 @@ module ArtemisRpiTeensyDeployment {
     connections DataProducts_DpWritten {
       ArtemisDataProducts.dpWriter.dpWrittenOut -> dpWrittenRouter.dpWrittenIn
       dpWrittenRouter.catalogOut -> ArtemisDataProducts.dpCat.addToCat
-      dpWrittenRouter.notifyOut -> payloadDriverLepton.dpWrittenIn
+      dpWrittenRouter.leptonNotifyOut -> payloadDriverLepton.dpWrittenIn
+      dpWrittenRouter.bosonNotifyOut -> payloadDriverBoson.dpWrittenIn
     }
 
     connections RateGroups {
@@ -138,8 +147,9 @@ module ArtemisRpiTeensyDeployment {
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup1] -> rateGroup1.CycleIn
       rateGroup1.RateGroupMemberOut[0] -> CdhCore.tlmSend.Run
       rateGroup1.RateGroupMemberOut[1] -> FileHandling.fileDownlink.Run
+      # Bound the one pending Teensy-local radio RPC at one-second resolution.
+      rateGroup1.RateGroupMemberOut[2] -> commsDriverTeensyRfm23.run
       # RF MVP: keep automatic downlink volume low; command-triggered paths remain active.
-      # rateGroup1.RateGroupMemberOut[2] -> systemResources.run
       rateGroup1.RateGroupMemberOut[3] -> ComCcsds.comQueue.run
       rateGroup1.RateGroupMemberOut[4] -> ComCcsds.aggregator.timeout
       rateGroup1.RateGroupMemberOut[5] -> teensyTransportManager.run
@@ -147,14 +157,14 @@ module ArtemisRpiTeensyDeployment {
       rateGroup1.RateGroupMemberOut[7] -> payloadDownlinkApp.run
       # RF MVP: tick the scheduled science path; keep higher-volume demo status loops off.
       rateGroup1.RateGroupMemberOut[8] -> scienceApp.run
-      # rateGroup1.RateGroupMemberOut[9] -> sohApp.run
-      # rateGroup1.RateGroupMemberOut[10] -> commsApp.run
+      rateGroup1.RateGroupMemberOut[9] -> payloadStreamApp.run
 
       # Rate group 2
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup2] -> rateGroup2.CycleIn
       rateGroup2.RateGroupMemberOut[0] -> cmdSeq.schedIn
       rateGroup2.RateGroupMemberOut[1] -> epsDriverArtemis.run
-      # rateGroup2.RateGroupMemberOut[2] -> payloadManager.run
+      # Slow radio policy tick: boot reconciliation, capped backoff, and status polling.
+      rateGroup2.RateGroupMemberOut[2] -> commsApp.run
       # rateGroup2.RateGroupMemberOut[3] -> adcsManager.run
       # rateGroup2.RateGroupMemberOut[4] -> gpsManager.run
       # rateGroup2.RateGroupMemberOut[5] -> storageManager.run
@@ -183,7 +193,6 @@ module ArtemisRpiTeensyDeployment {
       payloadManager.statusOut -> scienceApp.payloadStatusIn
       scienceApp.scienceProductOut -> storageManager.requestIn
       storageManager.downlinkReadyOut -> commsApp.scienceReadyIn
-      commsApp.downlinkRequestOut -> storageManager.downlinkRequestIn
       commsApp.payloadDownlinkRequestOut -> payloadDownlinkApp.downlinkRequestIn
       payloadDownlinkApp.statusOut -> commsApp.payloadDownlinkStatusIn
       scienceApp.missionModeOut -> missionApp.modeUpdateIn[0]
@@ -196,11 +205,21 @@ module ArtemisRpiTeensyDeployment {
       epsDriverArtemis.teensyRequestOut -> uartChannelMux.localSendIn
       uartChannelMux.localRecvOut -> epsDriverArtemis.teensyResponseIn
 
-      payloadManager.driverRequestOut -> payloadDriverLepton.requestIn
-      payloadDriverLepton.statusOut -> payloadManager.driverStatusIn
+      payloadManager.driverRequestOut -> payloadDriverSelector.requestIn
+      payloadDriverSelector.driverRequestOut[0] -> payloadDriverLepton.requestIn
+      payloadDriverSelector.driverRequestOut[1] -> payloadDriverBoson.requestIn
+      payloadDriverSelector.deactivateDriverOut[0] -> payloadDriverLepton.deactivateIn
+      payloadDriverSelector.deactivateDriverOut[1] -> payloadDriverBoson.deactivateIn
+      payloadDriverLepton.statusOut -> payloadDriverSelector.driverStatusIn[0]
+      payloadDriverBoson.statusOut -> payloadDriverSelector.driverStatusIn[1]
+      payloadDriverSelector.statusOut -> payloadManager.driverStatusIn
 
       payloadDriverLepton.productGetOut -> ArtemisDataProducts.dpMgr.productGetIn
       payloadDriverLepton.productSendOut -> ArtemisDataProducts.dpMgr.productSendIn
+      payloadStreamApp.previewRequestOut -> payloadDriverLepton.previewRequestIn
+      payloadDriverLepton.previewOut -> payloadStreamApp.previewIn
+      payloadDriverBoson.productGetOut -> ArtemisDataProducts.dpMgr.productGetIn
+      payloadDriverBoson.productSendOut -> ArtemisDataProducts.dpMgr.productSendIn
 
       adcsManager.driverRequestOut -> adcsDriverD2S2.requestIn
       adcsDriverD2S2.statusOut -> adcsManager.driverStatusIn
@@ -214,13 +233,8 @@ module ArtemisRpiTeensyDeployment {
       commsApp.driverRequestOut -> commsDriverTeensyRfm23.requestIn
       commsDriverTeensyRfm23.teensyRequestOut -> uartChannelMux.rfLocalSendIn
       uartChannelMux.rfLocalRecvOut -> commsDriverTeensyRfm23.teensyResponseIn
-      commsDriverTeensyRfm23.rssiStatusOut -> commsApp.rssiStatusIn
-      commsDriverTeensyRfm23.statusOut[0] -> commsApp.driverStatusIn
-      commsDriverTeensyRfm23.statusOut[1] -> teensyTransportManager.driverStatusIn
-    }
-
-    connections TransportFlow {
-      teensyTransportManager.linkStatusOut -> commsApp.linkStatusIn
+      commsDriverTeensyRfm23.statusOut -> commsApp.driverStatusIn
+      commsDriverTeensyRfm23.rfRxCountOut -> teensyTransportManager.driverStatusIn
     }
 
     connections SoHInputs {
@@ -231,7 +245,9 @@ module ArtemisRpiTeensyDeployment {
       storageManager.sohStatusOut -> sohApp.statusIn[4]
       thermalManager.sohStatusOut -> sohApp.statusIn[5]
       commsApp.sohStatusOut -> sohApp.statusIn[6]
-      teensyTransportManager.sohStatusOut -> sohApp.statusIn[7]
+      # CommsApp is the authoritative radio/Teensy health owner. The legacy
+      # transport manager infers RF contact from recent uplink packet counts,
+      # so radio silence is diagnostic data, not a bus failure.
     }
 
     connections ArtemisRpiTeensyDeployment {

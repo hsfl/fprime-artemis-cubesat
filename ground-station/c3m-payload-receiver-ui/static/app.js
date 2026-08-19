@@ -1,7 +1,11 @@
 const currentTab = document.getElementById("currentTab");
 const historyTab = document.getElementById("historyTab");
+const livestreamTab = document.getElementById("livestreamTab");
 const currentView = document.getElementById("currentView");
 const historyView = document.getElementById("historyView");
+const livestreamView = document.getElementById("livestreamView");
+const livestreamContent = document.getElementById("livestreamContent");
+const livestreamBadge = document.getElementById("livestreamBadge");
 const currentPanel = document.querySelector(".current-panel");
 const stateHeading = document.getElementById("stateHeading");
 const stateSupporting = document.getElementById("stateSupporting");
@@ -11,6 +15,8 @@ const portChooser = document.getElementById("portChooser");
 const portSelect = document.getElementById("portSelect");
 const connectButton = document.getElementById("connectButton");
 const connectionIndicator = document.getElementById("connectionIndicator");
+const hotspotToggle = document.getElementById("hotspotToggle");
+const hotspotToggleLabel = document.getElementById("hotspotToggleLabel");
 const systemTime = document.getElementById("systemTime");
 const productValue = document.getElementById("productValue");
 const transferValue = document.getElementById("transferValue");
@@ -23,6 +29,8 @@ const elapsedValue = document.getElementById("elapsedValue");
 const etaValue = document.getElementById("etaValue");
 const retryValue = document.getElementById("retryValue");
 const integrityValue = document.getElementById("integrityValue");
+const transferActions = document.getElementById("transferActions");
+const cancelTransferButton = document.getElementById("cancelTransferButton");
 const liveLog = document.getElementById("liveLog");
 const clearLogButton = document.getElementById("clearLogButton");
 const previewContent = document.getElementById("previewContent");
@@ -48,6 +56,20 @@ let logSignature = "";
 let previewSignature = "";
 let historySignature = "";
 let stateSignature = "";
+let livestreamSignature = "";
+const hotspotObservers = new Map();
+
+function applyHotspotPreference() {
+  const enabled = hotspotToggle.checked;
+  document.body.classList.toggle("hotspots-disabled", !enabled);
+  hotspotToggleLabel.textContent = `Hotspot indicator ${enabled ? "on" : "off"}`;
+  document.querySelectorAll(".hotspot-marker").forEach((marker) => {
+    marker.setAttribute("aria-hidden", String(!enabled));
+  });
+}
+
+hotspotToggle.addEventListener("change", applyHotspotPreference);
+applyHotspotPreference();
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -77,20 +99,49 @@ function formatTimestamp(value) {
   return `${date.toLocaleString([], { dateStyle: "medium", timeStyle: "medium", timeZone: "UTC" })} UTC`;
 }
 
+function decodePresentation(decode) {
+  const rawCounts = decode?.product === "boson" || decode?.units === "raw_counts";
+  return rawCounts
+    ? {
+        rawCounts: true,
+        unitLabel: "raw counts",
+        min: decode?.min_raw_counts,
+        max: decode?.max_raw_counts,
+        mean: decode?.mean_raw_counts,
+        productLabel: "Boson raw-count",
+      }
+    : {
+        rawCounts: false,
+        unitLabel: "°C",
+        min: decode?.min_c,
+        max: decode?.max_c,
+        mean: decode?.mean_c,
+        productLabel: "Lepton thermal",
+      };
+}
+
+function outputLabel(key) {
+  return { fdp: ".fdp" }[key] || key.toUpperCase();
+}
+
 function headingFor(current) {
   if (current.status === "failed") {
     if (current.crc_ok === false) return "CRC failed";
     return current.message || "Payload failed";
   }
+  if (current.status === "decoding" && current.product_kind === "boson") return "Decoding Boson raw-count image";
+  if (current.status === "complete" && current.product_kind === "boson") return "Boson payload complete";
   const headings = {
     starting: "Starting payload receiver",
     select_port: "Select payload port",
     ready: "Ready — awaiting downlink",
     receiving: "Receiving payload",
     retrying: "Retrying missing packets",
+    cancelling: "Saving partial payload",
     verifying: "Verifying payload integrity",
     decoding: "Decoding thermal product",
     complete: "Payload complete",
+    partial: "Partial — viewable with missing data",
     disconnected: "Payload receiver disconnected",
   };
   return headings[current.status] || "Payload receiver";
@@ -100,13 +151,23 @@ function supportingFor(current) {
   if (current.status === "ready") return `Listening on ${current.port || "Channel 1"}`;
   if (current.status === "receiving") return `${formatNumber(current.received_packets)} / ${formatNumber(current.total_packets)} packets`;
   if (current.status === "retrying") return `${formatNumber(current.missing_packets)} packets missing · Retry round ${formatNumber(current.retry_rounds)}`;
-  if (current.status === "complete") return "CRC passed · Current thermal product decoded";
+  if (current.status === "cancelling") return "Preserving received packets; satellite transmission continues";
+  if (current.status === "complete") {
+    return current.product_kind === "boson"
+      ? "CRC passed · Current Boson raw-count image decoded"
+      : "CRC passed · Current thermal product decoded";
+  }
+  if (current.status === "partial") {
+    const prefix = current.completion_reason === "operator_cancelled" ? "Stopped by operator · " : "";
+    return `${prefix}${formatNumber(current.missing_packets)} packets missing · Unknown pixels shown in white`;
+  }
   if (current.status === "failed") return current.failure_reason || "The current transfer could not be completed.";
   if (current.status === "disconnected" || current.status === "select_port") return current.failure_reason || current.message;
   return current.message || "Opening the Channel 1 payload link.";
 }
 
 function integrityFor(current) {
+  if (current.partial) return ["Partial · CRC unavailable", "is-warning"];
   if (current.crc_ok === true) return ["CRC passed", "is-success"];
   if (current.crc_ok === false) return ["CRC failed", "is-danger"];
   if (["receiving", "retrying", "verifying"].includes(current.status)) return ["CRC pending", "is-warning"];
@@ -115,16 +176,50 @@ function integrityFor(current) {
 
 function showTab(tab) {
   activeTab = tab;
-  const currentSelected = tab === "current";
-  currentTab.classList.toggle("is-selected", currentSelected);
-  currentTab.setAttribute("aria-selected", String(currentSelected));
-  currentTab.tabIndex = currentSelected ? 0 : -1;
-  historyTab.classList.toggle("is-selected", !currentSelected);
-  historyTab.setAttribute("aria-selected", String(!currentSelected));
-  historyTab.tabIndex = currentSelected ? -1 : 0;
-  currentView.hidden = !currentSelected;
-  historyView.hidden = currentSelected;
+  const entries = [
+    ["current", currentTab, currentView],
+    ["history", historyTab, historyView],
+    ["livestream", livestreamTab, livestreamView],
+  ];
+  entries.forEach(([name, button, view]) => {
+    const selected = tab === name;
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-selected", String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    view.hidden = !selected;
+  });
   if (latestState) renderHistory(latestState.history || []);
+}
+
+function renderLivestream(current) {
+  const preview = current.preview;
+  const nextSignature = JSON.stringify(preview || {});
+  if (nextSignature === livestreamSignature) return;
+  livestreamSignature = nextSignature;
+  if (!preview?.png) {
+    livestreamBadge.textContent = "Waiting";
+    livestreamBadge.className = "livestream-badge";
+    livestreamContent.innerHTML = `
+      <div class="preview-empty livestream-empty">
+        <span class="thermometer" aria-hidden="true"></span>
+        <p>Start <strong>payloadStreamApp.START_STREAM</strong> in GDS.</p>
+      </div>`;
+    return;
+  }
+  const state = preview.complete ? "Complete" : "Partial";
+  const freshness = preview.stale ? "Stale" : "Live";
+  livestreamBadge.textContent = `${state} · ${freshness}`;
+  livestreamBadge.className = `livestream-badge ${preview.stale ? "is-stale" : "is-live"}`;
+  livestreamContent.innerHTML = `
+    <div class="livestream-stage">
+      <img src="${escapeHtml(preview.png)}?frame=${escapeHtml(preview.session_id)}-${escapeHtml(preview.frame_sequence)}" alt="${state} thermal livestream frame ${escapeHtml(preview.frame_sequence)}">
+    </div>
+    <div class="livestream-stats">
+      <span><small>Frame</small><strong>${escapeHtml(preview.frame_sequence)}</strong></span>
+      <span><small>Received</small><strong>${Number(preview.percent || 0).toFixed(1)}%</strong></span>
+      <span><small>Fragments</small><strong>${escapeHtml(preview.received_fragments)} / ${escapeHtml(preview.fragment_count)}</strong></span>
+      <span><small>Integrity</small><strong>${preview.crc_ok === false ? "CRC mismatch" : (preview.complete ? "CRC valid" : "Best effort")}</strong></span>
+    </div>`;
 }
 
 function renderPorts(ports, current) {
@@ -165,11 +260,13 @@ function renderTiming(current) {
   if (current.timing_band === "degraded") {
     timingBanner.hidden = false;
     timingBanner.className = "timing-banner";
-    timingBanner.textContent = "Taking longer than nominal — transfer remains within the live-demo window.";
+    timingBanner.textContent = Number(current.elapsed_seconds || 0) >= 90
+      ? "Long transfer — reception will continue until complete or manually stopped."
+      : "Past the 75 s nominal target — reception is still progressing.";
   } else if (current.timing_band === "delayed") {
     timingBanner.hidden = false;
     timingBanner.className = "timing-banner is-delayed";
-    timingBanner.textContent = "Delayed — operator attention. Progress remains live; allow CRC repair to finish or reconnect if activity stops.";
+    timingBanner.textContent = "Long transfer — reception will continue until complete or manually stopped.";
   } else {
     timingBanner.hidden = true;
   }
@@ -193,38 +290,138 @@ function renderLogs(logs) {
 }
 
 function renderPreview(current) {
+  const displayPayload = current.display_payload;
   const nextSignature = JSON.stringify([
     current.status,
-    current.product_id,
-    current.transfer_id,
-    current.run_id,
     current.crc_ok,
     current.failure_reason,
-    current.outputs || {},
+    displayPayload || {},
+    current.preview || {},
   ]);
   if (nextSignature === previewSignature) return;
   previewSignature = nextSignature;
-  const png = current.outputs?.png;
-  if (png && current.status === "complete") {
-    previewContent.innerHTML = `<img src="${escapeHtml(png)}" alt="Current Lepton thermal image for product ${escapeHtml(current.product_id)}, transfer ${escapeHtml(current.transfer_id)}">`;
+  const livePreview = current.preview;
+  const livestreamNotice = livePreview?.png
+    ? `<p class="preview-stream-notice">Livestream frame available in the Livestream tab · ${livePreview.stale ? "Stale" : "Live"}</p>`
+    : "";
+  const png = displayPayload?.outputs?.png;
+  if (png) {
+    const decode = displayPayload.decode || {};
+    const presentation = decodePresentation(decode);
+    previewContent.innerHTML = `
+      <div class="thermal-inspector">
+        <img id="thermalImage" src="${escapeHtml(png)}" alt="Current ${presentation.productLabel} image for product ${escapeHtml(displayPayload.product_id)}, transfer ${escapeHtml(displayPayload.transfer_id)}">
+        <span id="thermalHotspot" class="hotspot-marker" aria-label="Hottest pixel"></span>
+        <output id="thermalHover" class="thermal-hover">Move over image to inspect ${presentation.unitLabel}</output>
+      </div>
+      <div class="thermal-stats">
+        <span>Min <strong>${presentation.min ?? "—"} ${presentation.unitLabel}</strong></span>
+        <span>Max <strong>${presentation.max ?? "—"} ${presentation.unitLabel}</strong></span>
+        <span>Mean <strong>${presentation.mean ?? "—"} ${presentation.unitLabel}</strong></span>
+        <span>Range <strong>${presentation.min ?? "—"}–${presentation.max ?? "—"} ${presentation.unitLabel}</strong></span>
+      </div>
+      ${livestreamNotice}`;
+    attachThermalInspection({
+      csvUrl: displayPayload.outputs?.csv,
+      width: decode.width || 160,
+      height: decode.height || 120,
+      imageId: "thermalImage",
+      outputId: "thermalHover",
+      hotspotId: "thermalHotspot",
+      unitLabel: presentation.unitLabel,
+    });
+    applyHotspotPreference();
   } else {
     let message = "Available after CRC verification";
-    if (current.crc_ok === false) message = "Thermal preview unavailable because integrity verification failed.";
-    else if (current.status === "failed") message = current.failure_reason || "Thermal preview unavailable.";
-    previewContent.innerHTML = `<div class="preview-empty"><span class="thermometer" aria-hidden="true"></span><p>${escapeHtml(message)}</p></div>`;
+    if (current.crc_ok === false) message = "Preview unavailable because integrity verification failed.";
+    else if (current.status === "failed") message = current.failure_reason || "Preview unavailable.";
+    previewContent.innerHTML = `<div class="preview-empty"><span class="thermometer" aria-hidden="true"></span><p>${escapeHtml(message)}</p>${livestreamNotice}</div>`;
   }
 
-  const outputs = current.outputs || {};
+  const outputs = displayPayload?.outputs || {};
   const keys = ["fdp", "json", "csv", "png"].filter((key) => outputs[key]);
   outputActions.hidden = keys.length === 0;
-  outputLinks.innerHTML = keys.map((key) => `<a href="${escapeHtml(outputs[key])}" target="_blank" rel="noopener">${key === "fdp" ? ".fdp" : key.toUpperCase()}</a>`).join("");
-  openFolderButton.hidden = !current.run_id;
-  openFolderButton.dataset.runId = current.run_id || "";
+  outputLinks.innerHTML = keys.map((key) => `<a href="${escapeHtml(outputs[key])}" target="_blank" rel="noopener">${outputLabel(key)}</a>`).join("");
+  openFolderButton.hidden = !displayPayload?.run_id;
+  openFolderButton.dataset.runId = displayPayload?.run_id || "";
+}
+
+function positionHotspotMarker(image, marker, hottest, gridWidth, gridHeight) {
+  if (!image.naturalWidth || !image.naturalHeight || !image.clientWidth || !image.clientHeight) return;
+  const scale = Math.min(image.clientWidth / image.naturalWidth, image.clientHeight / image.naturalHeight);
+  const renderedWidth = image.naturalWidth * scale;
+  const renderedHeight = image.naturalHeight * scale;
+  const offsetX = (image.clientWidth - renderedWidth) / 2;
+  const offsetY = (image.clientHeight - renderedHeight) / 2;
+  marker.style.left = `${offsetX + ((hottest.column + 0.5) / gridWidth) * renderedWidth}px`;
+  marker.style.top = `${offsetY + ((hottest.row + 0.5) / gridHeight) * renderedHeight}px`;
+}
+
+async function attachThermalInspection({ csvUrl, width, height, imageId, outputId, hotspotId, unitLabel = "°C", overlay = false }) {
+  const image = document.getElementById(imageId);
+  const hover = document.getElementById(outputId);
+  const hotspot = hotspotId ? document.getElementById(hotspotId) : null;
+  if (!image || !hover || !csvUrl) return;
+  let grid;
+  try {
+    const response = await fetch(csvUrl, { cache: "no-store" });
+    if (!response.ok) throw new Error(`Image CSV unavailable: ${response.status}`);
+    const text = await response.text();
+    grid = text.split(/\r?\n/)
+      .filter((line) => line && !line.startsWith("#"))
+      .map((line) => line.split(",").map((value) => {
+        const normalized = value.trim();
+        return normalized === "" || normalized === "NaN" ? null : Number(normalized);
+      }));
+  } catch (_error) {
+    hover.textContent = `${unitLabel} data unavailable`;
+    if (hotspot) hotspot.hidden = true;
+    if (overlay) hover.classList.add("is-visible");
+    return;
+  }
+  let hottest = null;
+  grid.forEach((row, rowIndex) => row.forEach((value, columnIndex) => {
+    if (Number.isFinite(value) && (hottest === null || value > hottest.value)) {
+      hottest = { value, row: rowIndex, column: columnIndex };
+    }
+  }));
+  if (hotspot && hottest) {
+    hotspot.hidden = false;
+    hotspot.title = `Hotspot · column ${hottest.column}, row ${hottest.row} · ${hottest.value.toFixed(2)} ${unitLabel}`;
+    const updateHotspot = () => positionHotspotMarker(image, hotspot, hottest, width, height);
+    if (image.complete) updateHotspot();
+    else image.addEventListener("load", updateHotspot, { once: true });
+    hotspotObservers.get(hotspotId)?.disconnect();
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(updateHotspot);
+      observer.observe(image);
+      hotspotObservers.set(hotspotId, observer);
+    }
+  } else if (hotspot) {
+    hotspot.hidden = true;
+  }
+  image.addEventListener("mousemove", (event) => {
+    const rect = image.getBoundingClientRect();
+    const column = Math.min(width - 1, Math.max(0, Math.floor((event.clientX - rect.left) * width / rect.width)));
+    const row = Math.min(height - 1, Math.max(0, Math.floor((event.clientY - rect.top) * height / rect.height)));
+    const value = grid?.[row]?.[column];
+    hover.textContent = value === null || !Number.isFinite(value)
+      ? `Column ${column}, row ${row} · No data`
+      : `Column ${column}, row ${row} · ${value.toFixed(2)} ${unitLabel}`;
+    if (overlay) hover.classList.add("is-visible");
+  });
+  image.addEventListener("mouseleave", () => {
+    hover.textContent = `Move over image to inspect ${unitLabel}`;
+    if (overlay) hover.classList.remove("is-visible");
+  });
 }
 
 function runResult(run) {
   if (run.result === "complete") return ["Complete", "run-complete"];
+  if (run.result === "partial" && run.completion_reason === "operator_cancelled") return ["Partial · stopped", "run-partial"];
+  if (run.result === "partial") return ["Partial", "run-partial"];
   if (run.result === "decode_failed") return ["Decode failed", "run-failed"];
+  if (run.result === "unknown_product") return ["Unknown product · archived", "run-failed"];
   if (run.result === "crc_failed") return ["CRC failed", "run-failed"];
   return run.crc_ok ? ["Complete", "run-complete"] : ["CRC failed", "run-failed"];
 }
@@ -268,6 +465,7 @@ function renderHistory(history) {
       run.run_id,
       run.result,
       run.crc_ok,
+      run.completion_reason,
       run.product_id,
       run.transfer_id,
       run.completed_at,
@@ -276,6 +474,7 @@ function renderHistory(history) {
       run.total_bytes,
       run.total_packets,
       run.output_urls || {},
+      run.decode || {},
     ]),
   ]);
   if (nextSignature === historySignature) return;
@@ -295,18 +494,43 @@ function renderHistory(history) {
   }
   const png = selected.output_urls?.png;
   const [resultLabel, resultClass] = runResult(selected);
-  const links = Object.entries(selected.output_urls || {}).map(([key, value]) => `<a href="${escapeHtml(value)}" target="_blank" rel="noopener">${key === "fdp" ? ".fdp" : key.toUpperCase()}</a>`).join(" · ");
+  const presentation = decodePresentation(selected.decode || {});
+  const links = Object.entries(selected.output_urls || {}).map(([key, value]) => `<a href="${escapeHtml(value)}" target="_blank" rel="noopener">${outputLabel(key)}</a>`).join(" · ");
   archivedContent.innerHTML = `
-    <h2>Product ${escapeHtml(selected.product_id ?? "—")}</h2>
+    <h2>${presentation.productLabel} · Product ${escapeHtml(selected.product_id ?? "—")}</h2>
     <p class="archived-result ${resultClass}">${resultLabel}</p>
     <div class="archived-meta">
       <div><span>Transfer</span><strong>${escapeHtml(selected.transfer_id ?? "—")}</strong></div>
       <div><span>Duration</span><strong>${formatDuration(selected.elapsed_seconds)}</strong></div>
       <div><span>Retries</span><strong>${formatNumber(selected.retry_rounds)}</strong></div>
-      <div><span>Integrity</span><strong class="${selected.crc_ok ? "crc-pass" : "crc-fail"}">${selected.crc_ok ? "CRC passed" : "CRC failed"}</strong></div>
+      <div><span>Integrity</span><strong class="${selected.partial ? "is-warning" : (selected.crc_ok ? "crc-pass" : "crc-fail")}">${selected.partial ? "Partial · no CRC" : (selected.crc_ok ? "CRC passed" : "CRC failed")}</strong></div>
     </div>
-    ${png ? `<img src="${escapeHtml(png)}" alt="Archived Lepton thermal image for product ${escapeHtml(selected.product_id)}, transfer ${escapeHtml(selected.transfer_id)}">` : ""}
+    ${png ? `
+      <div class="thermal-inspector archived-thermal-inspector">
+        <img id="archivedThermalImage" src="${escapeHtml(png)}" alt="Archived ${presentation.productLabel} image for product ${escapeHtml(selected.product_id)}, transfer ${escapeHtml(selected.transfer_id)}">
+        <span id="archivedThermalHotspot" class="hotspot-marker" aria-label="Hottest pixel"></span>
+        <output id="archivedThermalHover" class="thermal-tooltip" aria-live="polite">Move over image to inspect ${presentation.unitLabel}</output>
+      </div>
+      <div class="thermal-stats archived-thermal-stats">
+        <span>Min <strong>${presentation.min ?? "—"} ${presentation.unitLabel}</strong></span>
+        <span>Max <strong>${presentation.max ?? "—"} ${presentation.unitLabel}</strong></span>
+        <span>Mean <strong>${presentation.mean ?? "—"} ${presentation.unitLabel}</strong></span>
+        <span>Range <strong>${presentation.min ?? "—"}–${presentation.max ?? "—"} ${presentation.unitLabel}</strong></span>
+      </div>` : ""}
     <p>${links || "No output files available."}</p>`;
+  if (png && selected.output_urls?.csv) {
+    attachThermalInspection({
+      csvUrl: selected.output_urls?.csv,
+      width: selected.decode?.width || 160,
+      height: selected.decode?.height || 120,
+      imageId: "archivedThermalImage",
+      outputId: "archivedThermalHover",
+      hotspotId: "archivedThermalHotspot",
+      unitLabel: presentation.unitLabel,
+      overlay: true,
+    });
+    applyHotspotPreference();
+  }
 }
 
 function render(data) {
@@ -345,9 +569,18 @@ function render(data) {
     && ["receiving", "retrying", "verifying", "decoding"].includes(current.status);
   errorActions.hidden = current.status !== "disconnected" && !activeDelayed;
   reconnectButton.textContent = activeDelayed ? "Reset receiver" : "Reconnect receiver";
+  const canCancel = ["receiving", "retrying"].includes(current.status)
+    && current.transfer_id !== null
+    && Number(current.total_packets || 0) > 0;
+  transferActions.hidden = !canCancel && current.status !== "cancelling";
+  cancelTransferButton.disabled = current.status === "cancelling";
+  cancelTransferButton.textContent = current.status === "cancelling"
+    ? "Saving partial…"
+    : "Stop & save partial";
 
   renderLogs(data.logs || []);
   renderPreview(current);
+  renderLivestream(current);
   renderHistory(data.history || []);
 }
 
@@ -378,7 +611,9 @@ async function refresh() {
 
 currentTab.addEventListener("click", () => showTab("current"));
 historyTab.addEventListener("click", () => showTab("history"));
-const tabs = [currentTab, historyTab];
+livestreamTab.addEventListener("click", () => showTab("livestream"));
+const tabs = [currentTab, historyTab, livestreamTab];
+const tabNames = ["current", "history", "livestream"];
 tabs.forEach((tab, index) => {
   tab.addEventListener("keydown", (event) => {
     let nextIndex = null;
@@ -389,7 +624,7 @@ tabs.forEach((tab, index) => {
     if (nextIndex === null) return;
     event.preventDefault();
     tabs[nextIndex].focus();
-    showTab(nextIndex === 0 ? "current" : "history");
+    showTab(tabNames[nextIndex]);
   });
 });
 viewAllHistoryButton.addEventListener("click", () => showTab("history"));
@@ -410,6 +645,20 @@ reconnectButton.addEventListener("click", async () => {
   try { await postJson("/api/reconnect"); }
   catch (error) { stateSupporting.textContent = error.message; }
   finally { reconnectButton.disabled = false; }
+});
+cancelTransferButton.addEventListener("click", async () => {
+  const confirmed = window.confirm(
+    "Stop ground reception and save the packets received so far? The satellite will continue transmitting the rest of this downlink."
+  );
+  if (!confirmed) return;
+  cancelTransferButton.disabled = true;
+  cancelTransferButton.textContent = "Saving partial…";
+  try { await postJson("/api/transfer/cancel"); }
+  catch (error) {
+    stateSupporting.textContent = error.message;
+    cancelTransferButton.disabled = false;
+    cancelTransferButton.textContent = "Stop & save partial";
+  }
 });
 openFolderButton.addEventListener("click", async () => {
   try { await postJson("/api/open-folder", { run_id: openFolderButton.dataset.runId }); }

@@ -6,6 +6,7 @@
 #include "link_counters.hpp"
 #include "link_protocol.hpp"
 #include "rf23_driver.hpp"
+#include "usb_tx_progress.hpp"
 
 struct RelayConfig {
   bool enableUartToRf = true;
@@ -29,6 +30,7 @@ class RelayUartRf {
 
   void begin();
   void poll();
+  const usb_tx::ChannelCounters* usbTxCounters(uint8_t channel) const;
 
  private:
   enum class ParseState {
@@ -52,15 +54,19 @@ class RelayUartRf {
 
   void resetFrameParser(bool timeoutReset);
   void handleCompletedFrame();
-  bool sendUartFrame(uint8_t channel, const uint8_t* payload, uint16_t length);
-  bool sendRawToUart(const uint8_t* payload, uint16_t length);
+  uint16_t encodeUartFrame(uint8_t channel,
+                           const uint8_t* payload,
+                           uint16_t length,
+                           uint8_t* encoded);
 
   bool sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uint16_t length);
+  bool sendRfPacket(const uint8_t* packet, uint8_t packetLen);
   bool sendRfPacketWithAck(const uint8_t* packet, uint8_t packetLen, uint8_t channel, uint8_t msgId, uint8_t segIdx);
   bool waitForAck(uint8_t channel, uint8_t msgId, uint8_t segIdx);
   bool isAckPacket(const uint8_t* packet, uint8_t packetLen, uint8_t channel, uint8_t msgId, uint8_t segIdx) const;
   bool sendAck(uint8_t channel, uint8_t msgId, uint8_t segIdx);
   void processRfSegment(const uint8_t* packet, uint8_t packetLen);
+  bool acceptRfReceiveResult(Rf23ReceiveResult result);
   void resetReassembly(uint8_t channel, bool timeoutReset, bool dropReset);
 
   uint16_t crc16Ccitt(const uint8_t* data, uint16_t len) const;
@@ -69,12 +75,17 @@ class RelayUartRf {
   bool enqueueDownlinkMessage(uint8_t channel, const uint8_t* payload, uint16_t length);
   void serviceUplinkQueue();
   void serviceDownlinkQueue();
+  void serviceDownlinkChannel(uint8_t channel);
+  void popDownlinkEntry(uint8_t channel);
+  void discardRadioWorkOnOff();
 
   static constexpr uint8_t MAX_QUEUE_DEPTH = 32;
 
   struct QueueEntry {
     uint8_t channel;
     uint16_t length;
+    uint16_t writeOffset;
+    bool deliveryImpeded;
     uint8_t payload[link_protocol::FRAME_MAX_PAYLOAD];
   };
 
@@ -94,6 +105,7 @@ class RelayUartRf {
   Stream* m_payloadIo;
   Rf23Driver& m_rf;
   LinkCounters& m_counters;
+  usb_tx::QueueAccounting m_usbDownlink;
   RelayConfig m_config;
 
   ParseState m_state;
@@ -108,7 +120,7 @@ class RelayUartRf {
   size_t m_commandIndex;
   uint32_t m_lastFrameByteMs;
 
-  uint8_t m_nextMsgId;
+  uint8_t m_nextMsgId[link_protocol::CHANNEL_COUNT];
   ReassemblyState m_reassembly[link_protocol::CHANNEL_COUNT];
 
   uint8_t m_rawUartBuf[link_protocol::FRAME_MAX_PAYLOAD];
@@ -122,11 +134,12 @@ class RelayUartRf {
   uint8_t m_uplinkHead;
   uint8_t m_uplinkTail;
   uint8_t m_uplinkCount;
+  bool m_lastRadioReady;
 
-  QueueEntry m_downlinkQueue[MAX_QUEUE_DEPTH];
-  uint8_t m_downlinkHead;
-  uint8_t m_downlinkTail;
-  uint8_t m_downlinkCount;
+  QueueEntry m_downlinkQueue[usb_tx::CHANNEL_COUNT][MAX_QUEUE_DEPTH];
+  uint8_t m_downlinkHead[usb_tx::CHANNEL_COUNT];
+  uint8_t m_downlinkTail[usb_tx::CHANNEL_COUNT];
+  uint8_t m_downlinkCount[usb_tx::CHANNEL_COUNT];
 };
 
 #endif

@@ -17,6 +17,7 @@ class UartChannelMuxTester final : public UartChannelMuxGTestBase {
     ~UartChannelMuxTester();
 
     void testWrapsAndRoutesChannelFrames();
+    void testPropagatesPayloadLocalAcceptanceStatus();
 
   private:
     void connectPorts();
@@ -29,15 +30,18 @@ class UartChannelMuxTester final : public UartChannelMuxGTestBase {
     ) override;
     void from_payloadRecvOut_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
     void from_localRecvOut_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
+    void from_previewRecvOut_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
 
     static std::vector<U8> makeFrame(U8 channel, const U8* payload, FwSizeType size);
     static U16 crc16Ccitt(const U8* data, FwSizeType size);
 
     UartChannelMux component;
+    Drv::ByteStreamStatus m_drvSendStatus;
     std::vector<std::vector<U8> > m_txFrames;
     std::vector<std::vector<U8> > m_ccsdsFrames;
     std::vector<std::vector<U8> > m_payloadFrames;
     std::vector<std::vector<U8> > m_localFrames;
+    std::vector<std::vector<U8> > m_previewFrames;
 };
 
 }  // namespace Components

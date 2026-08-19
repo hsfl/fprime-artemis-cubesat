@@ -1,17 +1,22 @@
 import importlib.util
 import json
 import pathlib
+import struct
 import sys
 import tempfile
 import threading
 import time
 import types
 import unittest
+import zlib
 from unittest import mock
 
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 UI_PATH = REPO_ROOT / "ground-station" / "c3m-payload-receiver-ui" / "c3m_payload_receiver_ui.py"
+APP_JS_PATH = REPO_ROOT / "ground-station" / "c3m-payload-receiver-ui" / "static" / "app.js"
+STYLES_PATH = REPO_ROOT / "ground-station" / "c3m-payload-receiver-ui" / "static" / "styles.css"
+INDEX_PATH = REPO_ROOT / "ground-station" / "c3m-payload-receiver-ui" / "static" / "index.html"
 
 
 class DummySerialException(Exception):
@@ -76,6 +81,27 @@ def fake_decode(fdp_path: pathlib.Path, outdir: pathlib.Path, dictionary: pathli
     }
 
 
+def fake_partial_decode(
+    fdp_path: pathlib.Path,
+    outdir: pathlib.Path,
+    missing_packet_indices: list[int],
+    packet_data_bytes: int,
+):
+    result = fake_decode(fdp_path, outdir, None)
+    result.update(
+        {
+            "partial": True,
+            "valid_pixels": 19182,
+            "missing_pixels": 18,
+            "received_percent": 99.906,
+            "min_c": 18.0,
+            "max_c": 31.0,
+            "mean_c": 22.0,
+        }
+    )
+    return result
+
+
 def receiver_event(
     kind: str,
     *,
@@ -104,6 +130,218 @@ def receiver_event(
 
 
 class C3mPayloadReceiverUiTests(unittest.TestCase):
+    def test_livestream_tab_uses_large_thermal_preview(self) -> None:
+        index_html = INDEX_PATH.read_text(encoding="utf-8")
+        app_js = APP_JS_PATH.read_text(encoding="utf-8")
+        styles = STYLES_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('id="livestreamTab"', index_html)
+        self.assertIn('id="livestreamView"', index_html)
+        self.assertIn('id="livestreamContent"', index_html)
+        self.assertIn('renderLivestream(current)', app_js)
+        self.assertIn('const tabs = [currentTab, historyTab, livestreamTab]', app_js)
+        self.assertIn(".livestream-stage", styles)
+        self.assertIn("image-rendering: pixelated", styles)
+
+    def test_current_tab_uses_science_payload_and_only_mentions_livestream(self) -> None:
+        app_js = APP_JS_PATH.read_text(encoding="utf-8")
+        styles = STYLES_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("const displayPayload = current.display_payload", app_js)
+        self.assertIn("Livestream frame available in the Livestream tab", app_js)
+        self.assertNotIn('class="thermal-inspector preview-live"', app_js)
+        self.assertIn('id="thermalHotspot"', app_js)
+        self.assertIn("hottest.column", app_js)
+        self.assertIn("positionHotspotMarker", app_js)
+        self.assertIn("offsetX +", app_js)
+        self.assertIn("ResizeObserver", app_js)
+        self.assertIn(".hotspot-marker", styles)
+
+    def test_history_detail_includes_thermal_statistics_and_hotspot(self) -> None:
+        app_js = APP_JS_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('class="thermal-stats archived-thermal-stats"', app_js)
+        self.assertIn('id="archivedThermalHotspot"', app_js)
+        self.assertIn('hotspotId: "archivedThermalHotspot"', app_js)
+
+    def test_thermal_preview_png_is_rgb_and_keeps_missing_pixels_white(self) -> None:
+        png = ui.thermal_png(2, 1, bytes((10, 255)), partial=True)
+        self.assertEqual(png[:8], b"\x89PNG\r\n\x1a\n")
+        self.assertEqual(png[25], 2)  # RGB color type, not grayscale.
+
+        position = 8
+        compressed = bytearray()
+        while position < len(png):
+            length = struct.unpack(">I", png[position : position + 4])[0]
+            kind = png[position + 4 : position + 8]
+            body = png[position + 8 : position + 8 + length]
+            if kind == b"IDAT":
+                compressed.extend(body)
+            position += 12 + length
+        raw = zlib.decompress(bytes(compressed))
+        self.assertEqual(raw[:4], bytes((0, 3, 0, 18)))
+        self.assertEqual(raw[-3:], bytes((255, 255, 255)))
+
+    def test_timing_target_has_no_automatic_cutoff(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = ui.ReceiverController(pathlib.Path(tmp))
+            self.assertIsNone(controller.transfer_timeout_s)
+            controller.current.update(
+                {
+                    "status": "receiving",
+                    "started_at_s": 1000.0,
+                    "total_packets": 1100,
+                    "received_packets": 500,
+                }
+            )
+            for elapsed, expected in (
+                (75.0, "nominal"),
+                (75.1, "degraded"),
+                (90.0, "degraded"),
+                (119.9, "degraded"),
+                (120.0, "degraded"),
+                (1800.0, "degraded"),
+            ):
+                with self.subTest(elapsed=elapsed), mock.patch.object(
+                    ui.time, "time", return_value=1000.0 + elapsed
+                ):
+                    self.assertEqual(
+                        controller.snapshot()["current"]["timing_band"], expected
+                    )
+
+        app_js = APP_JS_PATH.read_text(encoding="utf-8")
+        index_html = INDEX_PATH.read_text(encoding="utf-8")
+        self.assertIn("Past the 75 s nominal target", app_js)
+        self.assertIn("reception will continue until complete or manually stopped", app_js)
+        self.assertNotIn("120 s cutoff reached", app_js)
+        self.assertIn("nominal ≤75 s · no automatic transfer cutoff", index_html)
+
+    def test_ready_after_complete_preserves_terminal_state_until_new_transfer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = ui.ReceiverController(pathlib.Path(tmp), decode_fn=fake_decode)
+            controller.current.update(
+                {
+                    "status": "complete",
+                    "connected": False,
+                    "message": "Payload complete",
+                    "product_id": 5,
+                    "transfer_id": 5,
+                    "total_bytes": 38480,
+                    "received_bytes": 38480,
+                    "total_packets": 1100,
+                    "received_packets": 1100,
+                    "missing_packets": 0,
+                    "crc_ok": True,
+                    "run_id": "c3m_completed_transfer_5",
+                }
+            )
+
+            controller.on_receiver_event(receiver_event("ready", product_id=0, transfer_id=0))
+            reconnected = controller.snapshot()["current"]
+
+            self.assertEqual(reconnected["status"], "complete")
+            self.assertTrue(reconnected["connected"])
+            self.assertEqual(reconnected["message"], "Ready — last payload complete")
+            self.assertEqual(reconnected["transfer_id"], 5)
+            self.assertTrue(reconnected["crc_ok"])
+
+            controller.on_receiver_event(receiver_event("transfer_started", product_id=6, transfer_id=6))
+            next_transfer = controller.snapshot()["current"]
+            self.assertEqual(next_transfer["status"], "receiving")
+            self.assertEqual(next_transfer["product_id"], 6)
+            self.assertEqual(next_transfer["transfer_id"], 6)
+            self.assertIsNone(next_transfer["crc_ok"])
+
+    def test_ready_preserves_other_terminal_states_but_resumes_incomplete_transfer(self) -> None:
+        cases = (
+            ({"partial": True, "crc_ok": False}, "partial", "Ready — last payload remains partial"),
+            ({"partial": False, "crc_ok": False}, "failed", "Ready — last payload failed"),
+        )
+        for terminal_fields, expected_status, expected_message in cases:
+            with self.subTest(expected_status=expected_status), tempfile.TemporaryDirectory() as tmp:
+                controller = ui.ReceiverController(pathlib.Path(tmp), decode_fn=fake_decode)
+                controller.current.update(
+                    {
+                        "status": "recovering",
+                        "product_id": 5,
+                        "transfer_id": 5,
+                        "total_packets": 1100,
+                        "received_packets": 1099 if terminal_fields["partial"] else 1100,
+                        "run_id": f"c3m_{expected_status}_transfer_5",
+                        **terminal_fields,
+                    }
+                )
+                controller.on_receiver_event(receiver_event("ready", product_id=0, transfer_id=0))
+                current = controller.snapshot()["current"]
+                self.assertEqual(current["status"], expected_status)
+                self.assertEqual(current["message"], expected_message)
+                self.assertTrue(current["connected"])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = ui.ReceiverController(pathlib.Path(tmp), decode_fn=fake_decode)
+            controller.current.update(
+                {
+                    "status": "recovering",
+                    "product_id": 6,
+                    "transfer_id": 6,
+                    "total_packets": 1100,
+                    "received_packets": 423,
+                    "run_id": None,
+                    "crc_ok": None,
+                }
+            )
+            controller.on_receiver_event(receiver_event("ready", product_id=0, transfer_id=0))
+            current = controller.snapshot()["current"]
+            self.assertEqual(current["status"], "receiving")
+            self.assertEqual(current["message"], "Resumed payload transfer")
+
+    def test_archived_history_wires_csv_to_temperature_overlay(self) -> None:
+        app_js = APP_JS_PATH.read_text(encoding="utf-8")
+        styles = STYLES_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('id="archivedThermalImage"', app_js)
+        self.assertIn('id="archivedThermalHover"', app_js)
+        self.assertIn('csvUrl: selected.output_urls?.csv', app_js)
+        self.assertIn('imageId: "archivedThermalImage"', app_js)
+        self.assertIn('outputId: "archivedThermalHover"', app_js)
+        self.assertIn("thermal-tooltip", app_js)
+        self.assertIn(".thermal-tooltip", styles)
+
+    def test_operator_cancel_controls_are_ground_only_and_confirm_satellite_continues(self) -> None:
+        app_js = APP_JS_PATH.read_text(encoding="utf-8")
+        index_html = INDEX_PATH.read_text(encoding="utf-8")
+        server_source = UI_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('id="cancelTransferButton"', index_html)
+        self.assertIn("Stop &amp; save partial", index_html)
+        self.assertIn("The satellite continues its current transmission", index_html)
+        self.assertIn("window.confirm", app_js)
+        self.assertIn('postJson("/api/transfer/cancel")', app_js)
+        self.assertIn('parsed.path == "/api/transfer/cancel"', server_source)
+
+    def test_cancel_request_requires_active_header_and_is_idempotent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = ui.ReceiverController(pathlib.Path(tmp))
+            with self.assertRaisesRegex(ValueError, "no active payload transfer"):
+                controller.cancel_current_transfer()
+
+            controller.current.update(
+                {
+                    "status": "receiving",
+                    "transfer_id": 9,
+                    "total_packets": 100,
+                }
+            )
+            self.assertTrue(controller.cancel_current_transfer())
+            self.assertFalse(controller.cancel_current_transfer())
+            current = controller.snapshot()["current"]
+            self.assertEqual(current["status"], "cancelling")
+            self.assertEqual(current["completion_reason"], "operator_cancelled")
+            self.assertTrue(controller.cancel_event.is_set())
+
+            controller.on_receiver_event(receiver_event("progress", product_id=9, transfer_id=9))
+            self.assertEqual(controller.snapshot()["current"]["status"], "cancelling")
+
     def test_detects_third_triple_serial_port_only_when_unambiguous(self) -> None:
         rows = [
             {
@@ -128,6 +366,144 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
         self.assertEqual(ui.detect_payload_port(rows), "/dev/cu.usbmodem115553305")
         self.assertIsNone(ui.detect_payload_port(rows[:2]))
 
+    def test_stable_payload_identity_resolves_after_device_renumbering(self) -> None:
+        before = [
+            {
+                "device": f"/dev/cu.usbmodem11555330{suffix}",
+                "description": "Triple Serial",
+                "serial_number": "11555330",
+                "location": "0-1",
+                "likely_payload": False,
+            }
+            for suffix in (1, 3, 5)
+        ]
+        identity = ui.stable_port_identity("/dev/cu.usbmodem115553305", before)
+        self.assertEqual(identity["interface_ordinal"], 2)
+        after = [
+            {
+                **row,
+                "device": f"/dev/cu.usbmodem998877{suffix}",
+            }
+            for row, suffix in zip(before, (1, 3, 5), strict=True)
+        ]
+        self.assertEqual(
+            ui.resolve_stable_port(identity, after),
+            "/dev/cu.usbmodem9988775",
+        )
+        self.assertIsNone(ui.resolve_stable_port(identity, after[:2]))
+
+    def test_reconnect_never_falls_back_to_stale_path_for_stable_identity(self) -> None:
+        rows = [
+            {
+                "device": f"/dev/cu.usbmodem11555330{suffix}",
+                "description": "Triple Serial",
+                "serial_number": "11555330",
+                "location": "0-1",
+                "likely_payload": suffix == 5,
+            }
+            for suffix in (1, 3, 5)
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = ui.ReceiverController(pathlib.Path(tmp), port_rows_fn=lambda: [])
+            controller.port_identity = ui.stable_port_identity(
+                "/dev/cu.usbmodem115553305", rows
+            )
+            controller.current.update(
+                {"port": "/dev/cu.usbmodem115553305", "status": "disconnected"}
+            )
+            with mock.patch.object(controller, "_start_worker") as start_worker:
+                controller.reconnect()
+            start_worker.assert_not_called()
+            self.assertEqual(controller.current["status"], "recovering")
+            self.assertFalse(controller.current["connected"])
+
+    def test_checkpoint_rejection_is_operator_visible(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = ui.ReceiverController(pathlib.Path(tmp))
+            event = ui.payload_receiver.ReceiverEvent(
+                kind="checkpoint_rejected",
+                timestamp_s=time.time(),
+                message="checkpoint rejected: stale",
+                port="test-channel-1",
+                product_id=0,
+                transfer_id=None,
+                total_bytes=0,
+                received_bytes=0,
+                total_packets=0,
+                received_packets=0,
+                missing_packets=0,
+                retry_rounds=0,
+                expected_crc=None,
+                error_phase="checkpoint",
+                error="checkpoint rejected: stale",
+            )
+            controller.on_receiver_event(event)
+            snapshot = controller.snapshot()
+            self.assertEqual(snapshot["current"]["status"], "warning")
+            self.assertEqual(
+                snapshot["current"]["failure_reason"], "checkpoint rejected: stale"
+            )
+            self.assertEqual(snapshot["logs"][-1]["level"], "warning")
+
+    def test_ui_restart_loads_checkpoint_and_finishes_same_transfer(self) -> None:
+        blob = bytes(index % 251 for index in range(ui.payload_receiver.DATA_BYTES * 20))
+        rows = [
+            {
+                "device": f"/dev/cu.usbmodem998877{suffix}",
+                "description": "Triple Serial",
+                "serial_number": "11555330",
+                "location": "0-1",
+                "likely_payload": suffix == 5,
+            }
+            for suffix in (1, 3, 5)
+        ]
+        payload_port = "/dev/cu.usbmodem9988775"
+        identity = ui.stable_port_identity(payload_port, rows)
+        raw = ui.build_channel1_stream(blob, product_id=777, transfer_id=66)
+        parser = ui.payload_receiver.PayloadReceiver(
+            "parser", 115200, pathlib.Path("/tmp/unused"), 1.0
+        )
+        parser.rx_buffer += raw
+        packets: list[bytes] = []
+        while packet := parser.try_extract_packet():
+            packets.append(packet)
+        self.assertEqual(len(packets), 22)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            checkpoint = root / ".incoming" / "active_transfer_checkpoint"
+            first = ui.payload_receiver.PayloadReceiver(
+                payload_port,
+                115200,
+                root / "unused.fdp",
+                1.0,
+                checkpoint_dir=checkpoint,
+                source_identity=identity,
+            )
+            first.handle_header(packets[0])
+            for packet in packets[1:6]:
+                first.handle_data(packet)
+
+            resumed_serial = ui.ReplaySerial(b"".join(packets[6:]), chunk_size=37)
+            controller = ui.ReceiverController(
+                root,
+                decode_fn=fake_decode,
+                port_rows_fn=lambda: rows,
+                serial_factory=lambda *_args, **_kwargs: resumed_serial,
+            )
+            try:
+                controller.connect(payload_port)
+                snapshot = wait_for_status(controller, "complete", timeout_s=5.0)
+            finally:
+                controller.stop()
+
+            self.assertEqual(snapshot["current"]["product_id"], 777)
+            self.assertEqual(snapshot["current"]["transfer_id"], 66)
+            self.assertEqual(snapshot["current"]["received_packets"], 20)
+            self.assertTrue(snapshot["current"]["crc_ok"])
+            self.assertEqual(snapshot["history"][0]["result"], "complete")
+            self.assertFalse(checkpoint.exists())
+
     def test_replay_completes_and_creates_history_run(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             controller = ui.ReceiverController(pathlib.Path(tmp), decode_fn=fake_decode)
@@ -142,6 +518,9 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
             self.assertEqual(current["received_packets"], current["total_packets"])
             self.assertEqual(current["received_bytes"], len(b"deterministic-fdp-bytes"))
             self.assertEqual(set(current["outputs"]), {"fdp", "json", "csv", "png"})
+            self.assertEqual(current["display_payload"]["run_id"], current["run_id"])
+            self.assertEqual(current["display_payload"]["status"], "complete")
+            self.assertEqual(current["display_payload"]["outputs"], current["outputs"])
             self.assertEqual(len(snapshot["history"]), 1)
             run = snapshot["history"][0]
             self.assertEqual(run["result"], "complete")
@@ -164,6 +543,40 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
             self.assertEqual(len(snapshot["history"]), 2)
             self.assertEqual(len({run["run_id"] for run in snapshot["history"]}), 2)
             self.assertTrue(all(run["output_urls"]["png"].startswith("/files/") for run in snapshot["history"]))
+
+    def test_previous_payload_display_persists_until_new_transfer_finishes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            controller = ui.ReceiverController(root, decode_fn=fake_decode)
+            livestream = {"session_id": 9, "frame_sequence": 4, "png": "/preview/latest.png"}
+            controller.current["preview"] = livestream
+            first_source = root / ".incoming" / "first" / "payload.fdp"
+            first_source.parent.mkdir(parents=True)
+            first_source.write_bytes(b"first")
+
+            controller.on_receiver_event(receiver_event("transfer_started", product_id=1, transfer_id=1))
+            controller.on_receiver_event(
+                receiver_event("transfer_saved", product_id=1, transfer_id=1, output_path=first_source)
+            )
+            first = wait_for_status(controller, "complete")["current"]["display_payload"]
+
+            controller.on_receiver_event(receiver_event("transfer_started", product_id=2, transfer_id=2))
+            receiving = controller.snapshot()["current"]
+            self.assertEqual(receiving["status"], "receiving")
+            self.assertEqual(receiving["product_id"], 2)
+            self.assertEqual(receiving["display_payload"], first)
+            self.assertEqual(receiving["preview"], {**livestream, "stale": False})
+
+            second_source = root / ".incoming" / "second" / "payload.fdp"
+            second_source.parent.mkdir(parents=True)
+            second_source.write_bytes(b"second")
+            controller.on_receiver_event(
+                receiver_event("transfer_saved", product_id=2, transfer_id=2, output_path=second_source)
+            )
+            completed = wait_for_status(controller, "complete")["current"]
+            self.assertEqual(completed["display_payload"]["product_id"], 2)
+            self.assertNotEqual(completed["display_payload"]["run_id"], first["run_id"])
+            self.assertEqual(completed["preview"], {**livestream, "stale": False})
 
     def test_decode_runs_off_receiver_callback_and_cannot_replace_new_transfer(self) -> None:
         decode_started = threading.Event()
@@ -263,6 +676,123 @@ class C3mPayloadReceiverUiTests(unittest.TestCase):
                 controller.reconnect()
 
             start_worker.assert_called_once_with(port="test-channel-1", replay=None)
+
+    def test_packet_loss_replay_finishes_as_honest_partial_product(self) -> None:
+        blob = bytes(index % 251 for index in range(38480))
+        with tempfile.TemporaryDirectory() as tmp:
+            controller = ui.ReceiverController(
+                pathlib.Path(tmp),
+                decode_fn=fake_decode,
+                partial_decode_fn=fake_partial_decode,
+                transfer_timeout_s=2.0,
+            )
+            try:
+                controller.connect_replay(blob, omit_packet_indices={100})
+                snapshot = wait_for_status(controller, "partial")
+            finally:
+                controller.stop()
+
+            current = snapshot["current"]
+            self.assertTrue(current["partial"])
+            self.assertFalse(current["crc_ok"])
+            self.assertEqual(current["missing_packets"], 1)
+            self.assertEqual(current["missing_packet_indices"], [100])
+            self.assertIn("png", current["outputs"])
+            self.assertEqual(current["display_payload"]["status"], "partial")
+            self.assertEqual(current["display_payload"]["outputs"], current["outputs"])
+            run = snapshot["history"][0]
+            self.assertEqual(run["result"], "partial")
+            self.assertFalse(run["crc_ok"])
+            self.assertEqual(run["missing_packet_indices"], [100])
+            self.assertTrue(run["outputs"]["fdp"].endswith(".fdp.partial"))
+            self.assertEqual(run["outputs"]["missing_map"], "missing_packets.json")
+
+    def test_operator_cancel_replay_saves_partial_and_records_reason(self) -> None:
+        blob = bytes(index % 251 for index in range(ui.payload_receiver.DATA_BYTES * 100))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            controller = ui.ReceiverController(
+                root,
+                decode_fn=fake_decode,
+                partial_decode_fn=fake_partial_decode,
+            )
+            try:
+                controller.connect_replay(blob, delay_s=0.01)
+                deadline = time.monotonic() + 3.0
+                while time.monotonic() < deadline:
+                    current = controller.snapshot()["current"]
+                    if current["status"] == "receiving" and current["received_packets"] >= 3:
+                        break
+                    time.sleep(0.01)
+                else:
+                    self.fail("replay did not begin before cancel deadline")
+
+                self.assertTrue(controller.cancel_current_transfer())
+                snapshot = wait_for_status(controller, "partial", timeout_s=5.0)
+            finally:
+                controller.stop()
+
+            current = snapshot["current"]
+            self.assertEqual(current["message"], "Partial — stopped by operator")
+            self.assertEqual(current["completion_reason"], "operator_cancelled")
+            self.assertGreater(current["received_packets"], 0)
+            self.assertLess(current["received_packets"], current["total_packets"])
+            run = snapshot["history"][0]
+            self.assertEqual(run["result"], "partial")
+            self.assertEqual(run["completion_reason"], "operator_cancelled")
+            self.assertIn("satellite transmission was not interrupted", run["timeout_reason"])
+            run_json = root / run["run_id"] / "run.json"
+            self.assertEqual(
+                json.loads(run_json.read_text(encoding="utf-8"))["completion_reason"],
+                "operator_cancelled",
+            )
+
+    def test_live_preview_persists_latest_partial_frame_and_reports_staleness(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            controller = ui.ReceiverController(root)
+            now = 1_000.0
+            pixels = bytes([12]) * 24 + bytes([255]) * (80 * 60 - 24)
+            event = ui.payload_receiver.ReceiverEvent(
+                kind="preview_frame",
+                timestamp_s=now,
+                message="preview partial",
+                port="test-channel-1",
+                product_id=0,
+                transfer_id=None,
+                total_bytes=0,
+                received_bytes=0,
+                total_packets=0,
+                received_packets=0,
+                missing_packets=0,
+                retry_rounds=0,
+                expected_crc=None,
+                preview_session_id=9,
+                preview_frame_sequence=4,
+                preview_width=80,
+                preview_height=60,
+                preview_total_bytes=4_800,
+                preview_received_bytes=24,
+                preview_fragment_count=200,
+                preview_received_fragments=1,
+                preview_percent=0.5,
+                preview_complete=False,
+                preview_crc_ok=None,
+                preview_finalize_reason="deadline",
+                preview_pixels=pixels,
+            )
+            controller.on_receiver_event(event)
+            with mock.patch.object(ui.time, "time", return_value=now + 4.0):
+                snapshot = controller.snapshot()["current"]
+
+            self.assertEqual(snapshot["preview"]["percent"], 0.5)
+            self.assertTrue(snapshot["preview"]["stale"])
+            self.assertEqual(snapshot["preview"]["png"], "/preview/latest.png")
+            self.assertTrue(controller.live_preview_path.is_file())
+            self.assertTrue(controller.live_preview_path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"))
+            app_js = APP_JS_PATH.read_text(encoding="utf-8")
+            self.assertIn("Complete", app_js)
+            self.assertIn("Stale", app_js)
 
 
 if __name__ == "__main__":

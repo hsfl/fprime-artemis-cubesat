@@ -81,18 +81,30 @@ the new directory has no old `PrmDb.dat`.
 After installing a new release, either re-run the needed `PRM_SET`/`PRM_SAVE`
 commands or copy `PrmDb.dat` forward intentionally.
 
-## C3M Lepton Backend Note
+## C3M Camera Backend Note
 
-The service sets:
+The service keeps the real Lepton backend explicit and configures the Boson
+driver for the stable Pi udev path:
 
 ```text
 LEPTON_CAMERA_BACKEND=uvc
+BOSON_CAMERA_BACKEND=v4l2
+BOSON_V4L2_DEVICE=/dev/v4l/by-id/usb-FLIR_Boson_371025-video-index0
 ```
+
+> **Camera replacement:** do not hot-swap the Lepton/Boson USB camera while
+> the Pi is powered. One physical Boson-to-Lepton swap abruptly reset the Pi
+> during lab HIL before the software selector command was sent. Power down
+> before changing cameras, or qualify an independently powered USB hub
+> separately. This is a USB/power-path precaution; the F Prime selector was not
+> implicated by the surviving logs.
 
 This is required for EPSCoR C3M HIL. If `PayloadDriver_Lepton` is wired in, the
 Pi deployment must use the real libuvc Lepton backend and fail if the camera or
-Y16 stream is unavailable. Local laptop emulation still uses
-`LEPTON_CAMERA_BACKEND=sample` through `run_c3m_local_demo.sh`.
+Y16 stream is unavailable. If `PayloadDriver_Boson` is selected, it uses direct
+Linux V4L2 against the stable device path above. The selector still defaults to
+Lepton; local laptop emulation uses `LEPTON_CAMERA_BACKEND=sample` and the
+Boson synthetic backend through `run_c3m_local_demo.sh`.
 
 ## Blank SD To Demo-Ready Pi
 

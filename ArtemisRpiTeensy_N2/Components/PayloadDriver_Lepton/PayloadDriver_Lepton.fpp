@@ -15,23 +15,24 @@ module Components {
         @ Health ping output
         output port pingOut: Svc.Ping
 
-        @ Bring the Lepton camera up and start its stream.
-        async command ENABLE opcode 1
-
-        @ Stop the Lepton stream and release the camera.
-        async command DISABLE opcode 2
-
-        @ Capture one thermal image and write it as a data product.
-        async command CAPTURE_IMAGE opcode 0
-
-        @ Scheduled collection request from PayloadManager.
+        @ Scheduled collection request from the payload-driver selector.
         async input port requestIn: Components.PayloadCaptureRequest
+
+        @ Release this camera when another payload driver is selected.
+        sync input port deactivateIn: Fw.Signal
+
+        @ Request a fresh 80x60 U8 preview derived from the newest validated Lepton frame.
+        @ Queued on this driver's task so camera lifecycle access is serialized with science capture.
+        async input port previewRequestIn: Fw.Signal
 
         @ Data-product write notification from DpWriter.
         async input port dpWrittenIn: Svc.DpWritten
 
         @ Captured product descriptor/status output
         output port statusOut: Components.ScienceProductDescriptor
+
+        @ One fixed 80x60 U8 preview buffer. It stays valid until the stream app requests another preview.
+        output port previewOut: Fw.BufferSend
 
         @ Data product record holding one thermal image.
         product record ThermalImageRecord: ThermalImageRecordType id 0
@@ -91,9 +92,6 @@ module Components {
 
         @ Port for requesting the current time
         time get port timeCaller
-
-        @ Enables command handling
-        import Fw.Command
 
         @ Enables event handling
         import Fw.Event

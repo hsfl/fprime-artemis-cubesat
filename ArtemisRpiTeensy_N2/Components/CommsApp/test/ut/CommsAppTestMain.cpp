@@ -5,9 +5,24 @@ TEST(Nominal, RejectsDownlinkWithoutScience) {
     tester.testRejectsDownlinkWithoutScience();
 }
 
-TEST(Nominal, RequestsScienceDownlinkAndCompletionClearsState) {
+TEST(Nominal, CompletedDownlinkRemainsAvailableForRetry) {
     Components::CommsAppTester tester;
-    tester.testRequestsScienceDownlinkAndCompletionClearsState();
+    tester.testCompletedDownlinkRemainsAvailableForRetry();
+}
+
+TEST(Nominal, DuplicateAndConflictingActiveRequestsAreGuarded) {
+    Components::CommsAppTester tester;
+    tester.testDuplicateAndConflictingActiveRequestsAreGuarded();
+}
+
+TEST(Nominal, NewPendingProductStartsAfterActiveTerminalStatus) {
+    Components::CommsAppTester tester;
+    tester.testNewPendingProductStartsAfterActiveTerminalStatus();
+}
+
+TEST(Nominal, StaleOrUncorrelatedStatusCannotEndActiveTransfer) {
+    Components::CommsAppTester tester;
+    tester.testStaleOrUncorrelatedStatusCannotEndActiveTransfer();
 }
 
 TEST(Nominal, DownlinkFailureReturnsBase) {
@@ -25,9 +40,24 @@ TEST(Nominal, DriverStatusPollingAndRssiPing) {
     tester.testDriverStatusPollingAndRssiPing();
 }
 
-TEST(Nominal, RunPublishesHealthFromLinkState) {
+TEST(Nominal, BootReconcilesOffToReadyAndPublishesHealth) {
     Components::CommsAppTester tester;
-    tester.testRunPublishesHealthFromLinkState();
+    tester.testBootReconcilesOffToReadyAndPublishesHealth();
+}
+
+TEST(Reliability, ReadyWithLocalFaultIsDegradedAndReinitialized) {
+    Components::CommsAppTester tester;
+    tester.testReadyWithLocalFaultIsDegradedAndReinitialized();
+}
+
+TEST(Reliability, RecoveryBackoffIsCappedAndStatusIsObservational) {
+    Components::CommsAppTester tester;
+    tester.testRecoveryBackoffIsCappedAndStatusIsObservational();
+}
+
+TEST(Reliability, InitializationFailureAndInvalidReissueDoNotWedge) {
+    Components::CommsAppTester tester;
+    tester.testInitializationFailureAndInvalidReissueDoNotWedge();
 }
 
 int main(int argc, char** argv) {

@@ -1,5 +1,11 @@
 # HackRF / SDR Ground Station Investigation
 
+> **Historical and superseded:** The planned adapter was subsequently
+> implemented and indoor-qualified. A 2026-08-06 hallway evaluation then led
+> to the accepted decision to keep RFM23BP primary and stop further
+> bidirectional HackRF mission development. See
+> [`C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md`](C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md).
+
 Date: 2026-06-30 HST
 Status: investigation note; no implementation yet
 Scope: replacing or augmenting the current `GDS_Teensy` ground node with a HackRF One / SDR-based ground path
@@ -306,4 +312,3 @@ repeatable.
 The first serious milestone is receive-only decode of existing RadioHead/RFM23BP
 packets. If that cannot be made reliable, do not attempt SDR transmit or remove
 the ground Teensy.
-

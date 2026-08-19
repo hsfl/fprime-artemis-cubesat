@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "link_protocol.hpp"
+#include "rf_tx_retry.hpp"
 #include "wdt_guard.hpp"
 
 RelayUartRf::RelayUartRf(Stream& linkIo,
@@ -10,13 +11,18 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
                          LinkCounters& counters,
                          const RelayConfig& config,
                          Stream* payloadIo,
-                         LocalChannelHandler* localHandler)
+                         LocalChannelHandler* localHandler,
+                         PayloadChannelHandler* payloadHandler,
+                         PreviewChannelHandler* previewHandler)
     : m_linkIo(linkIo),
       m_payloadIo(payloadIo),
       m_localHandler(localHandler),
+      m_payloadHandler(payloadHandler),
+      m_previewHandler(previewHandler),
       m_rf(rfDriver),
       m_counters(counters),
       m_config(config),
+      m_lastRadioReady(rfDriver.isReady()),
       m_state(ParseState::WAIT_MAGIC_0),
       m_frameChannel(link_protocol::CHANNEL_CCSDS),
       m_frameLength(0),
@@ -26,7 +32,6 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
       m_inCommandMode(false),
       m_commandIndex(0),
       m_lastFrameByteMs(0),
-      m_nextMsgId(0),
       m_rawUartLen(0),
       m_lastRawUartByteMs(0),
       m_payloadUartLen(0),
@@ -39,6 +44,7 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
       m_downlinkCount(0) {
   memset(m_framePayload, 0, sizeof(m_framePayload));
   memset(m_commandBuffer, 0, sizeof(m_commandBuffer));
+  memset(m_nextMsgId, 0, sizeof(m_nextMsgId));
   memset(m_reassembly, 0, sizeof(m_reassembly));
   memset(m_rawUartBuf, 0, sizeof(m_rawUartBuf));
   memset(m_payloadUartBuf, 0, sizeof(m_payloadUartBuf));
@@ -58,6 +64,7 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
 
 void RelayUartRf::begin() {
   resetFrameParser(false);
+  m_lastRadioReady = m_rf.isReady();
   for (uint8_t channel = 0; channel < link_protocol::CHANNEL_COUNT; channel++) {
     resetReassembly(channel, false, false);
   }
@@ -65,6 +72,7 @@ void RelayUartRf::begin() {
 
 void RelayUartRf::poll() {
   wdt_guard::feed();
+  handleRadioStateTransition();
   if (m_config.enableUartToRf) {
     while (m_linkIo.available() > 0) {
       const uint8_t b = static_cast<uint8_t>(m_linkIo.read());
@@ -92,10 +100,50 @@ void RelayUartRf::poll() {
     flushPayloadUartIfStale();
   }
 
+  // A channel-2 SET_ENABLED request can change readiness while the UART bytes
+  // above are being dispatched. Contain pre-shutdown RF work before any queue
+  // or reassembly service runs later in this same poll.
+  handleRadioStateTransition();
   flushRfToUart();
   flushLocalResponseToUart();
-  serviceUplinkQueue();
+  if (!m_rf.receiveInProgress()) {
+    serviceUplinkQueue();
+  }
+  if (!m_rf.receiveInProgress()) {
+    serviceCachedPayload();
+  }
   serviceDownlinkQueue();
+  // Preview is deliberately lowest priority: do not let it jump ahead of
+  // queued channel-0 traffic in either direction. At most one PV record is
+  // attempted in an otherwise-idle poll.
+  if (!m_rf.receiveInProgress() && m_uplinkCount == 0 && m_downlinkCount == 0) {
+    servicePreview();
+  }
+}
+
+void RelayUartRf::handleRadioStateTransition() {
+  const bool ready = m_rf.isReady();
+  if (m_lastRadioReady && !ready) {
+    discardRadioWorkOnOff();
+  }
+  m_lastRadioReady = ready;
+}
+
+void RelayUartRf::discardRadioWorkOnOff() {
+  m_rawUartLen = 0;
+  m_payloadUartLen = 0;
+
+  m_counters.rfTxDrops += m_uplinkCount;
+  m_uplinkTail = m_uplinkHead;
+  m_uplinkCount = 0;
+
+  for (uint8_t channel = 0; channel < link_protocol::CHANNEL_RF_COUNT; channel++) {
+    ReassemblyState& state = m_reassembly[channel];
+    const bool partialMessage = state.active;
+    resetReassembly(channel, false, partialMessage);
+    state.seenRxMsgId = false;
+    state.lastRxMsgId = 0;
+  }
 }
 
 void RelayUartRf::processUartByte(uint8_t b) {
@@ -179,7 +227,9 @@ void RelayUartRf::flushLocalResponseToUart() {
   uint8_t response[link_protocol::FRAME_MAX_PAYLOAD] = {0};
   uint16_t responseLen = 0;
   if (m_localHandler->pollLocalResponse(response, responseLen)) {
-    sendUartFrame(link_protocol::CHANNEL_TEENSY_LOCAL, response, responseLen);
+    if (sendUartFrame(link_protocol::CHANNEL_TEENSY_LOCAL, response, responseLen)) {
+      m_counters.localResponsesTx += 1U;
+    }
   }
 }
 
@@ -297,7 +347,8 @@ void RelayUartRf::flushRfToUart() {
 
   while (m_rf.available()) {
     rfLen = static_cast<uint8_t>(sizeof(rfBuffer));
-    if (m_rf.recv(rfBuffer, &rfLen) && rfLen > 0) {
+    const Rf23ReceiveResult result = m_rf.recv(rfBuffer, &rfLen);
+    if (acceptRfReceiveResult(result) && rfLen > 0) {
       m_counters.rfRxPackets += 1;
       processRfSegment(rfBuffer, rfLen);
     }
@@ -329,6 +380,13 @@ void RelayUartRf::handleCompletedFrame() {
   if (m_frameChannel == link_protocol::CHANNEL_TEENSY_LOCAL) {
     if (m_localHandler == nullptr || !m_localHandler->beginLocalFrame(m_framePayload, m_frameLength)) {
       m_counters.framingDrops += 1;
+    } else {
+      // Drain synchronously while this request's identity is still current.
+      // The normal end-of-poll drain remains for asynchronous PDU and preview
+      // commit-completion responses. Without this, consecutive complete local
+      // frames read in one UART batch can overwrite a one-slot response before
+      // the next poll has emitted it.
+      flushLocalResponseToUart();
     }
     return;
   }
@@ -372,7 +430,10 @@ bool RelayUartRf::sendRawToUart(const uint8_t* payload, uint16_t length) {
   return true;
 }
 
-bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uint16_t length) {
+bool RelayUartRf::sendPayloadOverRf(uint8_t channel,
+                                    const uint8_t* payload,
+                                    uint16_t length,
+                                    bool cachedPayload) {
   if (length == 0 || length > link_protocol::FRAME_MAX_PAYLOAD) {
     m_counters.rfOversizeDrops += 1;
     return false;
@@ -391,7 +452,10 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
   }
 
   const uint8_t segCount = static_cast<uint8_t>(segCountU16);
-  const uint8_t msgId = m_nextMsgId++;
+  // Receive-side continuity is tracked per RF channel, so allocate message
+  // identifiers per channel as well. A single global sequence makes normal
+  // channel-0/channel-1 interleaving look like packet loss.
+  const uint8_t msgId = m_nextMsgId[channel]++;
 
   uint16_t sent = 0;
   for (uint8_t segIdx = 0; segIdx < segCount; segIdx++) {
@@ -413,7 +477,7 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
     wdt_guard::feed();
     const bool sentOk = link_protocol::txAckRequiredForChannel(channel)
                             ? sendRfPacketWithAck(rfPacket, rfLen, channel, msgId, segIdx)
-                            : m_rf.send(rfPacket, rfLen);
+                            : sendRfPacket(rfPacket, rfLen);
     wdt_guard::feed();
     if (!sentOk) {
       m_counters.rfTxDrops += 1;
@@ -431,7 +495,8 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
       // Payload messages fit in one segment and do not use RF ACKs. Give the
       // peer time to drain each packet before the next preamble.
       wdt_guard::feed();
-      delay(link_protocol::RF_PAYLOAD_INTER_PACKET_GAP_MS);
+      delay(cachedPayload ? link_protocol::PAYLOAD_CACHE_RF_GAP_MS
+                          : link_protocol::RF_PAYLOAD_INTER_PACKET_GAP_MS);
       wdt_guard::feed();
     } else if (segIdx + 1 < segCount) {
       // ACK turnaround already paces CCSDS packets; retain only the original
@@ -449,6 +514,69 @@ bool RelayUartRf::sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uin
   return true;
 }
 
+bool RelayUartRf::sendPreviewPacketBestEffort(const uint8_t* payload, uint16_t length) {
+  // PV records are intentionally constrained to one RF segment. Unlike the
+  // science cache path, do not ACK, retry, or repair a preview fragment.
+  if (payload == nullptr || length == 0U || length > link_protocol::RF_SEGMENT_MAX_DATA) {
+    m_counters.rfOversizeDrops += 1;
+    return false;
+  }
+
+  const uint8_t msgId = m_nextMsgId[link_protocol::CHANNEL_PAYLOAD]++;
+  uint8_t rfPacket[link_protocol::RF_PACKET_MAX_LEN] = {0};
+  rfPacket[0] = link_protocol::magicForChannel(link_protocol::CHANNEL_PAYLOAD);
+  rfPacket[1] = msgId;
+  rfPacket[2] = 0U;
+  rfPacket[3] = 1U;
+  rfPacket[4] = static_cast<uint8_t>(length);
+  memcpy(&rfPacket[link_protocol::RF_SEGMENT_HEADER_LEN], payload, length);
+
+  const Rf23SendResult result =
+      m_rf.send(rfPacket, static_cast<uint8_t>(link_protocol::RF_SEGMENT_HEADER_LEN + length));
+  if (result != Rf23SendResult::SENT) {
+    m_counters.rfTxDrops += 1;
+    if (result == Rf23SendResult::TX_TIMEOUT) {
+      m_counters.rfTxTimeouts += 1;
+    }
+    return false;
+  }
+
+  m_counters.rfTxPackets += 1;
+  m_counters.rfTxSegments += 1;
+  m_counters.rfTxMessages += 1;
+  m_counters.payloadRfTxSegments += 1;
+  m_counters.payloadRfTxMessages += 1;
+  delay(link_protocol::LEPTON_PREVIEW_RF_GAP_MS);
+  return true;
+}
+
+bool RelayUartRf::sendRfPacket(const uint8_t* packet, uint8_t packetLen) {
+  const rf_tx_retry::Outcome outcome = rf_tx_retry::sendWithBoundedTimeoutRetry([&]() {
+    wdt_guard::feed();
+    const Rf23SendResult result = m_rf.send(packet, packetLen);
+    wdt_guard::feed();
+    switch (result) {
+      case Rf23SendResult::SENT:
+        return rf_tx_retry::AttemptResult::SENT;
+      case Rf23SendResult::TX_TIMEOUT:
+        return rf_tx_retry::AttemptResult::TX_TIMEOUT;
+      case Rf23SendResult::START_FAILED:
+        return rf_tx_retry::AttemptResult::START_FAILED;
+    }
+    return rf_tx_retry::AttemptResult::START_FAILED;
+  });
+  m_counters.rfTxTimeouts += outcome.timeouts;
+  m_counters.rfRecoveries += outcome.recoveries;
+  if (outcome.terminalFailure) {
+    m_counters.rfTxTerminalFailures += 1;
+    // A factual local transmit-completion failure after the one bounded FIFO
+    // recovery is evidence of a wedged local radio, not merely a missing peer.
+    // Force datasheet shutdown and let Pi/F Prime own the slow re-enable policy.
+    m_rf.failSafeOffLocalTx();
+  }
+  return outcome.sent;
+}
+
 bool RelayUartRf::sendRfPacketWithAck(const uint8_t* packet,
                                       uint8_t packetLen,
                                       uint8_t channel,
@@ -456,7 +584,7 @@ bool RelayUartRf::sendRfPacketWithAck(const uint8_t* packet,
                                       uint8_t segIdx) {
   for (uint8_t attempt = 0; attempt <= link_protocol::RF_ACK_RETRIES; attempt++) {
     wdt_guard::feed();
-    if (!m_rf.send(packet, packetLen)) {
+    if (!sendRfPacket(packet, packetLen)) {
       return false;
     }
     if (waitForAck(channel, msgId, segIdx)) {
@@ -478,7 +606,8 @@ bool RelayUartRf::waitForAck(uint8_t channel, uint8_t msgId, uint8_t segIdx) {
     wdt_guard::feed();
     while (m_rf.available()) {
       uint8_t rfLen = static_cast<uint8_t>(sizeof(rfBuffer));
-      if (m_rf.recv(rfBuffer, &rfLen) && rfLen > 0) {
+      const Rf23ReceiveResult result = m_rf.recv(rfBuffer, &rfLen);
+      if (acceptRfReceiveResult(result) && rfLen > 0) {
         if (isAckPacket(rfBuffer, rfLen, channel, msgId, segIdx)) {
           m_counters.rfAckRx += 1;
           return true;
@@ -505,6 +634,25 @@ bool RelayUartRf::isAckPacket(const uint8_t* packet,
          packet[4] == 0;
 }
 
+bool RelayUartRf::acceptRfReceiveResult(Rf23ReceiveResult result) {
+  switch (result) {
+    case Rf23ReceiveResult::ACCEPTED:
+      return true;
+    case Rf23ReceiveResult::WRONG_NETWORK:
+      m_counters.rfWrongNetworkDrops += 1;
+      break;
+    case Rf23ReceiveResult::WRONG_ADDRESS:
+      m_counters.rfWrongAddressDrops += 1;
+      break;
+    case Rf23ReceiveResult::WRONG_VERSION:
+      m_counters.rfVersionDrops += 1;
+      break;
+    case Rf23ReceiveResult::NO_PACKET:
+      break;
+  }
+  return false;
+}
+
 bool RelayUartRf::sendAck(uint8_t channel, uint8_t msgId, uint8_t segIdx) {
   uint8_t ackPacket[link_protocol::RF_SEGMENT_HEADER_LEN] = {
       link_protocol::magicForChannel(channel),
@@ -513,7 +661,7 @@ bool RelayUartRf::sendAck(uint8_t channel, uint8_t msgId, uint8_t segIdx) {
       segIdx,
       0,
   };
-  const bool ok = m_rf.send(ackPacket, sizeof(ackPacket));
+  const bool ok = sendRfPacket(ackPacket, sizeof(ackPacket));
   if (ok) {
     m_counters.rfAckTx += 1;
   }
@@ -560,6 +708,16 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
   ReassemblyState& state = m_reassembly[channel];
   if (state.active && (now - state.lastSegmentMs) > link_protocol::RF_REASSEMBLY_TIMEOUT_MS) {
     resetReassembly(channel, true, true);
+  }
+
+  // Re-ACK a completed-message retry without forwarding the same command or
+  // payload twice. This covers lost ACKs and ambiguous TX-completion timeouts.
+  if (!state.active && state.seenRxMsgId && msgId == state.lastRxMsgId) {
+    m_counters.rfDuplicateDrops += 1;
+    if (link_protocol::rxAckRequiredForChannel(channel)) {
+      sendAck(channel, msgId, segIdx);
+    }
+    return;
   }
 
   if (!state.active) {
@@ -624,7 +782,12 @@ void RelayUartRf::processRfSegment(const uint8_t* packet, uint8_t packetLen) {
     }
     state.seenRxMsgId = true;
     state.lastRxMsgId = msgId;
-    enqueueDownlinkMessage(channel, state.buffer, state.length);
+    const bool consumed =
+        channel == link_protocol::CHANNEL_PAYLOAD && m_payloadHandler != nullptr &&
+        m_payloadHandler->handlePayloadControl(state.buffer, state.length);
+    if (!consumed) {
+      enqueueDownlinkMessage(channel, state.buffer, state.length);
+    }
     resetReassembly(channel, false, false);
   }
 }
@@ -666,11 +829,11 @@ uint16_t RelayUartRf::crc16Ccitt(const uint8_t* data, uint16_t len) const {
 }
 
 void RelayUartRf::emitLinkStatus() {
-  char statusLine[360] = {0};
+  char statusLine[640] = {0};
   const int n =
       snprintf(statusLine,
                sizeof(statusLine),
-               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu rf_msg_id_gaps=%lu rf_ack_rx=%lu rf_ack_tx=%lu rf_retries=%lu rf_ack_timeouts=%lu up_q_drops=%lu down_q_drops=%lu\\n",
+               "#LINK_STATUS uart_rx=%lu uart_tx=%lu rf_rx_pkt=%lu rf_tx_pkt=%lu rf_rx_msg=%lu rf_tx_msg=%lu rf_rx_seg=%lu rf_tx_seg=%lu crc_drops=%lu framing_drops=%lu uart_timeouts=%lu rf_reasm_timeouts=%lu rf_reasm_drops=%lu rf_oversize_drops=%lu rf_tx_drops=%lu rf_tx_timeouts=%lu rf_recoveries=%lu rf_tx_terminal_failures=%lu rf_msg_id_gaps=%lu rf_ack_rx=%lu rf_ack_tx=%lu rf_retries=%lu rf_ack_timeouts=%lu rf_wrong_network=%lu rf_wrong_address=%lu rf_wrong_version=%lu rf_duplicate_drops=%lu up_q_drops=%lu down_q_drops=%lu\\n",
                static_cast<unsigned long>(m_counters.uartRxBytes),
                static_cast<unsigned long>(m_counters.uartTxBytes),
                static_cast<unsigned long>(m_counters.rfRxPackets),
@@ -686,17 +849,26 @@ void RelayUartRf::emitLinkStatus() {
                static_cast<unsigned long>(m_counters.rfReassemblyDrops),
                static_cast<unsigned long>(m_counters.rfOversizeDrops),
                static_cast<unsigned long>(m_counters.rfTxDrops),
+               static_cast<unsigned long>(m_counters.rfTxTimeouts),
+               static_cast<unsigned long>(m_counters.rfRecoveries),
+               static_cast<unsigned long>(m_counters.rfTxTerminalFailures),
                static_cast<unsigned long>(m_counters.rfMsgIdGaps),
                static_cast<unsigned long>(m_counters.rfAckRx),
                static_cast<unsigned long>(m_counters.rfAckTx),
                static_cast<unsigned long>(m_counters.rfRetries),
                static_cast<unsigned long>(m_counters.rfAckTimeouts),
+               static_cast<unsigned long>(m_counters.rfWrongNetworkDrops),
+               static_cast<unsigned long>(m_counters.rfWrongAddressDrops),
+               static_cast<unsigned long>(m_counters.rfVersionDrops),
+               static_cast<unsigned long>(m_counters.rfDuplicateDrops),
                static_cast<unsigned long>(m_counters.uplinkQueueDrops),
                static_cast<unsigned long>(m_counters.downlinkQueueDrops));
 
   if (n > 0) {
-    m_linkIo.write(reinterpret_cast<const uint8_t*>(statusLine), static_cast<size_t>(n));
-    m_counters.uartTxBytes += static_cast<uint32_t>(n);
+    const size_t writeLen =
+        static_cast<size_t>(n) < sizeof(statusLine) ? static_cast<size_t>(n) : sizeof(statusLine) - 1U;
+    m_linkIo.write(reinterpret_cast<const uint8_t*>(statusLine), writeLen);
+    m_counters.uartTxBytes += static_cast<uint32_t>(writeLen);
   }
 }
 
@@ -707,6 +879,10 @@ bool RelayUartRf::enqueueUplinkMessage(uint8_t channel, const uint8_t* payload, 
   }
   if (!link_protocol::isRfChannel(channel)) {
     m_counters.framingDrops += 1;
+    return false;
+  }
+  if (!m_rf.isReady()) {
+    m_counters.rfTxDrops += 1;
     return false;
   }
 
@@ -752,6 +928,12 @@ void RelayUartRf::serviceUplinkQueue() {
   if (m_uplinkCount == 0) {
     return;
   }
+  if (!m_rf.isReady()) {
+    m_counters.rfTxDrops += m_uplinkCount;
+    m_uplinkTail = m_uplinkHead;
+    m_uplinkCount = 0;
+    return;
+  }
 
   QueueEntry& entry = m_uplinkQueue[m_uplinkTail];
   if (link_protocol::isRfChannel(entry.channel)) {
@@ -761,6 +943,34 @@ void RelayUartRf::serviceUplinkQueue() {
   }
   m_uplinkTail = static_cast<uint8_t>((m_uplinkTail + 1) % m_config.uplinkQueueDepth);
   m_uplinkCount = static_cast<uint8_t>(m_uplinkCount - 1);
+}
+
+void RelayUartRf::serviceCachedPayload() {
+  if (m_payloadHandler == nullptr || !m_rf.isReady()) {
+    return;
+  }
+  uint8_t packet[link_protocol::FRAME_MAX_PAYLOAD] = {0};
+  uint16_t length = 0U;
+  if (!m_payloadHandler->nextPayloadPacket(packet, length)) {
+    return;
+  }
+  const bool sent =
+      sendPayloadOverRf(link_protocol::CHANNEL_PAYLOAD, packet, length, true);
+  m_payloadHandler->payloadPacketSent(sent);
+}
+
+void RelayUartRf::servicePreview() {
+  if (m_previewHandler == nullptr || !m_rf.isReady()) {
+    return;
+  }
+  uint8_t packet[link_protocol::RF_SEGMENT_MAX_DATA] = {0};
+  uint16_t length = 0U;
+  if (!m_previewHandler->nextPreviewPacket(packet, length)) {
+    return;
+  }
+  // Always advance after the one TX attempt. A failed PV fragment is allowed;
+  // the wire format supports partial reconstruction and never requests repair.
+  m_previewHandler->previewPacketAttempted(sendPreviewPacketBestEffort(packet, length));
 }
 
 void RelayUartRf::serviceDownlinkQueue() {

@@ -11,6 +11,36 @@ See [`SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHITECTURE.md) for why the link is built
 | Satellite Raspberry Pi Zero W | Hosts the F´ flight-software deployment | SSH over the network; talks to the satellite Teensy on its own `/dev/serial0` UART |
 | Satellite Teensy 4.1 | UART↔RF relay + local subsystem RPC | One USB serial (debug console) when plugged into a laptop |
 | Ground Teensy 4.1 | RF↔USB bridge for the ground laptop | **Three** USB serial ports (triple-serial), see below |
+| HackRF One research/diagnostic adapter | Preserved software RF22/GFSK experiment; not the primary or fallback mission radio | One USB SDR discovered by `hackrf_info`; software exposes channel-0 and channel-1 PTYs |
+
+## HackRF research/diagnostic adapter
+
+The 2026-08-06 engineering decision selected the ground Teensy/RFM23BP as the
+primary C3M radio and stopped further bidirectional HackRF mission development.
+Read
+[`C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md`](archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md)
+before deliberately reproducing the HackRF path with `./tools/c3m-sdr`.
+
+The indoor-proven
+RF path is:
+
+```text
+HackRF One -> SMA male -> 3 m RG174 -> POBADY 433 MHz magnetic-base antenna
+```
+
+The antenna path is identified by profile; geometry may change. Startup automatically
+selects RX from clean CRC-valid C3M frames and TX from an exact F Prime
+PING/Pong across the HackRF-supported gain ranges. It then maintains the link
+in-session from valid-frame silence, I/Q clipping, and repeated ACK outcomes.
+The RF amplifier starts off for each direction; only a complete normal-gain
+failure enables that direction's amplifier and restarts its search from minimum
+gain. Antenna bias always remains off for the passive POBADY. The bridge exposes `/tmp/c3m-sdr/gds-port` and
+`/tmp/c3m-sdr/payload-port`; it does not create a debug serial port. Use
+`/tmp/c3m-sdr/latest/bridge-status.json` for SDR/link counters.
+
+The path is not outdoor qualified. The preserved
+[`HACKRF_GROUND_STATION_RUNBOOK.md`](archive/HACKRF_GROUND_STATION_RUNBOOK.md) is a
+research/reproduction procedure, not the mission-operations default.
 
 ## USB serial enumeration (varies by OS and USB port)
 
@@ -47,7 +77,7 @@ From the RF debug session in [`archive/RF_CHAIN_ROOT_CAUSE_ANALYSIS_2026-04-24.m
 | Satellite Teensy | `/dev/cu.usbmodem115502201` | USB debug console |
 | Ground Teensy | `/dev/cu.usbmodem115551201` | GDS data stream (port 0) |
 | Ground Teensy | `/dev/cu.usbmodem115551203` | debug console (port 1) |
-| Raspberry Pi | `192.168.0.152` (`artemis-pi`) | F´ flight target over SSH |
+| Raspberry Pi | `192.168.0.234` (`artemis-pi`, `artemis-pi-c3m`) | F´ flight target over SSH |
 
 The Pi runs the deployment as a systemd service (`artemis-fprime.service`) executing `ArtemisRpiTeensyDeployment -d /dev/serial0`. Stop the service before re-deploying a new binary (it holds the file open).
 

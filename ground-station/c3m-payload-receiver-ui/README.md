@@ -3,9 +3,22 @@
 BLUF: this is the normal channel-1 operator surface for the EPSCoR C3M demo.
 Use F Prime GDS for commands/events/telemetry and keep this laptop browser open
 for receiver readiness, payload progress, CRC proof, automatic Lepton decode,
-and previous-run History.
+automatic Boson decode, and previous-run History.
 
 ## Start
+
+For normal HIL operation with exactly one complete ground Triple-Serial Teensy
+connected, start this payload UI and F Prime GDS together from the repository
+root:
+
+```bash
+./tools/c3m
+```
+
+The launcher uses the matching Pi-release dictionary and stops both processes
+on Ctrl-C. It does not connect to or modify the satellite/Pi.
+
+To run only the payload UI, use the command below.
 
 From the repository root on macOS:
 
@@ -17,6 +30,11 @@ python3 ground-station/c3m-payload-receiver-ui/c3m_payload_receiver_ui.py
 The app opens `http://127.0.0.1:8064/` and stores each run under repo-root
 `data/`. It selects the third ground Teensy serial interface only when that
 mapping is unambiguous; otherwise choose the channel-1 port in the page.
+
+The **Hotspot indicator** viewer overlay is enabled by default. Uncheck it to
+hide the computed hottest-pixel marker on current and archived thermal images;
+this only changes the browser display and never modifies the received `.fdp`,
+decoded CSV, or PNG.
 
 Do not request science downlink until the page shows
 `Ready — awaiting downlink`. Only one receiver may own the channel-1 serial
@@ -50,6 +68,35 @@ python3 ground-station/c3m-payload-receiver-ui/c3m_payload_receiver_ui.py \
 
 Use `--replay-bad-crc` to exercise the CRC failure state. Replay is local test
 evidence, not a substitute for the final three-run HIL rehearsal.
+
+Exercise best-effort recovery with a controlled missing packet:
+
+```bash
+python3 ground-station/c3m-payload-receiver-ui/c3m_payload_receiver_ui.py \
+  --replay-fdp ground-station/c3m-lepton-test-data/Dp_20260707_120740.fdp \
+  --replay-drop-packet 500 \
+  --transfer-timeout 5 \
+  --no-open
+```
+
+Normal operation keeps the preferred CRC-verified path. Transfers have no
+automatic time cutoff: the receiver continues until CRC-verified completion or
+the operator stops it. The `--transfer-timeout` option remains available for
+focused tests or explicitly bounded operations. When that option expires, the
+app saves a positional `.fdp.partial`, labels it partial, renders pixels touched
+by missing packets as white/`NaN`, and records the missing packet map and
+timeout reason in `run.json`. Hovering over white pixels reports `No data`.
+
+During an active transfer, **Stop & save partial** ends ground-side reception
+immediately and runs that same position-preserving partial-save path. It does
+not command or interrupt the satellite: the satellite finishes transmitting
+the current downlink while the receiver drains and ignores packets for that
+transfer. A later downlink with a new transfer ID is accepted normally. Use
+this action when the partial data is already sufficient; use GDS spacecraft
+commands separately if mission operations actually need to stop RF airtime.
+Once GDS reports `commsApp.DownlinkFinished`, request science downlink again to
+resend the same latest picture. The receiver preserves both the partial run and
+the later complete retry as separate History entries.
 
 ## Validation
 

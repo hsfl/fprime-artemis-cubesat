@@ -13,6 +13,21 @@ class LocalChannelHandler {
   virtual bool pollLocalResponse(uint8_t* payload, uint16_t& length) = 0;
 };
 
+class PayloadChannelHandler {
+ public:
+  virtual bool handlePayloadControl(const uint8_t* payload, uint16_t length) = 0;
+  virtual bool nextPayloadPacket(uint8_t* payload, uint16_t& length) = 0;
+  virtual void payloadPacketSent(bool sent) = 0;
+};
+
+// Preview records use the existing channel-1 transport but are deliberately
+// independent from the reliable science cache and its N2 repair protocol.
+class PreviewChannelHandler {
+ public:
+  virtual bool nextPreviewPacket(uint8_t* payload, uint16_t& length) = 0;
+  virtual void previewPacketAttempted(bool sent) = 0;
+};
+
 struct RelayConfig {
   bool enableUartToRf = true;
   bool uartOutputFramed = true;
@@ -32,7 +47,9 @@ class RelayUartRf {
               LinkCounters& counters,
               const RelayConfig& config = RelayConfig{},
               Stream* payloadIo = nullptr,
-              LocalChannelHandler* localHandler = nullptr);
+              LocalChannelHandler* localHandler = nullptr,
+              PayloadChannelHandler* payloadHandler = nullptr,
+              PreviewChannelHandler* previewHandler = nullptr);
 
   void begin();
   void poll();
@@ -57,18 +74,26 @@ class RelayUartRf {
   void processCommandByte(uint8_t b);
   void processFrameByte(uint8_t b);
   void flushRfToUart();
+  void handleRadioStateTransition();
+  void discardRadioWorkOnOff();
 
   void resetFrameParser(bool timeoutReset);
   void handleCompletedFrame();
   bool sendUartFrame(uint8_t channel, const uint8_t* payload, uint16_t length);
   bool sendRawToUart(const uint8_t* payload, uint16_t length);
 
-  bool sendPayloadOverRf(uint8_t channel, const uint8_t* payload, uint16_t length);
+  bool sendPayloadOverRf(uint8_t channel,
+                         const uint8_t* payload,
+                         uint16_t length,
+                         bool cachedPayload = false);
+  bool sendPreviewPacketBestEffort(const uint8_t* payload, uint16_t length);
+  bool sendRfPacket(const uint8_t* packet, uint8_t packetLen);
   bool sendRfPacketWithAck(const uint8_t* packet, uint8_t packetLen, uint8_t channel, uint8_t msgId, uint8_t segIdx);
   bool waitForAck(uint8_t channel, uint8_t msgId, uint8_t segIdx);
   bool isAckPacket(const uint8_t* packet, uint8_t packetLen, uint8_t channel, uint8_t msgId, uint8_t segIdx) const;
   bool sendAck(uint8_t channel, uint8_t msgId, uint8_t segIdx);
   void processRfSegment(const uint8_t* packet, uint8_t packetLen);
+  bool acceptRfReceiveResult(Rf23ReceiveResult result);
   void resetReassembly(uint8_t channel, bool timeoutReset, bool dropReset);
 
   uint16_t crc16Ccitt(const uint8_t* data, uint16_t len) const;
@@ -76,6 +101,8 @@ class RelayUartRf {
   bool enqueueUplinkMessage(uint8_t channel, const uint8_t* payload, uint16_t length);
   bool enqueueDownlinkMessage(uint8_t channel, const uint8_t* payload, uint16_t length);
   void serviceUplinkQueue();
+  void serviceCachedPayload();
+  void servicePreview();
   void serviceDownlinkQueue();
 
   static constexpr uint8_t MAX_QUEUE_DEPTH = 32;
@@ -101,9 +128,12 @@ class RelayUartRf {
   Stream& m_linkIo;
   Stream* m_payloadIo;
   LocalChannelHandler* m_localHandler;
+  PayloadChannelHandler* m_payloadHandler;
+  PreviewChannelHandler* m_previewHandler;
   Rf23Driver& m_rf;
   LinkCounters& m_counters;
   RelayConfig m_config;
+  bool m_lastRadioReady;
 
   ParseState m_state;
   uint8_t m_frameChannel;
@@ -117,7 +147,7 @@ class RelayUartRf {
   size_t m_commandIndex;
   uint32_t m_lastFrameByteMs;
 
-  uint8_t m_nextMsgId;
+  uint8_t m_nextMsgId[link_protocol::CHANNEL_COUNT];
   ReassemblyState m_reassembly[link_protocol::CHANNEL_COUNT];
 
   uint8_t m_rawUartBuf[link_protocol::FRAME_MAX_PAYLOAD];

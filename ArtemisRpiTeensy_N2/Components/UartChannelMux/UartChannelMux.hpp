@@ -26,16 +26,25 @@ class UartChannelMux final : public UartChannelMuxComponentBase {
     };
 
     Drv::ByteStreamStatus ccsdsSendIn_handler(FwIndexType portNum, Fw::Buffer& sendBuffer) override;
-    void payloadSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
+    Components::PayloadSendStatus payloadSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
     void localSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
     void rfLocalSendIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
+    Components::PayloadSendStatus payloadCacheSendIn_handler(FwIndexType portNum,
+                                                             Fw::Buffer& fwBuffer) override;
+    Components::PayloadSendStatus previewSendIn_handler(FwIndexType portNum,
+                                                        Fw::Buffer& fwBuffer) override;
     void drvReceiveIn_handler(FwIndexType portNum,
                               Fw::Buffer& buffer,
                               const Drv::ByteStreamStatus& status) override;
     void ccsdsRecvReturnIn_handler(FwIndexType portNum, Fw::Buffer& fwBuffer) override;
 
-    Drv::ByteStreamStatus sendWrapped(U8 channel, const U8* data, FwSizeType size);
-    static U64 interFrameDelayUs(U8 channel, FwSizeType size);
+    Drv::ByteStreamStatus sendWrapped(U8 channel,
+                                      const U8* data,
+                                      FwSizeType size,
+                                      bool payloadCachePacing = false);
+    static U64 interFrameDelayUs(U8 channel,
+                                 FwSizeType size,
+                                 bool payloadCachePacing = false);
     void parseByte(U8 byte);
     void resetParser();
     void handleFrame();

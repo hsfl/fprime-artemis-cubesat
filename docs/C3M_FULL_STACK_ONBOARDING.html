@@ -1,0 +1,1335 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interactive onboarding guide to the EPSCoR C3M F Prime, Teensy, RF, and ground-station demo stack.">
+  <title>C3M Full-Stack Mental Model</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #071016;
+      --bg-2: #0b161e;
+      --surface: #101e28;
+      --surface-2: #142633;
+      --surface-3: #19303e;
+      --text: #eef8fb;
+      --muted: #9db4bd;
+      --faint: #6f8791;
+      --border: rgba(182, 224, 235, 0.15);
+      --border-strong: rgba(182, 224, 235, 0.28);
+      --cyan: #58d6e7;
+      --cyan-soft: rgba(88, 214, 231, 0.13);
+      --green: #71d6a0;
+      --green-soft: rgba(113, 214, 160, 0.12);
+      --orange: #ffad66;
+      --orange-soft: rgba(255, 173, 102, 0.13);
+      --pink: #ef87ba;
+      --pink-soft: rgba(239, 135, 186, 0.13);
+      --yellow: #e8d27a;
+      --red: #ff7d7d;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+      --radius: 18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body[data-theme="light"] {
+      color-scheme: light;
+      --bg: #edf4f5;
+      --bg-2: #e5eef0;
+      --surface: #ffffff;
+      --surface-2: #f5f9fa;
+      --surface-3: #eaf3f5;
+      --text: #13242b;
+      --muted: #526a73;
+      --faint: #71858c;
+      --border: rgba(24, 61, 72, 0.13);
+      --border-strong: rgba(24, 61, 72, 0.24);
+      --cyan: #087f95;
+      --cyan-soft: rgba(8, 127, 149, 0.10);
+      --green: #217e4b;
+      --green-soft: rgba(33, 126, 75, 0.10);
+      --orange: #b85c12;
+      --orange-soft: rgba(184, 92, 18, 0.10);
+      --pink: #a33870;
+      --pink-soft: rgba(163, 56, 112, 0.10);
+      --yellow: #8f7418;
+      --red: #b73535;
+      --shadow: 0 18px 46px rgba(25, 56, 65, 0.10);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 28px; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 80% 4%, rgba(88, 214, 231, 0.10), transparent 24rem),
+        radial-gradient(circle at 15% 32%, rgba(239, 135, 186, 0.07), transparent 24rem),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.6;
+    }
+
+    a { color: var(--cyan); text-underline-offset: 3px; }
+    a:hover { text-decoration-thickness: 2px; }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    code, pre, .mono { font-family: var(--mono); }
+    code {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface-3);
+      padding: 0.08rem 0.34rem;
+      font-size: 0.88em;
+    }
+    pre {
+      position: relative;
+      overflow: auto;
+      margin: 0;
+      padding: 1rem 1.1rem;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #071219;
+      color: #dff7fb;
+      font-size: 0.82rem;
+      line-height: 1.65;
+    }
+    body[data-theme="light"] pre { background: #122831; }
+    h1, h2, h3, h4 { line-height: 1.14; letter-spacing: -0.025em; }
+    h1 { margin: 0.5rem 0 1rem; font-size: clamp(2.65rem, 6vw, 5.25rem); max-width: 13ch; }
+    h2 { margin: 0 0 0.85rem; font-size: clamp(1.85rem, 3vw, 3rem); }
+    h3 { margin: 0 0 0.55rem; font-size: 1.16rem; }
+    h4 { margin: 0 0 0.45rem; font-size: 0.98rem; }
+    p { margin: 0.5rem 0 0; }
+    ul, ol { padding-left: 1.25rem; }
+    li + li { margin-top: 0.38rem; }
+    ::selection { background: rgba(88, 214, 231, 0.28); }
+    :focus-visible { outline: 3px solid var(--cyan); outline-offset: 3px; }
+
+    .reading-progress {
+      position: fixed;
+      inset: 0 auto auto 0;
+      z-index: 100;
+      width: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--cyan), var(--green), var(--orange));
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 8px;
+      left: 8px;
+      z-index: 200;
+      transform: translateY(-160%);
+      padding: 0.65rem 0.85rem;
+      border-radius: 8px;
+      background: var(--text);
+      color: var(--bg);
+    }
+    .skip-link:focus { transform: translateY(0); }
+
+    .sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      z-index: 20;
+      display: flex;
+      width: 268px;
+      flex-direction: column;
+      gap: 1rem;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg) 91%, transparent);
+      padding: 1.25rem 1rem;
+      backdrop-filter: blur(18px);
+    }
+    .brand {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 0.7rem;
+      align-items: center;
+      padding: 0.35rem 0.3rem 0.7rem;
+    }
+    .brand-mark {
+      display: grid;
+      width: 42px;
+      height: 42px;
+      place-items: center;
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      background: linear-gradient(145deg, var(--cyan-soft), var(--pink-soft));
+      color: var(--cyan);
+      font-family: var(--mono);
+      font-weight: 800;
+    }
+    .brand strong { display: block; font-size: 0.9rem; }
+    .brand span { display: block; color: var(--muted); font-size: 0.72rem; }
+    .side-label {
+      margin: 0.5rem 0.55rem 0.2rem;
+      color: var(--faint);
+      font-size: 0.67rem;
+      font-weight: 800;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+    .nav-list { display: grid; gap: 0.18rem; margin: 0; padding: 0; list-style: none; }
+    .nav-list a {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      padding: 0.48rem 0.62rem;
+      color: var(--muted);
+      font-size: 0.81rem;
+      text-decoration: none;
+      transition: 150ms ease;
+    }
+    .nav-list a::before {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--border-strong);
+      content: "";
+    }
+    .nav-list a:hover, .nav-list a[aria-current="true"] {
+      border-color: var(--border);
+      background: var(--surface);
+      color: var(--text);
+    }
+    .nav-list a[aria-current="true"]::before { background: var(--cyan); box-shadow: 0 0 0 4px var(--cyan-soft); }
+    .sidebar-footer { margin-top: auto; display: grid; gap: 0.55rem; }
+    .theme-button, .ghost-button {
+      cursor: pointer;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      padding: 0.58rem 0.72rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+    .theme-button:hover, .ghost-button:hover { border-color: var(--border-strong); color: var(--text); }
+    .side-note { color: var(--faint); font-size: 0.68rem; line-height: 1.45; }
+
+    .content { margin-left: 268px; }
+    .hero, .section, .page-footer { width: min(1180px, calc(100% - 3rem)); margin-inline: auto; }
+    .hero { min-height: 92vh; display: grid; align-content: center; padding: 6rem 0 4rem; }
+    .eyebrow {
+      color: var(--cyan);
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .hero-lede { max-width: 760px; color: var(--muted); font-size: clamp(1.05rem, 1.7vw, 1.35rem); }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1.35rem; }
+    .hero-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      padding: 0.62rem 0.82rem;
+      color: var(--text);
+      font-size: 0.82rem;
+      font-weight: 750;
+      text-decoration: none;
+    }
+    .hero-link.primary { border-color: var(--cyan); background: var(--cyan-soft); }
+    .hero-link:hover { border-color: var(--cyan); }
+    .tag-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.4rem; }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.38rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      padding: 0.38rem 0.66rem;
+      color: var(--muted);
+      font-size: 0.74rem;
+    }
+    .tag::before { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); content: ""; }
+    .tag.green::before { background: var(--green); }
+    .tag.orange::before { background: var(--orange); }
+    .tag.pink::before { background: var(--pink); }
+    .bluf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin-top: 2.4rem; }
+    .bluf-card {
+      min-height: 170px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: linear-gradient(145deg, var(--surface), color-mix(in srgb, var(--surface) 70%, transparent));
+      padding: 1.2rem;
+      box-shadow: var(--shadow);
+    }
+    .bluf-card .number { color: var(--faint); font-family: var(--mono); font-size: 0.72rem; }
+    .bluf-card strong { display: block; margin: 0.8rem 0 0.35rem; font-size: 1.06rem; }
+    .bluf-card p { color: var(--muted); font-size: 0.86rem; }
+
+    .section { padding: 5.3rem 0; border-top: 1px solid var(--border); }
+    .section-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 430px); gap: 2rem; align-items: end; margin-bottom: 2rem; }
+    .section-head p { color: var(--muted); font-size: 0.94rem; }
+    .kicker { margin-bottom: 0.55rem; color: var(--orange); font-family: var(--mono); font-size: 0.7rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+    .callout {
+      border: 1px solid var(--border-strong);
+      border-left: 4px solid var(--cyan);
+      border-radius: 12px;
+      background: var(--cyan-soft);
+      padding: 0.9rem 1rem;
+      color: var(--muted);
+      font-size: 0.87rem;
+    }
+    .callout strong { color: var(--text); }
+    .callout.warning { border-left-color: var(--orange); background: var(--orange-soft); }
+    .callout.success { border-left-color: var(--green); background: var(--green-soft); }
+    .callout.pink { border-left-color: var(--pink); background: var(--pink-soft); }
+
+    .model-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; }
+    .model-card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--surface);
+      padding: 1.15rem;
+    }
+    .model-card .icon {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border-radius: 9px;
+      background: var(--cyan-soft);
+      color: var(--cyan);
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 800;
+    }
+    .model-card:nth-child(2n) .icon { background: var(--orange-soft); color: var(--orange); }
+    .model-card:nth-child(3n) .icon { background: var(--green-soft); color: var(--green); }
+    .model-card h3 { margin-top: 0.8rem; }
+    .model-card p { color: var(--muted); font-size: 0.84rem; }
+
+    .demo-shell {
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      gap: 1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 0.8rem;
+    }
+    .step-tabs { display: grid; align-content: start; gap: 0.35rem; }
+    .step-tab {
+      display: grid;
+      grid-template-columns: 26px 1fr;
+      gap: 0.65rem;
+      align-items: center;
+      cursor: pointer;
+      border: 1px solid transparent;
+      border-radius: 11px;
+      background: transparent;
+      padding: 0.62rem;
+      text-align: left;
+      color: var(--muted);
+    }
+    .step-tab span:first-child {
+      display: grid;
+      width: 26px;
+      height: 26px;
+      place-items: center;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 0.68rem;
+    }
+    .step-tab:hover, .step-tab[aria-selected="true"] { border-color: var(--border); background: var(--surface-2); color: var(--text); }
+    .step-tab[aria-selected="true"] span:first-child { border-color: var(--cyan); background: var(--cyan-soft); color: var(--cyan); }
+    .step-panel { min-height: 430px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-2); padding: clamp(1.2rem, 3vw, 2rem); }
+    .step-panel[hidden] { display: none; }
+    .step-meta { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 1rem 0; }
+    .mini-pill { border: 1px solid var(--border); border-radius: 999px; padding: 0.25rem 0.52rem; color: var(--muted); font-family: var(--mono); font-size: 0.67rem; }
+    .signal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.65rem; margin-top: 1.2rem; }
+    .signal { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 0.8rem; }
+    .signal span { display: block; margin-bottom: 0.35rem; color: var(--faint); font-size: 0.66rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+    .signal strong { font-size: 0.83rem; }
+
+    .path-toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+    .path-toggle {
+      cursor: pointer;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      padding: 0.45rem 0.72rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+    .path-toggle:hover, .path-toggle[aria-pressed="true"] { border-color: var(--cyan); background: var(--cyan-soft); color: var(--text); }
+    .system-map { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 1rem; overflow: hidden; }
+    .map-lane { display: grid; grid-template-columns: repeat(5, minmax(135px, 1fr)); gap: 0.55rem; align-items: stretch; counter-reset: map-node; }
+    .map-node {
+      position: relative;
+      display: grid;
+      min-height: 126px;
+      align-content: space-between;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      background: var(--surface-2);
+      padding: 0.75rem;
+      color: var(--text);
+      font: inherit;
+      text-align: left;
+      transition: opacity 180ms ease, transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+      counter-increment: map-node;
+    }
+    .map-node::before { position: absolute; top: 0.55rem; right: 0.6rem; color: var(--faint); content: counter(map-node, decimal-leading-zero); font-family: var(--mono); font-size: 0.58rem; }
+    .map-node .node-type { color: var(--faint); font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .map-node strong { font-size: 0.79rem; line-height: 1.28; }
+    .map-node small { color: var(--muted); font-size: 0.64rem; line-height: 1.35; }
+    .map-node.is-active { z-index: 3; border-color: var(--cyan); box-shadow: 0 0 0 3px var(--cyan-soft); transform: translateY(-3px); }
+    .map-node.is-dimmed { opacity: 0.23; }
+    .map-node.is-selected { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-soft); }
+    .direction-strip { display: flex; justify-content: space-between; gap: 1rem; margin: 0.8rem 0 0; color: var(--faint); font-family: var(--mono); font-size: 0.67rem; }
+    .path-panel { margin-top: 1rem; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-2); padding: 1rem; }
+    .path-panel[hidden] { display: none; }
+    .path-panel .flow-line { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-top: 0.75rem; }
+    .flow-chip { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 0.32rem 0.5rem; font-family: var(--mono); font-size: 0.67rem; }
+    .flow-arrow { color: var(--cyan); }
+    .node-inspector {
+      display: grid;
+      grid-template-columns: 0.75fr 1fr 1fr;
+      gap: 0.7rem;
+      margin-top: 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface-2);
+      padding: 0.9rem;
+    }
+    .node-inspector span { display: block; color: var(--faint); font-size: 0.63rem; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; }
+    .node-inspector strong, .node-inspector code { display: block; margin-top: 0.3rem; font-size: 0.78rem; }
+
+    .coordinate-panel { margin-top: 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 1rem; }
+    .number-controls { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.8rem 0; }
+    .number-filter { cursor: pointer; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); padding: 0.4rem 0.62rem; color: var(--muted); font-size: 0.76rem; }
+    .number-filter[aria-pressed="true"] { border-color: var(--orange); background: var(--orange-soft); color: var(--text); }
+    .coordinate-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.65rem; }
+    .coordinate-lane { min-width: 0; border: 1px solid var(--border); border-radius: 13px; background: var(--bg-2); padding: 0.8rem; }
+    .coordinate-lane h4 { color: var(--cyan); }
+    .coordinate-cell { display: grid; grid-template-columns: 32px 1fr; gap: 0.55rem; align-items: start; margin-top: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.5rem; transition: opacity 150ms ease; }
+    .coordinate-cell b { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 8px; background: var(--cyan-soft); color: var(--cyan); font-family: var(--mono); }
+    .coordinate-cell span { color: var(--muted); font-size: 0.76rem; }
+    .coordinate-cell.is-dimmed { opacity: 0.2; }
+
+    .role-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.8rem; margin-top: 1rem; }
+    .role-card { border: 1px solid var(--border); border-radius: 15px; background: var(--surface); padding: 1rem; }
+    .role-card .where { color: var(--orange); font-family: var(--mono); font-size: 0.65rem; text-transform: uppercase; }
+    .role-card p { color: var(--muted); font-size: 0.81rem; }
+
+    .fundamental-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.7rem; }
+    .fundamental { border-top: 3px solid var(--cyan); border-radius: 12px; background: var(--surface); padding: 1rem; }
+    .fundamental:nth-child(2n) { border-top-color: var(--orange); }
+    .fundamental:nth-child(3n) { border-top-color: var(--green); }
+    .fundamental p { color: var(--muted); font-size: 0.8rem; }
+    .amd {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.7rem;
+      margin-top: 1rem;
+    }
+    .amd-card { position: relative; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); padding: 1.2rem; }
+    .amd-card:not(:last-child)::after { position: absolute; top: 50%; right: -0.72rem; z-index: 2; color: var(--cyan); content: "→"; }
+    .amd-card .layer { color: var(--faint); font-family: var(--mono); font-size: 0.67rem; }
+    .amd-card .question { display: block; margin: 0.6rem 0; color: var(--orange); font-size: 1rem; font-weight: 750; }
+    .amd-card p { color: var(--muted); font-size: 0.82rem; }
+
+    .trace {
+      display: grid;
+      gap: 0;
+      counter-reset: trace;
+      margin-top: 1rem;
+    }
+    .trace-item { position: relative; display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 0.8rem; padding-bottom: 1rem; counter-increment: trace; }
+    .trace-item::before {
+      display: grid;
+      z-index: 2;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--cyan);
+      content: counter(trace, decimal-leading-zero);
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      font-weight: 800;
+    }
+    .trace-item:not(:last-child)::after { position: absolute; top: 34px; bottom: 0; left: 16px; width: 1px; background: var(--border); content: ""; }
+    .trace-body { border: 1px solid var(--border); border-radius: 13px; background: var(--surface); padding: 0.85rem 1rem; }
+    .trace-body h4 { color: var(--text); }
+    .trace-body p { color: var(--muted); font-size: 0.82rem; }
+    .boundary-tag { display: inline-block; margin-bottom: 0.45rem; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); padding: 0.2rem 0.45rem; color: var(--faint); font-family: var(--mono); font-size: 0.61rem; letter-spacing: 0.05em; text-transform: uppercase; }
+    .boundary-tag[data-boundary="ground"] { border-color: color-mix(in srgb, var(--green) 42%, var(--border)); color: var(--green); }
+    .boundary-tag[data-boundary="transport"] { border-color: color-mix(in srgb, var(--orange) 42%, var(--border)); color: var(--orange); }
+    .boundary-tag[data-boundary="flight"] { border-color: color-mix(in srgb, var(--cyan) 42%, var(--border)); color: var(--cyan); }
+
+    .table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: 15px; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); font-size: 0.82rem; }
+    th, td { padding: 0.78rem 0.85rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: var(--surface-2); color: var(--faint); font-size: 0.66rem; letter-spacing: 0.09em; text-transform: uppercase; }
+    tbody tr:last-child td { border-bottom: 0; }
+    td strong { color: var(--text); }
+    td { color: var(--muted); }
+    .status-good { color: var(--green); font-weight: 800; }
+    .status-warn { color: var(--orange); font-weight: 800; }
+    .status-info { color: var(--cyan); font-weight: 800; }
+
+    .proof-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 0.72fr); gap: 1rem; }
+    .proof-ladder { display: grid; gap: 0.48rem; }
+    .proof-rung {
+      display: grid;
+      grid-template-columns: 70px 1fr;
+      gap: 0.8rem;
+      align-items: center;
+      width: 100%;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      background: var(--surface);
+      padding: 0.72rem;
+      color: var(--text);
+      font: inherit;
+      text-align: left;
+    }
+    .proof-rung .level { color: var(--faint); font-family: var(--mono); font-size: 0.65rem; }
+    .proof-rung strong { display: block; font-size: 0.86rem; }
+    .proof-rung .proof-summary { display: block; color: var(--muted); font-size: 0.75rem; }
+    .proof-rung:nth-child(n+4) { border-color: color-mix(in srgb, var(--green) 32%, var(--border)); }
+    .proof-rung[aria-pressed="true"] { border-color: var(--cyan); background: var(--cyan-soft); }
+    .proof-detail { margin-top: 0.65rem; border: 1px solid var(--border); border-radius: 13px; background: var(--bg-2); padding: 0.9rem; }
+    .proof-detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.7rem; }
+    .proof-detail span { display: block; color: var(--faint); font-size: 0.63rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+    .proof-detail strong { display: block; margin-top: 0.3rem; font-size: 0.78rem; }
+    .evidence-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 1.15rem; }
+    .metric-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.55rem; margin: 1rem 0; }
+    .metric { border: 1px solid var(--border); border-radius: 11px; background: var(--surface-2); padding: 0.72rem; }
+    .metric strong { display: block; color: var(--cyan); font-family: var(--mono); font-size: 1.03rem; }
+    .metric span { color: var(--faint); font-size: 0.66rem; }
+
+    details { border: 1px solid var(--border); border-radius: 13px; background: var(--surface); }
+    details + details { margin-top: 0.55rem; }
+    summary { cursor: pointer; padding: 0.85rem 1rem; font-weight: 750; }
+    summary::marker { color: var(--cyan); }
+    .details-body { border-top: 1px solid var(--border); padding: 0.9rem 1rem 1rem; color: var(--muted); font-size: 0.83rem; }
+
+    .repo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+    .repo-card { display: block; border: 1px solid var(--border); border-radius: 15px; background: var(--surface); padding: 1rem; color: var(--text); text-decoration: none; transition: 150ms ease; }
+    .repo-card:hover { border-color: var(--cyan); transform: translateY(-2px); }
+    .repo-card .path { display: block; overflow-wrap: anywhere; color: var(--cyan); font-family: var(--mono); font-size: 0.68rem; }
+    .repo-card strong { display: block; margin: 0.55rem 0 0.25rem; }
+    .repo-card p { color: var(--muted); font-size: 0.77rem; }
+
+    .onboarding-grid { display: grid; grid-template-columns: 0.72fr 1.28fr; gap: 1rem; }
+    .section-head > *, .demo-shell > *, .proof-grid > *, .onboarding-grid > * { min-width: 0; }
+    .checklist { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 1.1rem; }
+    .checklist ol { margin-bottom: 0; }
+    .change-table td:first-child { width: 32%; color: var(--text); font-weight: 700; }
+
+    .glossary-tools { display: flex; gap: 0.65rem; margin-bottom: 1rem; }
+    .glossary-search {
+      width: min(520px, 100%);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      outline: none;
+      background: var(--surface);
+      padding: 0.7rem 0.8rem;
+      color: var(--text);
+    }
+    .glossary-search:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px var(--cyan-soft); }
+    .glossary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.65rem; }
+    .term { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 0.85rem; }
+    .term dt { color: var(--cyan); font-family: var(--mono); font-size: 0.76rem; font-weight: 800; }
+    .term dd { margin: 0.35rem 0 0; color: var(--muted); font-size: 0.76rem; }
+    .term[hidden] { display: none; }
+
+    .source-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.55rem; margin-top: 1rem; }
+    .source-list a { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 0.62rem; font-size: 0.74rem; text-decoration: none; }
+    .source-list a:hover { border-color: var(--cyan); }
+    .page-footer { padding: 2.5rem 0 4rem; border-top: 1px solid var(--border); color: var(--faint); font-size: 0.76rem; }
+
+    .copy-button {
+      position: absolute;
+      top: 0.55rem;
+      right: 0.55rem;
+      cursor: pointer;
+      border: 1px solid rgba(223, 247, 251, 0.18);
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 0.28rem 0.46rem;
+      color: #a9c8d0;
+      font-family: var(--sans);
+      font-size: 0.63rem;
+    }
+    .copy-button:hover { color: #fff; }
+
+    @media (max-width: 1120px) {
+      .map-lane { grid-template-columns: repeat(3, 1fr); }
+      .role-grid, .fundamental-grid { grid-template-columns: repeat(2, 1fr); }
+      .repo-grid, .glossary-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 900px) {
+      .sidebar { position: sticky; inset: 0 0 auto; width: 100%; max-height: none; flex-direction: row; align-items: center; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 0.6rem 0.8rem; }
+      .brand { min-width: 210px; padding: 0; }
+      .brand-mark { width: 34px; height: 34px; }
+      .side-label, .sidebar-footer { display: none; }
+      .nav-list { display: flex; }
+      .nav-list li { min-width: max-content; }
+      .nav-list a::before { display: none; }
+      .content { margin-left: 0; }
+      .hero { min-height: auto; padding-top: 5rem; }
+      .section-head, .proof-grid, .onboarding-grid, .node-inspector, .coordinate-grid, .proof-detail-grid { grid-template-columns: 1fr; }
+      .bluf-grid, .model-grid { grid-template-columns: repeat(2, 1fr); }
+      .demo-shell { grid-template-columns: 1fr; }
+      .step-tabs { grid-template-columns: repeat(4, 1fr); }
+      .step-tab { grid-template-columns: 26px; justify-content: center; }
+      .step-tab span:last-child { display: none; }
+    }
+    @media (max-width: 640px) {
+      .hero, .section, .page-footer { width: min(100% - 1.3rem, 1180px); }
+      .hero { padding-bottom: 3rem; }
+      .section { padding: 3.8rem 0; }
+      .bluf-grid, .model-grid, .role-grid, .fundamental-grid, .amd, .repo-grid, .glossary-grid, .source-list, .signal-grid { grid-template-columns: 1fr; }
+      .amd-card:not(:last-child)::after { top: auto; right: 50%; bottom: -1.1rem; transform: rotate(90deg); }
+      .map-lane { grid-template-columns: repeat(2, 1fr); }
+      .step-tabs { grid-template-columns: repeat(4, 1fr); }
+      .metric-grid { grid-template-columns: 1fr; }
+      h1 { font-size: clamp(2.45rem, 15vw, 4rem); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="reading-progress" aria-hidden="true"></div>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <aside class="sidebar" aria-label="Page navigation">
+    <div class="brand">
+      <div class="brand-mark">C3M</div>
+      <div><strong>Full-stack onboarding</strong><span>Click → RF → thermal image</span></div>
+    </div>
+    <div class="side-label">Mental model</div>
+    <ul class="nav-list">
+      <li><a href="#top">BLUF</a></li>
+      <li><a href="#models">Core models</a></li>
+      <li><a href="#onboarding">Onboarding path</a></li>
+      <li><a href="#demo">Demo story</a></li>
+      <li><a href="#map">System map</a></li>
+      <li><a href="#fprime">F´ fundamentals</a></li>
+      <li><a href="#science">Science path</a></li>
+      <li><a href="#proof">Proof</a></li>
+      <li><a href="#debug">Debugging</a></li>
+      <li><a href="#repo">Repo map</a></li>
+      <li><a href="#glossary">Glossary</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      <button class="theme-button" type="button" data-theme-toggle>Switch theme</button>
+      <div class="side-note">Self-contained HTML. No network, framework, or external asset required.</div>
+    </div>
+  </aside>
+
+  <div class="content">
+    <main id="main">
+      <header class="hero" id="top">
+        <div class="eyebrow">EPSCoR C3M · Artemis prototype · F´ flight software</div>
+        <h1>From one command to one thermal image.</h1>
+        <p class="hero-lede">This page shows where each part of the demo runs. It shows how commands and science data move through the system. It also shows which evidence proves ground delivery.</p>
+        <div class="hero-actions" aria-label="Start this guide">
+          <a class="hero-link primary" href="#onboarding">Start the onboarding path</a>
+          <a class="hero-link" href="#demo">Follow the demo story</a>
+          <a class="hero-link" href="#map">Open the system map</a>
+        </div>
+        <div class="tag-row" aria-label="Current system facts">
+          <span class="tag">Pi Zero W runs F´</span>
+          <span class="tag green">Lepton default · Boson selectable</span>
+          <span class="tag orange">RFM23BP satellite · RFM23BP or HackRF ground</span>
+          <span class="tag pink">GDS + payload receiver UI</span>
+          <span class="tag">STE-informed language</span>
+        </div>
+
+        <div class="bluf-grid">
+          <article class="bluf-card">
+            <span class="number">01 / MISSION BRAIN</span>
+            <strong>The Raspberry Pi owns meaning.</strong>
+            <p>F´ controls mission modes and validates commands. It schedules capture, creates science products, and requests downlink.</p>
+          </article>
+          <article class="bluf-card">
+            <span class="number">02 / TRANSPORT BRIDGES</span>
+            <strong>The Teensys move and control bytes.</strong>
+            <p>The satellite Teensy connects local hardware to RF. The ground Teensy separates RF traffic into three USB interfaces.</p>
+          </article>
+          <article class="bluf-card">
+            <span class="number">03 / GROUND TRUTH</span>
+            <strong>The laptop proves the outcome.</strong>
+            <p>GDS shows commands, events, and telemetry. The receiver reconstructs the <code>.fdp</code> and verifies its CRC. It also decodes pixels and saves evidence.</p>
+          </article>
+        </div>
+        <div class="callout" style="margin-top:1rem"><strong>Writing method:</strong> this guide applies ASD-STE100 fundamentals. It uses short sentences, active voice, one topic per sentence, and consistent technical terms. This guide does not claim formal ASD-STE100 compliance.</div>
+      </header>
+
+      <section class="section" id="models">
+        <div class="section-head">
+          <div>
+            <div class="kicker">01 · The six ideas to memorize</div>
+            <h2>Mental models before details</h2>
+          </div>
+          <p>If these six models are clear, the codebase stops looking like unrelated C++, Python, Arduino, and web folders. It becomes one distributed pipeline with explicit ownership boundaries.</p>
+        </div>
+
+        <div class="model-grid">
+          <article class="model-card"><div class="icon">DS</div><h3>A distributed system on a bench</h3><p>There is no single “app.” The laptop, two Teensys, Raspberry Pi, two radios, and camera cooperate across process and hardware boundaries.</p></article>
+          <article class="model-card"><div class="icon">2P</div><h3>Two planes, two jobs</h3><p><strong>Control plane:</strong> commands/events/telemetry through CCSDS. <strong>Data plane:</strong> bulk science through a separate packet-and-file protocol.</p></article>
+          <article class="model-card"><div class="icon">API</div><h3>FPP is the contract</h3><p>Component `.fpp` files declare typed ports and ground interfaces. Generated C++ and the dictionary make those contracts executable and visible in GDS.</p></article>
+          <article class="model-card"><div class="icon">HAL</div><h3>Policy → contract → mechanism</h3><p>Applications decide <em>why/when</em>. Managers define a stable subsystem capability. Drivers implement the camera, radio, PDU, or simulator details.</p></article>
+          <article class="model-card"><div class="icon">MUX</div><h3>One wire, several virtual lanes</h3><p>The Pi has one UART to the satellite Teensy, so `UartChannelMux` labels traffic. Channel numbers are logical lanes, not extra physical wires.</p></article>
+          <article class="model-card"><div class="icon">✓</div><h3>“Sent” is not “received”</h3><p>A flight-side completion event proves the sender finished. Ground CRC + decode proves every required byte arrived and still has meaning.</p></article>
+        </div>
+
+        <div class="callout warning" style="margin-top:1rem"><strong>Scope truth:</strong> this page explains the current C3M demo on the active `epscorc3m` transport identity. It is a demo/HIL architecture, not a flight-readiness, encryption, authentication, or full spacecraft qualification claim.</div>
+        <div class="callout" style="margin-top:1rem"><strong>Numbering warning:</strong> RF logical channels, Pi↔satellite-Teensy UART virtual channels, and ground USB interface numbers are related mappings—not one shared numbering system. Always name both the boundary and the number.</div>
+      </section>
+
+      <section class="section" id="demo">
+        <div class="section-head">
+          <div>
+            <div class="kicker">02 · Follow the operator</div>
+            <h2>The demo is the architecture</h2>
+          </div>
+          <p>Click each step. Every architectural layer exists to make this short story reliable, observable, and replaceable.</p>
+        </div>
+
+        <div class="demo-shell">
+          <div class="step-tabs" role="tablist" aria-label="Demo steps">
+            <button class="step-tab" id="step-tab-0" type="button" role="tab" aria-label="Step 00: Start ground" aria-selected="true" aria-controls="step-panel-0" tabindex="0"><span>00</span><span>Start ground</span></button>
+            <button class="step-tab" id="step-tab-1" type="button" role="tab" aria-label="Step 01: Base mode and SOH" aria-selected="false" aria-controls="step-panel-1" tabindex="-1"><span>01</span><span>Base + SOH</span></button>
+            <button class="step-tab" id="step-tab-2" type="button" role="tab" aria-label="Step 02: Schedule collection" aria-selected="false" aria-controls="step-panel-2" tabindex="-1"><span>02</span><span>Schedule</span></button>
+            <button class="step-tab" id="step-tab-3" type="button" role="tab" aria-label="Step 03: Capture a frame" aria-selected="false" aria-controls="step-panel-3" tabindex="-1"><span>03</span><span>Capture</span></button>
+            <button class="step-tab" id="step-tab-4" type="button" role="tab" aria-label="Step 04: Store the product" aria-selected="false" aria-controls="step-panel-4" tabindex="-1"><span>04</span><span>Store</span></button>
+            <button class="step-tab" id="step-tab-5" type="button" role="tab" aria-label="Step 05: Downlink science" aria-selected="false" aria-controls="step-panel-5" tabindex="-1"><span>05</span><span>Downlink</span></button>
+            <button class="step-tab" id="step-tab-6" type="button" role="tab" aria-label="Step 06: Repair missing data" aria-selected="false" aria-controls="step-panel-6" tabindex="-1"><span>06</span><span>Repair</span></button>
+            <button class="step-tab" id="step-tab-7" type="button" role="tab" aria-label="Step 07: Prove delivery" aria-selected="false" aria-controls="step-panel-7" tabindex="-1"><span>07</span><span>Prove</span></button>
+          </div>
+
+          <div>
+            <article class="step-panel" id="step-panel-0" role="tabpanel" aria-labelledby="step-tab-0" tabindex="0">
+              <div class="eyebrow">Ground segment</div><h3>Start the two operator surfaces</h3>
+              <p>Use <code>./tools/c3m</code> with one complete Triple-Serial Teensy/RFM23BP node. It is the accepted primary C3M ground radio and uses the dictionary from the exact deployed Pi build. The preserved <code>./tools/c3m-sdr</code> path is for deliberate research and receive diagnosis, not normal operations; see the <a href="archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md">2026-08-06 engineering decision</a>.</p>
+              <div class="step-meta"><span class="mini-pill">Primary RFM GDS · :5050</span><span class="mini-pill">Receiver · :8064</span><span class="mini-pill">HackRF · research only</span></div>
+              <pre><button class="copy-button" type="button">Copy</button>cd ~/Developer/fprime-artemis-cubesat
+./tools/c3m       # primary ground Teensy + RFM23BP</pre>
+              <div class="signal-grid"><div class="signal"><span>Ready signal</span><strong>Receiver says “Ready — awaiting downlink”</strong></div><div class="signal"><span>Control surface</span><strong>GDS Commanding / Events / Channels</strong></div><div class="signal"><span>Why first?</span><strong>Nothing should transmit before its consumer is listening</strong></div></div>
+            </article>
+
+            <article class="step-panel" id="step-panel-1" role="tabpanel" aria-labelledby="step-tab-1" tabindex="0" hidden>
+              <div class="eyebrow">Control plane · channel 0</div><h3>Establish a known mission state</h3>
+              <p>Send <code>missionApp.ENTER_BASE_MODE</code>, then <code>sohApp.EMIT_SOH_SNAPSHOT</code>. The first command resets the visible mission story. The second asks the health aggregator for a discrete, operator-readable snapshot.</p>
+              <div class="step-meta"><span class="mini-pill">Mode = BASE (0)</span><span class="mini-pill">Command ACK</span><span class="mini-pill">ModeChanged event</span><span class="mini-pill">SOH Snapshot event</span></div>
+              <div class="signal-grid"><div class="signal"><span>Command proves</span><strong>The uplink and handler work</strong></div><div class="signal"><span>Event proves</span><strong>The component executed its state change</strong></div><div class="signal"><span>Telemetry proves</span><strong>The current state is visible over time</strong></div></div>
+            </article>
+
+            <article class="step-panel" id="step-panel-2" role="tabpanel" aria-labelledby="step-tab-2" tabindex="0" hidden>
+              <div class="eyebrow">Mission timing</div><h3>Schedule collection ten seconds out</h3>
+              <p><code>missionApp.SCHEDULE_COLLECTION(delaySeconds = 10)</code> validates the range, stores a countdown, and changes mode to <code>COLLECTION_PENDING</code>. The 1 Hz rate group advances the countdown; this is software time, not a blocking sleep.</p>
+              <div class="step-meta"><span class="mini-pill">Valid range · 1–300 s</span><span class="mini-pill">PendingDelaySeconds</span><span class="mini-pill">CollectionScheduled</span><span class="mini-pill">1 Hz tick</span></div>
+              <div class="callout"><strong>Why this matters:</strong> event-driven scheduling keeps the F´ process responsive to PING, cancellation, health, and other queued work while time passes.</div>
+            </article>
+
+            <article class="step-panel" id="step-panel-3" role="tabpanel" aria-labelledby="step-tab-3" tabindex="0" hidden>
+              <div class="eyebrow">Mission stack → camera driver</div><h3>Capture through the selected payload driver</h3>
+              <p>At zero, the request follows <code>MissionApp → ScienceApp → PayloadManager → PayloadDriverSelector</code>. The selector uses Lepton by default. It uses Boson when the operator selects Boson. The driver captures one frame and writes an F´ Data Product.</p>
+              <div class="callout warning"><strong>Evidence rule:</strong> use the term “real camera” only when the log shows <code>uvc</code> or <code>v4l2</code>. Also record the physical-camera HIL evidence.</div>
+              <div class="step-meta"><span class="mini-pill">Lepton default</span><span class="mini-pill">Boson selectable</span><span class="mini-pill">No hot USB swap</span><span class="mini-pill">Driver owns camera API</span></div>
+              <div class="signal-grid"><div class="signal"><span>Lepton</span><strong>160×120 U16 centikelvin samples</strong></div><div class="signal"><span>Boson</span><strong>320×256 raw U16 counts</strong></div><div class="signal"><span>Abstraction</span><strong>Mission logic never calls UVC/V4L2 directly</strong></div></div>
+            </article>
+
+            <article class="step-panel" id="step-panel-4" role="tabpanel" aria-labelledby="step-tab-4" tabindex="0" hidden>
+              <div class="eyebrow">Data Products + storage</div><h3>Turn pixels into a named science product</h3>
+              <p>The driver waits for the F´ Data Product write notification. The driver then records the file metadata. It returns a <code>ScienceProductDescriptor</code> with the product ID, size, source, Pi path, and CRC. <code>ScienceApp</code> sends this descriptor to <code>StorageManager</code>.</p>
+              <div class="step-meta"><span class="mini-pill">Dp_*.fdp</span><span class="mini-pill">ScienceProductReady</span><span class="mini-pill">ScienceStored</span><span class="mini-pill">Latest descriptor retained</span></div>
+              <div class="callout success"><strong>Gate:</strong> wait for a new <code>storageManager.ScienceStored</code> with nonzero size. Otherwise you may downlink an older retained picture.</div>
+            </article>
+
+            <article class="step-panel" id="step-panel-5" role="tabpanel" aria-labelledby="step-tab-5" tabindex="0" hidden>
+              <div class="eyebrow">Bulk data plane</div><h3>Request the latest science downlink</h3>
+              <p><code>commsApp.REQUEST_SCIENCE_DOWNLINK</code> validates the retained descriptor. It then starts <code>PayloadDownlinkApp</code>. The app uploads the complete <code>.fdp</code> on satellite UART channel 2. The satellite Teensy stores the file in its cache. The app then commits the cache for RF transmission.</p>
+              <div class="step-meta"><span class="mini-pill">DownlinkRequested</span><span class="mini-pill">PayloadDownlinkStarted</span><span class="mini-pill">Target 3 cache RPC</span><span class="mini-pill">196,608 B max</span></div>
+              <div class="callout warning"><strong>Important:</strong> satellite UART channel 2 is local Pi↔satellite-Teensy traffic. After cache commit, the Teensy sends science packets on RF channel 1.</div>
+            </article>
+
+            <article class="step-panel" id="step-panel-6" role="tabpanel" aria-labelledby="step-tab-6" tabindex="0" hidden>
+              <div class="eyebrow">RFM23BP + application repair</div><h3>Move indexed packets over a lossy radio</h3>
+              <p>The cached file becomes one header, indexed 35-byte DATA packets, and one end record. The active RF configuration does not acknowledge channel-1 segments. The receiver detects missing indexes and requests selected DATA packets again.</p>
+              <div class="step-meta"><span class="mini-pill">RF packet max · 49 B</span><span class="mini-pill">Science data · 35 B/packet</span><span class="mini-pill">DATA-packet CRC-16</span><span class="mini-pill">Whole-file CRC</span></div>
+              <div class="signal-grid"><div class="signal"><span>Reliability</span><strong>Index map + selective retry</strong></div><div class="signal"><span>Concurrency</span><strong>A proof PING may be attempted; availability is not guaranteed</strong></div><div class="signal"><span>Discipline</span><strong>Keep other channel-0 traffic quiet</strong></div></div>
+            </article>
+
+            <article class="step-panel" id="step-panel-7" role="tabpanel" aria-labelledby="step-tab-7" tabindex="0" hidden>
+              <div class="eyebrow">Ground evidence</div><h3>Reconstruct, verify, decode, preserve</h3>
+              <p>The receiver puts each packet at its original offset. It verifies the whole-file CRC and identifies the Data Product. The receiver then runs the applicable camera decoder. It saves the <code>.fdp</code>, JSON, CSV, PNG, and <code>run.json</code> files in one history directory.</p>
+              <div class="step-meta"><span class="mini-pill">Complete</span><span class="mini-pill">CRC OK</span><span class="mini-pill">Decoded pixels</span><span class="mini-pill">History preserved</span></div>
+              <div class="callout success"><strong>Demo finish:</strong> get a new CRC-valid <code>.fdp</code> that decodes correctly. Compare the Pi and ground SHA-256 values for stronger HIL evidence. Repeat fresh capture and downlink cycles without a restart.</div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="map">
+        <div class="section-head">
+          <div>
+            <div class="kicker">03 · Where the bytes travel</div>
+            <h2>Interactive full-stack map</h2>
+          </div>
+          <p>Select a path. The map highlights each participating part. Select a part to see its owner, evidence, and source file.</p>
+        </div>
+
+        <div class="path-toolbar" role="group" aria-label="Select a data path">
+          <button class="path-toggle" type="button" data-path-mode="control" aria-pressed="true">Control · channel 0</button>
+          <button class="path-toggle" type="button" data-path-mode="science" aria-pressed="false">Science · cache + channel 1</button>
+          <button class="path-toggle" type="button" data-path-mode="preview" aria-pressed="false">Preview · best effort</button>
+          <button class="path-toggle" type="button" data-path-mode="local" aria-pressed="false">Local hardware RPC · channel 2</button>
+        </div>
+
+        <div class="system-map">
+          <div class="map-lane">
+            <div class="callout info"><strong>Ground-radio decision:</strong> the nodes below show the primary RFM23BP path. The preserved <code>c3m-sdr</code> research adapter can replace the ground Triple-Serial Teensy and ground RFM23BP without changing the satellite, but it is not the normal or fallback mission path.</div>
+            <button class="map-node" type="button" data-paths="control science preview" data-owner="Ground software" data-evidence="GDS events, telemetry, receiver CRC, and decoded files" data-source="tools/c3m, tools/c3m-sdr + ground-station/"><span class="node-type">Ground laptop</span><strong>GDS + receiver UI</strong><small>Human intent and final evidence</small></button>
+            <button class="map-node" type="button" data-paths="control science preview" data-owner="Ground Teensy USB stack" data-evidence="One complete three-interface USB group" data-source="GDS_Teensy/firmware/gds_teensy/"><span class="node-type">USB</span><strong>Triple-Serial ports</strong><small>0 GDS · 1 debug · 2 payload</small></button>
+            <button class="map-node" type="button" data-paths="control science preview" data-owner="Ground Teensy firmware" data-evidence="Directional UART and RF counters" data-source="GDS_Teensy/.../relay_uart_rf.cpp"><span class="node-type">Ground MCU</span><strong>Ground Teensy 4.1</strong><small>USB↔RF segmentation bridge</small></button>
+            <button class="map-node" type="button" data-paths="control science preview" data-owner="The two RFM23BP drivers" data-evidence="Packet counters, RSSI, timeouts, and recovery counters" data-source="both Teensy rf23_driver.cpp files"><span class="node-type">433 MHz</span><strong>RFM23BP radio pair</strong><small>49-byte packet limit</small></button>
+            <button class="map-node" type="button" data-paths="control science preview local" data-owner="Satellite Teensy firmware" data-evidence="Relay, cache, PDU, preview, and watchdog counters" data-source="ArtemisTeensy_N2_Baremetal/.../src/"><span class="node-type">Satellite MCU</span><strong>Satellite Teensy 4.1</strong><small>Relay · cache · local endpoints</small></button>
+            <button class="map-node" type="button" data-paths="control science preview local" data-owner="F´ UartChannelMux" data-evidence="Frame TX/RX and CRC error telemetry" data-source="Components/UartChannelMux/"><span class="node-type">One UART</span><strong>UartChannelMux</strong><small>D4 C3 · channel · length · CRC-16</small></button>
+            <button class="map-node" type="button" data-paths="control science preview local" data-owner="Linux deployment" data-evidence="Process state, events, telemetry, and Data Products" data-source="ArtemisRpiTeensyDeployment/Main.cpp"><span class="node-type">Flight computer</span><strong>Pi Zero W</strong><small>F´ deployment on Linux</small></button>
+            <button class="map-node" type="button" data-paths="control science preview local" data-owner="F´ topology" data-evidence="Commands, events, telemetry, and component state" data-source="Top/topology.fpp + Components/"><span class="node-type">F´ graph</span><strong>Apps · managers · drivers</strong><small>Mission logic and HAL</small></button>
+            <button class="map-node" type="button" data-paths="science preview local" data-owner="Hardware drivers" data-evidence="Backend logs and physical HIL results" data-source="PayloadDriver_* + EpsDriver_Artemis"><span class="node-type">Hardware</span><strong>Cameras · PDU · radio</strong><small>Physical effects and samples</small></button>
+          </div>
+          <div class="direction-strip"><span>GROUND SIDE</span><span>RF BOUNDARY</span><span>SPACECRAFT SIDE</span></div>
+          <div class="node-inspector" aria-live="polite">
+            <div><span>Selected part</span><strong data-node-name>Ground laptop</strong></div>
+            <div><span>Evidence at this boundary</span><strong data-node-evidence>GDS events, telemetry, receiver CRC, and decoded files</strong></div>
+            <div><span>Start in this source</span><code data-node-source>tools/c3m + ground-station/</code></div>
+          </div>
+
+          <div class="path-panel" data-path-panel="control">
+            <h3>Control plane: commands go right; events and telemetry come back left</h3>
+            <p>GDS speaks CCSDS. The bridges treat it as opaque bytes. Only the Pi’s <code>ComCcsds</code> and <code>CdhCore.cmdDisp</code> understand the command semantics.</p>
+            <div class="flow-line"><span class="flow-chip">GDS mnemonic</span><span class="flow-arrow">→</span><span class="flow-chip">ground USB interface 0</span><span class="flow-arrow">→</span><span class="flow-chip">RF channel 0</span><span class="flow-arrow">→</span><span class="flow-chip">UART channel 0</span><span class="flow-arrow">→</span><span class="flow-chip">ComCcsds</span><span class="flow-arrow">→</span><span class="flow-chip">CmdDispatcher</span><span class="flow-arrow">→</span><span class="flow-chip">component handler</span></div>
+          </div>
+          <div class="path-panel" data-path-panel="science" hidden>
+            <h3>Science plane: create on Pi, cache locally, transmit over RF, prove on ground</h3>
+            <p>The <code>.fdp</code> does not use stock GDS file downlink. The custom path obeys the RFM23BP packet limit. The ground receiver reconstructs the file.</p>
+            <div class="flow-line"><span class="flow-chip">camera driver</span><span class="flow-arrow">→</span><span class="flow-chip">F´ Data Product</span><span class="flow-arrow">→</span><span class="flow-chip">Pi descriptor</span><span class="flow-arrow">→</span><span class="flow-chip">UART ch 2 cache</span><span class="flow-arrow">→</span><span class="flow-chip">RF ch 1 packets</span><span class="flow-arrow">→</span><span class="flow-chip">ground USB interface 2</span><span class="flow-arrow">→</span><span class="flow-chip">CRC + decoder</span></div>
+          </div>
+          <div class="path-panel" data-path-panel="preview" hidden>
+            <h3>Preview plane: newest frame wins; missing pixels stay visibly missing</h3>
+            <p>Lepton is downsampled to 80×60 U8. The Pi uploads one frame to satellite target 4, then best-effort preview records cross the payload RF/USB surface. There is no repair or backlog.</p>
+            <p><strong>Operational rule:</strong> stop preview before reliable science downlink. The current F´ topology has no cross-component preview/science lock, so this is an operator/endpoint contract—not a proven flight-side interlock.</p>
+            <div class="flow-line"><span class="flow-chip">Lepton 160×120</span><span class="flow-arrow">→</span><span class="flow-chip">2×2 downsample</span><span class="flow-arrow">→</span><span class="flow-chip">4,800 B newest slot</span><span class="flow-arrow">→</span><span class="flow-chip">UART ch 2 target 4</span><span class="flow-arrow">→</span><span class="flow-chip">best-effort RF</span><span class="flow-arrow">→</span><span class="flow-chip">white loss markers</span></div>
+          </div>
+          <div class="path-panel" data-path-panel="local" hidden>
+            <h3>Local RPC plane: spacecraft hardware control that never crosses RF</h3>
+            <p>F´ drivers use satellite UART channel 2 for local requests. The satellite Teensy operates the PDU, radio controls, payload cache, and preview staging.</p>
+            <div class="flow-line"><span class="flow-chip">F´ driver/app</span><span class="flow-arrow">→</span><span class="flow-chip">UartChannelMux ch 2</span><span class="flow-arrow">→</span><span class="flow-chip">satellite local router</span><span class="flow-arrow">→</span><span class="flow-chip">target endpoint</span><span class="flow-arrow">→</span><span class="flow-chip">correlated response</span></div>
+          </div>
+        </div>
+
+        <div class="coordinate-panel">
+          <h3>Three number systems use 0, 1, and 2</h3>
+          <p>Do not use a number by itself. Always include the boundary name. Select a number to compare its meaning in each system.</p>
+          <div class="number-controls" role="group" aria-label="Filter channel and interface numbers">
+            <button class="number-filter" type="button" data-number-filter="all" aria-pressed="true">Show all</button>
+            <button class="number-filter" type="button" data-number-filter="0" aria-pressed="false">Number 0</button>
+            <button class="number-filter" type="button" data-number-filter="1" aria-pressed="false">Number 1</button>
+            <button class="number-filter" type="button" data-number-filter="2" aria-pressed="false">Number 2</button>
+          </div>
+          <div class="coordinate-grid">
+            <article class="coordinate-lane"><h4>RF logical channel</h4><div class="coordinate-cell" data-number="0"><b>0</b><span>CCSDS control traffic crosses RF.</span></div><div class="coordinate-cell" data-number="1"><b>1</b><span>Science and repair traffic crosses RF.</span></div><div class="coordinate-cell" data-number="2"><b>2</b><span>Channel 2 does not cross RF.</span></div></article>
+            <article class="coordinate-lane"><h4>Pi UART virtual channel</h4><div class="coordinate-cell" data-number="0"><b>0</b><span>The mux carries the CCSDS stream.</span></div><div class="coordinate-cell" data-number="1"><b>1</b><span>The mux carries payload sidecar traffic.</span></div><div class="coordinate-cell" data-number="2"><b>2</b><span>The mux carries local hardware RPC.</span></div></article>
+            <article class="coordinate-lane"><h4>Ground USB interface</h4><div class="coordinate-cell" data-number="0"><b>0</b><span>GDS uses this byte-clean interface.</span></div><div class="coordinate-cell" data-number="1"><b>1</b><span>Operators read debug counters here.</span></div><div class="coordinate-cell" data-number="2"><b>2</b><span>The payload receiver uses this interface.</span></div></article>
+          </div>
+        </div>
+
+        <div class="role-grid">
+          <article class="role-card"><span class="where">Ground laptop</span><h3>Operate + interpret</h3><p>Owns user interfaces, dictionary, receive state, decode, history, and human-readable evidence.</p></article>
+          <article class="role-card"><span class="where">Ground Teensy</span><h3>Adapt RF to USB</h3><p>USB interface 0 carries GDS bytes. Interface 1 shows counters. Interface 2 carries payload and preview records.</p></article>
+          <article class="role-card"><span class="where">Satellite Teensy</span><h3>Execute deterministic I/O</h3><p>Owns radio hardware, segmentation, one-product cache, PDU proxy, and local RPC watchdogs.</p></article>
+          <article class="role-card"><span class="where">Raspberry Pi</span><h3>Run flight semantics</h3><p>Owns F´ topology, commands, modes, cameras, products, storage descriptors, comms policy, and scheduling.</p></article>
+        </div>
+
+        <h3 style="margin-top:2rem">Demo slice versus the broader spacecraft model</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Area</th><th>What is active in this C3M demo</th><th>Do not assume</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Mission / C&amp;DH</strong></td><td>Modes, scheduling, SOH, commands, events, telemetry, and CCSDS control traffic.</td><td>Do not assume every imported F´ service appears in the visible demo.</td></tr>
+              <tr><td><strong>Payload</strong></td><td>Lepton by default, Boson selectable, Data Products, a retained descriptor, and a cache-first downlink.</td><td>Do not assume the retained Neutron simulator is active. The current C3M topology does not bind it.</td></tr>
+              <tr><td><strong>Communications</strong></td><td>An RFM23BP control plane and an indexed channel-1 science transport.</td><td>Do not assume stock F´ <code>FileDownlink</code> carries science. Do not assume local UART channel 2 crosses RF.</td></tr>
+              <tr><td><strong>EPS / PDU</strong></td><td>The software path includes the manager, driver, channel-2 RPC, and satellite PDU proxy.</td><td>Do not assume this code path proves real PDU actuation or HIL acceptance.</td></tr>
+              <tr><td><strong>ADCS / GPS / thermal</strong></td><td>Components and architecture seams support future system growth.</td><td>Do not assume every box has hardware support or demo coverage.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section" id="fprime">
+        <div class="section-head">
+          <div><div class="kicker">04 · F´ without the jargon wall</div><h2>The framework fundamentals</h2></div>
+          <p>F´ supplies the Pi architecture and code generation. It turns explicit contracts into one component graph. It also generates the ground dictionary.</p>
+        </div>
+
+        <div class="fundamental-grid">
+          <article class="fundamental"><h3>Component</h3><p>A module with private state and a public interface. Active components own a thread + queue; passive components run in the caller’s context.</p></article>
+          <article class="fundamental"><h3>Port</h3><p>A typed connection between components. Sync is a direct call, async is queued, guarded is a mutex-protected direct call.</p></article>
+          <article class="fundamental"><h3>Topology</h3><p>The compile-time wiring graph: which component instances exist, which ports connect, and which rate group ticks each component.</p></article>
+          <article class="fundamental"><h3>Dictionary</h3><p>The ground schema generated from FPP: command opcodes/arguments, events, telemetry, parameters, and Data Product definitions. It must match the exact deployed Pi build.</p></article>
+          <article class="fundamental"><h3>Command</h3><p>A one-shot request from ground. The handler must validate, act, and return a command response so GDS knows completion status.</p></article>
+          <article class="fundamental"><h3>Event</h3><p>A timestamped statement that something happened: mode changed, capture completed, downlink failed. It is history, not current state.</p></article>
+          <article class="fundamental"><h3>Telemetry</h3><p>A sampled current value: mode, pending seconds, packet counts, radio state. Use it to monitor and chart state over time.</p></article>
+          <article class="fundamental"><h3>Parameter</h3><p>A tunable setting. Setting changes runtime state; saving through the parameter database is what makes it persist.</p></article>
+        </div>
+
+        <div class="callout" style="margin-top:1rem"><strong>Runtime model:</strong> <code>Main.cpp</code> starts the Linux deployment. A UART read thread feeds <code>UartChannelMux</code>. Active components own queues and threads. Passive components run in the caller’s context. The Linux timer drives rate groups at 1 Hz, 0.5 Hz, and 0.25 Hz. A blocking handler can stop other work in the same execution context.</div>
+
+        <div class="callout pink" style="margin-top:1rem"><strong>Source versus generated output:</strong> component <code>.fpp</code> files and topology files are source contracts. Generation creates C++ support and the GDS dictionary. <code>config/transport_constants.json</code> is the transport source. <code>LinkCfg.hpp</code> and the two Teensy <code>link_protocol.hpp</code> files are generated outputs. Change the source first. Then regenerate, rebuild each affected target, and deploy the matching artifacts.</div>
+
+        <h3 style="margin-top:2rem">Application → Manager → Driver</h3>
+        <div class="amd">
+          <article class="amd-card"><span class="layer">APPLICATION · MISSION POLICY</span><span class="question">Why and when?</span><p><code>MissionApp</code>, <code>ScienceApp</code>, <code>CommsApp</code>, <code>SoHApp</code>. They coordinate the story and should not know camera APIs, UART frames, or PDU bytes.</p></article>
+          <article class="amd-card"><span class="layer">MANAGER · STABLE CAPABILITY</span><span class="question">What capability?</span><p><code>PayloadManager</code>, <code>StorageManager</code>, <code>EpsManager</code>. They expose mission-facing behavior that stays stable when hardware changes.</p></article>
+          <article class="amd-card"><span class="layer">DRIVER · MECHANISM / HAL</span><span class="question">How on this hardware?</span><p><code>PayloadDriver_Lepton</code>, <code>PayloadDriver_Boson</code>, <code>EpsDriver_Artemis</code>. Protocol and hardware glue belongs here.</p></article>
+        </div>
+
+        <div class="callout pink" style="margin-top:1rem"><strong>Camera selector seam:</strong> the current payload path adds <code>PayloadDriverSelector</code> between the manager and the Lepton/Boson drivers. It routes one capture to the selected driver without forking mission logic.</div>
+
+        <h3 style="margin-top:2rem">Trace one command: <code>SCHEDULE_COLLECTION(10)</code></h3>
+        <div class="trace">
+          <div class="trace-item"><div class="trace-body"><span class="boundary-tag" data-boundary="ground">Ground laptop</span><h4>Dictionary turns a name into wire data</h4><p>GDS uses the matching dictionary to find the command opcode. GDS serializes the U32 argument into a CCSDS telecommand.</p></div></div>
+          <div class="trace-item"><div class="trace-body"><span class="boundary-tag" data-boundary="transport">USB + RF + UART</span><h4>Bridges preserve bytes, not meaning</h4><p>Ground USB interface 0 → ground Teensy → RF segments → satellite Teensy → UART channel 0. These layers do not know the command meaning.</p></div></div>
+          <div class="trace-item"><div class="trace-body"><span class="boundary-tag" data-boundary="flight">Pi transport + C&amp;DH</span><h4>The Pi unwraps and dispatches</h4><p><code>UartChannelMux</code> removes the D4 C3 wrapper. <code>ComCcsds</code> removes the CCSDS frame. <code>CdhCore.cmdDisp</code> sends the opcode to <code>missionApp</code>.</p></div></div>
+          <div class="trace-item"><div class="trace-body"><span class="boundary-tag" data-boundary="flight">MissionApp queue</span><h4>The active component handles it</h4><p>The asynchronous command waits in the <code>MissionApp</code> queue. The handler validates the delay and sets the pending state. It emits <code>CollectionScheduled</code> and acknowledges the command.</p></div></div>
+          <div class="trace-item"><div class="trace-body"><span class="boundary-tag" data-boundary="flight">1 Hz rate group</span><h4>The scheduler advances the story</h4><p>Each 1 Hz <code>run</code> tick decreases the pending delay. At zero, a typed port call starts the science pipeline. The process does not sleep for ten seconds.</p></div></div>
+          <div class="trace-item"><div class="trace-body"><span class="boundary-tag" data-boundary="ground">Reverse control path</span><h4>Evidence returns to the ground</h4><p>Command responses, events, and telemetry return through CdhCore → ComCcsds → UART channel 0 → RF → GDS.</p></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="science">
+        <div class="section-head">
+          <div><div class="kicker">05 · Products, preview, and radio constraints</div><h2>The science path in detail</h2></div>
+          <p>The science path does not send the file through GDS. One configured 128-byte CCSDS frame requires three RF packets. A large image needs an indexed transport with repair.</p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Product</th><th>Source / representation</th><th>Current transfer shape</th><th>Reliability contract</th><th>What it proves</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Lepton science</strong></td><td>160×120 U16 centikelvin values in a standard F´ <code>.fdp</code>; real-camera only when the selected backend and HIL evidence say so.</td><td>Current documented product 38,482 B; 1,100 indexed packets.</td><td><span class="status-good">Repairable + whole-file CRC</span></td><td>Full-resolution thermal science after decode.</td></tr>
+              <tr><td><strong>Boson science</strong></td><td>320×256 raw U16 counts in its own standard F´ <code>.fdp</code> record; the same backend/provenance rule applies.</td><td>163,922 B; 4,684 indexed packets; one shared 196,608 B cache.</td><td><span class="status-good">Repairable + whole-file CRC</span></td><td>Full Boson raw-count product after camera-specific decode.</td></tr>
+              <tr><td><strong>Lepton preview</strong></td><td>Newest Lepton frame downsampled 2×2 to 80×60 U8 (4,800 B).</td><td>200 best-effort fragments, 24 pixel bytes each; newest-frame slot only.</td><td><span class="status-warn">No repair; white missing pixels</span></td><td>Operator awareness only—not the science artifact.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout warning" style="margin-top:1rem"><strong>Current-versus-legacy size:</strong> current C3M U32 serialization produces 38,482 bytes. The camera pixels remain U16 values. Older test products use 38,480 bytes. Do not put either size in new code. Use the descriptor, receiver header, and matching dictionary for that transfer.</div>
+
+        <h3 style="margin-top:2rem">Science lifecycle: camera to decoded artifact</h3>
+        <div class="trace">
+          <div class="trace-item"><div class="trace-body"><h4>Selected driver captures</h4><p>Lepton uses its camera backend; Boson uses its own. The driver validates the frame and serializes the correct record schema.</p></div></div>
+          <div class="trace-item"><div class="trace-body"><h4>F´ Data Products writes the `.fdp`</h4><p>The driver does not announce success until the Data Product writer reports completion. That prevents a descriptor from pointing at a half-written file.</p></div></div>
+          <div class="trace-item"><div class="trace-body"><h4>A typed descriptor moves, not raw pixels</h4><p>Product ID, bytes, source kind, Pi path, and CRC move through <code>ScienceApp → StorageManager → CommsApp</code>.</p></div></div>
+          <div class="trace-item"><div class="trace-body"><h4>The app retains the latest descriptor</h4><p>The operator can request a completed picture again with a new transfer ID. A new capture replaces the descriptor. A Pi or F´ restart clears it.</p></div></div>
+          <div class="trace-item"><div class="trace-body"><h4>Pi uploads to the satellite Teensy cache</h4><p><code>PayloadDownlinkApp</code> uses channel 2 target 3: begin, 200-byte chunks, commit-and-send. The cache bounds memory and decouples Pi scheduling from RF pacing.</p></div></div>
+          <div class="trace-item"><div class="trace-body"><h4>The satellite emits channel-1 science packets</h4><p>Header records identify transfer/product/size/count/CRC. Indexed data records carry 35 bytes. The end record closes nominal transmit.</p></div></div>
+          <div class="trace-item"><div class="trace-body"><h4>The ground owns end-to-end completion</h4><p>The receiver tracks indexes, requests missing packets, verifies the complete `.fdp` CRC, then calls the matching decoder using the dictionary/Data Product identity.</p></div></div>
+        </div>
+
+        <h3 style="margin-top:2rem">The three channel contracts</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Lane</th><th>Pi↔satellite meaning</th><th>Crosses RF?</th><th>Ground mapping</th><th>Reliability owner</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Channel 0</strong></td><td>Opaque CCSDS command / event / telemetry stream.</td><td><span class="status-good">Yes</span></td><td>Ground USB interface 0 → GDS.</td><td>Ground→sat RF segment ACK/retry; CCSDS frame CRC.</td></tr>
+              <tr><td><strong>Channel 1</strong></td><td>Science packet sidecar and ground retry/control packets.</td><td><span class="status-good">Yes</span></td><td>Ground USB interface 2 → receiver UI.</td><td>Indexed DATA-packet CRC-16 + whole-file CRC-16 + selective repair.</td></tr>
+              <tr><td><strong>Channel 2</strong></td><td>Satellite-local RPC: PDU, radio state/control, payload cache, preview staging.</td><td><span class="status-warn">No</span></td><td>No ground USB interface maps directly to this lane.</td><td>Correlated local requests, timeout, status, watchdog policy.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout" style="margin-top:1rem"><strong>Security boundary:</strong> CRC, CCSDS framing, ACK/retry, header filtering, and the C3M network ID improve integrity and traffic isolation. These controls do not provide authentication, authorization, encryption, or anti-replay protection.</div>
+      </section>
+
+      <section class="section" id="proof">
+        <div class="section-head">
+          <div><div class="kicker">06 · Do not overclaim</div><h2>The proof ladder</h2></div>
+          <p>Every rung answers a different question. Higher rungs include more of the real system. Do not report a lower-rung pass as end-to-end success.</p>
+        </div>
+
+        <div class="proof-grid">
+          <div>
+            <div class="proof-ladder" aria-label="Interactive proof levels">
+              <button class="proof-rung" type="button" aria-pressed="true" data-proves="The control path reached one command handler." data-limit="It does not prove that capture or downlink occurred." data-artifact="GDS command response"><span class="level">LEVEL 1</span><span><strong>Command response OK</strong><span class="proof-summary">GDS reached a handler and received its response.</span></span></button>
+              <button class="proof-rung" type="button" aria-pressed="false" data-proves="The flight-side state machine did the expected work." data-limit="It does not prove that the laptop received science bytes." data-artifact="Events + telemetry"><span class="level">LEVEL 2</span><span><strong>Expected event + telemetry chain</strong><span class="proof-summary">Flight software performed the intended work.</span></span></button>
+              <button class="proof-rung" type="button" aria-pressed="false" data-proves="The sender and cache finished their local work." data-limit="It does not prove ground delivery." data-artifact="PayloadDownlinkComplete"><span class="level">LEVEL 3</span><span><strong>Flight downlink completion</strong><span class="proof-summary">The sender completed its local responsibility.</span></span></button>
+              <button class="proof-rung" type="button" aria-pressed="false" data-proves="All indexed bytes reached the laptop in the correct positions." data-limit="It does not prove that the bytes match a valid camera record." data-artifact="Receiver packet map + CRC"><span class="level">LEVEL 4</span><span><strong>Every index + CRC OK</strong><span class="proof-summary">The receiver reconstructed one complete file.</span></span></button>
+              <button class="proof-rung" type="button" aria-pressed="false" data-proves="The file contains a valid Lepton or Boson Data Product." data-limit="It does not prove byte identity with the Pi source file." data-artifact="Decoder summary + PNG/CSV"><span class="level">LEVEL 5</span><span><strong>Camera decode succeeds</strong><span class="proof-summary">The complete file contains meaningful camera data.</span></span></button>
+              <button class="proof-rung" type="button" aria-pressed="false" data-proves="The Pi source and ground file are byte-for-byte equal." data-limit="One successful transfer does not prove repeatability." data-artifact="Two equal SHA-256 values"><span class="level">LEVEL 6</span><span><strong>Pi SHA-256 = ground SHA-256</strong><span class="proof-summary">The two files are byte-for-byte equal.</span></span></button>
+              <button class="proof-rung" type="button" aria-pressed="false" data-proves="The complete bench can repeat the demo without a restart." data-limit="This demo gate is not full flight qualification." data-artifact="Three separate run directories"><span class="level">LEVEL 7</span><span><strong>Three fresh HIL cycles</strong><span class="proof-summary">The complete demo repeats without a restart.</span></span></button>
+            </div>
+            <div class="proof-detail" aria-live="polite">
+              <div class="proof-detail-grid"><div><span>This level proves</span><strong data-proof-proves>The control path reached one command handler.</strong></div><div><span>This level does not prove</span><strong data-proof-limit>It does not prove that capture or downlink occurred.</strong></div><div><span>Primary artifact</span><strong data-proof-artifact>GDS command response</strong></div></div>
+            </div>
+          </div>
+
+          <aside class="evidence-card">
+            <div class="eyebrow">Latest checked-in live QA · 2026-08-03</div>
+            <h3>One fresh Lepton cycle passed</h3>
+            <div class="metric-grid">
+              <div class="metric"><strong>38,482 B</strong><span>complete `.fdp`</span></div>
+              <div class="metric"><strong>1,100 / 1,100</strong><span>packets received</span></div>
+              <div class="metric"><strong>CRC 0x467e</strong><span>whole-file check</span></div>
+              <div class="metric"><strong>11.757 s</strong><span>documented receive time</span></div>
+              <div class="metric"><strong>160 × 120</strong><span>19,200 decoded pixels</span></div>
+              <div class="metric"><strong>PING passed</strong><span>during bulk transfer</span></div>
+            </div>
+            <p style="color:var(--muted);font-size:.82rem">This dated QA entry adds one command-during-downlink cycle. This document build did not repeat that test. The entry does not supersede the separate three-run acceptance record.</p>
+            <p><a href="./C3M_LIVE_QA_LOG_2026-08-03.md">Open the checked-in QA log →</a></p>
+          </aside>
+        </div>
+
+        <div class="callout warning" style="margin-top:1rem"><strong>Local vs HIL:</strong> local emulation can prove F´ commands, scheduling, storage, packet formation, receiver logic, CRC, and decode. It cannot prove Pi UART, Teensy firmware, physical RF, USB enumeration, antenna behavior, power, or real camera capture.</div>
+      </section>
+
+      <section class="section" id="debug">
+        <div class="section-head">
+          <div><div class="kicker">07 · Find the first broken boundary</div><h2>Debug by ownership, not guesses</h2></div>
+          <p>Start at the visible symptom, move one boundary at a time, and ask what evidence the owning layer should produce. Counters and identities beat broad “radio is broken” conclusions.</p>
+        </div>
+
+        <details open><summary>GDS page loads, but commands do not reach the Pi</summary><div class="details-body"><ol><li>Confirm that GDS uses ground USB interface 0.</li><li>Confirm that GDS uses the dictionary from the deployed Pi build.</li><li>Check the ground <code>uart_rx</code> and <code>rf_tx_pkt</code> counters.</li><li>If local emulation used the global F´ IPC endpoints, restart the complete hardware GDS process tree.</li></ol><p>A browser refresh does not restart the backend.</p></div></details>
+        <details><summary>The schedule command succeeds, but no new ScienceStored appears</summary><div class="details-body"><ol><li>Follow <code>CollectionScheduled → CollectionTriggered → PayloadRequestRouted → capture events → ScienceProductReady → ScienceStored</code>.</li><li>Find the first missing event.</li><li>Inspect the component that owns that event.</li><li>Check the selected driver and camera before you inspect RF.</li></ol><p>The Pi captures the frame before downlink starts.</p></div></details>
+        <details><summary>PayloadDownlinkStarted appears, but the receiver sees nothing</summary><div class="details-body"><ol><li>Confirm that the receiver was ready before the request.</li><li>Confirm that the receiver owns ground USB interface 2.</li><li>Inspect satellite cache target-3 responses.</li><li>Inspect satellite payload, RF channel-1, and ground payload counters.</li><li>Inspect serial ownership last.</li></ol><p>Flight-side completion does not prove laptop delivery.</p></div></details>
+        <details><summary>The receiver saves a partial image or shows white pixels</summary><div class="details-body"><p>In science products, white or NaN regions identify unavailable packet bytes. The receiver preserves each pixel position.</p><p>In preview images, white pixels are expected loss markers. Preview does not repair missing data.</p><p>Identify the applicable contract before you report a defect.</p></div></details>
+        <details><summary>CRC fails even though packet counts look close</summary><div class="details-body"><ol><li>Check for missing packet indexes.</li><li>Check the transfer ID and product ID.</li><li>Check the final packet length.</li><li>Check the dictionary and Data Product format.</li><li>Check the whole-file CRC.</li></ol><p>Do not use a CRC-failed full product as authoritative science. Keep the file as a partial artifact.</p></div></details>
+        <details><summary>Preview pauses for several seconds</summary><div class="details-body"><p>Preview is response-paced and keeps only the newest frame. One lost local RPC response abandons the current frame after five 1 Hz ticks.</p><p>The app then requests a new frame. This behavior can cause a visible gap of approximately 7–8 seconds.</p></div></details>
+        <details><summary>Channel 0 becomes noisy or PING misses during science downlink</summary><div class="details-body"><p>The RFM23BP is half-duplex and has limited capacity.</p><ol><li>During the timed demo, send only one proof PING.</li><li>Keep other GDS traffic quiet.</li><li>If the response is missing, retry once when the link is idle.</li><li>Record the directional counters.</li><li>Do not send many duplicate commands.</li></ol></div></details>
+        <details><summary>Which “channel 2” do people mean?</summary><div class="details-body"><p><strong>Satellite UART channel 2</strong> carries local RPC between the Pi and satellite Teensy. It does not cross RF.</p><p><strong>Ground USB interface 2</strong> carries RF channel-1 payload traffic to the receiver. The two number systems are different.</p></div></details>
+
+        <div class="source-list">
+          <a href="./SOFTWARE_DEBUGGING_TROUBLESHOOTING.md">Software troubleshooting map</a>
+          <a href="./EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md">C3M operator + HIL runbook</a>
+          <a href="./HARDWARE_PORT_MAP_AND_POWER.md">Hardware port and power map</a>
+          <a href="./C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md">Radio lifecycle and recovery contract</a>
+        </div>
+      </section>
+
+      <section class="section" id="repo">
+        <div class="section-head">
+          <div><div class="kicker">08 · Translate model into files</div><h2>Repository map</h2></div>
+          <p>These are the source-of-truth entry points. Start here before searching broadly.</p>
+        </div>
+
+        <div class="callout warning" style="margin-bottom:1rem"><strong>Current-versus-legacy gate:</strong> archive documents can contain older Manager, Service, or Adapter names. The retained Neutron simulator is not the active Lepton/Boson route. Stock F´ <code>FileDownlink</code> is not the science path. Satellite UART channel 2 is not an RF path. Confirm the current topology edge before you follow a name.</div>
+
+        <div class="repo-grid">
+          <a class="repo-card" href="../tools/c3m"><span class="path">tools/c3m</span><strong>Operator launcher</strong><p>Maps one Triple-Serial Teensy and starts the two ground surfaces.</p></a>
+          <a class="repo-card" href="archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md"><span class="path">docs/archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md</span><strong>HackRF stop-work decision</strong><p>Field evidence, RFM23BP comparison, accepted mission posture, and reopening gate.</p></a>
+          <a class="repo-card" href="../ground-station/hackrf-rf22"><span class="path">ground-station/hackrf-rf22/</span><strong>Preserved SDR RF22 adapter</strong><p>Research and receive-diagnostic raw-I/Q modem, packet bridge, gain control, metrics, and proof collection.</p></a>
+          <a class="repo-card" href="../ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Top/topology.fpp"><span class="path">.../Top/topology.fpp</span><strong>System wiring graph</strong><p>Imports F´ services and connects mission, driver, transport, Data Product, and rate-group ports.</p></a>
+          <a class="repo-card" href="../ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Top/instances.fpp"><span class="path">.../Top/instances.fpp</span><strong>Runtime instances</strong><p>Active/passive types, queues, stacks, priorities, and base IDs.</p></a>
+          <a class="repo-card" href="../ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Main.cpp"><span class="path">.../Deployment/Main.cpp</span><strong>Process entrypoint</strong><p>Starts the Linux deployment and its UART-facing runtime.</p></a>
+          <a class="repo-card" href="../ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Top/ArtemisRpiTeensyDeploymentTopology.cpp"><span class="path">.../Top/...Topology.cpp</span><strong>Runtime setup</strong><p>Configures instances, drivers, rate groups, paths, and the deployed graph.</p></a>
+          <a class="repo-card" href="../ArtemisRpiTeensy_N2/Components/MissionApp/MissionApp.fpp"><span class="path">Components/MissionApp/</span><strong>Command + scheduling example</strong><p>Read the FPP contract, then the adjacent C++ handler and rate-group logic.</p></a>
+          <a class="repo-card" href="../ArtemisRpiTeensy_N2/Components/UartChannelMux/UartChannelMux.cpp"><span class="path">Components/UartChannelMux/</span><strong>Virtual-channel implementation</strong><p>Frames, checks, and routes the single Pi UART into logical lanes.</p></a>
+          <a class="repo-card" href="../ArtemisRpiTeensy_N2/Components/PayloadDownlinkApp/PayloadDownlinkApp.cpp"><span class="path">Components/PayloadDownlinkApp/</span><strong>Pi half of science transport</strong><p>Pairs with the satellite cache and ground receiver as one wire contract.</p></a>
+          <a class="repo-card" href="../ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/payload_cache.cpp"><span class="path">satellite_teensy/src/payload_cache.cpp</span><strong>MCU half of science transport</strong><p>Owns the bounded one-product cache, commit, RF send, and repair source.</p></a>
+          <a class="repo-card" href="../config/transport_constants.json"><span class="path">config/transport_constants.json</span><strong>Transport source of truth</strong><p>UART wrapper, channels, RF policy, cache, science packet, and preview constants.</p></a>
+          <a class="repo-card" href="../config/rf_networks.json"><span class="path">config/rf_networks.json</span><strong>Mission RF identity</strong><p>C3M network 0xC3, ground 0xA1, satellite 0xA2, protocol version 1.</p></a>
+          <a class="repo-card" href="../ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy"><span class="path">ArtemisTeensy_N2_Baremetal/...</span><strong>Satellite Teensy</strong><p>Pi UART mux peer, RF bridge, cache, PDU proxy, and radio control endpoints.</p></a>
+          <a class="repo-card" href="../GDS_Teensy/firmware/gds_teensy"><span class="path">GDS_Teensy/firmware/gds_teensy/</span><strong>Ground Teensy</strong><p>Triple-Serial USB mapping, RF segmentation/reassembly, and link counters.</p></a>
+          <a class="repo-card" href="../ground-station/c3m-payload-receiver-ui"><span class="path">ground-station/c3m-payload-receiver-ui/</span><strong>Science ground UI</strong><p>Readiness, receive progress, partials, CRC, decode, preview, and history.</p></a>
+          <a class="repo-card" href="../ArtemisRpiTeensy_N2/tools/payload_receiver.py"><span class="path">ArtemisRpiTeensy_N2/tools/payload_receiver.py</span><strong>Receiver protocol engine</strong><p>Shared parser, indexes, retry requests, CRC, reconstruction, and structured events.</p></a>
+          <a class="repo-card" href="./SYSTEM_ARCHITECTURE.md"><span class="path">docs/SYSTEM_ARCHITECTURE.md</span><strong>Architecture crosswalk</strong><p>Broader Neutron 2-on-Artemis model, HAL, channels, RF constraints, and traces.</p></a>
+          <a class="repo-card" href="./EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md"><span class="path">docs/EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md</span><strong>Canonical C3M operations</strong><p>Exact startup, command sequence, HIL gates, stop rules, and evidence.</p></a>
+        </div>
+
+        <div class="callout warning" style="margin-top:1rem"><strong>Generated-file rule:</strong> edit <code>config/transport_constants.json</code> first. Then run <code>python3 tools/generate_transport_constants.py</code>. Run the validation drift checks. Do not edit <code>Components/LinkCfg/LinkCfg.hpp</code> or a Teensy <code>link_protocol.hpp</code> file by hand.</div>
+      </section>
+
+      <section class="section" id="onboarding">
+        <div class="section-head">
+          <div><div class="kicker">09 · From zero context to useful changes</div><h2>New-developer path</h2></div>
+          <p>You do not need to memorize every component. Learn to trace one command and one artifact across system boundaries. Change only the layer that owns the behavior.</p>
+        </div>
+
+        <div class="callout warning" style="margin-bottom:1rem">
+          <strong>Before you touch anything: establish a safe local baseline.</strong>
+          <pre><button class="copy-button" type="button">Copy</button>cd ~/Developer/fprime-artemis-cubesat
+git status --short --branch
+git submodule status --recursive
+. ArtemisRpiTeensy_N2/fprime-venv/bin/activate
+./tools/validate_local.sh --demo c3m</pre>
+          <p>The safe path uses local emulation and replay data. It does not use a Pi, Teensy, radio, or live camera.</p>
+          <p>A pass has these results:</p>
+          <ul><li>The script exits with status 0.</li><li>Generated-constant checks, F´ builds, and tests pass.</li><li>Three cycles produce three separate ground <code>.fdp</code> files.</li><li>Each file decodes to 160×120 pixels.</li><li>The script prints the final three-cycle <code>PASS</code> message.</li></ul>
+          <p>This result is software evidence only. Use the <a href="#proof">proof ladder</a> before you make a HIL claim.</p>
+        </div>
+
+        <div class="onboarding-grid">
+          <article class="checklist">
+            <h3>First 90 minutes</h3>
+            <ol>
+              <li>Read this page once without opening code.</li>
+              <li>Open <code>topology.fpp</code> and find <code>MissionFlow</code>, <code>ManagerDriverBindings</code>, and <code>Communications</code>.</li>
+              <li>Open <code>MissionApp.fpp</code>; identify commands, ports, events, and telemetry.</li>
+              <li>Trace <code>SCHEDULE_COLLECTION</code> into its C++ handler and rate-group tick.</li>
+              <li>Trace <code>ScienceProductDescriptor</code> through storage and comms.</li>
+              <li>Run the local validation command above and inspect its run-log artifacts before touching hardware.</li>
+            </ol>
+          </article>
+          <article>
+            <div class="table-wrap change-table">
+              <table>
+                <thead><tr><th>I want to change…</th><th>Start here</th><th>Keep this boundary intact</th></tr></thead>
+                <tbody>
+                  <tr><td>Mission timing or modes</td><td><code>MissionApp/*</code>, <code>ScienceApp/*</code></td><td>No camera, UART, or RF details in applications.</td></tr>
+                  <tr><td>A GDS command/event/channel</td><td>Owning component <code>.fpp</code>, then <code>.cpp</code></td><td>Regenerate/build and deploy the dictionary from that exact Pi build.</td></tr>
+                  <tr><td>Lepton/Boson capture</td><td>Matching <code>PayloadDriver_*</code></td><td>Preserve the manager-facing descriptor contract.</td></tr>
+                  <tr><td>Add a payload camera</td><td>New driver + selector/topology wiring</td><td>Do not fork MissionApp, ScienceApp, or PayloadManager.</td></tr>
+                  <tr><td>Science retry/packet logic</td><td><code>PayloadDownlinkApp</code>, receiver, cache endpoint</td><td>Change both ends and tests as one wire contract.</td></tr>
+                  <tr><td>UART/RF constants</td><td><code>config/transport_constants.json</code> + generator</td><td>Never patch generated headers independently.</td></tr>
+                  <tr><td>Radio hardware behavior</td><td>Both Teensy <code>rf23_driver.*</code>/<code>relay_uart_rf.*</code></td><td>Keep F´ comms policy separate from MCU execution.</td></tr>
+                  <tr><td>PDU behavior</td><td><code>EpsDriver_Artemis</code> + satellite <code>pdu_proxy.*</code></td><td>Raw PDU protocol stays below <code>EpsManager</code>.</td></tr>
+                  <tr><td>Operator receiver UI</td><td><code>c3m-payload-receiver-ui/</code></td><td>Reuse <code>payload_receiver.py</code>; do not fork protocol truth.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+
+        <h3 style="margin-top:2rem">Safe learning loop</h3>
+        <div class="model-grid">
+          <article class="model-card"><div class="icon">1</div><h3>Observe</h3><p>Watch one known-good demo/replay and write down command, expected events, telemetry, file, CRC, and decode.</p></article>
+          <article class="model-card"><div class="icon">2</div><h3>Locate ownership</h3><p>Use the topology edge and component FPP contract before reading implementation details.</p></article>
+          <article class="model-card"><div class="icon">3</div><h3>Change one layer</h3><p>Make the smallest change in the owner. Avoid “convenient” cross-layer calls that bypass ports or drivers.</p></article>
+          <article class="model-card"><div class="icon">4</div><h3>Prove locally</h3><p>Generate/build, focused unit tests, receiver replay, and the local demo. This is software proof, not RF proof.</p></article>
+          <article class="model-card"><div class="icon">5</div><h3>Prove HIL when needed</h3><p>Use real ports, camera, Pi service, both Teensys, radios, receiver, counters, CRC, and decode.</p></article>
+          <article class="model-card"><div class="icon">6</div><h3>Leave evidence</h3><p>Record branch/SHA, exact configuration, command sequence, artifacts, what passed, and what remains untested.</p></article>
+        </div>
+
+        <div class="callout success" style="margin-top:1rem"><strong>Student platform policy:</strong> macOS is the primary developer path. Windows F´ development uses WSL2; the browser/viewer can remain native Windows. Do not make simple ground-side review require Linux-only tooling.</div>
+      </section>
+
+      <section class="section" id="glossary">
+        <div class="section-head">
+          <div><div class="kicker">10 · Vocabulary decoder</div><h2>Searchable glossary</h2></div>
+          <p>Use the repo’s full glossary for depth. This compact set covers the terms needed to read the demo code and runbooks without prior spacecraft context.</p>
+        </div>
+
+        <div class="glossary-tools"><label style="width:100%"><span class="side-label" style="display:block;margin:0 0 .35rem">Filter terms</span><input class="glossary-search" type="search" placeholder="Try: CCSDS, topology, CRC, HIL…" aria-label="Filter glossary terms"></label></div>
+        <dl class="glossary-grid">
+          <div class="term"><dt>F´ / F Prime</dt><dd>NASA/JPL component-based flight-software framework running on the Pi.</dd></div>
+          <div class="term"><dt>FPP</dt><dd>F Prime Prime language used to declare component interfaces, types, instances, and topology wiring.</dd></div>
+          <div class="term"><dt>Component</dt><dd>Encapsulated module with typed ports and optional ground interfaces.</dd></div>
+          <div class="term"><dt>Port</dt><dd>Typed component-to-component invocation edge. Not a USB or TCP port.</dd></div>
+          <div class="term"><dt>Topology</dt><dd>The graph of component instances and port connections that becomes the deployment.</dd></div>
+          <div class="term"><dt>Deployment</dt><dd>The complete F´ executable and generated support artifacts for one system configuration.</dd></div>
+          <div class="term"><dt>Dictionary</dt><dd>Ground-readable schema for commands, events, telemetry, parameters, types, and Data Products.</dd></div>
+          <div class="term"><dt>GDS</dt><dd>F´ Ground Data System: current command, event, and telemetry web surface.</dd></div>
+          <div class="term"><dt>C&amp;DH</dt><dd>Command and Data Handling: dispatch, event/telemetry collection, framing, and related flight services.</dd></div>
+          <div class="term"><dt>CCSDS</dt><dd>Space-data framing/packet standards used on the GDS-facing control plane.</dd></div>
+          <div class="term"><dt>TC / TM</dt><dd>Telecommand goes ground→spacecraft; telemetry transfer frame goes spacecraft→ground.</dd></div>
+          <div class="term"><dt>APID</dt><dd>Application Process Identifier inside CCSDS packets; sequence warnings expose dropped packet history.</dd></div>
+          <div class="term"><dt>SOH</dt><dd>State of health: normalized subsystem health and basic operating status.</dd></div>
+          <div class="term"><dt>OBC</dt><dd>On-Board Computer. Here it is a split Pi + Teensy prototype system.</dd></div>
+          <div class="term"><dt>HAL</dt><dd>Hardware Abstraction Layer; drivers isolate mission logic from a specific camera, PDU, or radio.</dd></div>
+          <div class="term"><dt>Data Product</dt><dd>Structured, file-backed science artifact created through F´ Data Products services.</dd></div>
+          <div class="term"><dt>Data Product writer</dt><dd>F´ service that serializes a typed record into the file-backed product and reports when the write is complete.</dd></div>
+          <div class="term"><dt>Descriptor</dt><dd>Small typed reference to a product: identity, byte count, source kind, Pi path, and CRC—not the pixel bytes themselves.</dd></div>
+          <div class="term"><dt>Selector</dt><dd>Routing seam that sends one manager request to the currently selected Lepton or Boson driver.</dd></div>
+          <div class="term"><dt>Rate group</dt><dd>Periodic F´ execution lane. This deployment ticks work at 1 Hz, 0.5 Hz, and 0.25 Hz.</dd></div>
+          <div class="term"><dt>.fdp</dt><dd>F´ Data Product container. The camera pixels live inside a typed record, not a normal PNG.</dd></div>
+          <div class="term"><dt>CRC</dt><dd>Cyclic Redundancy Check for corruption detection. Integrity check, not cryptographic authentication.</dd></div>
+          <div class="term"><dt>RFM23BP</dt><dd>433 MHz half-duplex packet radio used for the MVP RF link.</dd></div>
+          <div class="term"><dt>RadioHead</dt><dd>Embedded radio library used by the Teensys; its header fields carry mission/node/version identity here.</dd></div>
+          <div class="term"><dt>UART</dt><dd>Byte-oriented serial link. One physical Pi↔satellite-Teensy UART is multiplexed into logical channels.</dd></div>
+          <div class="term"><dt>RPC</dt><dd>Remote Procedure Call. Satellite UART channel 2 requests a bounded action from the satellite Teensy and returns status.</dd></div>
+          <div class="term"><dt>Target 3 / 4</dt><dd>Satellite-local channel-2 RPC endpoint IDs: target 3 owns the science cache; target 4 owns preview staging.</dd></div>
+          <div class="term"><dt>Local emulator / replay</dt><dd>Laptop-only stand-ins and checked-in data that exercise software paths without claiming Pi, radio, firmware, or camera HIL.</dd></div>
+          <div class="term"><dt>Triple-Serial</dt><dd>One ground Teensy USB device with three interfaces: interface 0 GDS, interface 1 debug, and interface 2 payload.</dd></div>
+          <div class="term"><dt>HIL</dt><dd>Hardware in the loop: proof using the real Pi UART, firmware, radios, USB, and camera.</dd></div>
+          <div class="term"><dt>EPS / PDU</dt><dd>Electrical Power System / Power Distribution Unit. Accessed behind the satellite Teensy local RPC path.</dd></div>
+          <div class="term"><dt>Lepton</dt><dd>160×120 thermal camera; science values are U16 centikelvin samples.</dd></div>
+          <div class="term"><dt>Boson</dt><dd>320×256 thermal camera; current science product preserves raw U16 sensor counts.</dd></div>
+        </dl>
+        <p style="margin-top:1rem"><a href="./GLOSSARY.md">Open the full repository glossary →</a></p>
+
+        <h3 style="margin-top:2.5rem">Primary source trail</h3>
+        <div class="source-list">
+          <a href="./SYSTEM_ARCHITECTURE.md">System architecture crosswalk</a>
+          <a href="./EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md">C3M local + RF mission operations</a>
+          <a href="./C3M_LEPTON_PREVIEW_STREAM_MVP.md">Preview contract and HIL boundary</a>
+          <a href="./FPRIME_GROUND_INTERFACES_PRIMER.md">Commands/events/telemetry/parameters</a>
+          <a href="../ArtemisRpiTeensy_N2/lib/fprime/docs/user-manual/overview/03-port-comp-top.md">Pinned F´ ports/components/topology docs</a>
+          <a href="../ArtemisRpiTeensy_N2/lib/fprime/docs/user-manual/design-patterns/app-man-drv.md">Pinned F´ App-Manager-Driver pattern</a>
+          <a href="../ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Top/topology.fpp">Current deployment topology</a>
+          <a href="../config/transport_constants.json">Active generated transport contract</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="page-footer">
+      <p><strong style="color:var(--text)">C3M full-stack onboarding</strong> · Grounded in the current <code>epscorc3m-develop</code> source and checked-in demo evidence on <time datetime="2026-08-06">2026-08-06 HST</time>.</p>
+      <p>This page is a teaching map. Exact bench procedures and pass/stop rules remain authoritative in the linked runbooks.</p>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      const body = document.body;
+      const themeToggle = document.querySelector('[data-theme-toggle]');
+      const savedTheme = localStorage.getItem('c3m-onboarding-theme');
+      if (savedTheme === 'light' || savedTheme === 'dark') body.dataset.theme = savedTheme;
+      themeToggle?.addEventListener('click', () => {
+        const next = body.dataset.theme === 'light' ? 'dark' : 'light';
+        body.dataset.theme = next;
+        localStorage.setItem('c3m-onboarding-theme', next);
+      });
+
+      const stepTabs = [...document.querySelectorAll('.step-tab')];
+      const stepPanels = [...document.querySelectorAll('.step-panel')];
+      const selectStep = (index, moveFocus = false) => {
+        stepTabs.forEach((item, itemIndex) => {
+          const selected = itemIndex === index;
+          item.setAttribute('aria-selected', String(selected));
+          item.tabIndex = selected ? 0 : -1;
+        });
+        stepPanels.forEach((panel, panelIndex) => { panel.hidden = panelIndex !== index; });
+        if (moveFocus) stepTabs[index].focus();
+      };
+      stepTabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => selectStep(index));
+        tab.addEventListener('keydown', event => {
+          const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+          if (!keys.includes(event.key)) return;
+          event.preventDefault();
+          const next = event.key === 'Home' ? 0 : event.key === 'End' ? stepTabs.length - 1 :
+            (index + (event.key === 'ArrowRight' ? 1 : -1) + stepTabs.length) % stepTabs.length;
+          selectStep(next, true);
+        });
+      });
+
+      const pathButtons = [...document.querySelectorAll('[data-path-mode]')];
+      const pathNodes = [...document.querySelectorAll('.map-node')];
+      const pathPanels = [...document.querySelectorAll('[data-path-panel]')];
+      const nodeName = document.querySelector('[data-node-name]');
+      const nodeEvidence = document.querySelector('[data-node-evidence]');
+      const nodeSource = document.querySelector('[data-node-source]');
+      const selectNode = node => {
+        pathNodes.forEach(item => item.classList.toggle('is-selected', item === node));
+        nodeName.textContent = node.querySelector('strong').textContent;
+        nodeEvidence.textContent = node.dataset.evidence;
+        nodeSource.textContent = node.dataset.source;
+      };
+      const selectPath = (mode) => {
+        pathButtons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.pathMode === mode)));
+        pathNodes.forEach(node => {
+          const active = node.dataset.paths.split(' ').includes(mode);
+          node.classList.toggle('is-active', active);
+          node.classList.toggle('is-dimmed', !active);
+        });
+        pathPanels.forEach(panel => { panel.hidden = panel.dataset.pathPanel !== mode; });
+        const selectedNode = pathNodes.find(node => node.classList.contains('is-selected'));
+        if (!selectedNode || !selectedNode.dataset.paths.split(' ').includes(mode)) {
+          selectNode(pathNodes.find(node => node.dataset.paths.split(' ').includes(mode)));
+        }
+      };
+      pathButtons.forEach((button, index) => {
+        button.addEventListener('click', () => selectPath(button.dataset.pathMode));
+        button.addEventListener('keydown', event => {
+          if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+          event.preventDefault();
+          const next = (index + (event.key === 'ArrowRight' ? 1 : -1) + pathButtons.length) % pathButtons.length;
+          pathButtons[next].focus();
+          selectPath(pathButtons[next].dataset.pathMode);
+        });
+      });
+      pathNodes.forEach(node => node.addEventListener('click', () => selectNode(node)));
+      selectPath('control');
+      selectNode(pathNodes[0]);
+
+      const numberButtons = [...document.querySelectorAll('[data-number-filter]')];
+      const numberCells = [...document.querySelectorAll('[data-number]')];
+      numberButtons.forEach(button => button.addEventListener('click', () => {
+        const number = button.dataset.numberFilter;
+        numberButtons.forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+        numberCells.forEach(cell => cell.classList.toggle('is-dimmed', number !== 'all' && cell.dataset.number !== number));
+      }));
+
+      const proofButtons = [...document.querySelectorAll('.proof-rung')];
+      const proofProves = document.querySelector('[data-proof-proves]');
+      const proofLimit = document.querySelector('[data-proof-limit]');
+      const proofArtifact = document.querySelector('[data-proof-artifact]');
+      proofButtons.forEach(button => button.addEventListener('click', () => {
+        proofButtons.forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+        proofProves.textContent = button.dataset.proves;
+        proofLimit.textContent = button.dataset.limit;
+        proofArtifact.textContent = button.dataset.artifact;
+      }));
+
+      document.querySelectorAll('pre').forEach(pre => {
+        const button = pre.querySelector('.copy-button');
+        if (!button) return;
+        button.addEventListener('click', async () => {
+          const text = [...pre.childNodes].filter(node => node !== button).map(node => node.textContent).join('').trim();
+          try {
+            await navigator.clipboard.writeText(text);
+            button.textContent = 'Copied';
+            window.setTimeout(() => { button.textContent = 'Copy'; }, 1200);
+          } catch {
+            button.textContent = 'Select text';
+          }
+        });
+      });
+
+      const search = document.querySelector('.glossary-search');
+      const terms = [...document.querySelectorAll('.term')];
+      search?.addEventListener('input', () => {
+        const query = search.value.trim().toLowerCase();
+        terms.forEach(term => { term.hidden = query.length > 0 && !term.textContent.toLowerCase().includes(query); });
+      });
+
+      const progress = document.querySelector('.reading-progress');
+      const updateProgress = () => {
+        const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+        const percent = scrollable > 0 ? Math.min(100, Math.max(0, (window.scrollY / scrollable) * 100)) : 0;
+        progress.style.width = `${percent}%`;
+      };
+      updateProgress();
+      window.addEventListener('scroll', updateProgress, { passive: true });
+
+      const navLinks = [...document.querySelectorAll('.nav-list a')];
+      const sections = navLinks.map(link => document.querySelector(link.getAttribute('href'))).filter(Boolean);
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver(entries => {
+          const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+          if (!visible) return;
+          navLinks.forEach(link => link.setAttribute('aria-current', String(link.getAttribute('href') === `#${visible.target.id}`)));
+        }, { rootMargin: '-20% 0px -68% 0px', threshold: [0, 0.15, 0.5] });
+        sections.forEach(section => observer.observe(section));
+      }
+    })();
+  </script>
+</body>
+</html>

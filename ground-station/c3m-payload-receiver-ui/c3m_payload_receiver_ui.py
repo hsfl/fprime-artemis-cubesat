@@ -20,6 +20,7 @@ import sys
 import threading
 import time
 import webbrowser
+import zlib
 from collections import deque
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -44,8 +45,19 @@ def find_repo_root(start: Path) -> Path:
 
 REPO_ROOT = find_repo_root(APP_DIR)
 DEFAULT_DATA_DIR = REPO_ROOT / "data"
+NOMINAL_TRANSFER_TARGET_S = 75.0
+SERIAL_RECONNECT_TIMEOUT_S = 120.0
+PREVIEW_STALE_AFTER_S = 3.0
 PAYLOAD_RECEIVER_PATH = REPO_ROOT / "ArtemisRpiTeensy_N2" / "tools" / "payload_receiver.py"
 LEPTON_VIEWER_PATH = REPO_ROOT / "ground-station" / "lepton-dp-viewer" / "lepton_dp_viewer.py"
+BOSON_VIEWER_PATH = REPO_ROOT / "ground-station" / "boson-viewer" / "boson_viewer.py"
+FW_PACKET_DP = 5
+LEPTON_CONTAINER_ID = 0x10027000
+BOSON_CONTAINER_ID = 0x1002A000
+PRODUCT_KIND_BY_CONTAINER_ID = {
+    LEPTON_CONTAINER_ID: "lepton",
+    BOSON_CONTAINER_ID: "boson",
+}
 
 
 def load_module(name: str, path: Path) -> ModuleType:
@@ -60,6 +72,11 @@ def load_module(name: str, path: Path) -> ModuleType:
 
 payload_receiver = load_module("c3m_payload_receiver_engine", PAYLOAD_RECEIVER_PATH)
 lepton_viewer = load_module("c3m_lepton_viewer", LEPTON_VIEWER_PATH)
+boson_viewer = load_module("c3m_boson_viewer", BOSON_VIEWER_PATH)
+
+
+class UnknownPayloadProductError(ValueError):
+    """Raised when a valid transfer is not a recognized ground product."""
 
 
 def utc_iso(timestamp_s: float | None = None) -> str:
@@ -73,6 +90,55 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _thermal_color(value: int) -> tuple[int, int, int]:
+    """Map a normalized U8 value onto a compact ironbow-style palette."""
+
+    stops = (
+        (0, (3, 0, 18)),
+        (48, (45, 8, 84)),
+        (96, (116, 18, 101)),
+        (144, (190, 45, 65)),
+        (192, (244, 105, 22)),
+        (224, (252, 190, 35)),
+        (255, (255, 255, 235)),
+    )
+    for index in range(1, len(stops)):
+        upper_value, upper_color = stops[index]
+        if value <= upper_value:
+            lower_value, lower_color = stops[index - 1]
+            span = upper_value - lower_value
+            weight = (value - lower_value) / span
+            return tuple(
+                round(lower + (upper - lower) * weight)
+                for lower, upper in zip(lower_color, upper_color)
+            )
+    return stops[-1][1]
+
+
+def thermal_png(width: int, height: int, pixels: bytes, *, partial: bool = False) -> bytes:
+    """Encode an auto-ranged thermal preview with no third-party dependency."""
+
+    if width <= 0 or height <= 0 or len(pixels) != width * height:
+        raise ValueError("preview dimensions do not match thermal pixels")
+    valid = [value for value in pixels if not (partial and value == 0xFF)]
+    low = min(valid) if valid else 0
+    high = max(valid) if valid else 255
+    span = max(1, high - low)
+    rows = []
+    for row in range(height):
+        rgb = bytearray()
+        for value in pixels[row * width : (row + 1) * width]:
+            if partial and value == 0xFF:
+                rgb.extend((255, 255, 255))
+            else:
+                normalized = max(0, min(255, round((value - low) * 255 / span)))
+                rgb.extend(_thermal_color(normalized))
+        rows.append(b"\x00" + bytes(rgb))
+    raw = b"".join(rows)
+    chunk = lambda kind, body: struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
 
 
 def safe_relative_url(run_id: str, filename: str) -> str:
@@ -146,12 +212,61 @@ def device_sort_key(device: str) -> tuple[str, int]:
     return (match.group(1), int(match.group(2))) if match else (device, -1)
 
 
+def stable_port_identity(
+    device: str, rows: list[dict[str, str | bool | None]]
+) -> dict[str, object] | None:
+    selected = next((row for row in rows if str(row.get("device")) == device), None)
+    if selected is None:
+        return None
+    serial_number = str(selected.get("serial_number") or "")
+    location = str(selected.get("location") or "")
+    if serial_number:
+        group = [row for row in rows if str(row.get("serial_number") or "") == serial_number]
+        key = {"serial_number": serial_number}
+    elif location:
+        group = [row for row in rows if str(row.get("location") or "") == location]
+        key = {"location": location}
+    else:
+        return None
+    ordered = sorted((str(row["device"]) for row in group), key=device_sort_key)
+    if device not in ordered:
+        return None
+    return {**key, "interface_ordinal": ordered.index(device), "interface_count": len(ordered)}
+
+
+def resolve_stable_port(
+    identity: dict[str, object] | None,
+    rows: list[dict[str, str | bool | None]],
+) -> str | None:
+    if not identity:
+        return None
+    if identity.get("serial_number"):
+        group = [
+            row
+            for row in rows
+            if str(row.get("serial_number") or "") == str(identity["serial_number"])
+        ]
+    elif identity.get("location"):
+        group = [
+            row for row in rows if str(row.get("location") or "") == str(identity["location"])
+        ]
+    else:
+        return None
+    ordered = sorted((str(row["device"]) for row in group), key=device_sort_key)
+    ordinal = int(identity.get("interface_ordinal", -1))
+    expected_count = int(identity.get("interface_count", 0))
+    if expected_count > 0 and len(ordered) != expected_count:
+        return None
+    return ordered[ordinal] if 0 <= ordinal < len(ordered) else None
+
+
 def build_channel1_stream(
     blob: bytes,
     *,
-    product_id: int = 314549,
+    product_id: int = 1,
     transfer_id: int = 42,
     expected_crc: int | None = None,
+    omit_packet_indices: set[int] | None = None,
 ) -> bytes:
     """Build a deterministic raw receiver stream for local UI replay."""
 
@@ -168,7 +283,10 @@ def build_channel1_stream(
     header += struct.pack("<H", file_crc)
 
     packets = [bytes(header)]
+    omitted = omit_packet_indices or set()
     for index in range(total_packets):
+        if index in omitted:
+            continue
         chunk = blob[index * data_bytes : (index + 1) * data_bytes]
         packet = bytearray(payload_receiver.MAGIC)
         packet += bytes([payload_receiver.TYPE_DATA, transfer_id])
@@ -226,6 +344,7 @@ def default_current_state() -> dict[str, Any]:
         "message": "Starting payload receiver",
         "failure_reason": None,
         "product_id": None,
+        "product_kind": None,
         "transfer_id": None,
         "total_bytes": 0,
         "received_bytes": 0,
@@ -244,7 +363,37 @@ def default_current_state() -> dict[str, Any]:
         "run_id": None,
         "outputs": {},
         "decode": None,
+        "partial": False,
+        "timeout_reason": None,
+        "completion_reason": None,
+        "missing_packet_indices": [],
+        # The Current tab keeps showing the last decoded science product while
+        # a newer transfer is in progress. A completed/partial finalization
+        # replaces this snapshot atomically.
+        "display_payload": None,
+        # A preview is deliberately independent of a science transfer. Keep
+        # the last frame visible while a newer N2 product is received.
+        "preview": None,
     }
+
+
+def ready_presentation(current: dict[str, Any]) -> tuple[str, str]:
+    """Return transfer presentation without confusing serial readiness with transfer state."""
+    if current.get("run_id"):
+        if current.get("partial") is True:
+            return "partial", "Ready — last payload remains partial"
+        if current.get("crc_ok") is True:
+            return "complete", "Ready — last payload complete"
+        if current.get("crc_ok") is False or current.get("status") == "failed":
+            return "failed", "Ready — last payload failed"
+
+    total_packets = int(current.get("total_packets") or 0)
+    received_packets = int(current.get("received_packets") or 0)
+    if current.get("transfer_id") is not None and total_packets > received_packets:
+        return "receiving", "Resumed payload transfer"
+    if current.get("status") in {"verifying", "decoding"}:
+        return str(current["status"]), str(current.get("message") or "Finalizing payload")
+    return "ready", "Ready — awaiting downlink"
 
 
 class ReceiverController:
@@ -255,22 +404,33 @@ class ReceiverController:
         baud: int = 115200,
         dictionary: Path | None = None,
         decode_fn: Callable[[Path, Path, Path | None], dict[str, Any]] | None = None,
+        partial_decode_fn: Callable[[Path, Path, list[int], int], dict[str, Any]] | None = None,
+        transfer_timeout_s: float | None = None,
+        port_rows_fn: Callable[[], list[dict[str, str | bool | None]]] = serial_port_rows,
+        serial_factory: Callable[..., object] | None = None,
     ) -> None:
         self.data_dir = data_dir.resolve()
         self.incoming_dir = self.data_dir / ".incoming"
         self.baud = baud
         self.dictionary = dictionary.resolve() if dictionary is not None else None
-        self.decode_fn = decode_fn or self._decode_lepton
+        self.decode_fn = decode_fn
+        self.partial_decode_fn = partial_decode_fn
+        self.transfer_timeout_s = transfer_timeout_s
+        self.port_rows_fn = port_rows_fn
+        self.serial_factory = serial_factory
         self.lock = threading.RLock()
         self.worker_lock = threading.RLock()
         self.current = default_current_state()
         self.logs: deque[dict[str, Any]] = deque(maxlen=160)
         self.thread: threading.Thread | None = None
         self.stop_event = threading.Event()
-        self.last_replay: tuple[bytes, float, int | None] | None = None
+        self.cancel_event = threading.Event()
+        self.last_replay: tuple[bytes, float, int | None, set[int]] | None = None
         self.worker_generation = 0
         self.transfer_sequence = 0
         self.finalize_lock = threading.Lock()
+        self.port_identity: dict[str, object] | None = None
+        self.live_preview_path = self.data_dir / ".live-preview.png"
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
     def _decode_lepton(self, fdp_path: Path, outdir: Path, dictionary: Path | None) -> dict[str, Any]:
@@ -283,6 +443,67 @@ class ReceiverController:
             no_show=True,
         )
         return lepton_viewer.decode_product(namespace)
+
+    def _decode_partial_lepton(
+        self,
+        fdp_path: Path,
+        outdir: Path,
+        missing_packet_indices: list[int],
+        packet_data_bytes: int,
+    ) -> dict[str, Any]:
+        return lepton_viewer.decode_partial_product(
+            fdp_path,
+            outdir,
+            missing_packet_indices,
+            packet_data_bytes,
+            no_show=True,
+        )
+
+    def _decode_boson(self, fdp_path: Path, outdir: Path, dictionary: Path | None) -> dict[str, Any]:
+        namespace = argparse.Namespace(
+            bin_file=fdp_path,
+            dictionary=dictionary,
+            outdir=outdir,
+            no_show=True,
+            no_png=False,
+            summary=False,
+        )
+        return boson_viewer.decode_product(namespace)
+
+    def _decode_partial_boson(
+        self,
+        fdp_path: Path,
+        outdir: Path,
+        missing_packet_indices: list[int],
+        packet_data_bytes: int,
+    ) -> dict[str, Any]:
+        return boson_viewer.decode_partial_product(
+            fdp_path,
+            outdir,
+            missing_packet_indices,
+            packet_data_bytes,
+            no_show=True,
+        )
+
+    def _classify_product(self, source: Path, product_id: int | None) -> str:
+        """Classify only from the verified standard-FDP bytes, never channel metadata."""
+
+        del product_id
+        try:
+            with source.open("rb") as stream:
+                signature = stream.read(struct.calcsize(">HI"))
+        except OSError:
+            return "unknown"
+        if len(signature) != struct.calcsize(">HI"):
+            return "unknown"
+        packet_descriptor, container_id = struct.unpack(">HI", signature)
+        if packet_descriptor != FW_PACKET_DP:
+            return "unknown"
+        return PRODUCT_KIND_BY_CONTAINER_ID.get(container_id, "unknown")
+
+    def _target_suffix(self, product_kind: str) -> str:
+        del product_kind
+        return ".fdp"
 
     def _append_log(self, message: str, timestamp_s: float | None = None, level: str = "info") -> None:
         if not message:
@@ -315,10 +536,18 @@ class ReceiverController:
             }:
                 return
             self.last_replay = None
+            self.port_identity = stable_port_identity(port, self.port_rows_fn())
         self._start_worker(port=port, replay=None)
 
-    def connect_replay(self, blob: bytes, *, delay_s: float = 0.0, expected_crc: int | None = None) -> None:
-        self.last_replay = (bytes(blob), delay_s, expected_crc)
+    def connect_replay(
+        self,
+        blob: bytes,
+        *,
+        delay_s: float = 0.0,
+        expected_crc: int | None = None,
+        omit_packet_indices: set[int] | None = None,
+    ) -> None:
+        self.last_replay = (bytes(blob), delay_s, expected_crc, omit_packet_indices or set())
         self._start_worker(port="Local channel-1 replay", replay=self.last_replay)
 
     def reconnect(self) -> None:
@@ -326,16 +555,57 @@ class ReceiverController:
             port = self.current.get("port")
             replay = self.last_replay
         if replay is not None:
-            self.connect_replay(replay[0], delay_s=replay[1], expected_crc=replay[2])
+            self.connect_replay(
+                replay[0], delay_s=replay[1], expected_crc=replay[2], omit_packet_indices=replay[3]
+            )
         elif isinstance(port, str) and port:
+            if self.port_identity:
+                resolved = resolve_stable_port(self.port_identity, self.port_rows_fn())
+                if resolved is None:
+                    with self.lock:
+                        self.current.update(
+                            {
+                                "status": "recovering",
+                                "connected": False,
+                                "message": "Waiting for the selected ground Teensy to reappear",
+                            }
+                        )
+                    return
+                port = resolved
             self._start_worker(port=port, replay=None)
         else:
             self.set_port_required()
 
-    def _start_worker(self, port: str, replay: tuple[bytes, float, int | None] | None) -> None:
+    def cancel_current_transfer(self) -> bool:
+        """Ask the ground receiver to save its current progress as partial data."""
+
+        with self.worker_lock:
+            with self.lock:
+                if self.cancel_event.is_set() or self.current.get("status") == "cancelling":
+                    return False
+                if self.current.get("status") not in {"receiving", "retrying"}:
+                    raise ValueError("no active payload transfer can be stopped")
+                if self.current.get("transfer_id") is None or int(self.current.get("total_packets") or 0) <= 0:
+                    raise ValueError("wait for a valid payload header before stopping the transfer")
+                self.cancel_event.set()
+                self.current.update(
+                    {
+                        "status": "cancelling",
+                        "message": "Saving received packets as a partial payload",
+                        "completion_reason": "operator_cancelled",
+                    }
+                )
+                self._append_log(
+                    "Operator stopped ground reception; satellite transmission continues",
+                    level="warning",
+                )
+                return True
+
+    def _start_worker(self, port: str, replay: tuple[bytes, float, int | None, set[int]] | None) -> None:
         with self.worker_lock:
             self.stop()
             self.stop_event = threading.Event()
+            self.cancel_event = threading.Event()
             with self.lock:
                 self.worker_generation += 1
                 generation = self.worker_generation
@@ -351,7 +621,7 @@ class ReceiverController:
                 self._append_log(f"Opening payload receiver on {port}")
             self.thread = threading.Thread(
                 target=self._run_receiver,
-                args=(port, replay, self.stop_event, generation),
+                args=(port, replay, self.stop_event, self.cancel_event, generation),
                 name="c3m-payload-receiver",
                 daemon=True,
             )
@@ -381,19 +651,36 @@ class ReceiverController:
     def _run_receiver(
         self,
         port: str,
-        replay: tuple[bytes, float, int | None] | None,
+        replay: tuple[bytes, float, int | None, set[int]] | None,
         stop_event: threading.Event,
+        cancel_event: threading.Event,
         generation: int,
     ) -> None:
         serial_factory: Callable[..., object] | None = None
         idle_timeout = 0.0
         if replay is not None:
-            raw = build_channel1_stream(replay[0], expected_crc=replay[2])
+            raw = build_channel1_stream(
+                replay[0], expected_crc=replay[2], omit_packet_indices=replay[3]
+            )
             replay_serial = ReplaySerial(raw, delay_s=replay[1])
             serial_factory = lambda *_args, **_kwargs: replay_serial
             idle_timeout = 0.5
+        else:
+            serial_factory = self.serial_factory
+
+        source_identity = dict(self.port_identity or {})
+        port_resolver = None
+        if replay is None and source_identity:
+            port_resolver = lambda: resolve_stable_port(source_identity, self.port_rows_fn())
 
         worker_incoming_dir = self.incoming_dir / f"worker_{generation}"
+
+        def consume_cancel_requested() -> bool:
+            if not cancel_event.is_set():
+                return False
+            cancel_event.clear()
+            return True
+
         receiver = payload_receiver.PayloadReceiver(
             port,
             self.baud,
@@ -405,6 +692,20 @@ class ReceiverController:
             on_event=lambda event: self.on_receiver_event(event, generation),
             serial_factory=serial_factory,
             stop_requested=stop_event.is_set,
+            consume_cancel_requested=consume_cancel_requested,
+            transfer_timeout_s=self.transfer_timeout_s,
+            absolute_transfer_timeout_s=None,
+            save_partial_on_timeout=True,
+            checkpoint_dir=(
+                self.incoming_dir / "active_transfer_checkpoint"
+                if replay is None
+                else None
+            ),
+            source_identity=source_identity,
+            port_resolver=port_resolver,
+            reconnect_timeout_s=SERIAL_RECONNECT_TIMEOUT_S if port_resolver is not None else 0.0,
+            save_partial_on_disconnect=port_resolver is not None,
+            retain_checkpoint_after_complete=replay is None,
         )
         try:
             receiver.run_directory(idle_timeout_s=idle_timeout)
@@ -426,19 +727,61 @@ class ReceiverController:
 
     def on_receiver_event(self, event: Any, generation: int | None = None) -> None:
         event_data = dataclasses.asdict(event)
-        finalize = event.kind == "transfer_saved"
+        finalize = event.kind in {"transfer_saved", "partial_saved"}
         transfer_sequence: int | None = None
         with self.lock:
             if generation is not None and generation != self.worker_generation:
                 return
             self.current["port"] = event.port
+            if event.kind == "preview_frame":
+                pixels = event.preview_pixels
+                if (
+                    pixels is None
+                    or event.preview_width is None
+                    or event.preview_height is None
+                    or event.preview_session_id is None
+                    or event.preview_frame_sequence is None
+                ):
+                    return
+                png = thermal_png(
+                    event.preview_width,
+                    event.preview_height,
+                    pixels,
+                    partial=not bool(event.preview_complete),
+                )
+                payload_receiver.PayloadReceiver._atomic_write(self.live_preview_path, png)
+                self.current["preview"] = {
+                    "session_id": event.preview_session_id,
+                    "frame_sequence": event.preview_frame_sequence,
+                    "width": event.preview_width,
+                    "height": event.preview_height,
+                    "total_bytes": event.preview_total_bytes,
+                    "received_bytes": event.preview_received_bytes,
+                    "fragment_count": event.preview_fragment_count,
+                    "received_fragments": event.preview_received_fragments,
+                    "percent": event.preview_percent,
+                    "complete": event.preview_complete,
+                    "crc_ok": event.preview_crc_ok,
+                    "finalize_reason": event.preview_finalize_reason,
+                    "received_at_s": event.timestamp_s,
+                    "png": "/preview/latest.png",
+                }
+                state = "Complete" if event.preview_complete else "Partial"
+                self._append_log(
+                    f"Preview {state.lower()}: {event.preview_percent:.1f}% frame {event.preview_frame_sequence}",
+                    event.timestamp_s,
+                    level="info" if event.preview_complete else "warning",
+                )
+                return
             if event.kind in {
                 "transfer_started",
+                "transfer_resumed",
                 "progress",
                 "retry_requested",
                 "crc_checked",
                 "transfer_saved",
                 "incomplete",
+                "partial_saved",
             }:
                 self.current.update(
                     {
@@ -455,48 +798,58 @@ class ReceiverController:
                 )
 
             if event.kind == "ready":
+                ready_status, ready_message = ready_presentation(self.current)
                 self.current.update(
                     {
-                        "status": "ready",
+                        "status": ready_status,
                         "connected": True,
-                        "message": "Ready — awaiting downlink",
-                        "failure_reason": None,
+                        "message": ready_message,
+                        "failure_reason": (
+                            self.current.get("failure_reason") if ready_status == "failed" else None
+                        ),
                     }
                 )
-            elif event.kind == "transfer_started":
+            elif event.kind in {"transfer_started", "transfer_resumed"}:
                 self.transfer_sequence += 1
                 self.current.update(
                     {
                         "status": "receiving",
                         "connected": True,
-                        "message": "Receiving payload",
+                        "message": "Resumed payload transfer" if event.kind == "transfer_resumed" else "Receiving payload",
                         "failure_reason": None,
-                        "started_at_s": event.timestamp_s,
+                        "started_at_s": event.transfer_started_at_s or event.timestamp_s,
                         "completed_at_s": None,
                         "elapsed_seconds": 0.0,
                         "estimated_remaining_seconds": None,
                         "actual_crc": None,
                         "crc_ok": None,
                         "run_id": None,
+                        "product_kind": None,
                         "outputs": {},
                         "decode": None,
+                        "partial": False,
+                        "timeout_reason": None,
+                        "completion_reason": None,
+                        "missing_packet_indices": [],
                     }
                 )
                 self._append_log(event.message, event.timestamp_s)
             elif event.kind == "progress":
-                self.current.update({"status": "receiving", "message": "Receiving payload"})
+                if self.current.get("status") != "cancelling":
+                    self.current.update({"status": "receiving", "message": "Receiving payload"})
                 if event.received_packets % 50 == 0 or event.received_packets == event.total_packets:
                     self._append_log(
                         f"Progress: {event.received_packets}/{event.total_packets} packets",
                         event.timestamp_s,
                     )
             elif event.kind == "retry_requested":
-                self.current.update(
-                    {
-                        "status": "retrying",
-                        "message": "Retrying missing packets",
-                    }
-                )
+                if self.current.get("status") != "cancelling":
+                    self.current.update(
+                        {
+                            "status": "retrying",
+                            "message": "Retrying missing packets",
+                        }
+                    )
                 self._append_log(event.message, event.timestamp_s, level="warning")
             elif event.kind == "crc_checked":
                 self.current.update(
@@ -520,6 +873,20 @@ class ReceiverController:
                     }
                 )
                 self._append_log(event.message, event.timestamp_s, level="error")
+            elif event.kind == "partial_saved":
+                self.current.update(
+                    {
+                        "status": "decoding",
+                        "message": "Decoding best-effort thermal product",
+                        "crc_ok": False,
+                        "partial": True,
+                        "timeout_reason": event.timeout_reason,
+                        "completion_reason": event.completion_reason,
+                        "missing_packet_indices": list(event.missing_packet_indices),
+                        "failure_reason": None,
+                    }
+                )
+                self._append_log(event.message, event.timestamp_s, level="warning")
             elif event.kind == "serial_error":
                 self.current.update(
                     {
@@ -530,9 +897,28 @@ class ReceiverController:
                     }
                 )
                 self._append_log(event.error or event.message, event.timestamp_s, level="error")
+            elif event.kind == "recovering":
+                self.current.update(
+                    {
+                        "status": "recovering",
+                        "connected": False,
+                        "message": "Recovering payload serial connection",
+                        "failure_reason": event.error or event.message,
+                    }
+                )
+                self._append_log(event.message, event.timestamp_s, level="warning")
+            elif event.kind == "checkpoint_rejected":
+                self.current.update(
+                    {
+                        "status": "warning",
+                        "message": "Saved payload checkpoint was rejected",
+                        "failure_reason": event.error or event.message,
+                    }
+                )
+                self._append_log(event.error or event.message, event.timestamp_s, level="warning")
             elif event.kind == "idle_timeout":
                 self.current["connected"] = False
-                if self.current["status"] not in {"complete", "failed"}:
+                if self.current["status"] not in {"complete", "partial", "failed"}:
                     self.current.update(
                         {
                             "status": "disconnected",
@@ -607,15 +993,47 @@ class ReceiverController:
         source = Path(str(event["output_path"])).resolve()
         crc_ok = event.get("crc_ok") is True
         run_dir = self._next_run_dir(float(event["timestamp_s"]), event.get("transfer_id"))
-        target = run_dir / ("payload.fdp" if crc_ok else "payload.fdp.badcrc")
+        partial = event.get("partial") is True
+        custom_dispatch = self.decode_fn is not None or self.partial_decode_fn is not None
+        product_kind = "custom" if custom_dispatch else self._classify_product(
+            source,
+            int(event["product_id"]) if event.get("product_id") is not None else None,
+        )
+        target_suffix = ".fdp" if custom_dispatch else self._target_suffix(product_kind)
+        target_name = f"payload{target_suffix}"
+        if partial:
+            target_name += ".partial"
+        elif not crc_ok:
+            target_name += ".badcrc"
+        target = run_dir / target_name
         shutil.move(str(source), str(target))
+        missing_map_target: Path | None = None
+        missing_map_source_value = event.get("missing_map_path")
+        if partial and missing_map_source_value:
+            missing_map_source = Path(str(missing_map_source_value)).resolve()
+            if missing_map_source.is_file():
+                missing_map_target = run_dir / "missing_packets.json"
+                shutil.move(str(missing_map_source), str(missing_map_target))
         digest = sha256_file(target)
         with self.lock:
             if self._is_current_transfer(generation, transfer_sequence):
                 self.current.update(
                     {
-                        "status": "decoding" if crc_ok else "verifying",
-                        "message": "Decoding thermal product" if crc_ok else "CRC failed",
+                        "status": "decoding" if (crc_ok or partial) else "verifying",
+                        "product_kind": product_kind,
+                        "message": (
+                            "Decoding best-effort Boson raw-count product"
+                            if partial and product_kind == "boson"
+                            else (
+                                "Decoding best-effort thermal product"
+                                if partial
+                                else (
+                                    "Decoding Boson raw-count product"
+                                    if crc_ok and product_kind == "boson"
+                                    else ("Decoding thermal product" if crc_ok else "CRC failed")
+                                )
+                            )
+                        ),
                         "run_id": run_dir.name,
                     }
                 )
@@ -625,14 +1043,60 @@ class ReceiverController:
         result = "crc_failed"
         if crc_ok:
             try:
-                summary = self.decode_fn(target, run_dir, self.dictionary)
+                if self.decode_fn is not None:
+                    summary = self.decode_fn(target, run_dir, self.dictionary)
+                elif product_kind == "boson":
+                    summary = self._decode_boson(target, run_dir, self.dictionary)
+                elif product_kind == "lepton":
+                    summary = self._decode_lepton(target, run_dir, self.dictionary)
+                else:
+                    raise UnknownPayloadProductError(
+                        f"unknown payload product id={event.get('product_id')}; archived as {target.name}"
+                    )
                 result = "complete"
+            except UnknownPayloadProductError as exc:
+                failure_reason = str(exc)
+                result = "unknown_product"
             except SystemExit as exc:
                 failure_reason = f"decoder exited with status {exc.code}"
                 result = "decode_failed"
             except Exception as exc:
                 failure_reason = str(exc)
                 result = "decode_failed"
+        elif partial:
+            try:
+                if self.partial_decode_fn is not None:
+                    summary = self.partial_decode_fn(
+                        target,
+                        run_dir,
+                        list(event.get("missing_packet_indices") or []),
+                        int(event.get("packet_data_bytes") or payload_receiver.DATA_BYTES),
+                    )
+                elif product_kind == "boson":
+                    summary = self._decode_partial_boson(
+                        target,
+                        run_dir,
+                        list(event.get("missing_packet_indices") or []),
+                        int(event.get("packet_data_bytes") or payload_receiver.DATA_BYTES),
+                    )
+                elif product_kind == "lepton":
+                    summary = self._decode_partial_lepton(
+                        target,
+                        run_dir,
+                        list(event.get("missing_packet_indices") or []),
+                        int(event.get("packet_data_bytes") or payload_receiver.DATA_BYTES),
+                    )
+                else:
+                    raise UnknownPayloadProductError(
+                        f"unknown payload product id={event.get('product_id')}; archived as {target.name}"
+                    )
+                result = "partial"
+            except UnknownPayloadProductError as exc:
+                failure_reason = str(exc)
+                result = "unknown_product"
+            except Exception as exc:
+                failure_reason = str(exc)
+                result = "partial_decode_failed"
         else:
             failure_reason = (
                 f"CRC mismatch: actual=0x{int(event.get('actual_crc') or 0):04x} "
@@ -641,6 +1105,8 @@ class ReceiverController:
 
         completed_at = time.time()
         output_paths: dict[str, str] = {"fdp": target.name}
+        if missing_map_target is not None:
+            output_paths["missing_map"] = missing_map_target.name
         if summary is not None:
             for key in ("json", "csv", "png"):
                 value = summary.get(key)
@@ -657,6 +1123,7 @@ class ReceiverController:
             "serial_port": event.get("port"),
             "baud": self.baud,
             "product_id": event.get("product_id"),
+            "product_kind": product_kind,
             "transfer_id": event.get("transfer_id"),
             "total_bytes": event.get("total_bytes"),
             "received_bytes": event.get("received_bytes"),
@@ -667,13 +1134,19 @@ class ReceiverController:
             "expected_crc": event.get("expected_crc"),
             "actual_crc": event.get("actual_crc"),
             "crc_ok": crc_ok,
+            "partial": partial,
+            "timeout_reason": event.get("timeout_reason"),
+            "completion_reason": event.get("completion_reason"),
+            "missing_packet_indices": event.get("missing_packet_indices") or [],
             "sha256": digest,
             "outputs": output_paths,
             "decode": summary,
         }
-        temporary = run_dir / "run.json.tmp"
-        temporary.write_text(json.dumps(run_info, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        temporary.replace(run_dir / "run.json")
+        payload_receiver.PayloadReceiver._atomic_write(
+            run_dir / "run.json",
+            (json.dumps(run_info, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        )
+        self._acknowledge_finalized_checkpoint(event)
 
         output_urls = {key: safe_relative_url(run_dir.name, value) for key, value in output_paths.items()}
         with self.lock:
@@ -681,13 +1154,21 @@ class ReceiverController:
                 return
             if result == "complete":
                 message = "Payload complete"
+            elif result == "partial":
+                message = (
+                    "Partial — stopped by operator"
+                    if event.get("completion_reason") == "operator_cancelled"
+                    else "Partial — viewable with missing data"
+                )
             elif result == "crc_failed":
                 message = "CRC failed"
+            elif result == "unknown_product":
+                message = "Unknown payload product archived"
             else:
                 message = "Payload received — decode failed"
             self.current.update(
                 {
-                    "status": "complete" if result == "complete" else "failed",
+                    "status": "partial" if result == "partial" else ("complete" if result == "complete" else "failed"),
                     "message": message,
                     "failure_reason": failure_reason,
                     "completed_at_s": completed_at,
@@ -695,12 +1176,50 @@ class ReceiverController:
                     "run_id": run_dir.name,
                     "outputs": output_urls,
                     "decode": summary,
+                    "completion_reason": event.get("completion_reason"),
                 }
             )
+            if result in {"complete", "partial"} and summary is not None and output_urls.get("png"):
+                self.current["display_payload"] = {
+                    "status": "partial" if result == "partial" else "complete",
+                    "product_id": event.get("product_id"),
+                    "product_kind": product_kind,
+                    "transfer_id": event.get("transfer_id"),
+                    "run_id": run_dir.name,
+                    "outputs": output_urls,
+                    "decode": summary,
+                }
             if result == "complete":
                 self._append_log("Decode complete", completed_at)
+            elif result == "partial":
+                partial_message = (
+                    "Operator-stopped partial saved; missing pixels are shown in white"
+                    if event.get("completion_reason") == "operator_cancelled"
+                    else "Best-effort decode complete; missing pixels are shown in white"
+                )
+                self._append_log(partial_message, completed_at, level="warning")
             elif failure_reason:
                 self._append_log(failure_reason, completed_at, level="error")
+
+    def _acknowledge_finalized_checkpoint(self, event: dict[str, Any]) -> None:
+        checkpoint = self.incoming_dir / "active_transfer_checkpoint"
+        owner = checkpoint / payload_receiver.CHECKPOINT_OWNER_FILENAME
+        manifest_path = checkpoint / "manifest.json"
+        try:
+            if owner.read_text(encoding="utf-8") != payload_receiver.CHECKPOINT_OWNER_VALUE:
+                return
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            transfer = manifest["transfer"]
+            if (
+                int(transfer["transfer_id"]) != int(event.get("transfer_id"))
+                or int(transfer["product_id"]) != int(event.get("product_id"))
+                or int(transfer["total_bytes"]) != int(event.get("total_bytes"))
+                or int(transfer["file_crc"]) != int(event.get("expected_crc"))
+            ):
+                return
+            shutil.rmtree(checkpoint)
+        except (KeyError, TypeError, ValueError, OSError, json.JSONDecodeError):
+            return
 
     def history(self) -> list[dict[str, Any]]:
         runs: list[dict[str, Any]] = []
@@ -737,9 +1256,7 @@ class ReceiverController:
                 current["estimated_remaining_seconds"] = round((total - received) / rate, 1) if rate > 0 else None
             else:
                 current["estimated_remaining_seconds"] = None
-            if elapsed > 120:
-                current["timing_band"] = "delayed"
-            elif elapsed > 60:
+            if elapsed > NOMINAL_TRANSFER_TARGET_S:
                 current["timing_band"] = "degraded"
             else:
                 current["timing_band"] = "nominal"
@@ -748,6 +1265,13 @@ class ReceiverController:
             if int(current.get("total_packets") or 0) > 0
             else 0.0
         )
+        preview = current.get("preview")
+        if isinstance(preview, dict):
+            received_at = preview.get("received_at_s")
+            preview["stale"] = (
+                isinstance(received_at, (int, float))
+                and time.time() - float(received_at) >= PREVIEW_STALE_AFTER_S
+            )
         return {
             "current": current,
             "logs": logs,
@@ -801,6 +1325,8 @@ class ReceiverHandler(BaseHTTPRequestHandler):
                 self.send_path(STATIC_DIR / "app.js")
             elif parsed.path == "/api/state":
                 self.send_json(self.server.controller.snapshot())
+            elif parsed.path == "/preview/latest.png":
+                self.send_path(self.server.controller.live_preview_path)
             elif parsed.path.startswith("/files/"):
                 relative = unquote(parsed.path.removeprefix("/files/"))
                 self.send_path(resolve_under(self.server.controller.data_dir, relative))
@@ -826,6 +1352,9 @@ class ReceiverHandler(BaseHTTPRequestHandler):
             elif parsed.path == "/api/reconnect":
                 self.server.controller.reconnect()
                 self.send_json({"ok": True})
+            elif parsed.path == "/api/transfer/cancel":
+                accepted = self.server.controller.cancel_current_transfer()
+                self.send_json({"ok": True, "accepted": accepted})
             elif parsed.path == "/api/open-folder":
                 if self.client_address[0] not in {"127.0.0.1", "::1"}:
                     raise ValueError("open-folder is localhost only")
@@ -902,6 +1431,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--replay-fdp", type=Path, help="Replay one local .fdp through the raw channel-1 receiver")
     parser.add_argument("--replay-delay-ms", type=float, default=2.0)
     parser.add_argument("--replay-bad-crc", action="store_true", help="Intentionally fail replay whole-file CRC")
+    parser.add_argument(
+        "--replay-drop-packet",
+        action="append",
+        type=int,
+        default=[],
+        help="Omit a channel-1 packet index during replay (repeatable)",
+    )
+    parser.add_argument(
+        "--transfer-timeout",
+        type=float,
+        default=None,
+        help="Optional stall timeout before saving an incomplete transfer; disabled by default",
+    )
     return parser
 
 
@@ -914,6 +1456,7 @@ def main(argv: list[str] | None = None) -> int:
         args.data_dir,
         baud=args.baud,
         dictionary=args.dictionary,
+        transfer_timeout_s=args.transfer_timeout,
     )
     if args.replay_fdp is not None:
         blob = args.replay_fdp.read_bytes()
@@ -922,6 +1465,7 @@ def main(argv: list[str] | None = None) -> int:
             blob,
             delay_s=max(0.0, args.replay_delay_ms) / 1000.0,
             expected_crc=expected_crc,
+            omit_packet_indices=set(args.replay_drop_packet),
         )
     elif args.port:
         controller.connect(args.port)

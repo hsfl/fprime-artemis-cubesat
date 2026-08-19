@@ -7,6 +7,8 @@ register_fprime_library(
         ${CMAKE_CURRENT_LIST_DIR}/UartChannelMux.hpp
     DEPENDS
         Components_LinkCfg
+        Components_PayloadLinkTypes
+        Components_Types
 )
 
 set(UT_SOURCE_FILES
@@ -17,6 +19,8 @@ set(UT_SOURCE_FILES
 
 set(UT_MOD_DEPS
     Components_LinkCfg
+    Components_PayloadLinkTypes
+    Components_Types
     STest
 )
 

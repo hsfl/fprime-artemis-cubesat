@@ -104,9 +104,10 @@ GDS command
 -> payload viewer parses the file
 ```
 
-Progress belongs in F Prime events. The current `PayloadDownlinkApp` emits
-`PayloadDownlinkProgress` at nominal `10%` increments and completes with
-`PayloadDownlinkComplete` plus `CommsApp.DownlinkFinished`.
+Per-packet progress belongs in the channel-1 receiver GUI. F Prime retains
+low-rate progress telemetry and an explicit `GET_PAYLOAD_STATUS` fallback,
+then completes with `PayloadDownlinkComplete` plus
+`CommsApp.DownlinkFinished`.
 
 APID sequence warnings in GDS mean the RF/GDS telemetry stream dropped packets.
 They do not automatically mean the payload failed. The payload pass/fail check

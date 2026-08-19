@@ -114,12 +114,27 @@ pieces:
 
 - Neutron 2 demo: `PayloadDriver_NeutronSim` produces neutron payload bytes,
   and `ground-station/neutron2-payload-viewer` parses the reconstructed file.
-- EPSCoR C3M demo: `PayloadDriver_Lepton` produces Lepton `.fdp` Data Products,
-  and `ground-station/lepton-dp-viewer` parses the reconstructed `.fdp`.
+- EPSCoR C3M demo: `PayloadDriverSelector` defaults to
+  `PayloadDriver_Lepton` and can select the separate `PayloadDriver_Boson`.
+  Both drivers produce standard `.fdp` Data Products through the same
+  application/manager, Data Products, one-product Teensy cache, channel-1
+  downlink, and receiver path. Their record schemas and pixel decoders remain
+  separate because Lepton is 160x120 centikelvin data while Boson is 320x256
+  raw U16 counts.
 
 Do not fork the application/manager stack for payload identity. Swap the driver
 wiring and keep `PayloadManager`, `StorageManager`, `CommsApp`, and
 `PayloadDownlinkApp` generic.
+
+### C3M preview stream MVP
+
+The Lepton preview stream is a separate, Lepton-first operator aid: newest
+`80x60` U8 frame only, one replaceable frame slot, best-effort full or partial
+ground rendering, and white missing pixels. It has no preview retry/repair and
+is not a Neutron 2 science product or the C3M `.fdp` science path. Preview and
+science are mutually exclusive so their transport and operator contracts stay
+unambiguous. See
+[`C3M_LEPTON_PREVIEW_STREAM_MVP.md`](C3M_LEPTON_PREVIEW_STREAM_MVP.md).
 
 ### Implementation notes (use the framework, don't fight it)
 
@@ -208,6 +223,63 @@ The RFM23BP has a small packet budget, so each cross-RF channel is segmented:
   retry requests, and final CRC repair at the application layer.
 - Reassembly timeout is `500 ms`; inter-segment gap is `8 ms`.
 
+### RFM23BP lifecycle and autonomous recovery
+
+The Raspberry Pi/F Prime deployment owns radio-service policy; the satellite
+Teensy is the deterministic hardware executor. On every Teensy reset, the
+firmware first places the RFM23BP in datasheet shutdown (`SDN = HIGH`), asserts
+`RPI_ENABLE`, and brings up the Pi UART/channel-2 path. F Prime then requests
+the first radio enable. Radio startup is never allowed to gate Pi power-up.
+
+The Teensy exposes only two steady radio states, `OFF` and `READY`, with a
+separate factual fault reason. Channel 2 provides `STATUS` and idempotent
+`SET_ENABLED` operations, permits one pending request, and uses a 15-second F
+Prime timeout so the Teensy's 12-second watchdog remains the final escape from
+a stalled RadioHead initialization. A failed request is retried by F Prime
+after `30 s`, then `120 s`, then at a capped `900 s` cadence until the critical
+radio service returns. While healthy, F Prime polls status every 60 seconds.
+
+After the relay's one low-level FIFO recovery retry, a factual local transmit
+completion/start failure forces `SDN = HIGH` and reports `OFF + LOCAL_TX_FAULT`.
+F Prime then uses the same bounded enable path to perform a known SDN power-on
+reset. Peer silence, an absent ground station, RSSI changes, and ordinary RF
+ACK loss do **not** trigger this hardware recovery path because they do not
+prove that the local RFM23BP is wedged.
+
+`CommsApp` is the authoritative SOH owner for radio readiness: comms is `OK`
+only for `READY + NONE`. Legacy transport-silence counters remain diagnostic
+and do not turn a quiet but healthy RF channel into a bus failure. The
+low-level disable operation is retained for trusted local/bench verification;
+there is no public persistent ground command that can strand the spacecraft by
+turning off its only command link.
+
+See [C3M RFM23BP KISS Control and Recovery Plan](C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md)
+for the exact recovery contract, test evidence, and remaining electrical gates.
+
+### RF mission identity and nearby-booth isolation
+
+The RadioHead `TO`, `FROM`, `ID`, and `FLAGS` bytes are assigned as a strict,
+CRC-protected mission header before any Artemis segment is accepted:
+
+- `ID` identifies the mission network (`0xC3` for EPSCoR C3M; `0xD2` is
+  reserved for Neutron 2).
+- `TO` / `FROM` identify the ground (`0xA1`) and satellite (`0xA2`) roles.
+- `FLAGS` carries link-protocol version `1`.
+
+The receiver rejects a wrong network, role direction, or protocol version
+before ACK handling, reassembly, UART/USB forwarding, GDS, or payload decode.
+Dedicated debug counters distinguish these intentional drops from CRC and RF
+loss. The constants are generated from `config/rf_networks.json` plus the
+active `rf.network` selection in `config/transport_constants.json`.
+
+This is intended as accidental cross-talk protection when C3M and Neutron 2
+operate in nearby conference booths. It adds no on-air bytes because RadioHead
+already transmits and CRC-protects this four-byte header, so the 49-byte RF
+packet and 44-byte Artemis segment capacity are unchanged. It does not prevent
+same-frequency collisions, provide encryption, or stop intentional spoofing.
+The planned shared-ground-station mapping for `N2-A` and `N2-B` is summarized
+in [Neutron 2 Radio Architecture Summary](NEUTRON2_RADIO_ARCHITECTURE_SUMMARY.md).
+
 See the [RFM23BP datasheet](#reference-documents) for the radio's packet/FIFO limits that drive these numbers.
 
 ### The three ground USB serial ports
@@ -258,9 +330,10 @@ Important student-facing rule:
 - ground serial port 1 is a **read-only debug** view of link health.
 - `tools/payload_receiver.py` is the file reconstruction tool for channel 1 (ground serial port 2).
 - `ground-station/neutron2-payload-viewer` is the science review tool after a payload file exists. It can parse `.bin` payload products when the bytes inside are the Neutron 2 CSV format.
-- `ground-station/lepton-dp-viewer` is the C3M review tool after a Lepton
-  `.fdp` exists. It decodes the thermal product produced by
-  `PayloadDriver_Lepton`.
+- The C3M payload receiver/viewer is the shared operator surface for both
+  cameras. It dispatches each reconstructed `.fdp` to the Lepton or Boson
+  decoder from the Data Product identity; the two pixel formats are not
+  treated as interchangeable.
 
 ## The RF Link Constraint: How fprime-gds Talks Over a Walkie-Talkie
 
@@ -418,22 +491,34 @@ For the MVP path, F Prime does not use stock GDS file downlink for the science p
 
 Runtime ownership is:
 
-- `PayloadDriver_NeutronSim`, `PayloadDriver_Lepton`, or a future real payload
+- `PayloadDriver_NeutronSim`, the selected C3M camera driver
+  (`PayloadDriver_Lepton` or `PayloadDriver_Boson`), or a future real payload
   board driver produces mission-specific payload bytes.
 - `StorageManager` tracks the latest science product.
 - `CommsApp.REQUEST_SCIENCE_DOWNLINK` requests downlink of the latest stored product.
-- `PayloadDownlinkApp` packetizes the product, sends channel 1 packets, and emits progress events.
+- `PayloadDownlinkApp` packetizes the product, sends channel 1 packets, and maintains progress telemetry.
 - `tools/payload_receiver.py` reconstructs bytes, requests retries for missing packets, verifies CRC, and writes the output file.
 - The mission payload viewer opens the reconstructed file: Neutron 2 uses the
-  neutron CSV viewer, while C3M uses the Lepton `.fdp` viewer.
+  neutron CSV viewer, while the C3M viewer dispatches Lepton and Boson `.fdp`
+  products to their camera-specific decoders.
 
-`PayloadDownlinkApp.PayloadDownlinkProgress` emits nominal `10%` increments from `10` through `90`. `PayloadDownlinkComplete` and `CommsApp.DownlinkFinished` are the completion signals. For tiny payloads, several progress events may appear at the same timestamp or packet count because one payload packet can represent more than ten percent of the file.
+The channel-1 receiver GUI is the normal per-packet progress display.
+`PayloadDownlinkApp` retains `ProgressPercent`, `ProgressPacketsSent`, and
+`ProgressTotalPackets` telemetry without automatically emitting progress
+events during the transfer. `GET_PAYLOAD_STATUS` emits one explicit progress
+summary when an operator needs a channel-0 fallback. `PayloadDownlinkComplete`
+and `CommsApp.DownlinkFinished` are the lifecycle completion signals.
 
 ## Development Assumptions
 
 Unless the user says otherwise, agents should assume the following:
 
 - `RFM23BP` is the default communications path for the MVP demo.
+- The ground Teensy/RFM23BP is the primary C3M operator path. The implemented
+  HackRF RF22 adapter is retained for research and receive diagnosis, but
+  bidirectional mission development stopped after the 2026-08-06 hallway
+  evaluation. See
+  [`C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md`](archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md).
 - `SatNOGS` is an alternate or future communications path, not the default assumption.
 - `D2S2` provides simulated `ADCS` behavior.
 - The payload source is the **Neutron 2 payload simulator**, with the loaned **Neutron 2 development payload board** as the future real source; simulation is acceptable until the dev board is integrated and stable.
@@ -458,6 +543,10 @@ Authoritative hardware/protocol references that back this architecture. Read the
 
 - **Artemis CubeSat User's Manual (April 2026)** — prototype hardware reference (OBC, EPS, GPS, structure). The repo file [`docs/Artemis User's Manual - April 2026.txt`](<Artemis User's Manual - April 2026.txt>) is a **local snapshot**; the full, up-to-date manual is the public Google Doc: <https://docs.google.com/document/d/1rWuh5gqnNprtgiNfhd3HfEG-Midq0QqxDkGm_KqfT8Y/edit?tab=t.0>
 - **RFM23BP datasheet** — radio packet/FIFO limits that drive the RF segmentation budget. The repo file [`docs/rfm23bp/RFM23BP_datasheet.txt`](rfm23bp/RFM23BP_datasheet.txt) is a **local copy**; the online datasheet is: <https://www.hoperf.com/uploads/RFM23BPdatasheet_1695351296.pdf>
+- **C3M HackRF ground-station decision** — implementation results, hallway
+  evidence, RFM23BP/HackRF power and turnaround comparison, and the accepted
+  stop-work/reopening gate:
+  [`docs/archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md`](archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md)
 - **RF chain root-cause analysis** — why the RF link forced the 128-byte frame and telemetry throttling decisions: [`docs/archive/RF_CHAIN_ROOT_CAUSE_ANALYSIS_2026-04-24.md`](archive/RF_CHAIN_ROOT_CAUSE_ANALYSIS_2026-04-24.md)
 - **iOBC 1 MB NOR fit & boot architecture** — why the 1 MB NOR is the bootloader budget (not the F´ app budget), the SD→SDRAM boot chain, and the recommended golden-image/A-B failover memory map: [`docs/archive/IOBC_NOR_FIT_AND_BOOT_ARCHITECTURE.md`](archive/IOBC_NOR_FIT_AND_BOOT_ARCHITECTURE.md)
 - **Artemis PDU Protocol ICD** — PDU v2 command/telemetry wire format used by `EpsDriver_Artemis` over channel 2: [`external/artemis-pdu/PDU_PROTOCOL_ICD.md`](../external/artemis-pdu/PDU_PROTOCOL_ICD.md) ([PDF](../external/artemis-pdu/docs/PDU_PROTOCOL_ICD.pdf))

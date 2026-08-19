@@ -99,6 +99,15 @@ void ScienceApp::payloadStatusIn_handler(FwIndexType portNum,
                                              const Fw::StringBase& sourcePath,
                                              U32 sourceCrc) {
     static_cast<void>(portNum);
+    if ((productBytes == 0U) ||
+        (sourceKind == Components::ScienceProductSource::UNKNOWN) ||
+        (sourcePath.toChar()[0] == '\0')) {
+        this->log_WARNING_LO_ScienceProductRejected(1U);
+        if (this->isConnected_missionModeOut_OutputPort(0)) {
+            this->missionModeOut_out(0, Components::MissionMode::BASE, 0U);
+        }
+        return;
+    }
     this->m_collectionCount += 1;
     this->writeTelemetry();
     this->log_ACTIVITY_HI_ScienceProductReady(productBytes);

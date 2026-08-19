@@ -1,7 +1,9 @@
+import json
 import pathlib
 import struct
 import sys
 import tempfile
+import time
 import types
 import unittest
 from unittest import mock
@@ -95,7 +97,112 @@ def make_end(transfer_id: int, total_packets: int, blob: bytes) -> bytes:
     return bytes(packet)
 
 
+def make_preview_fragment(
+    pixels: bytes,
+    fragment_index: int,
+    *,
+    session_id: int = 7,
+    frame_sequence: int = 11,
+) -> bytes:
+    fragment_count = (len(pixels) + payload_receiver.PREVIEW_FRAGMENT_DATA_BYTES - 1) // payload_receiver.PREVIEW_FRAGMENT_DATA_BYTES
+    offset = fragment_index * payload_receiver.PREVIEW_FRAGMENT_DATA_BYTES
+    chunk = pixels[offset : offset + payload_receiver.PREVIEW_FRAGMENT_DATA_BYTES]
+    return (
+        payload_receiver.PREVIEW_MAGIC
+        + bytes([payload_receiver.PREVIEW_VERSION, payload_receiver.PREVIEW_TYPE_FRAGMENT])
+        + struct.pack("<H", session_id)
+        + struct.pack("<I", frame_sequence)
+        + bytes([
+            payload_receiver.PREVIEW_WIDTH,
+            payload_receiver.PREVIEW_HEIGHT,
+            payload_receiver.PREVIEW_PIXEL_FORMAT_U8,
+            fragment_index,
+            fragment_count,
+            len(chunk),
+        ])
+        + struct.pack("<H", len(pixels))
+        + struct.pack("<H", payload_receiver.crc16_ccitt(pixels))
+        + chunk
+    )
+
+
 class PayloadReceiverTests(unittest.TestCase):
+    def test_preview_complete_reassembles_out_of_order_and_ignores_duplicate(self) -> None:
+        pixels = bytes(index % 256 for index in range(payload_receiver.PREVIEW_TOTAL_BYTES))
+        events: list[payload_receiver.ReceiverEvent] = []
+        receiver = payload_receiver.PayloadReceiver(
+            "unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0, on_event=events.append
+        )
+        order = list(range(1, 200, 2)) + list(range(0, 200, 2))
+        for index in order:
+            receiver.handle_preview_fragment(make_preview_fragment(pixels, index))
+        # A duplicate after the completed frame must not produce another frame.
+        receiver.handle_preview_fragment(make_preview_fragment(pixels, 0))
+
+        previews = [event for event in events if event.kind == "preview_frame"]
+        self.assertEqual(len(previews), 1)
+        event = previews[0]
+        self.assertTrue(event.preview_complete)
+        self.assertEqual(event.preview_percent, 100.0)
+        self.assertTrue(event.preview_crc_ok)
+        self.assertEqual(event.preview_pixels, pixels)
+        self.assertEqual(event.preview_finalize_reason, "all_fragments")
+
+    def test_preview_partial_finalizes_on_deadline_with_missing_pixels_white_and_no_repair(self) -> None:
+        pixels = bytes(index % 256 for index in range(payload_receiver.PREVIEW_TOTAL_BYTES))
+        events: list[payload_receiver.ReceiverEvent] = []
+        receiver = payload_receiver.PayloadReceiver(
+            "unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0, on_event=events.append
+        )
+        receiver.handle_preview_fragment(make_preview_fragment(pixels, 0))
+        receiver.handle_preview_fragment(make_preview_fragment(pixels, 2))
+        assert receiver.preview_frame is not None
+        self.assertTrue(
+            receiver.finalize_preview_if_due(
+                now=receiver.preview_frame.last_fragment_s + payload_receiver.PREVIEW_FINALIZE_DEADLINE_S
+            )
+        )
+
+        event = next(event for event in events if event.kind == "preview_frame")
+        self.assertFalse(event.preview_complete)
+        self.assertEqual(event.preview_finalize_reason, "deadline")
+        self.assertEqual(event.preview_pixels[:24], pixels[:24])
+        self.assertEqual(event.preview_pixels[24:48], b"\xff" * 24)
+        self.assertEqual(event.preview_pixels[48:72], pixels[48:72])
+        serial = DummySerial()
+        self.assertFalse(receiver.request_retries(serial))
+        self.assertEqual(serial.writes, [])
+
+    def test_preview_next_frame_finalizes_previous_as_partial(self) -> None:
+        pixels = bytes(index % 256 for index in range(payload_receiver.PREVIEW_TOTAL_BYTES))
+        events: list[payload_receiver.ReceiverEvent] = []
+        receiver = payload_receiver.PayloadReceiver(
+            "unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0, on_event=events.append
+        )
+        receiver.handle_preview_fragment(make_preview_fragment(pixels, 0, frame_sequence=11))
+        receiver.handle_preview_fragment(make_preview_fragment(pixels, 0, frame_sequence=12))
+
+        event = next(event for event in events if event.kind == "preview_frame")
+        self.assertEqual(event.preview_frame_sequence, 11)
+        self.assertFalse(event.preview_complete)
+        self.assertEqual(event.preview_finalize_reason, "next_frame")
+
+    def test_preview_demux_rejects_malformed_records_and_leaves_n2_behavior_intact(self) -> None:
+        pixels = bytes(index % 256 for index in range(payload_receiver.PREVIEW_TOTAL_BYTES))
+        n2_blob = b"science"
+        header = make_header(42, 3, n2_blob)
+        data = make_data(3, 0, n2_blob)
+        malformed = bytearray(make_preview_fragment(pixels, 0))
+        malformed[10] = 79  # wrong width
+        receiver = payload_receiver.PayloadReceiver("unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0)
+        receiver.rx_buffer += bytes(malformed) + header + data
+
+        packets = [receiver.try_extract_packet(), receiver.try_extract_packet(), receiver.try_extract_packet()]
+        self.assertEqual(packets[1:], [header, data])
+        for packet in packets:
+            receiver.handle_packet(packet, DummySerial())  # type: ignore[arg-type]
+        self.assertEqual(receiver.reconstruct(), n2_blob)
+        self.assertIsNone(receiver.preview_frame)
     def test_extracts_variable_length_packets_and_reconstructs_arbitrary_bytes(self) -> None:
         blob = b"\x00N2\xffpayload,csv\n1,2,3\n"
         transfer_id = 9
@@ -116,6 +223,30 @@ class PayloadReceiverTests(unittest.TestCase):
         self.assertTrue(receiver.complete)
         self.assertEqual(receiver.reconstruct(), blob)
         self.assertEqual(serial.writes, [])
+
+    def test_reconstructs_full_boson_fdp_with_single_transport_cache(self) -> None:
+        blob = bytes((index * 17 + 3) & 0xFF for index in range(163_922))
+        transfer_id = 10
+        receiver = payload_receiver.PayloadReceiver(
+            "unused", 115200, pathlib.Path("/tmp/boson.fdp"), 1.0
+        )
+        receiver.handle_header(make_header(917, transfer_id, blob))
+
+        with mock.patch("builtins.print"):
+            for packet_index in range(receiver.total_packets):
+                start = packet_index * payload_receiver.DATA_BYTES
+                chunk = blob[start : start + payload_receiver.DATA_BYTES]
+                receiver.handle_data(make_data(transfer_id, packet_index, chunk))
+
+        self.assertEqual(receiver.total_bytes, 163_922)
+        self.assertEqual(receiver.total_packets, 4_684)
+        self.assertEqual(len(receiver.packets[4_683]), 17)
+        self.assertTrue(receiver.complete)
+        self.assertEqual(receiver.reconstruct(), blob)
+        self.assertEqual(
+            payload_receiver.crc16_ccitt(receiver.reconstruct()),
+            payload_receiver.crc16_ccitt(blob),
+        )
 
     def test_preserves_split_magic_prefix_across_serial_reads(self) -> None:
         receiver = payload_receiver.PayloadReceiver("unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0)
@@ -158,6 +289,26 @@ class PayloadReceiverTests(unittest.TestCase):
         self.assertEqual(event.retry_rounds, 1)
         self.assertEqual(event.missing_packets, 10)
 
+    def test_retry_waits_for_quiet_after_repair_data(self) -> None:
+        blob = b"x" * (payload_receiver.DATA_BYTES * 2)
+        receiver = payload_receiver.PayloadReceiver(
+            "unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0
+        )
+        receiver.handle_header(make_header(7, 3, blob))
+        receiver.end_seen = True
+        receiver.last_end_s = 100.0
+        receiver.last_packet_s = 105.0
+        receiver.next_retry_request_s = 0.0
+        serial = DummySerial()
+
+        with mock.patch.object(payload_receiver.time, "monotonic", return_value=105.1):
+            receiver.request_retries_if_due(serial)  # type: ignore[arg-type]
+        self.assertEqual(serial.writes, [])
+
+        with mock.patch.object(payload_receiver.time, "monotonic", return_value=105.6):
+            receiver.request_retries_if_due(serial)  # type: ignore[arg-type]
+        self.assertEqual(len(serial.writes), 1)
+
     def test_repeated_header_preserves_packets_for_same_transfer(self) -> None:
         blob = b"a" * payload_receiver.DATA_BYTES + b"tail"
         transfer_id = 11
@@ -172,6 +323,39 @@ class PayloadReceiverTests(unittest.TestCase):
 
         self.assertEqual(receiver.packets, {0: blob[: payload_receiver.DATA_BYTES]})
         self.assertTrue(receiver.end_seen)
+
+    def test_data_packet_with_wrong_position_length_is_rejected(self) -> None:
+        blob = b"a" * payload_receiver.DATA_BYTES + b"tail"
+        transfer_id = 12
+        receiver = payload_receiver.PayloadReceiver(
+            "unused", 115200, pathlib.Path("/tmp/out.bin"), 1.0
+        )
+        receiver.handle_header(make_header(7, transfer_id, blob))
+
+        receiver.handle_data(make_data(transfer_id, 0, b"short"))
+        receiver.handle_data(make_data(transfer_id, 1, b"too-long"))
+
+        self.assertEqual(receiver.packets, {})
+
+    def test_conflicting_duplicate_packet_is_rejected_and_checkpoint_stays_consistent(self) -> None:
+        original = b"a" * payload_receiver.DATA_BYTES
+        conflicting = b"b" * payload_receiver.DATA_BYTES
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            checkpoint = root / "checkpoint"
+            receiver = payload_receiver.PayloadReceiver(
+                "port", 115200, root / "unused.fdp", 1.0, checkpoint_dir=checkpoint
+            )
+            receiver.handle_header(make_header(7, 12, original))
+            receiver.handle_data(make_data(12, 0, original))
+            receiver.handle_data(make_data(12, 0, conflicting))
+            self.assertEqual(receiver.packets[0], original)
+
+            resumed = payload_receiver.PayloadReceiver(
+                "port", 115200, root / "unused.fdp", 1.0, checkpoint_dir=checkpoint
+            )
+            self.assertTrue(resumed.load_checkpoint())
+            self.assertEqual(resumed.packets[0], original)
 
     def test_new_header_resets_previous_transfer_state(self) -> None:
         first_blob = b"first"
@@ -394,9 +578,542 @@ class PayloadReceiverTests(unittest.TestCase):
             output_dir=None,
             ext=".bin",
             debug=False,
+            checkpoint_dir=None,
+            checkpoint_max_age_s=payload_receiver.DEFAULT_CHECKPOINT_MAX_AGE_S,
+            transfer_timeout_s=None,
+            absolute_transfer_timeout_s=None,
+            save_partial_on_timeout=False,
         )
         receiver.run.assert_called_once_with()
         receiver.run_directory.assert_not_called()
+
+    def test_main_exposes_bounded_partial_timeout_mode(self) -> None:
+        with mock.patch.object(payload_receiver, "PayloadReceiver") as receiver_class:
+            receiver_class.return_value.run_directory.return_value = 0
+            result = payload_receiver.main(
+                [
+                    "--port",
+                    "test-port",
+                    "--output-dir",
+                    "/tmp/payloads",
+                    "--transfer-timeout",
+                    "2",
+                    "--absolute-transfer-timeout",
+                    "10",
+                    "--save-partial-on-timeout",
+                ]
+            )
+
+        self.assertEqual(result, 0)
+        kwargs = receiver_class.call_args.kwargs
+        self.assertEqual(kwargs["transfer_timeout_s"], 2.0)
+        self.assertEqual(kwargs["absolute_transfer_timeout_s"], 10.0)
+        self.assertTrue(kwargs["save_partial_on_timeout"])
+
+    def test_partial_reconstruction_preserves_packet_positions(self) -> None:
+        blob = bytes(range(105))
+        receiver = payload_receiver.PayloadReceiver(
+            "unused",
+            115200,
+            pathlib.Path("/tmp/unused.bin"),
+            1.0,
+        )
+        receiver.handle_header(make_header(301, 31, blob))
+        receiver.handle_data(make_data(31, 0, blob[:35]))
+        receiver.handle_data(make_data(31, 2, blob[70:]))
+
+        partial = receiver.reconstruct_partial()
+
+        self.assertEqual(len(partial), len(blob))
+        self.assertEqual(partial[:35], blob[:35])
+        self.assertEqual(partial[35:70], b"\x00" * 35)
+        self.assertEqual(partial[70:], blob[70:])
+
+    def test_operator_cancel_saves_partial_quarantines_tail_and_accepts_next_transfer(self) -> None:
+        first_blob = bytes(range(105))
+        second_blob = b"fresh-transfer"
+        first_transfer = 41
+        second_transfer = 42
+        stream = (
+            make_header(401, first_transfer, first_blob)
+            + make_data(first_transfer, 0, first_blob[:35])
+            + make_data(first_transfer, 1, first_blob[35:70])
+            + make_header(401, first_transfer, first_blob)
+            + make_data(first_transfer, 2, first_blob[70:])
+            + make_end(first_transfer, 3, first_blob)
+            + make_header(402, second_transfer, second_blob)
+            + make_data(second_transfer, 0, second_blob)
+            + make_end(second_transfer, 1, second_blob)
+        )
+        events: list[payload_receiver.ReceiverEvent] = []
+        serial = ScriptedSerial(stream)
+        cancel_consumed = False
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = pathlib.Path(tmp)
+            receiver: payload_receiver.PayloadReceiver
+
+            def consume_cancel() -> bool:
+                nonlocal cancel_consumed
+                if (
+                    not cancel_consumed
+                    and receiver.transfer_id == first_transfer
+                    and len(receiver.packets) == 1
+                ):
+                    cancel_consumed = True
+                    return True
+                return False
+
+            receiver = payload_receiver.PayloadReceiver(
+                "test-port",
+                115200,
+                output_dir / "unused.bin",
+                1.0,
+                output_dir=output_dir,
+                ext=".fdp",
+                on_event=events.append,
+                serial_factory=lambda *args, **kwargs: serial,
+                stop_requested=lambda: receiver.received_count >= 2,
+                consume_cancel_requested=consume_cancel,
+            )
+
+            self.assertEqual(receiver.run_directory(), 0)
+            partial_path = next(output_dir.glob("*.fdp.partial"))
+            complete_path = next(output_dir.glob("*.fdp"))
+            self.assertEqual(
+                partial_path.read_bytes(),
+                first_blob[:35] + (b"\x00" * 70),
+            )
+            self.assertEqual(complete_path.read_bytes(), second_blob)
+
+        partial_event = next(event for event in events if event.kind == "partial_saved")
+        self.assertEqual(partial_event.completion_reason, "operator_cancelled")
+        self.assertEqual(partial_event.received_packets, 1)
+        self.assertEqual(partial_event.missing_packet_indices, (1, 2))
+        self.assertIn("satellite transmission was not interrupted", partial_event.timeout_reason or "")
+        self.assertEqual(serial.writes, [])
+        self.assertEqual(
+            [event.transfer_id for event in events if event.kind == "transfer_started"],
+            [first_transfer, second_transfer],
+        )
+
+    def test_operator_cancel_after_header_saves_all_missing_partial(self) -> None:
+        blob = bytes(range(70))
+        transfer_id = 43
+        serial = ScriptedSerial(make_header(403, transfer_id, blob))
+        cancel_consumed = False
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = pathlib.Path(tmp)
+            receiver: payload_receiver.PayloadReceiver
+
+            def consume_cancel() -> bool:
+                nonlocal cancel_consumed
+                if not cancel_consumed and receiver.transfer_id == transfer_id:
+                    cancel_consumed = True
+                    return True
+                return False
+
+            receiver = payload_receiver.PayloadReceiver(
+                "test-port",
+                115200,
+                output_dir / "unused.bin",
+                1.0,
+                output_dir=output_dir,
+                ext=".fdp",
+                serial_factory=lambda *args, **kwargs: serial,
+                stop_requested=lambda: receiver.received_count >= 1,
+                consume_cancel_requested=consume_cancel,
+            )
+
+            self.assertEqual(receiver.run_directory(), 0)
+            partial_path = next(output_dir.glob("*.fdp.partial"))
+            missing_map = json.loads(
+                pathlib.Path(f"{partial_path}.missing.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(partial_path.read_bytes(), b"\x00" * len(blob))
+            self.assertEqual(missing_map["missing_packet_indices"], [0, 1])
+            self.assertEqual(missing_map["completion_reason"], "operator_cancelled")
+            self.assertEqual(serial.writes, [])
+
+    def test_directory_deadline_saves_partial_with_missing_map(self) -> None:
+        blob = bytes(range(105))
+        stream = (
+            make_header(302, 32, blob)
+            + make_data(32, 0, blob[:35])
+            + make_data(32, 2, blob[70:])
+            + make_end(32, 3, blob)
+        )
+        events: list[payload_receiver.ReceiverEvent] = []
+        serial = ScriptedSerial(stream)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = pathlib.Path(tmp)
+            receiver: payload_receiver.PayloadReceiver
+            receiver = payload_receiver.PayloadReceiver(
+                "test-port",
+                115200,
+                output_dir / "unused.bin",
+                1.0,
+                output_dir=output_dir,
+                ext=".fdp",
+                on_event=events.append,
+                serial_factory=lambda *args, **kwargs: serial,
+                stop_requested=lambda: receiver.received_count >= 1,
+                transfer_timeout_s=0.01,
+                save_partial_on_timeout=True,
+            )
+
+            self.assertEqual(receiver.run_directory(), 0)
+            outputs = list(output_dir.glob("*.fdp.partial"))
+            self.assertEqual(len(outputs), 1)
+            self.assertEqual(len(outputs[0].read_bytes()), len(blob))
+
+        event = next(item for item in events if item.kind == "partial_saved")
+        self.assertTrue(event.partial)
+        self.assertEqual(event.missing_packet_indices, (1,))
+        self.assertFalse(event.crc_ok)
+        self.assertEqual(event.completion_reason, "timeout")
+        self.assertIn("stalled", event.timeout_reason or "")
+
+    def test_checkpoint_restart_resumes_at_25_50_and_90_percent_with_exact_crc(self) -> None:
+        blob = bytes(index % 251 for index in range(payload_receiver.DATA_BYTES * 20))
+        transfer_id = 44
+        header = make_header(9001, transfer_id, blob)
+        for label, received_packets in (("25", 5), ("50", 10), ("90", 18)):
+            with self.subTest(percent=label), tempfile.TemporaryDirectory() as tmp:
+                root = pathlib.Path(tmp)
+                checkpoint = root / "active-checkpoint"
+                first = payload_receiver.PayloadReceiver(
+                    "old-port",
+                    115200,
+                    root / "unused.fdp",
+                    1.0,
+                    checkpoint_dir=checkpoint,
+                    source_identity={"serial_number": "ground", "interface_ordinal": 2},
+                )
+                first.handle_header(header)
+                for index in range(received_packets):
+                    start = index * payload_receiver.DATA_BYTES
+                    first.handle_data(
+                        make_data(transfer_id, index, blob[start : start + payload_receiver.DATA_BYTES])
+                    )
+                first.retry_rounds = 3
+                first.persist_checkpoint(reason=f"receiver stopped at {label}%")
+
+                events: list[payload_receiver.ReceiverEvent] = []
+                resumed = payload_receiver.PayloadReceiver(
+                    "new-port",
+                    115200,
+                    root / "unused.fdp",
+                    1.0,
+                    checkpoint_dir=checkpoint,
+                    source_identity={"serial_number": "ground", "interface_ordinal": 2},
+                    on_event=events.append,
+                )
+                self.assertTrue(resumed.load_checkpoint())
+                self.assertEqual(len(resumed.packets), received_packets)
+                self.assertEqual(resumed.retry_rounds, 3)
+                self.assertEqual(events[-1].kind, "transfer_resumed")
+                for index in range(received_packets, resumed.total_packets):
+                    start = index * payload_receiver.DATA_BYTES
+                    resumed.handle_data(
+                        make_data(transfer_id, index, blob[start : start + payload_receiver.DATA_BYTES])
+                    )
+                self.assertTrue(resumed.complete)
+                reconstructed = resumed.reconstruct()
+                self.assertEqual(reconstructed, blob)
+                self.assertEqual(payload_receiver.crc16_ccitt(reconstructed), resumed.file_crc)
+
+    def test_corrupted_and_stale_checkpoints_are_rejected(self) -> None:
+        blob = b"checkpoint-integrity" * 4
+        for mode in ("corrupt-json", "corrupt-packet", "stale"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = pathlib.Path(tmp)
+                checkpoint = root / "checkpoint"
+                receiver = payload_receiver.PayloadReceiver(
+                    "port",
+                    115200,
+                    root / "unused.fdp",
+                    1.0,
+                    checkpoint_dir=checkpoint,
+                    checkpoint_max_age_s=5.0,
+                )
+                receiver.handle_header(make_header(77, 8, blob))
+                receiver.handle_data(make_data(8, 0, blob[: payload_receiver.DATA_BYTES]))
+                if mode == "corrupt-json":
+                    (checkpoint / "manifest.json").write_text("{not-json", encoding="utf-8")
+                elif mode == "corrupt-packet":
+                    (checkpoint / "packets/000000.bin").write_bytes(b"corrupt")
+                else:
+                    manifest_path = checkpoint / "manifest.json"
+                    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                    manifest["updated_at_wall_s"] = time.time() - 30.0
+                    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+                events: list[payload_receiver.ReceiverEvent] = []
+                restored = payload_receiver.PayloadReceiver(
+                    "port",
+                    115200,
+                    root / "unused.fdp",
+                    1.0,
+                    checkpoint_dir=checkpoint,
+                    checkpoint_max_age_s=5.0,
+                    on_event=events.append,
+                )
+                self.assertFalse(restored.load_checkpoint())
+                self.assertIsNone(restored.transfer_id)
+                self.assertEqual(events[-1].kind, "checkpoint_rejected")
+                self.assertFalse(checkpoint.exists())
+                self.assertEqual(len(list(root.glob("checkpoint.rejected.*"))), 1)
+
+    def test_checkpoint_directory_requires_safe_dedicated_ownership(self) -> None:
+        blob = b"checkpoint-safety"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            output_dir = root / "history"
+            output_dir.mkdir()
+            history = output_dir / "existing.fdp"
+            history.write_bytes(b"preserve-me")
+
+            with self.assertRaisesRegex(ValueError, "dedicated child directory"):
+                payload_receiver.PayloadReceiver(
+                    "port",
+                    115200,
+                    root / "unused.fdp",
+                    1.0,
+                    output_dir=output_dir,
+                    checkpoint_dir=output_dir,
+                )
+            self.assertEqual(history.read_bytes(), b"preserve-me")
+
+            unowned = root / "unowned-checkpoint"
+            unowned.mkdir()
+            unrelated = unowned / "unrelated.txt"
+            unrelated.write_text("preserve-me", encoding="utf-8")
+            receiver = payload_receiver.PayloadReceiver(
+                "port",
+                115200,
+                root / "unused.fdp",
+                1.0,
+                checkpoint_dir=unowned,
+            )
+            with self.assertRaisesRegex(ValueError, "not owned"):
+                receiver.handle_header(make_header(7, 12, blob))
+            self.assertEqual(unrelated.read_text(encoding="utf-8"), "preserve-me")
+            self.assertTrue(unowned.is_dir())
+
+    def test_checkpoint_cleanup_deletes_only_owned_artifacts(self) -> None:
+        blob = b"owned-checkpoint-cleanup"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            checkpoint = root / "checkpoint"
+            receiver = payload_receiver.PayloadReceiver(
+                "port",
+                115200,
+                root / "unused.fdp",
+                1.0,
+                checkpoint_dir=checkpoint,
+            )
+            receiver.handle_header(make_header(7, 12, blob))
+            unrelated = checkpoint / "operator-note.txt"
+            unrelated.write_text("preserve-me", encoding="utf-8")
+
+            receiver.clear_checkpoint()
+
+            self.assertEqual(unrelated.read_text(encoding="utf-8"), "preserve-me")
+            self.assertTrue(
+                (checkpoint / payload_receiver.CHECKPOINT_OWNER_FILENAME).is_file()
+            )
+            self.assertFalse((checkpoint / "manifest.json").exists())
+
+    def test_reenumerated_port_resumes_checkpoint_and_completes_exact_crc(self) -> None:
+        blob = bytes(index % 251 for index in range(payload_receiver.DATA_BYTES * 8))
+        transfer_id = 19
+        first_half = make_header(501, transfer_id, blob) + b"".join(
+            make_data(
+                transfer_id,
+                index,
+                blob[index * payload_receiver.DATA_BYTES : (index + 1) * payload_receiver.DATA_BYTES],
+            )
+            for index in range(4)
+        )
+        second_half = b"".join(
+            make_data(
+                transfer_id,
+                index,
+                blob[index * payload_receiver.DATA_BYTES : (index + 1) * payload_receiver.DATA_BYTES],
+            )
+            for index in range(4, 8)
+        ) + make_end(transfer_id, 8, blob)
+        disconnect = payload_receiver.serial.SerialException("device disappeared")
+        serials = {
+            "old-port": ScriptedSerial(first_half, read_error=disconnect),
+            "new-port": ScriptedSerial(second_half),
+        }
+        resolved_calls = 0
+
+        def resolve() -> str | None:
+            nonlocal resolved_calls
+            resolved_calls += 1
+            return "new-port"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            receiver: payload_receiver.PayloadReceiver
+            receiver = payload_receiver.PayloadReceiver(
+                "old-port",
+                115200,
+                root / "unused.fdp",
+                1.0,
+                output_dir=root / "output",
+                ext=".fdp",
+                serial_factory=lambda port, *_args, **_kwargs: serials[port],
+                stop_requested=lambda: receiver.received_count >= 1,
+                checkpoint_dir=root / "checkpoint",
+                source_identity={"serial_number": "ground", "interface_ordinal": 2},
+                port_resolver=resolve,
+                reconnect_timeout_s=0.2,
+                reconnect_interval_s=0.01,
+                save_partial_on_disconnect=True,
+            )
+            self.assertEqual(receiver.run_directory(), 0)
+            outputs = list((root / "output").glob("*.fdp"))
+            self.assertEqual(len(outputs), 1)
+            self.assertEqual(outputs[0].read_bytes(), blob)
+            self.assertGreaterEqual(resolved_calls, 1)
+            self.assertEqual(receiver.port, "new-port")
+            self.assertFalse((root / "checkpoint").exists())
+
+    def test_complete_checkpoint_finalizes_without_reopening_serial(self) -> None:
+        blob = bytes(index % 251 for index in range(payload_receiver.DATA_BYTES * 3))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            checkpoint = root / "checkpoint"
+            first = payload_receiver.PayloadReceiver(
+                "old-port", 115200, root / "unused.fdp", 1.0, checkpoint_dir=checkpoint
+            )
+            first.handle_header(make_header(701, 33, blob))
+            for index in range(3):
+                first.handle_data(
+                    make_data(
+                        33,
+                        index,
+                        blob[index * payload_receiver.DATA_BYTES : (index + 1) * payload_receiver.DATA_BYTES],
+                    )
+                )
+
+            receiver: payload_receiver.PayloadReceiver
+            receiver = payload_receiver.PayloadReceiver(
+                "missing-port",
+                115200,
+                root / "unused.fdp",
+                1.0,
+                output_dir=root / "output",
+                ext=".fdp",
+                checkpoint_dir=checkpoint,
+                serial_factory=lambda *_args, **_kwargs: self.fail("serial must not be opened"),
+                stop_requested=lambda: receiver.received_count >= 1,
+            )
+            self.assertEqual(receiver.run_directory(), 0)
+            output = next((root / "output").glob("*.fdp"))
+            self.assertEqual(output.read_bytes(), blob)
+            self.assertFalse(checkpoint.exists())
+
+    def test_permanent_disconnect_saves_position_aware_partial_and_reason(self) -> None:
+        blob = bytes(range(105))
+        transfer_id = 55
+        stream = make_header(601, transfer_id, blob) + make_data(
+            transfer_id, 1, blob[35:70]
+        )
+        disconnect = payload_receiver.serial.SerialException("permanent disconnect")
+        events: list[payload_receiver.ReceiverEvent] = []
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            receiver = payload_receiver.PayloadReceiver(
+                "old-port",
+                115200,
+                root / "unused.fdp",
+                1.0,
+                output_dir=root / "output",
+                ext=".fdp",
+                on_event=events.append,
+                serial_factory=lambda *_args, **_kwargs: ScriptedSerial(
+                    stream, read_error=disconnect
+                ),
+                checkpoint_dir=root / "checkpoint",
+                port_resolver=lambda: None,
+                reconnect_timeout_s=0.02,
+                reconnect_interval_s=0.005,
+                save_partial_on_disconnect=True,
+            )
+            self.assertEqual(receiver.run_directory(), 2)
+            partial = next((root / "output").glob("*.fdp.partial"))
+            positional = partial.read_bytes()
+            self.assertEqual(positional[:35], b"\x00" * 35)
+            self.assertEqual(positional[35:70], blob[35:70])
+            self.assertEqual(positional[70:], b"\x00" * 35)
+            missing_map = pathlib.Path(f"{partial}.missing.json")
+            missing = json.loads(missing_map.read_text(encoding="utf-8"))
+            self.assertEqual(missing["missing_packet_indices"], [0, 2])
+            self.assertIn("serial recovery expired", missing["failure_reason"])
+            event = next(item for item in events if item.kind == "partial_saved")
+            self.assertEqual(event.missing_packet_indices, (0, 2))
+            self.assertIn("serial recovery expired", event.timeout_reason or "")
+            self.assertEqual(event.missing_map_path, str(missing_map))
+
+    def test_stop_during_serial_recovery_preserves_checkpoint_without_partial(self) -> None:
+        blob = b"restart-during-recovery" * 3
+        stream = make_header(801, 61, blob) + make_data(
+            61, 0, blob[: payload_receiver.DATA_BYTES]
+        )
+        stopped = False
+
+        def resolve() -> str | None:
+            nonlocal stopped
+            stopped = True
+            return None
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            receiver = payload_receiver.PayloadReceiver(
+                "old-port",
+                115200,
+                root / "unused.fdp",
+                1.0,
+                output_dir=root / "output",
+                ext=".fdp",
+                serial_factory=lambda *_args, **_kwargs: ScriptedSerial(
+                    stream,
+                    read_error=payload_receiver.serial.SerialException("disconnected"),
+                ),
+                stop_requested=lambda: stopped,
+                checkpoint_dir=root / "checkpoint",
+                port_resolver=resolve,
+                reconnect_timeout_s=0.2,
+                reconnect_interval_s=0.005,
+                save_partial_on_disconnect=True,
+            )
+            self.assertEqual(receiver.run_directory(), 0)
+            self.assertTrue((root / "checkpoint/manifest.json").is_file())
+            self.assertEqual(list((root / "output").glob("*.partial")), [])
+
+    def test_progress_stall_and_absolute_deadlines_are_independent(self) -> None:
+        receiver = payload_receiver.PayloadReceiver(
+            "port",
+            115200,
+            pathlib.Path("/tmp/unused.fdp"),
+            1.0,
+            transfer_timeout_s=10.0,
+            absolute_transfer_timeout_s=200.0,
+        )
+        receiver.transfer_id = 1
+        receiver.transfer_started_s = 100.0
+        receiver.last_packet_s = 195.0
+        self.assertIsNone(receiver.transfer_expiry_reason(now=200.0))
+        receiver.last_packet_s = 180.0
+        self.assertIn("stalled", receiver.transfer_expiry_reason(now=200.0) or "")
+        self.assertIn("absolute", receiver.transfer_expiry_reason(now=301.0) or "")
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ DEPLOYMENT_NAME="ArtemisRpiTeensyDeployment"
 DICT_BASENAME="${DEPLOYMENT_NAME}TopologyDictionary.json"
 GUI_PORT="${GUI_PORT:-5050}"
 DELAY_SECONDS="${DELAY_SECONDS:-10}"
-CAPTURE_SECONDS="${CAPTURE_SECONDS:-10}"
+CAPTURES="${CAPTURES:-3}"
 HOLD_AFTER_SEQUENCE="true"
 DICT_PATH="${DICT_PATH:-}"
 APP_BINARY_PATH="${APP_BINARY_PATH:-}"
@@ -16,8 +16,18 @@ BUILD_CACHE="${BUILD_CACHE:-$ROOT_DIR/build-c3m-local}"
 SKIP_BUILD="false"
 GENERATE_PNG="true"
 OPEN_PNG="true"
+CAMERA="${C3M_CAMERA:-lepton}"
 LEPTON_SAMPLE_CSV="${C3M_LEPTON_SAMPLE_CSV:-$REPO_ROOT/ground-station/c3m-lepton-test-data/data/Dp_20260707_120740.csv}"
 LEPTON_CAMERA_BACKEND="${LEPTON_CAMERA_BACKEND:-sample}"
+BOSON_CAMERA_BACKEND="${BOSON_CAMERA_BACKEND:-synthetic}"
+PAYLOAD_RECEIVER_TIMEOUT_SECONDS="${PAYLOAD_RECEIVER_TIMEOUT_SECONDS:-}"
+DROP_PAYLOAD_DATA_INDEX=""
+RESTART_RECEIVER_CYCLE=""
+ABANDON_FIRST_CYCLE="false"
+PARTIAL_TRANSFER_TIMEOUT_SECONDS="${PARTIAL_TRANSFER_TIMEOUT_SECONDS:-2}"
+RADIO_INIT_FAILURES="${RADIO_INIT_FAILURES:-0}"
+RADIO_WATCHDOG_RESETS="${RADIO_WATCHDOG_RESETS:-0}"
+RADIO_READY_TIMEOUT_SECONDS="${RADIO_READY_TIMEOUT_SECONDS:-180}"
 
 usage() {
   cat <<'EOF'
@@ -25,13 +35,24 @@ Usage: run_c3m_local_demo.sh [options]
 
 Runs the EPSCoR C3M laptop-only demo:
   local F' app <-> PTY link emulator <-> fprime-gds
-  PayloadDriver_Lepton -> ArtemisDataProducts ./DpCat/*.fdp
-  Lepton data-product decoder -> JSON/CSV/PNG under tools/logs
+  selected camera driver -> one saved image -> channel-1 downlink
+  camera-specific decoder -> JSON/CSV/PNG under tools/logs
 
 Options:
+  --camera <lepton|boson>   selected camera (default: lepton)
   --gui-port <port>          fprime-gds GUI port (default: 5050)
   --delay <seconds>          scheduled collection delay (default: 10)
-  --capture-seconds <secs>   accepted by the shared science flow; Lepton captures one frame (default: 10)
+  --captures <count>         consecutive capture/downlink/view cycles (default: 3)
+  --drop-payload-data-index <index>
+                             drop one N2 DATA packet once; its repair must pass
+  --restart-receiver-cycle <cycle>
+                             restart/checkpoint-resume receiver during this cycle
+  --abandon-first-cycle     permanently lose DATA 100 in cycle 1, save an
+                             honest partial, then require later cycles to pass
+  --radio-init-failures <count>
+                             fail COUNT radio init attempts before recovery
+  --radio-watchdog-resets <count>
+                             drop COUNT enable replies as simulated Teensy watchdog resets
   --app-binary <path>        deployment binary path (default: host-platform artifact)
   --dictionary <path>        topology dictionary path (default: latest generated dict)
   --build-cache <path>       local build cache (default: ArtemisRpiTeensy_N2/build-c3m-local)
@@ -45,10 +66,11 @@ Options:
 
 Pass criteria:
   - GDS command path accepts the demo commands
-  - scheduled collection writes a new ./DpCat/Dp_*.fdp
-  - F Prime payload downlink completes over channel 1
-  - Lepton viewer decodes the .fdp and verifies a 160x120 thermal frame
-  - interactive runs open the decoded PNG image
+  - every scheduled collection writes one distinct selected-camera product
+  - every F Prime payload downlink completes over emulated channel 1
+  - the real ground payload receiver reconstructs one CRC-valid product per cycle
+  - the selected-camera viewer verifies the expected frame shape and units
+  - interactive runs open the final decoded PNG image
 EOF
 }
 
@@ -63,6 +85,10 @@ fail() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --camera)
+      CAMERA="${2:-}"
+      shift 2
+      ;;
     --gui-port)
       GUI_PORT="${2:-}"
       shift 2
@@ -71,8 +97,28 @@ while [[ $# -gt 0 ]]; do
       DELAY_SECONDS="${2:-}"
       shift 2
       ;;
-    --capture-seconds)
-      CAPTURE_SECONDS="${2:-}"
+    --captures)
+      CAPTURES="${2:-}"
+      shift 2
+      ;;
+    --drop-payload-data-index)
+      DROP_PAYLOAD_DATA_INDEX="${2:-}"
+      shift 2
+      ;;
+    --restart-receiver-cycle)
+      RESTART_RECEIVER_CYCLE="${2:-}"
+      shift 2
+      ;;
+    --abandon-first-cycle)
+      ABANDON_FIRST_CYCLE="true"
+      shift
+      ;;
+    --radio-init-failures)
+      RADIO_INIT_FAILURES="${2:-}"
+      shift 2
+      ;;
+    --radio-watchdog-resets)
+      RADIO_WATCHDOG_RESETS="${2:-}"
       shift 2
       ;;
     --app-binary)
@@ -122,15 +168,69 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+case "$CAMERA" in
+  lepton)
+    CAMERA_LABEL="Lepton"
+    PRODUCT_EXT=".fdp"
+    SOURCE_GLOB="Dp_268595200_*.fdp"
+    SOURCE_MIN_BYTES="38482"
+    SOURCE_EXACT_BYTES="38482"
+    VIEWER_PATH="$REPO_ROOT/ground-station/lepton-dp-viewer/lepton_dp_viewer.py"
+    PAYLOAD_RECEIVER_TIMEOUT_SECONDS="${PAYLOAD_RECEIVER_TIMEOUT_SECONDS:-180}"
+    ;;
+  boson)
+    CAMERA_LABEL="Boson"
+    PRODUCT_EXT=".fdp"
+    SOURCE_GLOB="Dp_268607488_*.fdp"
+    SOURCE_MIN_BYTES="163922"
+    SOURCE_EXACT_BYTES="163922"
+    VIEWER_PATH="$REPO_ROOT/ground-station/boson-viewer/boson_viewer.py"
+    PAYLOAD_RECEIVER_TIMEOUT_SECONDS="${PAYLOAD_RECEIVER_TIMEOUT_SECONDS:-600}"
+    ;;
+  *)
+    fail "--camera must be lepton or boson"
+    ;;
+esac
+
+[[ "$CAPTURES" =~ ^[0-9]+$ ]] && (( CAPTURES > 0 )) || fail "--captures must be a positive integer"
+[[ "$DELAY_SECONDS" =~ ^[0-9]+$ ]] && (( DELAY_SECONDS >= 1 && DELAY_SECONDS <= 300 )) || \
+  fail "--delay must be an integer from 1 through 300"
+if [[ -n "$DROP_PAYLOAD_DATA_INDEX" ]]; then
+  [[ "$DROP_PAYLOAD_DATA_INDEX" =~ ^[0-9]+$ ]] && (( DROP_PAYLOAD_DATA_INDEX <= 65535 )) || \
+    fail "--drop-payload-data-index must be an integer from 0 through 65535"
+fi
+if [[ -n "$RESTART_RECEIVER_CYCLE" ]]; then
+  [[ "$RESTART_RECEIVER_CYCLE" =~ ^[0-9]+$ ]] && \
+    (( RESTART_RECEIVER_CYCLE >= 1 && RESTART_RECEIVER_CYCLE <= CAPTURES )) || \
+    fail "--restart-receiver-cycle must identify one requested capture cycle"
+fi
+if [[ "$ABANDON_FIRST_CYCLE" == "true" ]]; then
+  (( CAPTURES >= 2 )) || fail "--abandon-first-cycle requires --captures 2 or greater"
+  [[ -z "$DROP_PAYLOAD_DATA_INDEX" && -z "$RESTART_RECEIVER_CYCLE" ]] || \
+    fail "--abandon-first-cycle cannot be combined with another receiver fault"
+fi
+[[ "$RADIO_INIT_FAILURES" =~ ^[0-9]+$ ]] || \
+  fail "--radio-init-failures must be a non-negative integer"
+[[ "$RADIO_WATCHDOG_RESETS" =~ ^[0-9]+$ ]] || \
+  fail "--radio-watchdog-resets must be a non-negative integer"
+[[ "$PAYLOAD_RECEIVER_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] && (( PAYLOAD_RECEIVER_TIMEOUT_SECONDS > 0 )) || \
+  fail "PAYLOAD_RECEIVER_TIMEOUT_SECONDS must be a positive integer"
+if (( RADIO_INIT_FAILURES > 0 && RADIO_WATCHDOG_RESETS > 0 )); then
+  fail "--radio-init-failures and --radio-watchdog-resets cannot both be nonzero"
+fi
+
 [[ -f "$VENV_ACTIVATE" ]] || fail "Missing venv: $VENV_ACTIVATE"
 [[ -x "$ROOT_DIR/tools/run_local_emulation.sh" ]] || fail "Missing local emulator launcher"
-[[ -x "$REPO_ROOT/ground-station/lepton-dp-viewer/lepton_dp_viewer.py" ]] || fail "Missing Lepton DP viewer"
-[[ -f "$LEPTON_SAMPLE_CSV" ]] || fail "Missing real Lepton sample CSV: $LEPTON_SAMPLE_CSV"
+[[ -f "$VIEWER_PATH" ]] || fail "Missing $CAMERA_LABEL viewer: $VIEWER_PATH"
+if [[ "$CAMERA" == "lepton" ]]; then
+  [[ -f "$LEPTON_SAMPLE_CSV" ]] || fail "Missing real Lepton sample CSV: $LEPTON_SAMPLE_CSV"
+fi
 
 # shellcheck disable=SC1090
 . "$VENV_ACTIVATE"
 export C3M_LEPTON_SAMPLE_CSV="$LEPTON_SAMPLE_CSV"
 export LEPTON_CAMERA_BACKEND
+export BOSON_CAMERA_BACKEND
 
 if [[ "$SKIP_BUILD" != "true" ]]; then
   log "building unified C3M topology"
@@ -182,13 +282,20 @@ fi
 mkdir -p "$ROOT_DIR/tools/logs" "$ROOT_DIR/DpCat"
 RUN_ID="$(date +%Y%m%d_%H%M%S)"
 LOG_DIR="$ROOT_DIR/tools/logs/c3m_local_demo_$RUN_ID"
-DECODE_DIR="$LOG_DIR/lepton_decode"
-mkdir -p "$LOG_DIR" "$DECODE_DIR"
+DECODE_DIR="$LOG_DIR/${CAMERA}_decode"
+GROUND_RECEIVED_DIR="$LOG_DIR/ground_received"
+RECEIVER_CHECKPOINT_DIR="$LOG_DIR/receiver_checkpoint"
+mkdir -p "$LOG_DIR" "$DECODE_DIR" "$GROUND_RECEIVED_DIR"
 
 EMU_PID=""
+RECEIVER_PID=""
 
 cleanup() {
   local code=$?
+  if [[ -n "$RECEIVER_PID" ]] && kill -0 "$RECEIVER_PID" >/dev/null 2>&1; then
+    kill "$RECEIVER_PID" >/dev/null 2>&1 || true
+    wait "$RECEIVER_PID" >/dev/null 2>&1 || true
+  fi
   if [[ -n "$EMU_PID" ]] && kill -0 "$EMU_PID" >/dev/null 2>&1; then
     kill "$EMU_PID" >/dev/null 2>&1 || true
     wait "$EMU_PID" >/dev/null 2>&1 || true
@@ -228,13 +335,16 @@ raise SystemExit(1)
 PY
 }
 
-wait_for_log_pattern() {
+wait_for_log_count() {
   local pattern="$1"
-  local label="$2"
+  local expected_count="$2"
+  local label="$3"
   local deadline
-  deadline=$((SECONDS + 90))
+  deadline=$((SECONDS + PAYLOAD_RECEIVER_TIMEOUT_SECONDS))
   while (( SECONDS < deadline )); do
-    if grep -q "$pattern" "$LOG_DIR/emulation.log"; then
+    local actual_count
+    actual_count="$(grep -c "$pattern" "$LOG_DIR/emulation.log" 2>/dev/null || true)"
+    if (( actual_count >= expected_count )); then
       return 0
     fi
     if grep -Eq "ImageCaptureFailed|PayloadDownlinkFailed|DownlinkFailed" "$LOG_DIR/emulation.log"; then
@@ -246,17 +356,134 @@ wait_for_log_pattern() {
   return 1
 }
 
-latest_fdp_after() {
+wait_for_payload_uart() {
+  local deadline
+  deadline=$((SECONDS + 45))
+  while (( SECONDS < deadline )); do
+    local payload_uart
+    payload_uart="$(sed -n 's/^PAYLOAD_UART_DEVICE=//p' "$LOG_DIR/emulation.log" 2>/dev/null | tail -n 1)"
+    if [[ -n "$payload_uart" && -e "$payload_uart" ]]; then
+      printf '%s\n' "$payload_uart"
+      return 0
+    fi
+    if ! kill -0 "$EMU_PID" >/dev/null 2>&1; then
+      return 1
+    fi
+    sleep 0.25
+  done
+  return 1
+}
+
+wait_for_radio_ready() {
+  local deadline
+  deadline=$((SECONDS + RADIO_READY_TIMEOUT_SECONDS))
+  while (( SECONDS < deadline )); do
+    if grep -q '^RADIO_STATE=READY' "$LOG_DIR/emulation.log" 2>/dev/null; then
+      return 0
+    fi
+    if ! kill -0 "$EMU_PID" >/dev/null 2>&1; then
+      return 1
+    fi
+    sleep 0.25
+  done
+  return 1
+}
+
+verify_radio_recovery_evidence() {
+  local injected_failures=$((RADIO_INIT_FAILURES + RADIO_WATCHDOG_RESETS))
+  if (( injected_failures == 0 )); then
+    return 0
+  fi
+
+  wait_for_log_count "RadioRecoveryScheduled" "$injected_failures" \
+    "F Prime radio recovery scheduling" || return 1
+  wait_for_log_count "RadioRecovered" 1 "F Prime radio recovery completion" || return 1
+
+  python3 - "$LOG_DIR/emulation.log" "$injected_failures" "$RADIO_WATCHDOG_RESETS" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+log_path = Path(sys.argv[1])
+failure_count = int(sys.argv[2])
+watchdog_count = int(sys.argv[3])
+pattern = re.compile(r"^RADIO_ENABLE_ATTEMPT=(\d+) T_MONOTONIC=([0-9.]+)$")
+attempts = []
+for line in log_path.read_text(errors="replace").splitlines():
+    match = pattern.match(line)
+    if match:
+        attempts.append((int(match.group(1)), float(match.group(2))))
+
+expected = failure_count + 1
+if len(attempts) != expected:
+    raise SystemExit(f"expected exactly {expected} radio enable attempts, observed {len(attempts)}")
+if [number for number, _ in attempts] != list(range(1, expected + 1)):
+    raise SystemExit(f"radio enable attempt numbering was not contiguous: {attempts}")
+
+backoff_seconds = (30.0, 120.0, 900.0)
+watchdog_timeout_allowance = 15.0 if watchdog_count else 0.0
+for index in range(failure_count):
+    observed_gap = attempts[index + 1][1] - attempts[index][1]
+    required_gap = backoff_seconds[min(index, len(backoff_seconds) - 1)] + watchdog_timeout_allowance - 5.0
+    if observed_gap < required_gap:
+        raise SystemExit(
+            f"radio retry {index + 1} was too fast: {observed_gap:.1f}s < {required_gap:.1f}s"
+        )
+PY
+}
+
+wait_for_receiver_ready() {
+  local expected_count="$1"
+  local deadline
+  deadline=$((SECONDS + 15))
+  while (( SECONDS < deadline )); do
+    local actual_count
+    actual_count="$(grep -c '^listening on ' "$LOG_DIR/payload_receiver.log" 2>/dev/null || true)"
+    if (( actual_count >= expected_count )); then
+      return 0
+    fi
+    if ! kill -0 "$RECEIVER_PID" >/dev/null 2>&1; then
+      return 1
+    fi
+    sleep 0.25
+  done
+  return 1
+}
+
+wait_for_receiver_progress_after() {
+  local baseline="$1"
+  local deadline
+  deadline=$((SECONDS + 45))
+  while (( SECONDS < deadline )); do
+    local actual_count
+    actual_count="$(grep -c '^progress:' "$LOG_DIR/payload_receiver.log" 2>/dev/null || true)"
+    if (( actual_count > baseline )); then
+      return 0
+    fi
+    if ! kill -0 "$RECEIVER_PID" >/dev/null 2>&1; then
+      return 1
+    fi
+    sleep 0.25
+  done
+  return 1
+}
+
+latest_product_after() {
   local epoch="$1"
-  python3 - "$ROOT_DIR/DpCat" "$epoch" <<'PY'
+  python3 - "$ROOT_DIR/DpCat" "$epoch" "$SOURCE_GLOB" "$SOURCE_MIN_BYTES" "$SOURCE_EXACT_BYTES" <<'PY'
 from pathlib import Path
 import sys
 
 dp_dir = Path(sys.argv[1])
 epoch = float(sys.argv[2])
+source_glob = sys.argv[3]
+minimum_bytes = int(sys.argv[4])
+exact_bytes = int(sys.argv[5])
 matches = [
-    path for path in dp_dir.glob("Dp_*.fdp")
-    if path.stat().st_mtime >= epoch and path.stat().st_size >= 38000
+    path for path in dp_dir.glob(source_glob)
+    if path.stat().st_mtime >= epoch
+    and path.stat().st_size >= minimum_bytes
+    and (exact_bytes == 0 or path.stat().st_size == exact_bytes)
 ]
 if not matches:
     raise SystemExit(1)
@@ -265,15 +492,89 @@ print(matches[0])
 PY
 }
 
-wait_for_fdp_after() {
+wait_for_product_after() {
   local epoch="$1"
   local deadline
   deadline=$((SECONDS + 35))
   while (( SECONDS < deadline )); do
-    if latest_fdp_after "$epoch"; then
+    if latest_product_after "$epoch"; then
       return 0
     fi
     sleep 0.5
+  done
+  return 1
+}
+
+count_ground_products() {
+  find "$GROUND_RECEIVED_DIR" -maxdepth 1 -type f -name '*.fdp' | wc -l | tr -d ' '
+}
+
+count_partial_products() {
+  find "$GROUND_RECEIVED_DIR" -maxdepth 1 -type f -name '*.fdp.partial' | wc -l | tr -d ' '
+}
+
+ground_product_at() {
+  local index="$1"
+  python3 - "$GROUND_RECEIVED_DIR" "$index" <<'PY'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+index = int(sys.argv[2])
+products = sorted(root.glob("*.fdp"), key=lambda path: (path.stat().st_mtime_ns, path.name))
+if len(products) <= index:
+    raise SystemExit(1)
+print(products[index])
+PY
+}
+
+partial_product_at() {
+  local index="$1"
+  python3 - "$GROUND_RECEIVED_DIR" "$index" <<'PY'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+index = int(sys.argv[2])
+products = sorted(root.glob("*.fdp.partial"), key=lambda path: (path.stat().st_mtime_ns, path.name))
+if len(products) <= index:
+    raise SystemExit(1)
+print(products[index])
+PY
+}
+
+wait_for_ground_product_count() {
+  local expected_count="$1"
+  local deadline
+  deadline=$((SECONDS + PAYLOAD_RECEIVER_TIMEOUT_SECONDS))
+  while (( SECONDS < deadline )); do
+    if [[ -n "$RECEIVER_PID" ]] && ! kill -0 "$RECEIVER_PID" >/dev/null 2>&1; then
+      return 1
+    fi
+    local actual_count
+    actual_count="$(count_ground_products)"
+    if (( actual_count >= expected_count )); then
+      return 0
+    fi
+    sleep 0.5
+  done
+  return 1
+}
+
+wait_for_partial_product_count() {
+  local expected_count="$1"
+  local deadline
+  deadline=$((SECONDS + 30))
+  while (( SECONDS < deadline )); do
+    if [[ -n "$RECEIVER_PID" ]] && ! kill -0 "$RECEIVER_PID" >/dev/null 2>&1; then
+      return 1
+    fi
+    local actual_count
+    actual_count="$(count_partial_products)"
+    if (( actual_count >= expected_count )); then
+      return 0
+    fi
+    sleep 0.25
   done
   return 1
 }
@@ -299,6 +600,33 @@ send_command() {
     sleep 2
   done
   return 1
+}
+
+start_payload_receiver() {
+  local ready_baseline
+  ready_baseline="$(grep -c '^listening on ' "$LOG_DIR/payload_receiver.log" 2>/dev/null || true)"
+  local receiver_args=(
+    --port "$PAYLOAD_UART_DEVICE"
+    --output-dir "$GROUND_RECEIVED_DIR"
+    --ext .fdp
+    --timeout "$PAYLOAD_RECEIVER_TIMEOUT_SECONDS"
+  )
+  if [[ -n "$RESTART_RECEIVER_CYCLE" ]]; then
+    receiver_args+=(--checkpoint-dir "$RECEIVER_CHECKPOINT_DIR")
+  fi
+  if [[ "$ABANDON_FIRST_CYCLE" == "true" ]]; then
+    receiver_args+=(
+      --transfer-timeout "$PARTIAL_TRANSFER_TIMEOUT_SECONDS"
+      --absolute-transfer-timeout "$PAYLOAD_RECEIVER_TIMEOUT_SECONDS"
+      --save-partial-on-timeout
+    )
+  fi
+  PYTHONUNBUFFERED=1 python3 "$ROOT_DIR/tools/payload_receiver.py" \
+    "${receiver_args[@]}" >>"$LOG_DIR/payload_receiver.log" 2>&1 &
+  RECEIVER_PID="$!"
+  log "started ground payload receiver pid=$RECEIVER_PID"
+  wait_for_receiver_ready "$((ready_baseline + 1))" || \
+    fail "Ground payload receiver did not become ready; see $LOG_DIR/payload_receiver.log"
 }
 
 open_png_viewer() {
@@ -327,56 +655,22 @@ open_png_viewer() {
   esac
 }
 
-log "app binary: $APP_BINARY_PATH"
-log "dictionary: $DICT_PATH"
-log "data products: $ROOT_DIR/DpCat"
-log "real Lepton sample CSV: $LEPTON_SAMPLE_CSV"
-log "Lepton camera backend: $LEPTON_CAMERA_BACKEND"
-log "logs: $LOG_DIR"
+decode_ground_product() {
+  local cycle="$1"
+  local fdp_file="$2"
+  local cycle_decode_dir="$DECODE_DIR/cycle_$cycle"
+  local summary_file="$LOG_DIR/${CAMERA}_summary_cycle_$cycle.json"
+  local viewer_args=(--dictionary "$DICT_PATH" --outdir "$cycle_decode_dir" --summary --no-show)
+  mkdir -p "$cycle_decode_dir"
+  if [[ "$GENERATE_PNG" != "true" ]]; then
+    viewer_args+=(--no-png)
+  fi
 
-(
-  cd "$ROOT_DIR"
-  exec ./tools/run_local_emulation.sh \
-    --app-binary "$APP_BINARY_PATH" \
-    --dictionary "$DICT_PATH" \
-    --gui-port "$GUI_PORT" \
-    --link-mode channelized
-) >"$LOG_DIR/emulation.log" 2>&1 &
-EMU_PID="$!"
-log "started local emulator pid=$EMU_PID; GDS: http://127.0.0.1:$GUI_PORT"
+  python3 "$VIEWER_PATH" "$fdp_file" "${viewer_args[@]}" \
+    > "$summary_file"
 
-wait_for_port "$GUI_PORT" "fprime-gds"
-
-START_EPOCH="$(python3 -c 'import time; print(time.time())')"
-
-log "sending C3M command sequence"
-send_command "missionApp.ENTER_BASE_MODE" || fail "Command failed: missionApp.ENTER_BASE_MODE"
-send_command "sohApp.EMIT_SOH_SNAPSHOT" || fail "Command failed: sohApp.EMIT_SOH_SNAPSHOT"
-send_command "payloadDriverLepton.ENABLE" || fail "Command failed: payloadDriverLepton.ENABLE"
-send_command "scienceApp.CONFIGURE_CAPTURE_DURATION" "$CAPTURE_SECONDS" || fail "Command failed: scienceApp.CONFIGURE_CAPTURE_DURATION"
-send_command "missionApp.SCHEDULE_COLLECTION" "$DELAY_SECONDS" || fail "Command failed: missionApp.SCHEDULE_COLLECTION"
-
-WAIT_SECONDS=$((DELAY_SECONDS + 6))
-log "waiting ${WAIT_SECONDS}s for scheduled Lepton capture"
-sleep "$WAIT_SECONDS"
-
-FDP_FILE="$(wait_for_fdp_after "$START_EPOCH")" || fail "No new Lepton Dp_*.fdp found in $ROOT_DIR/DpCat"
-log "new Lepton data product: $FDP_FILE"
-
-send_command "storageManager.REPORT_LATEST_DATASET" || fail "Command failed: storageManager.REPORT_LATEST_DATASET"
-send_command "storageManager.REPORT_STORAGE_HISTORY" || fail "Command failed: storageManager.REPORT_STORAGE_HISTORY"
-send_command "commsApp.REQUEST_SCIENCE_DOWNLINK" || fail "Command failed: commsApp.REQUEST_SCIENCE_DOWNLINK"
-wait_for_log_pattern "PayloadDownlinkComplete" "payload downlink completion" || fail "Payload downlink did not complete"
-wait_for_log_pattern "DownlinkFinished" "comms downlink completion" || fail "Comms downlink did not complete"
-
-VIEWER_ARGS=(--dictionary "$DICT_PATH" --outdir "$DECODE_DIR" --summary --no-show)
-if [[ "$GENERATE_PNG" != "true" ]]; then
-  VIEWER_ARGS+=(--no-png)
-fi
-python3 "$REPO_ROOT/ground-station/lepton-dp-viewer/lepton_dp_viewer.py" "$FDP_FILE" "${VIEWER_ARGS[@]}" \
-  > "$LOG_DIR/lepton_summary.json"
-
-PNG_FILE="$(python3 - "$LOG_DIR/lepton_summary.json" "$GENERATE_PNG" "$LEPTON_SAMPLE_CSV" <<'PY'
+  if [[ "$CAMERA" == "lepton" ]]; then
+    LAST_PNG="$(python3 - "$summary_file" "$GENERATE_PNG" "$LEPTON_SAMPLE_CSV" <<'PY'
 import json
 import sys
 
@@ -419,17 +713,200 @@ if png:
     print(png)
 PY
 )"
+    log "cycle $cycle decoded ground Lepton CSV matches real sample data"
+  else
+    LAST_PNG="$(python3 - "$summary_file" "$GENERATE_PNG" "$BOSON_CAMERA_BACKEND" <<'PY'
+import json
+import sys
 
-log "viewer summary written: $LOG_DIR/lepton_summary.json"
-log "decoded Lepton CSV matches real sample data"
-if [[ -n "$PNG_FILE" ]]; then
-  log "viewer PNG written: $PNG_FILE"
-  if [[ "$OPEN_PNG" == "true" ]]; then
-    log "opening decoded Lepton PNG"
-    open_png_viewer "$PNG_FILE"
+summary = json.load(open(sys.argv[1]))
+expect_png = sys.argv[2] == "true"
+backend = sys.argv[3]
+if summary.get("width") != 320 or summary.get("height") != 256 or summary.get("pixels") != 81920:
+    raise SystemExit("decoded Boson dimensions did not match 320x256")
+if summary.get("units") != "raw_counts":
+    raise SystemExit("decoded Boson data was not labeled as raw counts")
+if summary.get("max_raw_counts", 0) <= summary.get("min_raw_counts", 0):
+    raise SystemExit("decoded Boson raw-count range is invalid")
+if "min_c" in summary or "max_c" in summary:
+    raise SystemExit("Boson raw counts were incorrectly labeled as temperature")
+png = summary.get("png")
+if expect_png and not png:
+    raise SystemExit("decoded Boson PNG was not generated")
+payload_json = summary.get("json")
+if not payload_json:
+    raise SystemExit("decoded Boson JSON was not generated")
+if backend == "synthetic":
+    if summary.get("first_raw_counts") != 1000 or summary.get("center_raw_counts") != 18704:
+        raise SystemExit("decoded Boson synthetic frame did not preserve exact raw counts")
+if png:
+    print(png)
+PY
+)"
+    log "cycle $cycle decoded ground Boson frame as 320x256 raw counts"
   fi
+
+  LAST_SUMMARY="$summary_file"
+  log "cycle $cycle viewer summary: $summary_file"
+  if [[ -n "$LAST_PNG" ]]; then
+    log "cycle $cycle viewer PNG: $LAST_PNG"
+  fi
+}
+
+log "app binary: $APP_BINARY_PATH"
+log "dictionary: $DICT_PATH"
+log "data products: $ROOT_DIR/DpCat"
+log "selected camera: $CAMERA_LABEL"
+if [[ "$CAMERA" == "lepton" ]]; then
+  log "real Lepton sample CSV: $LEPTON_SAMPLE_CSV"
+  log "Lepton camera backend: $LEPTON_CAMERA_BACKEND"
+else
+  log "Boson camera backend: $BOSON_CAMERA_BACKEND"
 fi
-log "PASS: local EPSCoR C3M demo produced, downlinked, and decoded a Lepton .fdp"
+log "capture/downlink cycles: $CAPTURES"
+if [[ -n "$DROP_PAYLOAD_DATA_INDEX" ]]; then
+  log "one-shot payload DATA drop index: $DROP_PAYLOAD_DATA_INDEX"
+fi
+if [[ -n "$RESTART_RECEIVER_CYCLE" ]]; then
+  log "receiver checkpoint/restart cycle: $RESTART_RECEIVER_CYCLE"
+fi
+if [[ "$ABANDON_FIRST_CYCLE" == "true" ]]; then
+  log "cycle 1 expected result: honest partial after permanent DATA loss"
+fi
+if (( RADIO_INIT_FAILURES > 0 )); then
+  log "radio init failures before recovery: $RADIO_INIT_FAILURES"
+fi
+if (( RADIO_WATCHDOG_RESETS > 0 )); then
+  log "simulated radio watchdog resets before recovery: $RADIO_WATCHDOG_RESETS"
+fi
+log "logs: $LOG_DIR"
+
+EMULATOR_ARGS=(
+  --app-binary "$APP_BINARY_PATH"
+  --dictionary "$DICT_PATH"
+  --gui-port "$GUI_PORT"
+  --link-mode channelized
+)
+if [[ -n "$DROP_PAYLOAD_DATA_INDEX" ]]; then
+  EMULATOR_ARGS+=(--drop-payload-data-index "$DROP_PAYLOAD_DATA_INDEX")
+fi
+if [[ "$ABANDON_FIRST_CYCLE" == "true" ]]; then
+  EMULATOR_ARGS+=(--blackhole-payload-data-index-first-transfer 100)
+fi
+if (( RADIO_INIT_FAILURES > 0 )); then
+  EMULATOR_ARGS+=(--radio-init-failures "$RADIO_INIT_FAILURES")
+fi
+if (( RADIO_WATCHDOG_RESETS > 0 )); then
+  EMULATOR_ARGS+=(--radio-watchdog-resets "$RADIO_WATCHDOG_RESETS")
+fi
+
+(
+  cd "$ROOT_DIR"
+  exec ./tools/run_local_emulation.sh "${EMULATOR_ARGS[@]}"
+) >"$LOG_DIR/emulation.log" 2>&1 &
+EMU_PID="$!"
+log "started local emulator pid=$EMU_PID; GDS: http://127.0.0.1:$GUI_PORT"
+
+PAYLOAD_UART_DEVICE="$(wait_for_payload_uart)" || fail "Local emulator did not publish a payload UART device"
+log "payload UART: $PAYLOAD_UART_DEVICE"
+
+start_payload_receiver
+
+wait_for_port "$GUI_PORT" "fprime-gds"
+wait_for_radio_ready || fail "Radio did not reach READY within ${RADIO_READY_TIMEOUT_SECONDS}s"
+verify_radio_recovery_evidence || fail "F Prime radio recovery evidence/backoff check failed"
+log "radio reached READY"
+
+log "sending one-time C3M startup commands"
+send_command "missionApp.ENTER_BASE_MODE" || fail "Command failed: missionApp.ENTER_BASE_MODE"
+send_command "sohApp.EMIT_SOH_SNAPSHOT" || fail "Command failed: sohApp.EMIT_SOH_SNAPSHOT"
+if [[ "$CAMERA" == "boson" ]]; then
+  send_command "payloadDriverSelector.SELECT_PAYLOAD_DRIVER" "BOSON" || \
+    fail "Command failed: payloadDriverSelector.SELECT_PAYLOAD_DRIVER BOSON"
+fi
+
+SOURCE_PRODUCT_COUNT="$(find "$ROOT_DIR/DpCat" -maxdepth 1 -type f -name "$SOURCE_GLOB" | wc -l | tr -d ' ')"
+GROUND_PRODUCT_BASELINE="$(count_ground_products)"
+PARTIAL_PRODUCT_BASELINE="$(count_partial_products)"
+COMPLETED_GROUND_PRODUCTS=0
+HISTORY_FILE="$LOG_DIR/cycle_history.tsv"
+printf 'cycle\tresult\tsatellite_product\tground_product\tdecode_summary\n' >"$HISTORY_FILE"
+LAST_PNG=""
+LAST_SUMMARY=""
+
+for ((cycle = 1; cycle <= CAPTURES; cycle++)); do
+  START_EPOCH="$(python3 -c 'import time; print(time.time())')"
+  log "cycle $cycle/$CAPTURES: scheduling $CAMERA_LABEL capture after ${DELAY_SECONDS}s"
+  send_command "missionApp.SCHEDULE_COLLECTION" "$DELAY_SECONDS" || \
+    fail "Cycle $cycle command failed: missionApp.SCHEDULE_COLLECTION"
+
+  wait_for_log_count "ScienceStored" "$cycle" "cycle $cycle ScienceStored" || \
+    fail "Cycle $cycle did not reach ScienceStored"
+  FDP_FILE="$(wait_for_product_after "$START_EPOCH")" || \
+    fail "Cycle $cycle produced no new $CAMERA_LABEL FDP in $ROOT_DIR/DpCat"
+  CURRENT_SOURCE_COUNT="$(find "$ROOT_DIR/DpCat" -maxdepth 1 -type f -name "$SOURCE_GLOB" | wc -l | tr -d ' ')"
+  (( CURRENT_SOURCE_COUNT > SOURCE_PRODUCT_COUNT )) || \
+    fail "Cycle $cycle did not create a distinct satellite-side data product"
+  SOURCE_PRODUCT_COUNT="$CURRENT_SOURCE_COUNT"
+  log "cycle $cycle satellite product: $FDP_FILE"
+
+  RECEIVER_PROGRESS_BASELINE="$(grep -c '^progress:' "$LOG_DIR/payload_receiver.log" 2>/dev/null || true)"
+  send_command "commsApp.REQUEST_SCIENCE_DOWNLINK" || \
+    fail "Cycle $cycle command failed: commsApp.REQUEST_SCIENCE_DOWNLINK"
+  if [[ "$RESTART_RECEIVER_CYCLE" == "$cycle" ]]; then
+    wait_for_receiver_progress_after "$RECEIVER_PROGRESS_BASELINE" || \
+      fail "Cycle $cycle receiver never made progress before restart"
+    log "cycle $cycle: restarting ground receiver after checkpointed progress"
+    kill "$RECEIVER_PID" >/dev/null 2>&1 || true
+    wait "$RECEIVER_PID" >/dev/null 2>&1 || true
+    RECEIVER_PID=""
+    start_payload_receiver
+  fi
+  wait_for_log_count "PayloadDownlinkComplete" "$cycle" "cycle $cycle payload completion" || \
+    fail "Cycle $cycle payload downlink did not complete"
+  wait_for_log_count "DownlinkFinished" "$cycle" "cycle $cycle comms completion" || \
+    fail "Cycle $cycle comms downlink did not complete"
+
+  if [[ "$ABANDON_FIRST_CYCLE" == "true" && "$cycle" == "1" ]]; then
+    EXPECTED_PARTIAL_COUNT=$((PARTIAL_PRODUCT_BASELINE + 1))
+    wait_for_partial_product_count "$EXPECTED_PARTIAL_COUNT" || \
+      fail "Cycle 1 did not terminate as an honest partial"
+    PARTIAL_FDP_FILE="$(partial_product_at "$((EXPECTED_PARTIAL_COUNT - 1))")" || \
+      fail "Cycle 1 partial artifact could not be selected"
+    [[ "$(count_ground_products)" == "$GROUND_PRODUCT_BASELINE" ]] || \
+      fail "Cycle 1 incorrectly produced a complete ground artifact"
+    log "cycle 1 expected partial product: $PARTIAL_FDP_FILE"
+    printf '%s\t%s\t%s\t%s\t%s\n' \
+      "$cycle" "PARTIAL_EXPECTED" "$FDP_FILE" "$PARTIAL_FDP_FILE" "" \
+      >>"$HISTORY_FILE"
+    continue
+  fi
+
+  COMPLETED_GROUND_PRODUCTS=$((COMPLETED_GROUND_PRODUCTS + 1))
+  EXPECTED_GROUND_COUNT=$((GROUND_PRODUCT_BASELINE + COMPLETED_GROUND_PRODUCTS))
+  wait_for_ground_product_count "$EXPECTED_GROUND_COUNT" || \
+    fail "Cycle $cycle produced no CRC-valid ground-received artifact; see $LOG_DIR/payload_receiver.log"
+  GROUND_FDP_FILE="$(ground_product_at "$((EXPECTED_GROUND_COUNT - 1))")" || \
+    fail "Cycle $cycle ground artifact could not be selected"
+  log "cycle $cycle ground product: $GROUND_FDP_FILE"
+  cmp -s "$FDP_FILE" "$GROUND_FDP_FILE" || \
+    fail "Cycle $cycle ground FDP differs from the satellite-side FDP"
+  decode_ground_product "$cycle" "$GROUND_FDP_FILE"
+  printf '%s\t%s\t%s\t%s\t%s\n' \
+    "$cycle" "COMPLETE" "$FDP_FILE" "$GROUND_FDP_FILE" "$LAST_SUMMARY" \
+    >>"$HISTORY_FILE"
+done
+
+if [[ -n "$LAST_PNG" && "$OPEN_PNG" == "true" ]]; then
+  log "opening final decoded $CAMERA_LABEL PNG"
+  open_png_viewer "$LAST_PNG"
+fi
+if [[ "$ABANDON_FIRST_CYCLE" == "true" ]]; then
+  log "PASS: cycle 1 failed honestly and $COMPLETED_GROUND_PRODUCTS later capture(s) completed cleanly"
+else
+  log "PASS: completed $CAPTURES consecutive C3M capture/downlink/decode cycles from ground-received artifacts"
+fi
+log "cycle history: $HISTORY_FILE"
 
 if [[ "$HOLD_AFTER_SEQUENCE" == "true" ]]; then
   log "GDS: http://127.0.0.1:$GUI_PORT"

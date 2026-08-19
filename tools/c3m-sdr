@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Start the C3M HackRF ground adapter, F' GDS, and payload/livestream UI.
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HACKRF_DIR="$ROOT_DIR/ground-station/hackrf-rf22"
+PYTHON="$HACKRF_DIR/.venv/bin/python"
+SUPERVISOR="$HACKRF_DIR/run_hackrf_ground_station.py"
+
+usage() {
+  cat <<'EOF'
+Usage: ./tools/c3m-sdr [--rx-only] [--no-open]
+
+Start the self-calibrating HackRF C3M ground station.
+
+  (no flag)  Full RX/TX ground station. It identifies CRC-valid C3M RF22
+             downlink frames, selects the lowest clean RX preset, finds the
+             lowest end-to-end PING/Pong-capable TX gain, then continuously
+             adapts as link conditions change.
+             Running this launcher confirms the exact POBADY 433 MHz
+             magnetic-base antenna with its 3 m RG174 cable is attached.
+  --rx-only  Diagnostic receive-only mode; TX gain is forced to zero.
+  --no-open  Start services without opening the two browser pages.
+
+This launcher deliberately has no operator gain controls. Calibration searches
+the HackRF's supported RX and TX gain ranges and fails closed without proof.
+EOF
+}
+
+fail() {
+  echo "c3m-sdr: $*" >&2
+  exit 1
+}
+
+TX_ARGS=(--enable-tx --tx-safety-confirmed)
+OPEN_ARG=""
+while (($#)); do
+  case "$1" in
+    --rx-only)
+      TX_ARGS=(--no-tx)
+      ;;
+    --no-open)
+      OPEN_ARG="--no-open"
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      usage >&2
+      fail "unknown option: $1"
+      ;;
+  esac
+  shift
+done
+
+[[ "$(uname -s)" == "Darwin" ]] || fail "the qualified HackRF path currently supports macOS only"
+command -v hackrf_info >/dev/null 2>&1 || fail "missing HackRF tools; install with: brew install hackrf"
+[[ -x "$PYTHON" ]] || fail "missing HackRF venv; follow the one-time setup in docs/HACKRF_GROUND_STATION_RUNBOOK.md"
+[[ -f "$SUPERVISOR" ]] || fail "missing HackRF supervisor: $SUPERVISOR"
+
+echo "Checking HackRF..."
+hackrf_info
+
+if [[ "${TX_ARGS[0]}" == "--enable-tx" ]]; then
+  cat <<'EOF'
+Automatic C3M RF setup:
+  antenna: POBADY 433 MHz magnetic base, SMA male, 3 m RG174
+  RX: lowest clean CRC-valid preset    TX: lowest PING/Pong-capable preset
+  RF amp: off-first fallback    antenna bias: always off
+Calibration will fail closed if the known C3M link cannot be proven.
+After READY, link adaptation and reacquisition continue without restarting GDS.
+EOF
+else
+  echo "Receive-only diagnostic mode: TX gain forced to 0; GDS commands cannot uplink."
+fi
+
+cd "$HACKRF_DIR"
+if [[ -n "$OPEN_ARG" ]]; then
+  exec "$PYTHON" "$SUPERVISOR" "${TX_ARGS[@]}" "$OPEN_ARG"
+else
+  exec "$PYTHON" "$SUPERVISOR" "${TX_ARGS[@]}"
+fi

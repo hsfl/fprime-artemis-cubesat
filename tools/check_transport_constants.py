@@ -14,6 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "config/transport_constants.json"
+RF_NETWORKS = ROOT / "config/rf_networks.json"
 PAYLOAD_RECEIVER = ROOT / "ArtemisRpiTeensy_N2/tools/payload_receiver.py"
 
 SOURCES = {
@@ -99,12 +100,14 @@ def main() -> int:
 
     constants = {name: read_constants(path) for name, path in SOURCES.items()}
     manifest = json.loads(MANIFEST.read_text())
+    registry = json.loads(RF_NETWORKS.read_text())
     receiver = read_python_constants(PAYLOAD_RECEIVER)
     errors: list[str] = []
 
     fp = constants["fprime"]
     sat = constants["satellite_teensy"]
     gnd = constants["ground_teensy"]
+    selected_network = registry["networks"][manifest["rf"]["network"]]
 
     expected_payload_magic = bytes(
         [manifest["payload"]["magic_0"], manifest["payload"]["magic_1"]]
@@ -132,8 +135,13 @@ def main() -> int:
         ("UART inter-frame margin", ("fprime", fp["UART_INTER_FRAME_MARGIN_US"]), ("satellite", sat["UART_INTER_FRAME_MARGIN_US"]), ("ground", gnd["UART_INTER_FRAME_MARGIN_US"])),
         ("UART CCSDS extra margin", ("fprime", fp["UART_CCSDS_EXTRA_MARGIN_US"]), ("satellite", sat["UART_CCSDS_EXTRA_MARGIN_US"]), ("ground", gnd["UART_CCSDS_EXTRA_MARGIN_US"])),
         ("RF payload segment data", ("fprime", fp["RF_SEGMENT_MAX_DATA_BYTES"]), ("satellite", sat["RF_SEGMENT_MAX_DATA"]), ("ground", gnd["RF_SEGMENT_MAX_DATA"])),
+        ("RF network ID", ("registry", selected_network["id"]), ("fprime", fp["RF_NETWORK_ID"]), ("satellite", sat["RF_NETWORK_ID"]), ("ground", gnd["RF_NETWORK_ID"])),
+        ("RF protocol version", ("registry", registry["protocol_version"]), ("fprime", fp["RF_PROTOCOL_VERSION"]), ("satellite", sat["RF_PROTOCOL_VERSION"]), ("ground", gnd["RF_PROTOCOL_VERSION"])),
+        ("RF ground address", ("registry", registry["addresses"]["ground"]), ("fprime", fp["RF_GROUND_ADDRESS"]), ("ground local", gnd["RF_LOCAL_ADDRESS"]), ("satellite remote", sat["RF_REMOTE_ADDRESS"])),
+        ("RF satellite address", ("registry", registry["addresses"]["satellite"]), ("fprime", fp["RF_SATELLITE_ADDRESS"]), ("satellite local", sat["RF_LOCAL_ADDRESS"]), ("ground remote", gnd["RF_REMOTE_ADDRESS"])),
         ("RF inter-segment gap", ("fprime", fp["RF_INTER_SEGMENT_GAP_MS"]), ("satellite", sat["RF_INTER_SEGMENT_GAP_MS"]), ("ground", gnd["RF_INTER_SEGMENT_GAP_MS"])),
         ("RF payload inter-packet gap", ("fprime", fp["RF_PAYLOAD_INTER_PACKET_GAP_MS"]), ("satellite", sat["RF_PAYLOAD_INTER_PACKET_GAP_MS"]), ("ground", gnd["RF_PAYLOAD_INTER_PACKET_GAP_MS"])),
+        ("RF TX completion timeout", ("manifest", manifest["rf"]["tx_complete_timeout_ms"]), ("fprime", fp["RF_TX_COMPLETE_TIMEOUT_MS"]), ("satellite", sat["RF_TX_COMPLETE_TIMEOUT_MS"]), ("ground", gnd["RF_TX_COMPLETE_TIMEOUT_MS"])),
         ("ground TX CCSDS ACK", ("fprime", fp["RF_GROUND_TX_ACK_REQUIRED_CCSDS"]), ("ground TX", gnd["RF_TX_ACK_REQUIRED_CCSDS"]), ("satellite RX", sat["RF_RX_ACK_REQUIRED_CCSDS"])),
         ("ground TX payload ACK", ("fprime", fp["RF_GROUND_TX_ACK_REQUIRED_PAYLOAD"]), ("ground TX", gnd["RF_TX_ACK_REQUIRED_PAYLOAD"]), ("satellite RX", sat["RF_RX_ACK_REQUIRED_PAYLOAD"])),
         ("satellite TX CCSDS ACK", ("fprime", fp["RF_SATELLITE_TX_ACK_REQUIRED_CCSDS"]), ("satellite TX", sat["RF_TX_ACK_REQUIRED_CCSDS"]), ("ground RX", gnd["RF_RX_ACK_REQUIRED_CCSDS"])),

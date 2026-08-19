@@ -27,15 +27,16 @@ class PayloadDriver_Lepton final : public PayloadDriver_LeptonComponentBase {
 
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void requestIn_handler(FwIndexType portNum, U32 durationSeconds) override;
+    void deactivateIn_handler(FwIndexType portNum) override;
+    void previewRequestIn_handler(FwIndexType portNum) override;
     void dpWrittenIn_handler(FwIndexType portNum,
                              const Fw::StringBase& fileName,
                              FwDpPriorityType priority,
                              FwSizeType size) override;
-    void ENABLE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
-    void DISABLE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
-    void CAPTURE_IMAGE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
 
     bool captureThermalImage(U32 durationSeconds);
+    bool publishLatestPreview();
+    void downsampleLatestPreview();
     bool ensureCameraOpen(char* reason, U32 reasonSize);
     void publishFailure(CaptureStatus status, const char* reason);
     void writeTelemetry();
@@ -43,6 +44,11 @@ class PayloadDriver_Lepton final : public PayloadDriver_LeptonComponentBase {
     static bool computeFileCrc16(const std::string& outputPath, U32& crcOut);
 
     LeptonCamera m_camera;
+    // Preview streaming owns one stable latest source and one stable preview
+    // buffer. previewOut is synchronous, so the buffer remains valid through
+    // a complete response-paced upload without a ring or queued copies.
+    U16 m_latestPreviewSource[LeptonCamera::NUM_PIXELS];
+    U8 m_previewBuffer[80U * 60U];
     U32 m_lastDurationSeconds;
     U32 m_lastProductId;
     U32 m_lastDataBytes;

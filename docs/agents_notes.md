@@ -43,6 +43,55 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 
 ## Current State
 
+### C3M ground-radio decision (2026-08-06)
+
+- The ground Teensy/RFM23BP through `./tools/c3m` is the primary C3M HIL and
+  mission-operations radio.
+- The completed HackRF RF22 adapter remains available through
+  `./tools/c3m-sdr` for research, teaching, captures, and receive diagnosis. It
+  is not the normal or fallback operator path, is not outdoor qualified, and
+  has no scheduled bidirectional mission-development work.
+- Controlled indoor HackRF qualification proved real RF22 interoperability,
+  PING/Pong, preview, and exact science downlink. The later hallway run retained
+  2,915 valid RF22 frames and 951 complete channel-0 messages, but recorded 43
+  ACK timeouts versus 26 received ACKs, three TX failures, and 34 holds after
+  reaching TX gain 47 with the RF amplifier enabled.
+- Datasheet/implementation review found the RFM23BP specifies 200 microsecond
+  RX/TX transitions, while HackRF has no deterministic system-turnaround
+  specification and must stop/start separate host-controlled USB streams. The
+  weaker TX capability and ACK blind interval make additional mission work a
+  poor trade against SpaSat priorities.
+- Do not change satellite ACK timing, packet format, modem, or validated flight
+  code for HackRF compatibility. The full evidence, proof limits, rejected
+  options, RFM23BP electrical follow-up, and reopening gate are in
+  `docs/archive/C3M_HACKRF_GROUND_STATION_DECISION_2026-08-06.md`.
+
+### C3M on-demand cached downlink acceptance (2026-07-29)
+
+- `REQUEST_SCIENCE_DOWNLINK` now performs one on-demand Pi-to-satellite-Teensy
+  cache upload; capture does not automatically stage the `.fdp`.
+- The satellite Teensy verifies the cached byte count and CRC, sequences the
+  existing ground-compatible `N2` packets locally, and retains the bytes for
+  bitmap repair requests.
+- The existing ground Teensy and payload receiver over-the-air contract did
+  not change.
+- Connected FlatSat acceptance passed 3/3 consecutive fresh pictures with CRC
+  and 160 by 120 decode at approximately 10 seconds per 38,480-byte downlink.
+  The measured legacy compatibility run was 64.7 seconds.
+- Accepted Pi release:
+  `/home/pi/artemis/releases/c3m-on-demand-cache-20260729T233825Z`.
+  `/home/pi/artemis/current` points to it and the enabled
+  `artemis-fprime.service` launches that symlink on boot.
+- Detailed design, failure behavior, pass gate, and acceptance evidence:
+  `docs/C3M_ON_DEMAND_TEENSY_CACHE_DOWNLINK_PLAN.md`.
+- A post-acceptance static review found RadioHead's shared TX/RX buffer could
+  retain a stale ACK or payload length and corrupt the next command before Pi
+  forwarding. The project wrapper now performs a clean TX-to-RX transition on
+  both radios and applies a six-millisecond in-flight-preamble TX deferral only
+  on the satellite. Offline tests/builds pass; the focused
+  command-during-downlink HIL gate is still pending and recorded in the same
+  plan.
+
 ### 1) F' side (`ArtemisRpiTeensy_N2`)
 - Deployment uses Linux UART transport (`Drv.LinuxUartDriver`) on `/dev/serial0`.
 - `UartChannelMux` wraps/unwraps the single Pi <-> satellite Teensy UART into tagged channels.
@@ -1103,3 +1152,244 @@ Driver tier, formerly repo "Adapter":
 - The obsolete Pi legacy rollback binary was deleted; the supported active
   release remains `/home/pi/artemis/releases/c3m-hil-uartflow37-channel`.
 - Durable work plan: `docs/C3M_DEMO_HARDENING_PLAN_2026-07-09.md`.
+
+## C3M Best-Effort Thermal Reception (2026-07-10)
+
+- The channel-1 web receiver preserves the complete CRC-verified happy path
+  and finalizes incomplete transfers at the 120-second demo cutoff. The UI
+  shows `75 s` as nominal and approximately `90 s` as longer than target.
+- Partial products are position-preserving `.fdp.partial` files. Missing
+  channel-1 packets are never collapsed out of the byte stream.
+- The Lepton partial decoder treats pixels intersecting missing packet bytes as
+  unknown, exports CSV `NaN` / JSON `null`, and renders them white.
+- Partial results are explicitly non-CRC (`crc_ok: false`) and retain the
+  packet map, timeout reason, counts, and thermal statistics in `run.json`.
+- The UI supports pixel hover temperature inspection and reports `No data` on
+  white unknown samples.
+- Deterministic local replay supports repeatable `--replay-drop-packet` fault
+  injection. Packet-500 evidence recovered 19,182/19,200 pixels without
+  shifting valid data.
+- `./tools/validate_local.sh --skip-demo` passes after the change, including
+  Python tests, native F Prime build, and 6/6 component UT executables.
+- HIL packet-loss qualification passed with the portable-GDS eighth-floor
+  walkaround: 24 missing packets recovered in four selective-repair rounds,
+  followed by a zero-repair clean cycle at restored inside-lab geometry.
+
+## RF Mission Traffic Isolation (2026-07-10)
+
+- C3M now assigns RadioHead's existing CRC-protected header as a strict mission
+  identity: network `0xC3`, ground `0xA1`, satellite `0xA2`, version `1`.
+- Neutron 2 network ID `0xD2` is reserved in `config/rf_networks.json`; its
+  branch must deliberately select `rf.network: neutron2` and rebuild both
+  Teensys before use.
+- Wrong network, role direction, or version is rejected before ACK handling,
+  reassembly, UART/USB forwarding, GDS, or payload decode.
+- Dedicated `rf_wrong_network`, `rf_wrong_address`, and `rf_wrong_version`
+  counters appear in periodic debug output and `#LINK_STATUS`.
+- There is no new packet overhead: RadioHead already sends these four bytes, so
+  the 49-byte RF packet and 44-byte Artemis segment capacity remain unchanged.
+- This protects against accidental nearby-booth cross-talk, not RF collisions,
+  intentional spoofing, encryption, or authentication.
+- Local generator/isolation tests and both Teensy builds pass. No firmware was
+  flashed; same-mission and cross-mission HIL qualification remains deferred.
+
+## C3M RF Reliability HIL (2026-07-15)
+
+- Active evidence and remaining fault cases live in
+  `docs/C3M_RF_RELIABILITY_HARDENING_PLAN_2026-07-14.md`.
+- Current ground/satellite HEX and ARMv6 Pi binary hashes were verified live.
+  The initial nominal/fault campaign remained on PID `706` with zero systemd
+  restarts; the post-bridge-flash epoch booted as PID `256` with zero restarts.
+- HIL-MVP-1 startup, the separate one-capture gate, and the independent 3/3
+  repeated-capture gate passed on basic antennas. All four new 38,480-byte
+  ground files matched their Pi sources, CRC-checked, and decoded as 160x120.
+- Current downlink timing was 64.7-65.2 seconds. One repeat cycle completed a
+  one-round selective repair; the other three transfers required none.
+- The false mixed-channel `rf_msg_id_gaps` diagnostic was fixed in `bdca6a3`
+  by allocating rolling message IDs independently per channel on both bridges.
+  Focused tests, the 68-test local gate, both firmware builds, and a live
+  1,100-packet post-fix transfer passed. During that HIL transfer the ground
+  gap counter changed only 1 to 3 alongside one real reassembly loss/repair,
+  rather than climbing by hundreds from ordinary channel interleaving.
+- Focused HIL recovery gates also passed: duplicate active request, receiver
+  restart from a 253/1,100 checkpoint, a six-second GDS-reader stop with
+  subsequent PING recovery, and a full ground-USB unplug/replug with automatic
+  receiver/GDS reconnection and a clean next cycle. Physical RF-fade
+  qualification also passed with the later portable eighth-floor walkaround.
+- The bounded RF TX-completion policy remains 500 ms per attempt with one retry
+  and passed focused injected timeout/recovery cases on both bridges. Simply
+  removing the peer does not trigger this local completion timeout, so the HIL
+  plan does not claim peer-offline ACK loss as proof of `waitPacketSent()`.
+- The first operator-cued five-second basic-antenna fade attempt did not
+  measurably impair the link: product/transfer 2 completed 1,100/1,100 with
+  zero repair rounds and exact source/ground SHA-256. It remains an
+  inconclusive nominal control, not HIL-MVP-4 qualification.
+- Do not use aluminum or another conductor close to the 1 W monopole setup to
+  force loss. The later aluminum attempt detuned/stressed the RF path, produced
+  an honest 332/1,100 partial, and coincided with persistent satellite-local TX
+  completion timeouts that required a hard reset. Treat it as an invalid fade
+  and hardware-stress incident; retry MVP-4 only with safe far-field distance
+  or off-axis antenna geometry.
+- The clean post-reset cycle passed 1,100/1,100 with exact source/ground SHA,
+  zero repairs, zero satellite TX timeouts, and no stale partial contamination.
+- Implemented on 2026-07-16: Pi/F Prime owns bounded satellite-local channel-2
+  radio status and re-enable policy. The Teensy boots the RFM23BP safely `OFF`,
+  asserts `RPI_ENABLE` independently, exposes factual `OFF`/`READY` status, and
+  performs one SDN/POR initialization attempt per request. F Prime retries at
+  `30 s`, `120 s`, then capped `900 s` intervals without depending on RF or
+  toggling Pi power.
+- HIL-MVP-7 ground USB reconnect passed. Removing the ground Teensy during
+  product/transfer 2 made all three ports disappear at 423/1,100 and put the
+  receiver into explicit recovery. Replug auto-restored the ports, payload
+  receiver, and GDS; the transfer completed after two repair rounds with exact
+  source/ground SHA, PING 39008 returned, and the next fresh transfer completed
+  1,100/1,100 with zero repairs. Pi PID 255 stayed at zero restarts and the
+  satellite reported zero TX timeouts/drops.
+- Portable/battery HIL also passed as a nominal control: only the ground Teensy
+  was USB-connected to the Mac, the satellite ran from battery, and both ends
+  used normal monopoles. PING 39009 passed after the new satellite boot, then
+  three fresh 38,480-byte products completed with exact Pi/ground hashes and
+  160x120 decode; PINGs 39010-39012 passed and Pi PID 254 stayed at zero
+  restarts. Initial short distance/orientation fade windows caused no
+  observable loss and remain nominal controls rather than qualification.
+- HIL-MVP-4 subsequently passed using real building distance/attenuation with
+  no antenna manipulation: the portable GDS was carried outside the lab and
+  around the eighth floor while both ends retained normal monopoles and the
+  satellite remained battery-powered. Product/transfer 4 accumulated 24
+  missing packets, recovered all of them in four selective-repair rounds, and
+  completed exact in 70.3 s; PING 39013 returned. Back inside, fresh
+  product/transfer 5 completed exact in 64.6 s with zero repairs and PING
+  39014. Both decoded 160x120, Pi PID 254 stayed at zero restarts, and their
+  exact SHA-256 values are recorded in the core reliability plan.
+- A separate handheld Yagi comparison passed indoors at about 15-20 ft. The
+  operator stood in one location but waved and mispointed the ground Yagi
+  during the transfer; the battery-powered satellite retained a normal
+  monopole. PINGs 39015 and 39016 returned, and fresh product/transfer 6
+  completed exact in 64.7 s with zero repairs and 160x120 decode. Pi PID 254
+  remained at zero restarts. After the ground USB power cycle used for the
+  antenna swap, the payload UI temporarily presented completed product 5 as
+  `receiving` despite 1,100/1,100 and `crc_ok=true`; product 6 replaced the
+  stale presentation cleanly. Treat that label reconciliation as a ground-UI
+  follow-up, not evidence of RF corruption.
+
+## C3M RFM23BP Pi-Owned Recovery Finalization (2026-07-16)
+
+- The authoritative plan/evidence is
+  `docs/C3M_RFM23BP_KISS_CONTROL_PLAN_2026-07-16.md`.
+- Teensy steady states remain only `OFF` and `READY`; factual fault metadata is
+  separate. F Prime owns desired-enabled policy and retries after `30 s`,
+  `120 s`, then at a capped `900 s` cadence. Channel 2 remains responsive and
+  radio recovery never toggles `RPI_ENABLE`.
+- The final local-TX refinement forces `OFF + LOCAL_TX_FAULT` through real SDN
+  shutdown only after the relay's one bounded FIFO recovery retry also fails.
+  RSSI is invalidated on shutdown. Peer silence and ordinary ACK loss do not
+  trigger the local hardware reset path.
+- Full validation passed 81 Python tests, 7/7 F Prime CTest executables
+  (`CommsApp` 12 cases and `CommsDriver_TeensyRfm23` 3 cases), both Teensy
+  builds, native F Prime build, and 3/3 exact local C3M demo cycles.
+- Satellite firmware was flashed to physical upload ID `usb:2100000`. The
+  final ARMv6KZ/VFPv2 release is
+  `/home/pi/artemis/releases/c3m-rf-recovery-20260716T213916Z-9e392fb3`, SHA-256
+  `9e392fb31ea7e4751a5e18898bf83f55b46f2ae0519de05b9b3b7db3b13dee84`.
+  Dictionary SHA-256 is
+  `5a961fb5d301097cb0ad0dcd01d6ef2a27709f3156c5f7ed96084b0c4b54716d`.
+- Final controlled HIL probe acknowledged `OFF + NONE`; fresh F Prime startup
+  then observed `OFF`, issued one `SET_ENABLED`, and reached `READY + NONE` in
+  the same second. Post-recovery PING `47164` and `PING_LINK_RSSI` passed.
+  Satellite status showed two init attempts and zero terminal TX failures;
+  Pi service `NRestarts` remained zero.
+- A stale-GDS case was reproduced and explained: local emulation reused the
+  global `/tmp/fprime-server-in` and `-out` IPC endpoints while the hardware
+  GDS remained open. The web UI stayed HTTP 200 but command UART writes stopped.
+  Browser refresh cannot repair that backend; restart the complete GDS process
+  tree after local emulation. The final GDS and payload receiver remain in
+  detached screens `c3m-gds` and `c3m-payload-hil`.
+- Physical-only gates remain: meter/scope proof of SDN, pin 37,
+  `RPI_ENABLE`, VCC/current/backfeed/brownout behavior; five true cold cycles
+  per node; a safely induced physical init stall/watchdog case; and a physical
+  mid-transfer Teensy reset.
+
+## Payload Ground Cancel, Retained Retry, and UVC Guard (2026-07-16)
+
+- `CommsApp` retains the latest successfully captured science descriptor after
+  a completed downlink. A later `REQUEST_SCIENCE_DOWNLINK` therefore sends the
+  same product with a new transfer ID; a new capture replaces it. Retention is
+  intentionally volatile across an F Prime process restart.
+- The payload receiver's **Stop & save partial** remains ground-only. Operators
+  must wait for `commsApp.DownlinkFinished` / `DownlinkActive = 0` before
+  requesting the retained product again because the spacecraft cannot see the
+  ground cancel and continues its first transfer.
+- HIL exposed a startup UVC frame with a zero-filled tail. The camera callback
+  had ignored `data_bytes`, and its validity rule allowed nearly 80% impossible
+  pixels. The conservative fix requires exact 160x120 dimensions, at least
+  38,400 received bytes, and no more than 1% samples below 1,000 centikelvin.
+  The Cubeternet/libuvc Y16 path reports `step=0` even for valid full frames, so
+  stride is deliberately not used as a validity gate.
+- Full validation passed 87 Python tests, the native deployment build, and 7/7
+  F Prime component test executables. The final Pi build verified as ARMv6KZ +
+  VFPv2 with `/lib/ld-linux-armhf.so.3`.
+- Active release:
+  `/home/pi/artemis/releases/c3m-payload-retry-camera-20260716T224440Z-7c23d355`,
+  SHA-256
+  `7c23d3554e4d6abb0b5c81180190c1113c779fc1271b74ebfb7f687edf5d9e79`.
+- Final HIL: product 1 transfer 1 was canceled on the ground at 253/1,100 and
+  saved under `data/c3m_20260716_224646_transfer_1/`. After spacecraft
+  `DownlinkFinished`, the same product was requested without another capture
+  and completed as transfer 2, 1,100/1,100, CRC OK, zero repair rounds, 64.8 s,
+  with PING 37121 passing during the transfer. Evidence:
+  `data/c3m_20260716_224901_transfer_2/`.
+- Spacecraft source and complete ground `.fdp` matched SHA-256
+  `1babc1aa35ed840d12b6353cf44cabbd1face542d69cd544384ed9a33ffb472c`.
+  Decode was 160x120 / 19,200 pixels, 14.83–24.69 C, with zero invalid pixels.
+
+## C3M Lepton/Boson HIL Acceptance (2026-07-30)
+
+- The unified C3M demo produced viewable captures from both the real Lepton and
+  real Boson. Lepton remains the default driver; the F Prime selector switches
+  between separate camera drivers while both use one standard U32 `.fdp`
+  handling path, one 196,608-byte Teensy payload cache, channel 1, and the
+  shared C3M receiver/viewer.
+- A complete 163,922-byte Boson product (4,684 packets) downlinked in about
+  3 minutes 13 seconds with retries under current lab conditions. This is a
+  measured bench result, not a guaranteed upper bound. Start the payload
+  receiver before requesting downlink and budget at least four minutes for the
+  current lab demo.
+- During one physical Boson-to-Lepton USB replacement, the Raspberry Pi
+  abruptly rebooted before GDS transmitted the Lepton selection command.
+  Surviving GDS logs showed the Boson downlink completed, `ENTER_BASE_MODE`
+  completed, F Prime started fresh, and only then was `SELECT_PAYLOAD_DRIVER
+  LEPTON` sent. The new boot also reported an unclean filesystem, so the
+  evidence points to a board-level reset during the physical USB/power event,
+  not the selector's Boson V4L2 teardown.
+- Operator rule: power down the Pi before physically changing cameras. An
+  independently powered USB hub may be qualified separately; do not assume a
+  powered USB camera swap is safe merely because logical driver selection is
+  supported.
+
+## C3M Lepton Preview Stream MVP (2026-07-31)
+
+- Documentation contract: a connected Lepton produces a separate `80x60` U8
+  newest-frame preview, held in one replaceable slot rather than a ring or
+  backlog. The ground may show a complete or partial frame; missing pixels are
+  white and preview never requests retries.
+- This is deliberately not a Neutron 2 science product or a C3M `.fdp`
+  science/downlink operation. Preview and science are mutually exclusive.
+- MVP acceptance is one real HIL preview run with the Lepton connected. Confirm
+  visible `80x60` output, white loss markers if applicable, no preview retry,
+  no concurrent science transfer, and science allowed only after preview stops.
+- Bench IDs: ground upload is `usb:100000`; re-enumerate the satellite before
+  upload instead of trusting the historical `usb:2100000` / `usb:200` shorthand.
+  Details: `docs/C3M_LEPTON_PREVIEW_STREAM_MVP.md`.
+- HIL passed on the real Lepton. Consecutive `80x60` U8 previews arrived at
+  roughly two-second intervals; complete frames contained 4,800 bytes in 200
+  fragments with valid CRCs. Missing local RPC responses now abandon only the
+  affected frame after five ticks and continue with a new session, without RF
+  preview retry or repair.
+- PING and SOH commands completed during preview. After STOP_STREAM, the normal
+  science path completed 38,482/38,482 bytes, 1,100/1,100 packets, CRC OK, zero
+  retry rounds, 11.2 seconds, and decoded as a 160x120 Lepton image under
+  `data/c3m_20260801_002926_transfer_1/`.
+- Active Pi release:
+  `/home/pi/artemis/releases/lepton-preview-mvp-final-20260801T002651Z`,
+  SHA-256
+  `ed443c037020228d6959d7261b99f97d93c12013b7ad787a49f2fe86f20062da`.

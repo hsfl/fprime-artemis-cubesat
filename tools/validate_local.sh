@@ -23,7 +23,7 @@ Default checks:
   - Python local-emulation and payload-receiver unit tests pass
   - unified topology generates and builds
   - F Prime component unit tests pass
-  - automated local EPSCoR C3M demo sequence produces and decodes a Lepton .fdp
+  - automated local EPSCoR C3M demo completes three capture/downlink/decode cycles
 
 Options:
   --skip-build     skip F Prime generate/build
@@ -47,6 +47,7 @@ check_shared_teensy_drift() {
   local shared_pairs=(
     "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/artemis_rf23bp.hpp|GDS_Teensy/firmware/gds_teensy/src/artemis_rf23bp.hpp"
     "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/link_counters.hpp|GDS_Teensy/firmware/gds_teensy/src/link_counters.hpp"
+    "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/rf_tx_retry.hpp|GDS_Teensy/firmware/gds_teensy/src/rf_tx_retry.hpp"
     "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/wdt_guard.hpp|GDS_Teensy/firmware/gds_teensy/src/wdt_guard.hpp"
   )
 
@@ -103,8 +104,16 @@ python3 tools/check_transport_constants.py
 log "running Python local-emulation tests"
 python3 -m unittest \
   ArtemisRpiTeensy_N2/tools/tests/test_local_emulation_loop.py \
+  ArtemisRpiTeensy_N2/tools/tests/test_c3m_local_demo_script.py \
   ArtemisRpiTeensy_N2/tools/tests/test_payload_receiver.py \
-  ArtemisRpiTeensy_N2/tools/tests/test_c3m_payload_receiver_ui.py
+  ArtemisRpiTeensy_N2/tools/tests/test_c3m_payload_receiver_ui.py \
+  ArtemisRpiTeensy_N2/tools/tests/test_rf_network_identity.py \
+  GDS_Teensy/tools/tests/test_gds_tx_thermal_soak.py \
+  GDS_Teensy/tools/tests/test_rf_recovery_hardening.py \
+  GDS_Teensy/tools/tests/test_rf_rx_buffer_transition.py \
+  GDS_Teensy/tools/tests/test_rf_tx_retry.py \
+  GDS_Teensy/tools/tests/test_rf_msg_id_sequence.py \
+  GDS_Teensy/tools/tests/test_usb_tx_progress.py
 
 # shellcheck disable=SC1090
 . "$VENV_ACTIVATE"
@@ -140,7 +149,7 @@ if [[ "$RUN_DEMO" == "true" ]]; then
           --no-open \
           --gui-port 5061 \
           --delay 2 \
-          --capture-seconds 2
+          --captures 3
       )
       ;;
     neutron2)
