@@ -13,3 +13,6 @@
 	path = external/artemis-cubesat-examples
 	url = https://github.com/hsfl/artemis-cubesat.git
 	branch = master
+[submodule "FprimeZephyrSatellite/lib/fprime-zephyr"]
+	path = FprimeZephyrSatellite/lib/fprime-zephyr
+	url = https://github.com/fprime-community/fprime-zephyr.git

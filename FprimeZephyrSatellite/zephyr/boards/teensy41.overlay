@@ -1,0 +1,54 @@
+/*
+ * Satellite Teensy 4.1 wiring. Pin mappings are the Zephyr Teensy LPSPI3
+ * pinctrl mapping plus the RT1062 GPIO pads used by the Arduino oracle.
+ */
+&lpspi3 {
+    status = "okay";
+
+    rfm23: rfm23@0 {
+        compatible = "artemis,rfm23bp";
+        reg = <0>;
+        spi-max-frequency = <1000000>;
+        irq-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>; /* Teensy pin 40 */
+        rx-on-gpios = <&gpio3 23 GPIO_ACTIVE_HIGH>; /* pin 30 */
+        tx-on-gpios = <&gpio3 22 GPIO_ACTIVE_HIGH>; /* pin 31 */
+        sdn-gpios = <&gpio2 19 GPIO_ACTIVE_HIGH>; /* pin 37 */
+    };
+};
+
+&lpuart6 {
+    status = "okay";
+    current-speed = <9600>; /* PDU Serial1, Teensy pins 0/1 */
+};
+
+&lpuart1 {
+    status = "okay";
+    current-speed = <115200>; /* dedicated Zephyr debug console */
+};
+
+&lpuart4 {
+    status = "okay";
+    current-speed = <115200>; /* Pi Serial2, Teensy pins 7/8 */
+};
+
+&wdog0 {
+    status = "okay"; /* RT1062 WDOG1, matching the Arduino 12 s reset contract */
+};
+
+/ {
+    chosen {
+        /* RT1062 OCRAM2 is the supported 512 KiB general SRAM region in the
+         * current board model. DTCM and ITCM remain separate 128 KiB regions;
+         * they are not falsely modeled as one contiguous 1 MiB heap. */
+        zephyr,sram = &ocram2;
+        zephyr,dtcm = &dtcm;
+        zephyr,itcm = &itcm;
+        zephyr,console = &lpuart1;
+        zephyr,shell-uart = &lpuart1;
+    };
+
+    satellite_control {
+        compatible = "artemis,satellite-control";
+        rpi-enable-gpios = <&gpio2 18 GPIO_ACTIVE_HIGH>; /* pin 36 */
+    };
+};

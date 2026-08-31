@@ -17,6 +17,7 @@ OUTPUTS = {
     "fprime": ROOT / "ArtemisRpiTeensy_N2/Components/LinkCfg/LinkCfg.hpp",
     "satellite": ROOT / "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/link_protocol.hpp",
     "ground": ROOT / "GDS_Teensy/firmware/gds_teensy/src/link_protocol.hpp",
+    "zephyr": ROOT / "FprimeZephyrSatellite/include/SatelliteController/GeneratedProtocol.hpp",
 }
 
 
@@ -406,12 +407,112 @@ inline bool channelForMagic(uint8_t magic, uint8_t& channel) {{
 """
 
 
+def render_zephyr(cfg: dict, identity: dict) -> str:
+    """Render the Arduino-free constants used by the F Prime/Zephyr port."""
+    frame = cfg["frame"]
+    channels = cfg["channels"]
+    rpc = cfg["teensy_rpc"]
+    rf = cfg["rf"]
+    payload = cfg["payload"]
+    preview = cfg["lepton_preview"]
+    satellite_ack = rf["ack_directions"]["satellite_to_ground"]
+    ground_ack = rf["ack_directions"]["ground_to_satellite"]
+    return f"""#ifndef ARTEMIS_FPRIME_ZEPHYR_GENERATED_PROTOCOL_HPP
+#define ARTEMIS_FPRIME_ZEPHYR_GENERATED_PROTOCOL_HPP
+
+{generated_notice()}#include <cstddef>
+#include <cstdint>
+
+namespace SatelliteController {{
+namespace Generated {{
+inline constexpr std::uint8_t FRAME_MAGIC_0 = {hex_byte(frame["magic_0"])};
+inline constexpr std::uint8_t FRAME_MAGIC_1 = {hex_byte(frame["magic_1"])};
+inline constexpr std::uint8_t CHANNEL_CCSDS = {channels["ccsds"]};
+inline constexpr std::uint8_t CHANNEL_PAYLOAD = {channels["payload"]};
+inline constexpr std::uint8_t CHANNEL_LOCAL = {channels["teensy_local"]};
+inline constexpr std::size_t CHANNEL_COUNT = {channels["satellite_count"]};
+inline constexpr std::size_t RF_CHANNEL_COUNT = {channels["rf_count"]};
+inline constexpr std::size_t FRAME_MAX_PAYLOAD = {frame["max_payload"]};
+inline constexpr std::uint32_t FRAME_TIMEOUT_MS = {frame["timeout_ms"]};
+inline constexpr std::uint32_t UART_BAUD = {frame["uart_baud"]};
+inline constexpr std::uint8_t RF_NETWORK_ID = {hex_byte(identity["network_id"])};
+inline constexpr std::uint8_t RF_PROTOCOL_VERSION = {hex_byte(identity["protocol_version"])};
+inline constexpr std::uint8_t RF_LOCAL_ADDRESS = {hex_byte(identity["satellite_address"])};
+inline constexpr std::uint8_t RF_REMOTE_ADDRESS = {hex_byte(identity["ground_address"])};
+inline constexpr std::uint8_t RF_MAGIC_CCSDS = {hex_byte(rf["segment_magic_ccsds"])};
+inline constexpr std::uint8_t RF_MAGIC_PAYLOAD = {hex_byte(rf["segment_magic_payload"])};
+inline constexpr std::uint8_t RF_ACK_INDEX = {hex_byte(rf["ack_segment_index"])};
+inline constexpr std::size_t RF_PACKET_MAX_LEN = {rf["packet_max_len"]};
+inline constexpr std::size_t RF_SEGMENT_HEADER_LEN = {rf["segment_header_len"]};
+inline constexpr std::size_t RF_SEGMENT_MAX_DATA = RF_PACKET_MAX_LEN - RF_SEGMENT_HEADER_LEN;
+inline constexpr std::uint32_t RF_REASSEMBLY_TIMEOUT_MS = {rf["reassembly_timeout_ms"]};
+inline constexpr std::uint32_t RF_INTER_SEGMENT_GAP_MS = {rf["inter_segment_gap_ms"]};
+inline constexpr std::uint32_t RF_PAYLOAD_INTER_PACKET_GAP_MS = {rf["payload_inter_packet_gap_ms"]};
+inline constexpr std::uint32_t RF_TX_COMPLETE_TIMEOUT_MS = {rf["tx_complete_timeout_ms"]};
+inline constexpr std::uint8_t RF_ACK_RETRIES = {rf["ack_retries"]};
+inline constexpr std::uint32_t RF_ACK_TIMEOUT_MS = {rf["ack_timeout_ms"]};
+inline constexpr bool TX_ACK_REQUIRED_CCSDS = {str(satellite_ack["ccsds"]).lower()};
+inline constexpr bool TX_ACK_REQUIRED_PAYLOAD = {str(satellite_ack["payload"]).lower()};
+inline constexpr bool RX_ACK_REQUIRED_CCSDS = {str(ground_ack["ccsds"]).lower()};
+inline constexpr bool RX_ACK_REQUIRED_PAYLOAD = {str(ground_ack["payload"]).lower()};
+inline constexpr std::uint8_t TEENSY_TARGET_PDU = {rpc["target_pdu"]};
+inline constexpr std::uint8_t TEENSY_TARGET_RF_STATUS = {rpc["target_rf_status"]};
+inline constexpr std::uint8_t TEENSY_TARGET_PAYLOAD_CACHE = {rpc["target_payload_cache"]};
+inline constexpr std::uint8_t TEENSY_TARGET_LEPTON_PREVIEW = {rpc["target_lepton_preview"]};
+inline constexpr std::uint8_t TEENSY_STATUS_OK = {rpc["status_ok"]};
+inline constexpr std::uint8_t TEENSY_STATUS_BAD_REQUEST = {rpc["status_bad_request"]};
+inline constexpr std::uint8_t TEENSY_STATUS_BUSY = {rpc["status_busy"]};
+inline constexpr std::uint8_t TEENSY_STATUS_TIMEOUT = {rpc["status_timeout"]};
+inline constexpr std::uint8_t TEENSY_STATUS_TARGET_ERROR = {rpc["status_target_error"]};
+inline constexpr std::uint8_t TEENSY_RF_OP_STATUS = {rpc["rf_op_status"]};
+inline constexpr std::uint8_t TEENSY_RF_OP_SET_ENABLED = {rpc["rf_op_set_enabled"]};
+inline constexpr std::uint32_t TEENSY_RF_RSSI_AGE_UNKNOWN_MS = {rpc["rf_rssi_age_unknown_ms"]};
+inline constexpr std::uint8_t PAYLOAD_CACHE_OP_BEGIN = {payload["cache_op_begin"]};
+inline constexpr std::uint8_t PAYLOAD_CACHE_OP_CHUNK = {payload["cache_op_chunk"]};
+inline constexpr std::uint8_t PAYLOAD_CACHE_OP_COMMIT_AND_SEND = {payload["cache_op_commit_and_send"]};
+inline constexpr std::uint8_t PAYLOAD_CACHE_OP_ABORT = {payload["cache_op_abort"]};
+inline constexpr std::uint8_t PAYLOAD_CACHE_STATE_EMPTY = {payload["cache_state_empty"]};
+inline constexpr std::uint8_t PAYLOAD_CACHE_STATE_RECEIVING = {payload["cache_state_receiving"]};
+inline constexpr std::uint8_t PAYLOAD_CACHE_STATE_READY = {payload["cache_state_ready"]};
+inline constexpr std::uint8_t PAYLOAD_CACHE_STATE_SENDING = {payload["cache_state_sending"]};
+inline constexpr std::uint8_t PAYLOAD_CACHE_STATE_ERROR = {payload["cache_state_error"]};
+inline constexpr std::uint8_t PAYLOAD_MAGIC_0 = {hex_byte(payload["magic_0"])};
+inline constexpr std::uint8_t PAYLOAD_MAGIC_1 = {hex_byte(payload["magic_1"])};
+inline constexpr std::uint8_t PAYLOAD_PACKET_DATA_BYTES = {payload["packet_data_bytes"]};
+inline constexpr std::size_t PAYLOAD_CACHE_MAX_BYTES = {payload["cache_max_bytes"]};
+inline constexpr std::uint16_t PAYLOAD_CACHE_CHUNK_BYTES = {payload["cache_chunk_bytes"]};
+inline constexpr std::size_t PREVIEW_MAX_FRAME_BYTES = {preview["max_frame_bytes"]};
+inline constexpr std::uint16_t PREVIEW_CHUNK_BYTES = {preview["chunk_bytes"]};
+inline constexpr std::uint8_t PREVIEW_WIDTH = {preview["width"]};
+inline constexpr std::uint8_t PREVIEW_HEIGHT = {preview["height"]};
+inline constexpr std::uint8_t PREVIEW_PIXEL_FORMAT_U8 = {preview["pixel_format_u8"]};
+inline constexpr std::uint8_t PREVIEW_OP_BEGIN = {preview["op_begin"]};
+inline constexpr std::uint8_t PREVIEW_OP_CHUNK = {preview["op_chunk"]};
+inline constexpr std::uint8_t PREVIEW_OP_COMMIT_AND_SEND = {preview["op_commit_and_send"]};
+inline constexpr std::uint8_t PREVIEW_OP_ABORT = {preview["op_abort"]};
+inline constexpr std::uint8_t PREVIEW_STATE_EMPTY = {preview["state_empty"]};
+inline constexpr std::uint8_t PREVIEW_STATE_RECEIVING = {preview["state_receiving"]};
+inline constexpr std::uint8_t PREVIEW_STATE_READY = {preview["state_ready"]};
+inline constexpr std::uint8_t PREVIEW_STATE_SENDING = {preview["state_sending"]};
+inline constexpr std::uint8_t PREVIEW_STATE_ERROR = {preview["state_error"]};
+inline constexpr std::uint8_t PREVIEW_WIRE_MAGIC_0 = {hex_byte(preview["wire_magic_0"])};
+inline constexpr std::uint8_t PREVIEW_WIRE_MAGIC_1 = {hex_byte(preview["wire_magic_1"])};
+inline constexpr std::uint8_t PREVIEW_WIRE_VERSION = {preview["wire_version"]};
+inline constexpr std::uint8_t PREVIEW_WIRE_TYPE_FRAGMENT = {preview["wire_type_fragment"]};
+}}  // namespace Generated
+}}  // namespace SatelliteController
+
+#endif
+"""
+
+
 def render_all(cfg: dict, registry: dict) -> dict[Path, str]:
     identity = resolve_rf_identity(cfg, registry)
     return {
         OUTPUTS["fprime"]: render_fprime(cfg, identity),
         OUTPUTS["satellite"]: render_teensy(cfg, identity, satellite=True),
         OUTPUTS["ground"]: render_teensy(cfg, identity, satellite=False),
+        OUTPUTS["zephyr"]: render_zephyr(cfg, identity),
     }
 
 

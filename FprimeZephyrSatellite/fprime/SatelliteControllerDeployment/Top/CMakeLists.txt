@@ -1,0 +1,13 @@
+register_fprime_module(
+    AUTOCODER_INPUTS
+        "${CMAKE_CURRENT_LIST_DIR}/instances.fpp"
+        "${CMAKE_CURRENT_LIST_DIR}/topology.fpp"
+    SOURCES
+        "${CMAKE_CURRENT_LIST_DIR}/SatelliteControllerDeploymentTopology.cpp"
+    DEPENDS
+        SatelliteController
+        Svc_ActiveRateGroup
+        Svc_RateGroupDriver
+        fprime-zephyr_Drv_ZephyrRateDriver
+        fprime-zephyr_Svc_ZephyrTime
+)
