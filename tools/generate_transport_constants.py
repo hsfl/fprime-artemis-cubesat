@@ -17,7 +17,7 @@ OUTPUTS = {
     "fprime": ROOT / "ArtemisRpiTeensy_N2/Components/LinkCfg/LinkCfg.hpp",
     "satellite": ROOT / "ArtemisTeensy_N2_Baremetal/firmware/satellite_teensy/src/link_protocol.hpp",
     "ground": ROOT / "GDS_Teensy/firmware/gds_teensy/src/link_protocol.hpp",
-    "zephyr": ROOT / "FprimeZephyrSatellite/include/SatelliteController/GeneratedProtocol.hpp",
+    "zephyr": ROOT / "ArtemisTeensyZephyr/ArtemisTeensyZephyr/SatelliteController/include/SatelliteController/GeneratedProtocol.hpp",
 }
 
 
