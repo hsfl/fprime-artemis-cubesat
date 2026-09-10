@@ -39,7 +39,7 @@ struct RadioPins {
 
 // Runtime radio settings students will most commonly tune.
 struct RadioProfile {
-  float frequency_mhz = 433.0f;
+  float frequency_mhz = 424.0f;
   RH_RF22::ModemConfigChoice modem = RH_RF22::GFSK_Rb125Fd125;
   uint8_t tx_power = RH_RF22_RF23BP_TXPOW_30DBM;
   bool start_in_receive = true;

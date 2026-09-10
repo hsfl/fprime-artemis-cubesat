@@ -1,9 +1,10 @@
-# EPSCoR C3M Demo Frozen Release
+# EPSCoR C3M Demo v2.0.0 Release
 
-This bundle freezes the laptop-operated EPSCoR C3M Lepton RF demo validated by
-three consecutive live HIL runs on 2026-07-09. The normal operator uses F Prime
-GDS for channel-0 mission operations and the C3M payload receiver web app for
-channel-1 progress, CRC proof, thermal decode, and history.
+This bundle freezes the SmallSat Conference 2026 EPSCoR C3M demonstration.
+It retains the v1 Lepton RF workflow and adds hardened RF recovery, resumable
+on-demand science downlink, live Lepton preview, Boson payload support, and the
+qualified RFM23BP operator path. HIL acceptance was confirmed separately before
+this release; the packaged artifacts were rebuilt and verified from the tag.
 
 The exact tag, commit, submodule revisions, artifact sizes, and hashes are in
 `RELEASE_INFO.txt` and `SHA256SUMS`. Run `shasum -a 256 -c SHA256SUMS` from the
@@ -16,8 +17,10 @@ bundle root before flashing or deploying.
 - `artifacts/rpi/`: validated Pi Zero W ARMv6/libuvc deployment and dictionary.
 - `scripts/`: pinned-ID flash scripts and atomic Pi release installer.
 - `ArtemisRpiTeensy_N2/tools/`: GDS launcher and CLI receiver fallback.
-- `ground-station/`: primary C3M web receiver, decoder, and replay sample.
+- `ground-station/`: C3M receiver, Lepton/Boson viewers, replay sample, and the
+  archived HackRF research adapter.
 - `docs/`: operator runbook, HIL evidence, and bench handoff.
+- `RELEASE_NOTES.md`: complete v1-to-v2 changelog and verification boundary.
 - `source/`: a complete tracked-source archive for the tagged commit. Git
   submodule contents are intentionally not embedded; their exact revisions are
   recorded in `RELEASE_INFO.txt`.
@@ -100,9 +103,8 @@ Select the actual enumerated port if it differs. macOS is the primary student
 path; Windows F Prime operation uses WSL2 with the USB device attached.
 
 Follow `docs/EPSCOR_C3M_LEPTON_RF_MVP_RUNBOOK.md` for the exact command order.
-The current frozen acceptance rule remains complete reception plus CRC proof.
-The best-effort `NaN`/white missing-pixel behavior is documented follow-on work,
-not part of this release.
+Use `scripts/c3m` for the normal RFM23BP operator workflow. `scripts/c3m-sdr`
+is retained for research and receive diagnosis; it is not the normal fallback.
 
 ## Offline Viewer Check
 
@@ -120,7 +122,7 @@ replace live HIL proof.
 GitHub-generated source archives do not populate submodules. Clone recursively:
 
 ```bash
-git clone --recurse-submodules --branch v1.0.0-epscorc3m-demo <repository-url>
+git clone --recurse-submodules --branch v2.0.0-epscorc3m-demo <repository-url>
 ```
 
 Then follow the build instructions in the repository. Do not assume a generic
