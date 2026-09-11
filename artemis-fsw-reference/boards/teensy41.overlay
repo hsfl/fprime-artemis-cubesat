@@ -1,0 +1,152 @@
+&zephyr_udc0 {
+    cdc_acm_uart0: cdc_acm_uart0 {
+        compatible = "zephyr,cdc-acm-uart";
+    };
+};
+
+&lpuart1 {
+	status = "okay";
+	current-speed = < 115200 >;
+};
+
+&lpuart2 {
+	status = "okay";
+	current-speed = < 115200 >;
+};
+
+/* Teensy TX=8, RX=7 - connected to RPi */
+&lpuart4 {
+    status = "okay";
+    current-speed = <115200>;
+};
+
+/* Teensy TX=1, RX=0 - connected to PDU */
+&lpuart6 {
+    status = "okay";
+    current-speed = <9600>; /* PDU Serial1, Teensy pins 0/1 */
+};
+
+/* Radio SPI1 (RFM23BP). CS=38, INT=40, RX_ON=30, TX_ON=31. */
+&lpspi3 {
+    status = "okay";
+
+    rfm23: rfm23@0 {
+        compatible = "artemis,rfm23bp";
+        reg = <0>;
+        spi-max-frequency = <1000000>;
+        irq-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>; /* pin 40 */
+        rx-on-gpios = <&gpio3 23 GPIO_ACTIVE_HIGH>; /* pin 30 */
+        tx-on-gpios = <&gpio3 22 GPIO_ACTIVE_HIGH>; /* pin 31 */
+        sdn-gpios = <&gpio2 19 GPIO_ACTIVE_HIGH>; /* pin 37 */
+    };
+};
+
+/* 7x TMP36 analog temperature sensors: pins 14, 15, 41, 20, 21, 22, 23  */
+&pinctrl {
+    pinmux_adc1: pinmux_adc1 {
+        group0 {
+            pinmux = <&iomuxc_gpio_ad_b1_02_adc1_in7>,
+                     <&iomuxc_gpio_ad_b1_03_adc1_in8>,
+                     <&iomuxc_gpio_ad_b1_05_adc1_in10>,
+                     <&iomuxc_gpio_ad_b1_10_adc1_in15>,
+                     <&iomuxc_gpio_ad_b1_11_adc1_in0>,
+                     <&iomuxc_gpio_ad_b1_08_adc1_in13>,
+                     <&iomuxc_gpio_ad_b1_09_adc1_in14>;
+            bias-disable;
+        };
+    };
+};
+
+&adc1 {
+    status = "okay";
+    pinctrl-0 = <&pinmux_adc1>;
+    pinctrl-names = "default";
+    #address-cells = <1>;
+    #size-cells = <0>;
+
+    channel@7 {
+        reg = <7>;
+        zephyr,gain = "ADC_GAIN_1";
+        zephyr,reference = "ADC_REF_INTERNAL";
+        zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+        zephyr,resolution = <10>;
+    };
+
+    channel@8 {
+        reg = <8>;
+        zephyr,gain = "ADC_GAIN_1";
+        zephyr,reference = "ADC_REF_INTERNAL";
+        zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+        zephyr,resolution = <10>;
+    };
+
+    channel@10 {
+        reg = <10>;
+        zephyr,gain = "ADC_GAIN_1";
+        zephyr,reference = "ADC_REF_INTERNAL";
+        zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+        zephyr,resolution = <10>;
+    };
+
+    channel@15 {
+        reg = <15>;
+        zephyr,gain = "ADC_GAIN_1";
+        zephyr,reference = "ADC_REF_INTERNAL";
+        zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+        zephyr,resolution = <10>;
+    };
+
+    channel@0 {
+        reg = <0>;
+        zephyr,gain = "ADC_GAIN_1";
+        zephyr,reference = "ADC_REF_INTERNAL";
+        zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+        zephyr,resolution = <10>;
+    };
+
+    channel@13 {
+        reg = <13>;
+        zephyr,gain = "ADC_GAIN_1";
+        zephyr,reference = "ADC_REF_INTERNAL";
+        zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+        zephyr,resolution = <10>;
+    };
+
+    channel@14 {
+        reg = <14>;
+        zephyr,gain = "ADC_GAIN_1";
+        zephyr,reference = "ADC_REF_INTERNAL";
+        zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+        zephyr,resolution = <10>;
+    };
+};
+
+/* TODO: add solar panels I2C */
+
+/ {
+    chosen {
+        zephyr,console = &cdc_acm_uart0;
+        zephyr,sram = &ocram2;
+    };
+
+    rpi_power {
+        compatible = "artemis,rpi-power";
+        rpi-enable-gpios = <&gpio2 18 GPIO_ACTIVE_HIGH>; /* pin 36, RPi power enable */
+    };
+
+    leds {
+        compatible = "gpio-leds";
+        led0: led_0 {
+            gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>; /* pin 13, status LED */
+        };
+    };
+
+    aliases {
+        led0 = &led0;
+    };
+
+    /* Teensy pin order: 14, 15, 41, 20, 21, 22, 23 (matches temperatureSensorPins[]) */
+    temp_sensors: zephyr,user {
+        io-channels = <&adc1 7>, <&adc1 8>, <&adc1 10>, <&adc1 15>, <&adc1 0>, <&adc1 13>, <&adc1 14>;
+    };
+};
