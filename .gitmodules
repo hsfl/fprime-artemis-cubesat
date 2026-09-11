@@ -22,3 +22,9 @@
 [submodule "ArtemisTeensyZephyr/lib/zephyr-workspace/zephyr"]
 	path = ArtemisTeensyZephyr/lib/zephyr-workspace/zephyr
 	url = https://github.com/zephyrproject-rtos/zephyr.git
+[submodule "artemis-fsw-reference/lib/fprime-zephyr"]
+	path = artemis-fsw-reference/lib/fprime-zephyr
+	url = https://github.com/fprime-community/fprime-zephyr.git
+[submodule "artemis-fsw-reference/lib/fprime"]
+	path = artemis-fsw-reference/lib/fprime
+	url = https://github.com/nasa/fprime.git
