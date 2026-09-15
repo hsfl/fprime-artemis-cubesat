@@ -1,0 +1,24 @@
+# fprime items
+logs/
+cmake-build-*
+build-artifacts/
+build-fprime-*
+*-template
+*.template.cpp
+*.template.hpp
+
+# Zephyr workspace
+lib/zephyr-workspace/*
+
+# Misc
+/venv/
+/fprime-venv/
+/.idea/
+/.vscode/
+.DS_Store
+*.gcov
+build
+
+**/__pycache__/
+**/*.egg-info/
+
