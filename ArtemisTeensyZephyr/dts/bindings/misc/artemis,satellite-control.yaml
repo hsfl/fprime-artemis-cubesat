@@ -1,6 +1,0 @@
-description: Artemis satellite controller board-level control pins
-compatible: "artemis,satellite-control"
-properties:
-  rpi-enable-gpios:
-    type: phandle-array
-    required: true
