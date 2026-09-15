@@ -4,9 +4,9 @@
 //
 // ======================================================================
 // Provides access to autocoded functions
-#include <FprimeZephyrReference/ReferenceDeployment/Top/ReferenceDeploymentTopologyAc.hpp>
+#include <FprimeArtemisCore/ReferenceDeployment/Top/ReferenceDeploymentTopologyAc.hpp>
 // Note: Uncomment when using Svc:TlmPacketizer
-//#include <FprimeZephyrReference/ReferenceDeployment/Top/ReferenceDeploymentPacketsAc.hpp>
+//#include <FprimeArtemisCore/ReferenceDeployment/Top/ReferenceDeploymentPacketsAc.hpp>
 
 // Necessary project-specified types
 #include <Fw/Types/MallocAllocator.hpp>

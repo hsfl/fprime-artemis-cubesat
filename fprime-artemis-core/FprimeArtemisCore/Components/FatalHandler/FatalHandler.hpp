@@ -13,7 +13,7 @@
 #ifndef FatalHandler_HPP
 #define FatalHandler_HPP
 
-#include "FprimeZephyrReference/Components/FatalHandler/FatalHandlerComponentAc.hpp"
+#include "FprimeArtemisCore/Components/FatalHandler/FatalHandlerComponentAc.hpp"
 
 namespace Components {
 

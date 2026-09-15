@@ -9,7 +9,7 @@
 #ifndef Components_NullPrmDb_HPP
 #define Components_NullPrmDb_HPP
 
-#include "FprimeZephyrReference/Components/NullPrmDb/NullPrmDbComponentAc.hpp"
+#include "FprimeArtemisCore/Components/NullPrmDb/NullPrmDbComponentAc.hpp"
 
 namespace Components {
 

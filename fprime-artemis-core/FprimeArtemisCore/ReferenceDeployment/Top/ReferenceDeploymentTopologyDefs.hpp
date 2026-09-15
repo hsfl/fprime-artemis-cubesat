@@ -21,7 +21,7 @@
 #include "Svc/Subtopologies/ComCcsds/Ports_ComBufferQueueEnumAc.hpp"
 
 // Include autocoded FPP constants
-#include "FprimeZephyrReference/ReferenceDeployment/Top/FppConstantsAc.hpp"
+#include "FprimeArtemisCore/ReferenceDeployment/Top/FppConstantsAc.hpp"
 #include <zephyr/drivers/uart.h>
 
 

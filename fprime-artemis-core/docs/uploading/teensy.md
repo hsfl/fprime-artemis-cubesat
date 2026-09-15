@@ -19,7 +19,7 @@ These steps were tested for the following boards:
 
 ## Flashing the Board
 ```sh
-# In fprime-zephyr-reference
+# In fprime-artemis-core
 
 # Teensy 4.1
 teensy_loader_cli -v -mmcu=TEENSY41 -w build-fprime-automatic-zephyr/zephyr/zephyr.hex

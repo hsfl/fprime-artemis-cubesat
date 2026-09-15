@@ -1,4 +1,4 @@
-# fprime-zephyr-reference project
+# fprime-artemis-core project
 This project is an implementation of F` on Zephyr RTOS. 
 
 <!-- Not sure if this will be true in the future -->

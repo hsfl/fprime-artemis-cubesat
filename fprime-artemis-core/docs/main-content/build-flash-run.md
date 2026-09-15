@@ -9,13 +9,13 @@ This guide assumes that the initial setup steps have been completed, and will wa
 1. In order to build the ReferenceDeployment application, or any other F´ application, we first need to generate a build directory. This can be done with the following commands:
 
 ```sh
-# In fprime-zephyr-reference (fprime-venv)
+# In fprime-artemis-core (fprime-venv)
 fprime-util generate
 ```
 
 2. The next step is to build the ReferenceDeployment application's code.
 ```sh
-# In fprime-zephyr-reference (fprime-venv)
+# In fprime-artemis-core (fprime-venv)
 fprime-util build
 ```
 
@@ -24,7 +24,7 @@ fprime-util build
 Different boards will likely require different steps to flash software onto the board. Instructions for tested boards are provided [here][board-list] The following is an example of flashing the deployment onto a stm32 board.
 
 ```sh
-# In fprime-zephyr-reference
+# In fprime-artemis-core
 
 # Linux/Windows WSL
 sh ~/.arduino15/packages/STMicroelectronics/tools/STM32Tools/2.3.0/stm32CubeProg.sh -i swd -f build-fprime-automatic-zephyr/zephyr/zephyr.hex -c /dev/ttyACM0
@@ -44,7 +44,7 @@ sh ~/Library/Arduino15/packages/STMicroelectronics/tools/STM32Tools/2.3.0/stm32C
 The following command will spin up the F' GDS as well as run the application binary and the components necessary for the GDS and application to communicate.
 
 ```sh
-# In fprime-zephyr-reference (fprime-venv)
+# In fprime-artemis-core (fprime-venv)
 fprime-gds -n --dictionary ./build-artifacts/zephyr/fprime-zephyr-deployment/dict/ReferenceDeploymentTopologyDictionary.json --communication-selection uart --uart-baud 115200 --output-unframed-data
 
 # Or

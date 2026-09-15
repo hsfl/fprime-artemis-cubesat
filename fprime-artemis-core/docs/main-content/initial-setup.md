@@ -6,19 +6,19 @@ This guide will walk through the steps of setting up the reference deployment.
 ## 1. Clone the GitHub repository
 Clone the GitHub repository onto your local machine.
 ```sh
-git clone https://github.com/fprime-community/fprime-zephyr-reference.git
+git clone https://github.com/fprime-community/fprime-artemis-core.git
 ```
 
 > [!NOTE]
 > If you would like to use fprime-bootstrap instead of git to clone this project, run this command and skip to step 5.
 > ```sh
-> fprime-bootstrap clone https://github.com/fprime-community/fprime-zephyr-reference.git
+> fprime-bootstrap clone https://github.com/fprime-community/fprime-artemis-core.git
 > ```
 
 ## 2. Fetch git submodules
 Install the required libraries for this deployment
 ```sh
-# In fprime-zephyr-reference
+# In fprime-artemis-core
 git submodule update --recursive --init
 ```
 
@@ -26,14 +26,14 @@ git submodule update --recursive --init
 Create a virtual environment in the main project directory
 
 ```sh
-# In fprime-zephyr-reference
+# In fprime-artemis-core
 python3 -m venv fprime-venv
 ```
 
 ## 4. Activate the virtual environment
 
 ```sh
-# In fprime-zephyr-reference
+# In fprime-artemis-core
 # Linux, MacOS, & Windows WSL
 source fprime-venv/bin/activate
 ```
@@ -41,7 +41,7 @@ source fprime-venv/bin/activate
 ## 5. Install python requirements
 With the virtual environment activated, install the requirements
 ```sh
-# In fprime-zephyr-reference (fprime-venv)
+# In fprime-artemis-core (fprime-venv)
 pip install -r requirements.txt
 ```
 
@@ -52,7 +52,7 @@ pip install -r requirements.txt
 ## 6. Get Zephyr Source Code
 Navigate to the `zephyr-workspace` directory to set up zephyr. You may need to update the `config` file in `./lib/zephyr-workspace/.west/` if you are using a different board. Refer to the documentation [here][specifying-board-configuration]
 ```sh
-# In fprime-zephyr-reference
+# In fprime-artemis-core
 cd lib/zephyr-workspace
 
 # Run the following commands
@@ -63,7 +63,7 @@ west zephyr-export
 > [!NOTE]
 > If you have not installed the [Zephyr SDK](https://docs.zephyrproject.org/latest/develop/toolchains/zephyr_sdk.html#toolchain-zephyr-sdk), please install it with the following command:
 > ```shell
-> # In fprime-zephyr-reference/lib/zephyr-workspace/zephyr
+> # In fprime-artemis-core/lib/zephyr-workspace/zephyr
 > west sdk install
 > ```
 > The Zephyr SDK only needs to be installed once.

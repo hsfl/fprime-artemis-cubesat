@@ -7,7 +7,7 @@ If your board is supported by Zephyr, the config file in `./lib/zephyr-workspace
 
 The following is an example of a configuration for stm32 boards.
 ```ini
-# In fprime-zephyr-reference/lib/zephyr-workspace/.west/config
+# In fprime-artemis-core/lib/zephyr-workspace/.west/config
 [zephyr]
 base = zephyr
 
@@ -39,7 +39,7 @@ In order to specify the board to build for, update the `BOARD` option in the `se
 
 
 ```ini
-# In fprime-zephyr-reference/settings.ini
+# In fprime-artemis-core/settings.ini
 BOARD=nucleo_h723zg # Example for the NUCLEO-H723ZG (existing zephyr support)
 BOARD=teensy41 # Example for the Teensy 4.1 (existing zephyr support)
 ```
@@ -50,7 +50,7 @@ A list of supported boards can be found [here](https://docs.zephyrproject.org/la
 Different boards may have different USB PID and VID configurations. Update the following atrributes to your board's PID and VID configurations.
 
 ```ini
-# In fprime-zephyr-reference/prj.conf
+# In fprime-artemis-core/prj.conf
 CONFIG_USB_DEVICE_VID=<VID>
 CONFIG_USB_DEVICE_PID=<PID>
 ```

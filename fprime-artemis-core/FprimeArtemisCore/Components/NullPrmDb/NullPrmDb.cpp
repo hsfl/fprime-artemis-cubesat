@@ -4,7 +4,7 @@
 // \brief  cpp file for NullPrmDb component implementation class
 // ======================================================================
 
-#include "FprimeZephyrReference/Components/NullPrmDb/NullPrmDb.hpp"
+#include "FprimeArtemisCore/Components/NullPrmDb/NullPrmDb.hpp"
 
 namespace Components {
 

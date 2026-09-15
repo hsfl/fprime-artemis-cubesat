@@ -7,7 +7,7 @@
 #define REFERENCEDEPLOYMENT_REFERENCEDEPLOYMENTTOPOLOGY_HPP
 // Included for access to ReferenceDeployment::TopologyState and ReferenceDeployment::ConfigObjects::pingEntries. These definitions are required by the
 // autocoder, but are also used in this hand-coded topology.
-#include <FprimeZephyrReference/ReferenceDeployment/Top/ReferenceDeploymentTopologyDefs.hpp>
+#include <FprimeArtemisCore/ReferenceDeployment/Top/ReferenceDeploymentTopologyDefs.hpp>
 
 // Remove unnecessary ReferenceDeployment:: qualifications
 using namespace ReferenceDeployment;
