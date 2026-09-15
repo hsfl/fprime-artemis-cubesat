@@ -1,6 +1,0 @@
-[manifest]
-path = .
-file = west.yml
-
-[zephyr]
-base = ./lib/zephyr-workspace/zephyr
