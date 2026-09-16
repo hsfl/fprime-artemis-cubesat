@@ -58,14 +58,14 @@ module FprimeArtemisCore {
   # Passive component instances
   # ----------------------------------------------------------------------
 
-  instance chronoTime: Svc.ChronoTime base id 0x10010000
+  instance chronoTime: Zephyr.ZephyrTime base id 0x10010000
 
   instance rateGroupDriver: Svc.RateGroupDriver base id 0x10011000
 
   instance systemResources: Svc.SystemResources base id 0x10012000
 
-  instance timer: Svc.LinuxTimer base id 0x10013000
+  instance timer: Zephyr.ZephyrRateDriver base id 0x10013000
 
-  instance comDriver: Drv.LinuxUartDriver base id 0x10014000
+  instance comDriver: Zephyr.ZephyrUartDriver base id 0x10014000
 
 }

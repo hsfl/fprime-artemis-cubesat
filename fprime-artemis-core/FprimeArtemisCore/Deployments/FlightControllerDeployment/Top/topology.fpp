@@ -108,6 +108,7 @@ module FprimeArtemisCore {
       rateGroup_1Hz.RateGroupMemberOut[3] -> ComCcsds.comQueue.run
       rateGroup_1Hz.RateGroupMemberOut[4] -> ComCcsds.aggregator.timeout
       rateGroup_1Hz.RateGroupMemberOut[5] -> CdhCore.cmdDisp.run
+      rateGroup_1Hz.RateGroupMemberOut[6] -> comDriver.schedIn
 
       # 0.5Hz rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_0_5Hz] -> rateGroup_0_5Hz.CycleIn

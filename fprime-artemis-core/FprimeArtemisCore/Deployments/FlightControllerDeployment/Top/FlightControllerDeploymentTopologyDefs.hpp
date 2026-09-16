@@ -22,6 +22,9 @@
 #include "Svc/Subtopologies/ComCcsds/Ports_ComPacketQueueEnumAc.hpp"
 #include "Svc/Subtopologies/ComCcsds/Ports_ComBufferQueueEnumAc.hpp"
 
+// Zephyr device handle type for the UART driver
+#include <zephyr/device.h>
+
 // Include autocoded FPP constants
 #include "FprimeArtemisCore/Deployments/FlightControllerDeployment/Top/FppConstantsAc.hpp"
 
@@ -62,7 +65,7 @@ namespace FprimeArtemisCore {
  * contents are entirely up to the definition of the project. This deployment uses subtopologies.
  */
 struct TopologyState {
-    const char* uartDevice; //!< UART device path for communication
+    const struct device* uartDevice; //!< Zephyr UART device handle for communication
     U32 baudRate;          //!< Baud rate for UART communication
     CdhCore::SubtopologyState cdhCore;           //!< Subtopology state for CdhCore
     ComCcsds::SubtopologyState comCcsds;         //!< Subtopology state for ComCcsds 

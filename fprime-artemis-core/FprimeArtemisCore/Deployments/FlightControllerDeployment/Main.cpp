@@ -1,96 +1,36 @@
 // ======================================================================
 // \title  Main.cpp
-// \brief main program for the F' application. Intended for CLI-based systems (Linux, macOS)
+// \brief main program for the F' application. Intended for Zephyr (Teensy 4.1)
 //
 // ======================================================================
 // Used to access topology functions
 #include <FprimeArtemisCore/Deployments/FlightControllerDeployment/Top/FlightControllerDeploymentTopology.hpp>
 // OSAL initialization
 #include <Os/Os.hpp>
-// Used for signal handling shutdown
-#include <signal.h>
-// Used for command line argument processing
-#include <getopt.h>
-// Used for atoi
-#include <cstdlib>
-// Used for logging to the console
-#include <Fw/Logger/Logger.hpp>
 
-/**
- * \brief print command line help message
- *
- * This will print a command line help message including the available command line arguments.
- *
- * @param app: name of application
- */
-void print_usage(const char* app) {
-    Fw::Logger::log("Usage: ./%s [options]\n-b\tBaud rate\n-d\tUART Device\n", app);
-}
+#include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
 
-/**
- * \brief shutdown topology cycling on signal
- *
- * The reference topology allows for a simulated cycling of the rate groups. This simulated cycling needs to be stopped
- * in order for the program to shutdown. This is done via handling signals such that it is performed via Ctrl-C
- *
- * @param signum
- */
-static void signalHandler(int signum) {
-    FprimeArtemisCore::stopRateGroups();
-}
+// UART used for the ground link. Exposed over USB CDC ACM on the Teensy 4.1.
+const struct device* serial = DEVICE_DT_GET(DT_NODELABEL(cdc_acm_uart0));
 
-/**
- * \brief execute the program
- *
- * This F´ program is designed to run in standard environments (e.g. Linux/macOs running on a laptop). Thus it uses
- * command line inputs to specify how to connect.
- *
- * @param argc: argument count supplied to program
- * @param argv: argument values supplied to program
- * @return: 0 on success, something else on failure
- */
 int main(int argc, char* argv[]) {
-    I32 option = 0;
-    CHAR* uart_device = nullptr;
-    U32 baud_rate = 0;
+    // ** DO NOT REMOVE **//
+    //
+    // This sleep is necessary to allow the USB CDC ACM interface to initialize before
+    // the application starts writing to it.
+    k_sleep(K_MSEC(3000));
 
     Os::init();
 
-    // Loop while reading the getopt supplied options
-    while ((option = getopt(argc, argv, "hb:d:")) != -1) {
-        switch (option) {
-            // Handle the -b baud rate argument
-            case 'b':
-                baud_rate = static_cast<U32>(atoi(optarg));
-                break;
-            // Handle the -d device argument
-            case 'd':
-                uart_device = optarg;
-                break;
-            // Cascade intended: help output
-            case 'h':
-            // Cascade intended: help output
-            case '?':
-            // Default case: output help and exit
-            default:
-                print_usage(argv[0]);
-                return (option == 'h') ? 0 : 1;
-        }
-    }
     // Object for communicating state to the topology
     FprimeArtemisCore::TopologyState inputs;
-    inputs.uartDevice = uart_device;
-    inputs.baudRate = baud_rate;
-
-    // Setup program shutdown via Ctrl-C
-    signal(SIGINT, signalHandler);
-    signal(SIGTERM, signalHandler);
-    Fw::Logger::log("Hit Ctrl-C to quit\n");
+    inputs.uartDevice = serial;
+    inputs.baudRate = 115200;
 
     // Setup, cycle, and teardown topology
     FprimeArtemisCore::setupTopology(inputs);
-    FprimeArtemisCore::startRateGroups();
+    FprimeArtemisCore::startRateGroups();  // Program loop
     FprimeArtemisCore::teardownTopology(inputs);
-    Fw::Logger::log("Exiting...\n");
     return 0;
 }
