@@ -1,3 +1,3 @@
-module FprimeArtemisCore {
+module PayloadComputerDeployment {
   system PayloadComputerDeploymentSystem: PayloadComputerDeployment
 }

@@ -9,7 +9,7 @@
 // autocoder, but are also used in this hand-coded topology.
 #include <FprimeArtemisCore/Deployments/PayloadComputerDeployment/Top/PayloadComputerDeploymentTopologyDefs.hpp>
 
-namespace FprimeArtemisCore {
+namespace PayloadComputerDeployment {
 /**
  * \brief initialize and run the F´ topology
  *
@@ -53,7 +53,7 @@ void setupTopology(const TopologyState& state);
  * Step 1, 2, 3, and 4 must occur in-order as the tasks must be stopped before being joined. These tasks must be stopped
  * and joined before any active resources may be deallocated.
  *
- * For an explanation of the required type FprimeArtemisCore::TopologyState see: FprimeArtemisCoreTopologyDefs.hpp.
+ * For an explanation of the required type PayloadComputerDeployment::TopologyState see: PayloadComputerDeploymentTopologyDefs.hpp.
  *
  * \param state: state object provided to setupTopology
  */
@@ -73,5 +73,5 @@ void startRateGroups();
  */
 void stopRateGroups();
 
-} // namespace FprimeArtemisCore
+} // namespace PayloadComputerDeployment
 #endif

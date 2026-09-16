@@ -11,19 +11,19 @@ telemetry packets PayloadComputerDeploymentPackets {
     FileHandling.fileDownlink.PacketsSent
     FileHandling.fileManager.CommandsExecuted
 
-    FprimeArtemisCore.cmdSeq.CS_LoadCommands
-    FprimeArtemisCore.cmdSeq.CS_CancelCommands
-    FprimeArtemisCore.cmdSeq.CS_CommandsExecuted
-    FprimeArtemisCore.cmdSeq.CS_SequencesCompleted
+    PayloadComputerDeployment.cmdSeq.CS_LoadCommands
+    PayloadComputerDeployment.cmdSeq.CS_CancelCommands
+    PayloadComputerDeployment.cmdSeq.CS_CommandsExecuted
+    PayloadComputerDeployment.cmdSeq.CS_SequencesCompleted
     ComCcsds.comQueue.comQueueDepth
     ComCcsds.comQueue.buffQueueDepth
     ComCcsds.commsBufferManager.TotalBuffs
     ComCcsds.commsBufferManager.CurrBuffs
     ComCcsds.commsBufferManager.HiBuffs
 
-    FprimeArtemisCore.rateGroup_1Hz.RgMaxTime
-    FprimeArtemisCore.rateGroup_0_5Hz.RgMaxTime
-    FprimeArtemisCore.rateGroup_0_25Hz.RgMaxTime
+    PayloadComputerDeployment.rateGroup_1Hz.RgMaxTime
+    PayloadComputerDeployment.rateGroup_0_5Hz.RgMaxTime
+    PayloadComputerDeployment.rateGroup_0_25Hz.RgMaxTime
   }
 
   packet CDHErrors id 2 group 1 {
@@ -33,40 +33,40 @@ telemetry packets PayloadComputerDeploymentPackets {
     FileHandling.fileDownlink.Warnings
     FileHandling.fileManager.Errors
 
-    FprimeArtemisCore.cmdSeq.CS_Errors
+    PayloadComputerDeployment.cmdSeq.CS_Errors
     ComCcsds.commsBufferManager.NoBuffs
     ComCcsds.commsBufferManager.EmptyBuffs
 
-    FprimeArtemisCore.rateGroup_1Hz.RgCycleSlips
-    FprimeArtemisCore.rateGroup_0_5Hz.RgCycleSlips
-    FprimeArtemisCore.rateGroup_0_25Hz.RgCycleSlips
+    PayloadComputerDeployment.rateGroup_1Hz.RgCycleSlips
+    PayloadComputerDeployment.rateGroup_0_5Hz.RgCycleSlips
+    PayloadComputerDeployment.rateGroup_0_25Hz.RgCycleSlips
   }
 
   packet SystemRes1 id 5 group 2 {
-    FprimeArtemisCore.systemResources.MEMORY_TOTAL
-    FprimeArtemisCore.systemResources.MEMORY_USED
-    FprimeArtemisCore.systemResources.NON_VOLATILE_TOTAL
-    FprimeArtemisCore.systemResources.NON_VOLATILE_FREE
+    PayloadComputerDeployment.systemResources.MEMORY_TOTAL
+    PayloadComputerDeployment.systemResources.MEMORY_USED
+    PayloadComputerDeployment.systemResources.NON_VOLATILE_TOTAL
+    PayloadComputerDeployment.systemResources.NON_VOLATILE_FREE
   }
 
   packet SystemRes3 id 6 group 2 {
-    FprimeArtemisCore.systemResources.CPU
-    FprimeArtemisCore.systemResources.CPU_00
-    FprimeArtemisCore.systemResources.CPU_01
-    FprimeArtemisCore.systemResources.CPU_02
-    FprimeArtemisCore.systemResources.CPU_03
-    FprimeArtemisCore.systemResources.CPU_04
-    FprimeArtemisCore.systemResources.CPU_05
-    FprimeArtemisCore.systemResources.CPU_06
-    FprimeArtemisCore.systemResources.CPU_07
-    FprimeArtemisCore.systemResources.CPU_08
-    FprimeArtemisCore.systemResources.CPU_09
-    FprimeArtemisCore.systemResources.CPU_10
-    FprimeArtemisCore.systemResources.CPU_11
-    FprimeArtemisCore.systemResources.CPU_12
-    FprimeArtemisCore.systemResources.CPU_13
-    FprimeArtemisCore.systemResources.CPU_14
-    FprimeArtemisCore.systemResources.CPU_15
+    PayloadComputerDeployment.systemResources.CPU
+    PayloadComputerDeployment.systemResources.CPU_00
+    PayloadComputerDeployment.systemResources.CPU_01
+    PayloadComputerDeployment.systemResources.CPU_02
+    PayloadComputerDeployment.systemResources.CPU_03
+    PayloadComputerDeployment.systemResources.CPU_04
+    PayloadComputerDeployment.systemResources.CPU_05
+    PayloadComputerDeployment.systemResources.CPU_06
+    PayloadComputerDeployment.systemResources.CPU_07
+    PayloadComputerDeployment.systemResources.CPU_08
+    PayloadComputerDeployment.systemResources.CPU_09
+    PayloadComputerDeployment.systemResources.CPU_10
+    PayloadComputerDeployment.systemResources.CPU_11
+    PayloadComputerDeployment.systemResources.CPU_12
+    PayloadComputerDeployment.systemResources.CPU_13
+    PayloadComputerDeployment.systemResources.CPU_14
+    PayloadComputerDeployment.systemResources.CPU_15
   }
 
   packet DataProducts id 21 group 3 {

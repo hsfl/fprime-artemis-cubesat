@@ -45,19 +45,19 @@
  * ```
  */
 namespace PingEntries {
-    namespace FprimeArtemisCore_rateGroup_1Hz {enum { WARN = 3, FATAL = 5 };}
-    namespace FprimeArtemisCore_rateGroup_0_5Hz {enum { WARN = 3, FATAL = 5 };}
-    namespace FprimeArtemisCore_rateGroup_0_25Hz {enum { WARN = 3, FATAL = 5 };}
-    namespace FprimeArtemisCore_cmdSeq {enum { WARN = 3, FATAL = 5 };}
+    namespace PayloadComputerDeployment_rateGroup_1Hz {enum { WARN = 3, FATAL = 5 };}
+    namespace PayloadComputerDeployment_rateGroup_0_5Hz {enum { WARN = 3, FATAL = 5 };}
+    namespace PayloadComputerDeployment_rateGroup_0_25Hz {enum { WARN = 3, FATAL = 5 };}
+    namespace PayloadComputerDeployment_cmdSeq {enum { WARN = 3, FATAL = 5 };}
 }  // namespace PingEntries
 
 // Definitions are placed within the same namespace as the FPP module that contains the topology.
-namespace FprimeArtemisCore {
+namespace PayloadComputerDeployment {
 
 /**
  * \brief required type definition to carry state
  *
- * The topology autocoder requires an object that carries state with the name `FprimeArtemisCore::TopologyState`. Only the type
+ * The topology autocoder requires an object that carries state with the name `PayloadComputerDeployment::TopologyState`. Only the type
  * definition is required by the autocoder and the contents of this object are otherwise opaque to the autocoder. The
  * contents are entirely up to the definition of the project. This deployment uses subtopologies.
  */
@@ -71,6 +71,6 @@ struct TopologyState {
 };
 
 namespace PingEntries = ::PingEntries;
-}  // namespace FprimeArtemisCore
+}  // namespace PayloadComputerDeployment
 
 #endif

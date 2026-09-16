@@ -11,9 +11,9 @@
 // Necessary project-specified types
 #include <Fw/Types/MallocAllocator.hpp>
 
-// Public functions for use in main program are namespaced with deployment module FprimeArtemisCore
+// Public functions for use in main program are namespaced with deployment module PayloadComputerDeployment
 // This is also the namespace where the topology components are instantiated by FPP.
-namespace FprimeArtemisCore {
+namespace PayloadComputerDeployment {
 
 // Instantiate a malloc allocator for cmdSeq buffer allocation
 Fw::MallocAllocator mallocator;
@@ -110,4 +110,4 @@ void teardownTopology(const TopologyState& state) {
     tearDownComponents(state);
     deinitComponents(state);
 }
-};  // namespace FprimeArtemisCore
+};  // namespace PayloadComputerDeployment

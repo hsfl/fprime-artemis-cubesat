@@ -36,7 +36,7 @@ void print_usage(const char* app) {
  * @param signum
  */
 static void signalHandler(int signum) {
-    FprimeArtemisCore::stopRateGroups();
+    PayloadComputerDeployment::stopRateGroups();
 }
 
 /**
@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
         }
     }
     // Object for communicating state to the topology
-    FprimeArtemisCore::TopologyState inputs;
+    PayloadComputerDeployment::TopologyState inputs;
     inputs.uartDevice = uart_device;
     inputs.baudRate = baud_rate;
 
@@ -88,9 +88,9 @@ int main(int argc, char* argv[]) {
     Fw::Logger::log("Hit Ctrl-C to quit\n");
 
     // Setup, cycle, and teardown topology
-    FprimeArtemisCore::setupTopology(inputs);
-    FprimeArtemisCore::startRateGroups();
-    FprimeArtemisCore::teardownTopology(inputs);
+    PayloadComputerDeployment::setupTopology(inputs);
+    PayloadComputerDeployment::startRateGroups();
+    PayloadComputerDeployment::teardownTopology(inputs);
     Fw::Logger::log("Exiting...\n");
     return 0;
 }

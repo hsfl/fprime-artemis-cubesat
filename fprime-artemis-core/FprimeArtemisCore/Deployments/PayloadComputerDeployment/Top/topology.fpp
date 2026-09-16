@@ -1,4 +1,4 @@
-module FprimeArtemisCore {
+module PayloadComputerDeployment {
 
   # ----------------------------------------------------------------------
   # Symbolic constants for port numbers
