@@ -1,10 +1,10 @@
 // ======================================================================
-// \title  FlightControllerDeploymentTopologyDefs.hpp
+// \title  ReferenceDeploymentTopologyDefs.hpp
 // \brief required header file containing the required definitions for the topology autocoder
 //
 // ======================================================================
-#ifndef FLIGHTCONTROLLERDEPLOYMENT_FLIGHTCONTROLLERDEPLOYMENTTOPOLOGYDEFS_HPP
-#define FLIGHTCONTROLLERDEPLOYMENT_FLIGHTCONTROLLERDEPLOYMENTTOPOLOGYDEFS_HPP
+#ifndef REFERENCEDEPLOYMENT_REFERENCEDEPLOYMENTTOPOLOGYDEFS_HPP
+#define REFERENCEDEPLOYMENT_REFERENCEDEPLOYMENTTOPOLOGYDEFS_HPP
 
 // Subtopology PingEntries includes
 #include "Svc/Subtopologies/CdhCore/PingEntries.hpp"
@@ -15,15 +15,15 @@
 // SubtopologyTopologyDefs includes
 #include "Svc/Subtopologies/CdhCore/SubtopologyTopologyDefs.hpp"
 #include "Svc/Subtopologies/ComCcsds/SubtopologyTopologyDefs.hpp"
-#include "Svc/Subtopologies/DataProducts/SubtopologyTopologyDefs.hpp"
-#include "Svc/Subtopologies/FileHandling/SubtopologyTopologyDefs.hpp"
 
 //ComCcsds Enum Includes
 #include "Svc/Subtopologies/ComCcsds/Ports_ComPacketQueueEnumAc.hpp"
 #include "Svc/Subtopologies/ComCcsds/Ports_ComBufferQueueEnumAc.hpp"
 
 // Include autocoded FPP constants
-#include "FprimeArtemisCore/FlightControllerDeployment/Top/FppConstantsAc.hpp"
+#include "FprimeArtemisCore/Deployments/ReferenceDeployment/Top/FppConstantsAc.hpp"
+#include <zephyr/drivers/uart.h>
+
 
 /**
  * \brief required ping constants
@@ -45,32 +45,27 @@
  * ```
  */
 namespace PingEntries {
-    namespace FprimeArtemisCore_rateGroup_1Hz {enum { WARN = 3, FATAL = 5 };}
-    namespace FprimeArtemisCore_rateGroup_0_5Hz {enum { WARN = 3, FATAL = 5 };}
-    namespace FprimeArtemisCore_rateGroup_0_25Hz {enum { WARN = 3, FATAL = 5 };}
-    namespace FprimeArtemisCore_cmdSeq {enum { WARN = 3, FATAL = 5 };}
+    namespace ReferenceDeployment_rateGroup10Hz {enum { WARN = 3, FATAL = 5 };}
+    namespace ReferenceDeployment_rateGroup1Hz {enum { WARN = 3, FATAL = 5 };}
 }  // namespace PingEntries
 
-// Definitions are placed within the same namespace as the FPP module that contains the topology.
-namespace FprimeArtemisCore {
+// Definitions are placed within a namespace named after the deployment
+namespace ReferenceDeployment {
 
 /**
  * \brief required type definition to carry state
  *
- * The topology autocoder requires an object that carries state with the name `FprimeArtemisCore::TopologyState`. Only the type
+ * The topology autocoder requires an object that carries state with the name `ReferenceDeployment::TopologyState`. Only the type
  * definition is required by the autocoder and the contents of this object are otherwise opaque to the autocoder. The
  * contents are entirely up to the definition of the project. This deployment uses subtopologies.
  */
 struct TopologyState {
-    const char* uartDevice; //!< UART device path for communication
+    const device* uartDevice; //!< UART device path for communication
     U32 baudRate;          //!< Baud rate for UART communication
     CdhCore::SubtopologyState cdhCore;           //!< Subtopology state for CdhCore
     ComCcsds::SubtopologyState comCcsds;         //!< Subtopology state for ComCcsds 
-    DataProducts::SubtopologyState dataProducts; //!< Subtopology state for DataProducts
-    FileHandling::SubtopologyState fileHandling; //!< Subtopology state for FileHandling
 };
 
 namespace PingEntries = ::PingEntries;
-}  // namespace FprimeArtemisCore
-
+}  // namespace ReferenceDeployment
 #endif

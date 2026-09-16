@@ -1,10 +1,10 @@
 // ======================================================================
-// \title  PayloadComputerDeploymentTopologyDefs.hpp
+// \title  FlightControllerDeploymentTopologyDefs.hpp
 // \brief required header file containing the required definitions for the topology autocoder
 //
 // ======================================================================
-#ifndef PAYLOADCOMPUTERDEPLOYMENT_PAYLOADCOMPUTERDEPLOYMENTTOPOLOGYDEFS_HPP
-#define PAYLOADCOMPUTERDEPLOYMENT_PAYLOADCOMPUTERDEPLOYMENTTOPOLOGYDEFS_HPP
+#ifndef FLIGHTCONTROLLERDEPLOYMENT_FLIGHTCONTROLLERDEPLOYMENTTOPOLOGYDEFS_HPP
+#define FLIGHTCONTROLLERDEPLOYMENT_FLIGHTCONTROLLERDEPLOYMENTTOPOLOGYDEFS_HPP
 
 // Subtopology PingEntries includes
 #include "Svc/Subtopologies/CdhCore/PingEntries.hpp"
@@ -23,7 +23,7 @@
 #include "Svc/Subtopologies/ComCcsds/Ports_ComBufferQueueEnumAc.hpp"
 
 // Include autocoded FPP constants
-#include "FprimeArtemisCore/PayloadComputerDeployment/Top/FppConstantsAc.hpp"
+#include "FprimeArtemisCore/Deployments/FlightControllerDeployment/Top/FppConstantsAc.hpp"
 
 /**
  * \brief required ping constants

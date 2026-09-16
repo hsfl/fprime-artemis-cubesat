@@ -7,7 +7,7 @@
 #define PAYLOADCOMPUTERDEPLOYMENT_PAYLOADCOMPUTERDEPLOYMENTTOPOLOGY_HPP
 // Included for access to PayloadComputerDeployment::TopologyState and PayloadComputerDeployment::ConfigObjects::pingEntries. These definitions are required by the
 // autocoder, but are also used in this hand-coded topology.
-#include <FprimeArtemisCore/PayloadComputerDeployment/Top/PayloadComputerDeploymentTopologyDefs.hpp>
+#include <FprimeArtemisCore/Deployments/PayloadComputerDeployment/Top/PayloadComputerDeploymentTopologyDefs.hpp>
 
 namespace FprimeArtemisCore {
 /**

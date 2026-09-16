@@ -4,9 +4,9 @@
 //
 // ======================================================================
 // Provides access to autocoded functions
-#include <FprimeArtemisCore/PayloadComputerDeployment/Top/PayloadComputerDeploymentTopologyAc.hpp>
+#include <FprimeArtemisCore/Deployments/PayloadComputerDeployment/Top/PayloadComputerDeploymentTopologyAc.hpp>
 // Note: Uncomment when using Svc:TlmPacketizer
-//#include <FprimeArtemisCore/PayloadComputerDeployment/Top/PayloadComputerDeploymentPacketsAc.hpp>
+//#include <FprimeArtemisCore/Deployments/PayloadComputerDeployment/Top/PayloadComputerDeploymentPacketsAc.hpp>
 
 // Necessary project-specified types
 #include <Fw/Types/MallocAllocator.hpp>

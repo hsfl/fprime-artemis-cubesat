@@ -4,7 +4,7 @@
 //
 // ======================================================================
 // Used to access topology functions
-#include <FprimeArtemisCore/PayloadComputerDeployment/Top/PayloadComputerDeploymentTopology.hpp>
+#include <FprimeArtemisCore/Deployments/FlightControllerDeployment/Top/FlightControllerDeploymentTopology.hpp>
 // OSAL initialization
 #include <Os/Os.hpp>
 // Used for signal handling shutdown

@@ -4,7 +4,7 @@
 //
 // ======================================================================
 // Used to access topology functions
-#include <FprimeArtemisCore/ReferenceDeployment/Top/ReferenceDeploymentTopology.hpp>
+#include <FprimeArtemisCore/Deployments/ReferenceDeployment/Top/ReferenceDeploymentTopology.hpp>
 #include <zephyr/sys/printk.h>
 #include <zephyr/kernel.h>
 

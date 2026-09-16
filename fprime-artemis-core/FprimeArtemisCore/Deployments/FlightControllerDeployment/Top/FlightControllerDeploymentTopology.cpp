@@ -4,9 +4,9 @@
 //
 // ======================================================================
 // Provides access to autocoded functions
-#include <FprimeArtemisCore/FlightControllerDeployment/Top/FlightControllerDeploymentTopologyAc.hpp>
+#include <FprimeArtemisCore/Deployments/FlightControllerDeployment/Top/FlightControllerDeploymentTopologyAc.hpp>
 // Note: Uncomment when using Svc:TlmPacketizer
-//#include <FprimeArtemisCore/FlightControllerDeployment/Top/FlightControllerDeploymentPacketsAc.hpp>
+//#include <FprimeArtemisCore/Deployments/FlightControllerDeployment/Top/FlightControllerDeploymentPacketsAc.hpp>
 
 // Necessary project-specified types
 #include <Fw/Types/MallocAllocator.hpp>

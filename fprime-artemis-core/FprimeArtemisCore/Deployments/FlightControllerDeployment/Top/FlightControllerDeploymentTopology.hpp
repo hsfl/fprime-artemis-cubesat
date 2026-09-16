@@ -7,7 +7,7 @@
 #define FLIGHTCONTROLLERDEPLOYMENT_FLIGHTCONTROLLERDEPLOYMENTTOPOLOGY_HPP
 // Included for access to FlightControllerDeployment::TopologyState and FlightControllerDeployment::ConfigObjects::pingEntries. These definitions are required by the
 // autocoder, but are also used in this hand-coded topology.
-#include <FprimeArtemisCore/FlightControllerDeployment/Top/FlightControllerDeploymentTopologyDefs.hpp>
+#include <FprimeArtemisCore/Deployments/FlightControllerDeployment/Top/FlightControllerDeploymentTopologyDefs.hpp>
 
 namespace FprimeArtemisCore {
 /**
