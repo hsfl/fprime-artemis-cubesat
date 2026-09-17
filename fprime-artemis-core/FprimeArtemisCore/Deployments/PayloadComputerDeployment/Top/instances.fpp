@@ -66,6 +66,6 @@ module PayloadComputerDeployment {
 
   instance timer: Svc.LinuxTimer base id 0x10013000
 
-  instance comDriver: Drv.LinuxUartDriver base id 0x10014000
+  instance comDriver: Drv.PosixUartDriver base id 0x10014000
 
 }

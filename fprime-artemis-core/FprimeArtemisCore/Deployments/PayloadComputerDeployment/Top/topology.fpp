@@ -49,7 +49,7 @@ module PayloadComputerDeployment {
   # Telemetry packets (only used when TlmPacketizer is used)
   # ----------------------------------------------------------------------
 
-    # include "PayloadComputerDeploymentPackets.fppi"
+    include "PayloadComputerDeploymentPackets.fppi"
 
   # ----------------------------------------------------------------------
   # Direct graph specifiers

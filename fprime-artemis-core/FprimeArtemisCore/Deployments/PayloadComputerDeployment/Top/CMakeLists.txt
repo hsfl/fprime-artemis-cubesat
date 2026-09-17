@@ -19,4 +19,6 @@ register_fprime_module(
         "${CMAKE_CURRENT_LIST_DIR}/PayloadComputerDeploymentTopology.cpp"
     DEPENDS
         Fw_Logger
+        Drv_PosixUartDriver
+        PayloadComputerCdhCoreTlmConfig
 )

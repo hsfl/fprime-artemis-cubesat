@@ -3,27 +3,32 @@ telemetry packets PayloadComputerDeploymentPackets {
   packet CDH id 1 group 1 {
     CdhCore.cmdDisp.CommandsDispatched
     CdhCore.cmdDisp.CommandsDropped
+    CdhCore.events.EventsDropped
     #CdhCore.tlmSend.SendLevel # uncomment when using TlmPacketizer
 
     FileHandling.fileUplink.FilesReceived
     FileHandling.fileUplink.PacketsReceived
+    FileHandling.fileUplink.FilesReceivedFailed
+    DataProducts.dpBufferAccumulator.BA_NumQueuedBuffers
     FileHandling.fileDownlink.FilesSent
     FileHandling.fileDownlink.PacketsSent
     FileHandling.fileManager.CommandsExecuted
 
-    PayloadComputerDeployment.cmdSeq.CS_LoadCommands
-    PayloadComputerDeployment.cmdSeq.CS_CancelCommands
-    PayloadComputerDeployment.cmdSeq.CS_CommandsExecuted
-    PayloadComputerDeployment.cmdSeq.CS_SequencesCompleted
+    cmdSeq.CS_LoadCommands
+    cmdSeq.CS_CancelCommands
+    cmdSeq.CS_CommandsExecuted
+    cmdSeq.CS_SequencesCompleted
     ComCcsds.comQueue.comQueueDepth
     ComCcsds.comQueue.buffQueueDepth
+    CdhCore.tlmSend.GroupConfigs
+    CdhCore.tlmSend.SectionEnabled
     ComCcsds.commsBufferManager.TotalBuffs
     ComCcsds.commsBufferManager.CurrBuffs
     ComCcsds.commsBufferManager.HiBuffs
 
-    PayloadComputerDeployment.rateGroup_1Hz.RgMaxTime
-    PayloadComputerDeployment.rateGroup_0_5Hz.RgMaxTime
-    PayloadComputerDeployment.rateGroup_0_25Hz.RgMaxTime
+    rateGroup_1Hz.RgMaxTime
+    rateGroup_0_5Hz.RgMaxTime
+    rateGroup_0_25Hz.RgMaxTime
   }
 
   packet CDHErrors id 2 group 1 {
@@ -33,40 +38,40 @@ telemetry packets PayloadComputerDeploymentPackets {
     FileHandling.fileDownlink.Warnings
     FileHandling.fileManager.Errors
 
-    PayloadComputerDeployment.cmdSeq.CS_Errors
+    cmdSeq.CS_Errors
     ComCcsds.commsBufferManager.NoBuffs
     ComCcsds.commsBufferManager.EmptyBuffs
 
-    PayloadComputerDeployment.rateGroup_1Hz.RgCycleSlips
-    PayloadComputerDeployment.rateGroup_0_5Hz.RgCycleSlips
-    PayloadComputerDeployment.rateGroup_0_25Hz.RgCycleSlips
+    rateGroup_1Hz.RgCycleSlips
+    rateGroup_0_5Hz.RgCycleSlips
+    rateGroup_0_25Hz.RgCycleSlips
   }
 
   packet SystemRes1 id 5 group 2 {
-    PayloadComputerDeployment.systemResources.MEMORY_TOTAL
-    PayloadComputerDeployment.systemResources.MEMORY_USED
-    PayloadComputerDeployment.systemResources.NON_VOLATILE_TOTAL
-    PayloadComputerDeployment.systemResources.NON_VOLATILE_FREE
+    systemResources.MEMORY_TOTAL
+    systemResources.MEMORY_USED
+    systemResources.NON_VOLATILE_TOTAL
+    systemResources.NON_VOLATILE_FREE
   }
 
   packet SystemRes3 id 6 group 2 {
-    PayloadComputerDeployment.systemResources.CPU
-    PayloadComputerDeployment.systemResources.CPU_00
-    PayloadComputerDeployment.systemResources.CPU_01
-    PayloadComputerDeployment.systemResources.CPU_02
-    PayloadComputerDeployment.systemResources.CPU_03
-    PayloadComputerDeployment.systemResources.CPU_04
-    PayloadComputerDeployment.systemResources.CPU_05
-    PayloadComputerDeployment.systemResources.CPU_06
-    PayloadComputerDeployment.systemResources.CPU_07
-    PayloadComputerDeployment.systemResources.CPU_08
-    PayloadComputerDeployment.systemResources.CPU_09
-    PayloadComputerDeployment.systemResources.CPU_10
-    PayloadComputerDeployment.systemResources.CPU_11
-    PayloadComputerDeployment.systemResources.CPU_12
-    PayloadComputerDeployment.systemResources.CPU_13
-    PayloadComputerDeployment.systemResources.CPU_14
-    PayloadComputerDeployment.systemResources.CPU_15
+    systemResources.CPU
+    systemResources.CPU_00
+    systemResources.CPU_01
+    systemResources.CPU_02
+    systemResources.CPU_03
+    systemResources.CPU_04
+    systemResources.CPU_05
+    systemResources.CPU_06
+    systemResources.CPU_07
+    systemResources.CPU_08
+    systemResources.CPU_09
+    systemResources.CPU_10
+    systemResources.CPU_11
+    systemResources.CPU_12
+    systemResources.CPU_13
+    systemResources.CPU_14
+    systemResources.CPU_15
   }
 
   packet DataProducts id 21 group 3 {
@@ -163,6 +168,8 @@ telemetry packets PayloadComputerDeploymentPackets {
 
 } omit {
   CdhCore.cmdDisp.CommandErrors
+  # String channel: TlmPacketizer cannot packetize variable-length strings
+  cmdSeq.CS_CurrentSequence
   comDriver.BytesRecv
   comDriver.BytesSent
 }

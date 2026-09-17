@@ -13,8 +13,12 @@
 #include <Fw/Logger/Logger.hpp>
 #include <FprimeArtemisCore/Components/FatalHandler/FatalHandler.hpp>
 #include <Fw/FPrimeBasicTypes.hpp>
-#include <zephyr/sys/reboot.h>
 #include <cstring>  // for strncmp
+#ifdef __ZEPHYR__
+#include <zephyr/sys/reboot.h>
+#else
+#include <cstdlib>  // for exit
+#endif
 
 namespace Components {
 
@@ -37,6 +41,7 @@ namespace Components {
   }
 
   void FatalHandler::reboot() {
+  #ifdef __ZEPHYR__
   // When running in CI failsafe mode and the board is a teensy,
   // then we should invoke bkpt #251 to trigger the soft reboot enabling a
   // flash of new software
@@ -48,6 +53,14 @@ namespace Components {
   #endif
     // Otherwise, use Zephyr to reboot the system
     sys_reboot(SYS_REBOOT_COLD);
+  #else
+    // Hosted targets (Linux/RPi payload computer) have no sys_reboot, and
+    // rebooting the whole Pi on a FATAL would take down services that are not
+    // part of this deployment. Exit instead and let the supervisor (systemd)
+    // restart the process.
+    Fw::Logger::log("FatalHandler: exiting for supervisor restart\n");
+    ::exit(1);
+  #endif
   }
 
   void FatalHandler::FatalReceive_handler(
