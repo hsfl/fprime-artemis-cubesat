@@ -13,32 +13,71 @@ description: "Cross-compile F' (F Prime) deployments for ARM/Linux targets, espe
 
 ### KISS workflow for this repo
 
-Run from the active F' project root:
+The driver lives at the repo root and is shared by every F Prime project here.
+Run it from the repo root, not from a project directory:
 
 ```sh
-cd ArtemisRpiTeensy_N2
-./tools/docker_cross_compile_pi_zero_w.sh
+cd fprime-artemis-cubesat
+./tools/cross/cross_compile.sh
 ```
 
+That builds the default target: `ArtemisRpiTeensyDeployment` in the
+`ArtemisRpiTeensy_N2` project. To build something else, name it:
+
+```sh
+./tools/cross/cross_compile.sh --local-only \
+    --project fprime-artemis-core \
+    --deployment PayloadComputerDeployment
+```
+
+The deployment is located by directory name anywhere under the project, so flat
+layouts (`ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment`) and nested ones
+(`fprime-artemis-core/FprimeArtemisCore/Deployments/PayloadComputerDeployment`)
+both work without extra flags. Pass a name that does not exist and the script
+lists the deployments it can see.
+
+### Cross Python environments
+
+The container's Python environments live under `tools/cross/venv/<hash>` and are
+shared between projects, not rebuilt per project. The hash is the first 12 chars
+of `sha256sum <project>/lib/fprime/requirements.txt`.
+
+That means two projects pinning the same F Prime release reuse one environment,
+and a project on a different release gets its own. This repo currently needs
+two: `ArtemisRpiTeensy_N2` pins fprime-tools 4.2.1 / fprime-fpp 3.2.0, while
+`fprime-artemis-core` pins 4.3.0 / 3.3.0. Sharing one venv across those would
+autocode a project with the wrong FPP compiler — a silent failure, so the split
+is deliberate. A venv is only rebuilt when that project's requirements.txt
+actually changes.
+
+Both projects cross-compile today. `fprime-artemis-core` builds per target:
+`ARTEMIS_TARGET_ZEPHYR` (derived from `CMAKE_TOOLCHAIN_FILE` before `project()`)
+selects Zephyr + the Teensy deployments, or skips Zephyr and builds
+`PayloadComputerDeployment` for Linux/ARM. `PayloadComputerDeployment` keeps its
+own config overrides in `PayloadComputerConfig/` so the shared project config
+stays sized for the Teensy.
+
 Default mode is the normal iterative path. It reuses the Docker image, Pi
-sysroot, `.cross-venv-linux` Python environment, and F Prime build cache when
+sysroot, shared cross Python environment, and F Prime build cache when
 present, then still builds and verifies the final ARMv6 binary with `readelf`.
 
 Use local-only when you only need the ARM artifact and dictionary:
 
 ```sh
-./tools/docker_cross_compile_pi_zero_w.sh --local-only
+./tools/cross/cross_compile.sh --local-only
 ```
 
 Use clean mode when the toolchain, sysroot, Docker base image, or Python
 dependencies may be stale:
 
 ```sh
-./tools/docker_cross_compile_pi_zero_w.sh --clean
+./tools/cross/cross_compile.sh --clean
 ```
 
-`--clean` refreshes the sysroot, rebuilds the Docker image, recreates the cross
-Python venv, and force-regenerates the F Prime build cache. Do not use it for
+`--clean` rebuilds the Docker image, recreates this project's cross Python venv, and
+force-regenerates the selected project's F Prime build cache. It deliberately
+leaves the sysroot alone, because `tools/cross/sysroot` is now shared by every
+project — use `--resync-sysroot` to re-copy it from the Pi. Do not use it for
 every small C++/FPP iteration; the slow part is usually Python dependency setup,
 and forced regeneration also throws away incremental compile state.
 

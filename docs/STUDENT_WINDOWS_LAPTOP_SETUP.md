@@ -232,15 +232,15 @@ The full operator flow, expected events, and pass criteria live in
 From WSL2 with Docker available:
 
 ```bash
-cd ArtemisRpiTeensy_N2
-export PI_ZERO_W_SSH_HOST=pi@artemis-pi.local
-./tools/docker_cross_compile_pi_zero_w.sh
+cd fprime-artemis-cubesat
+export PI_SSH_HOST=pi@artemis-pi.local
+./tools/cross/cross_compile.sh
 ```
 
 For a local artifact check only:
 
 ```bash
-./tools/docker_cross_compile_pi_zero_w.sh --local-only
+./tools/cross/cross_compile.sh --local-only
 ```
 
 Use `--clean` only when the Docker image, Pi sysroot, or Python dependencies may

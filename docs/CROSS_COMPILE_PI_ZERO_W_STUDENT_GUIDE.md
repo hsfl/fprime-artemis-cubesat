@@ -21,14 +21,14 @@ not need to use the same host alias as the original machine.
 You can do that either by exporting variables:
 
 ```bash
-export PI_ZERO_W_SSH_HOST=pi@192.168.1.44
-export PI_ZERO_W_REMOTE_DIR=/home/pi/artemis/cross
+export PI_SSH_HOST=pi@192.168.1.44
+export PI_REMOTE_DIR=/home/pi/artemis/cross
 ```
 
 or by passing flags each time:
 
 ```bash
-./tools/docker_cross_compile_pi_zero_w.sh --host pi@192.168.1.44 --remote-dir /home/pi/artemis/cross
+./tools/cross/cross_compile.sh --host pi@192.168.1.44 --remote-dir /home/pi/artemis/cross
 ```
 
 Your Pi SSH target should support:
@@ -51,6 +51,12 @@ A generic Linux ARM hard-float build is not automatically safe for Pi Zero W. So
 
 That is why this flow checks the final binary with `readelf` before using it.
 
+## Where You Run It
+
+Run everything from the **repo root**, not from inside a project folder. The
+cross-compile tool lives at `tools/cross/` and is shared by every F Prime
+project in this repo.
+
 ## One-Command Flow
 
 ### macOS
@@ -58,10 +64,10 @@ That is why this flow checks the final binary with `readelf` before using it.
 Use this when the repo is cloned at `~/Developer/fprime-artemis-cubesat`.
 
 ```bash
-cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-export PI_ZERO_W_SSH_HOST=pi@artemis-pi.local
-export PI_ZERO_W_REMOTE_DIR=/home/pi/artemis/cross
-./tools/docker_cross_compile_pi_zero_w.sh
+cd ~/Developer/fprime-artemis-cubesat
+export PI_SSH_HOST=pi@artemis-pi.local
+export PI_REMOTE_DIR=/home/pi/artemis/cross
+./tools/cross/cross_compile.sh
 ```
 
 ### Windows Laptop (WSL2)
@@ -69,14 +75,14 @@ export PI_ZERO_W_REMOTE_DIR=/home/pi/artemis/cross
 Use this when the repo is cloned inside Ubuntu/WSL at `~/fprime-artemis-cubesat`.
 
 ```bash
-cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-export PI_ZERO_W_SSH_HOST=pi@artemis-pi.local
-export PI_ZERO_W_REMOTE_DIR=/home/pi/artemis/cross
-./tools/docker_cross_compile_pi_zero_w.sh
+cd ~/fprime-artemis-cubesat
+export PI_SSH_HOST=pi@artemis-pi.local
+export PI_REMOTE_DIR=/home/pi/artemis/cross
+./tools/cross/cross_compile.sh
 ```
 
 That script uses the normal fast path. It reuses the Docker image, Pi sysroot,
-cross Python environment, and F Prime build cache when they already exist, but
+shared cross Python environment, and F Prime build cache when they already exist, but
 it still builds and verifies the ARMv6 binary.
 
 That script will:
@@ -94,19 +100,54 @@ That script will:
 For a local artifact check without copying to the Pi:
 
 ```bash
-cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-./tools/docker_cross_compile_pi_zero_w.sh --local-only
+cd ~/fprime-artemis-cubesat
+./tools/cross/cross_compile.sh --local-only
 ```
 
 For a deliberate full refresh:
 
 ```bash
-cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-./tools/docker_cross_compile_pi_zero_w.sh --clean
+cd ~/fprime-artemis-cubesat
+./tools/cross/cross_compile.sh --clean
 ```
 
-Use `--clean` when the Docker image, Pi sysroot, Python dependencies, or F Prime
-build cache may be stale. Do not use it for every small code change.
+Use `--clean` when the Docker image, Python dependencies, or F Prime build cache
+may be stale. Do not use it for every small code change.
+
+`--clean` does not touch the sysroot. That folder is copied from the Pi and
+shared by every project, so refreshing it is a separate, explicit step:
+
+```bash
+./tools/cross/cross_compile.sh --resync-sysroot
+```
+
+You need a reachable Pi for that one.
+
+## Building A Different Deployment
+
+By default the tool builds `ArtemisRpiTeensyDeployment` from the
+`ArtemisRpiTeensy_N2` project. That is the one the demo uses, so most of the
+time you do not need these flags.
+
+To build a different one, name the project and the deployment:
+
+```bash
+cd ~/fprime-artemis-cubesat
+./tools/cross/cross_compile.sh --local-only \
+    --project fprime-artemis-core \
+    --deployment PayloadComputerDeployment
+```
+
+You only need the deployment's folder name. The tool finds it wherever it lives
+inside the project. If you get the name wrong, it prints the deployments it
+found so you can pick one.
+
+Each project/deployment keeps its own verification files, so building one does
+not overwrite the evidence for another.
+
+**Heads up:** `fprime-artemis-core` targets the Teensy through Zephyr and cannot
+be cross-compiled for the Pi yet. The flag works, but the build stops early with
+a Zephyr error. That is expected, not something you broke.
 
 ## What Success Looks Like
 
@@ -119,7 +160,7 @@ The important signs of success are:
 
 The verification files are saved in:
 
-- `ArtemisRpiTeensy_N2/cross/pi-zero-w/verify/`
+- `tools/cross/verify/<project>/<deployment>/`
 
 The large generated sysroot and verification outputs are intentionally kept out
 of Git. They are local build data, not source files.

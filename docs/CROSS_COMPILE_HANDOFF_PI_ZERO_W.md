@@ -57,26 +57,26 @@ The validated solution is:
 
 That logic now lives in:
 
-- `ArtemisRpiTeensy_N2/cross/pi-zero-w/cmake/toolchain/pi-zero-w-armv6hf.cmake`
-- `ArtemisRpiTeensy_N2/tools/sync_pi_zero_w_sysroot.sh`
-- `ArtemisRpiTeensy_N2/tools/docker_cross_compile_pi_zero_w.sh`
+- `tools/cross/cmake/toolchain/pi-zero-w-armv6hf.cmake`
+- `tools/cross/sync_sysroot.sh`
+- `tools/cross/cross_compile.sh`
 
 ## Repo Files Added or Changed
 
 Cross-build registration:
 
 - `ArtemisRpiTeensy_N2/settings.ini`
-- `ArtemisRpiTeensy_N2/cross/pi-zero-w/library.cmake`
+- `tools/cross/library.cmake`
 
 Toolchain and Docker:
 
-- `ArtemisRpiTeensy_N2/cross/pi-zero-w/cmake/toolchain/pi-zero-w-armv6hf.cmake`
-- `ArtemisRpiTeensy_N2/cross/pi-zero-w/docker/Dockerfile`
+- `tools/cross/cmake/toolchain/pi-zero-w-armv6hf.cmake`
+- `tools/cross/docker/Dockerfile`
 
 Automation scripts:
 
-- `ArtemisRpiTeensy_N2/tools/sync_pi_zero_w_sysroot.sh`
-- `ArtemisRpiTeensy_N2/tools/docker_cross_compile_pi_zero_w.sh`
+- `tools/cross/sync_sysroot.sh`
+- `tools/cross/cross_compile.sh`
 
 Smoke-test behavior:
 
@@ -107,26 +107,27 @@ This allows the deployment to come up far enough for a no-UART smoke test withou
 macOS:
 
 ```bash
-cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-export PI_ZERO_W_SSH_HOST=pi@artemis-pi.local
-export PI_ZERO_W_REMOTE_DIR=/home/pi/artemis/cross
-./tools/docker_cross_compile_pi_zero_w.sh
+cd ~/Developer/fprime-artemis-cubesat
+export PI_SSH_HOST=pi@artemis-pi.local
+export PI_REMOTE_DIR=/home/pi/artemis/cross
+./tools/cross/cross_compile.sh
 ```
 
 Windows WSL2:
 
 ```bash
-cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-export PI_ZERO_W_SSH_HOST=pi@artemis-pi.local
-export PI_ZERO_W_REMOTE_DIR=/home/pi/artemis/cross
-./tools/docker_cross_compile_pi_zero_w.sh
+cd ~/fprime-artemis-cubesat
+export PI_SSH_HOST=pi@artemis-pi.local
+export PI_REMOTE_DIR=/home/pi/artemis/cross
+./tools/cross/cross_compile.sh
 ```
 
 The default flow is now the fast iterative path:
 
 - reuse the Docker image if it already exists
 - reuse the synced Pi Zero W sysroot if it is complete
-- reuse `.cross-venv-linux` if the F Prime tools still run
+- reuse the shared `tools/cross/venv/<requirements-hash>` environment if the
+  F Prime tools still run
 - reuse the F Prime build cache unless `--clean` is used
 - build and verify the ARMv6 binary every time
 - deploy to the Pi and run the `/dev/null` smoke test unless `--local-only` is used
@@ -138,15 +139,15 @@ Students or future agents should change the target using either environment
 variables:
 
 ```bash
-export PI_ZERO_W_SSH_HOST=pi@artemis-pi.local
-export PI_ZERO_W_REMOTE_DIR=/home/pi/artemis/cross
-export PI_ZERO_W_SYSROOT_DIR="$PWD/cross/pi-zero-w/sysroot"
+export PI_SSH_HOST=pi@artemis-pi.local
+export PI_REMOTE_DIR=/home/pi/artemis/cross
+export PI_SYSROOT_DIR="$PWD/tools/cross/sysroot"
 ```
 
 or explicit flags:
 
 ```bash
-./tools/docker_cross_compile_pi_zero_w.sh --host pi@artemis-pi.local --remote-dir /home/pi/artemis/cross
+./tools/cross/cross_compile.sh --host pi@artemis-pi.local --remote-dir /home/pi/artemis/cross
 ```
 
 The Pi-side requirements are:
@@ -167,13 +168,13 @@ What the script does:
 Useful flags:
 
 ```bash
-cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-./tools/docker_cross_compile_pi_zero_w.sh --local-only
-./tools/docker_cross_compile_pi_zero_w.sh --clean
-./tools/docker_cross_compile_pi_zero_w.sh --skip-sync
-./tools/docker_cross_compile_pi_zero_w.sh --skip-image-build
-./tools/docker_cross_compile_pi_zero_w.sh --host pi@artemis-pi.local
-./tools/docker_cross_compile_pi_zero_w.sh --remote-dir /home/pi/artemis/cross
+cd ~/fprime-artemis-cubesat
+./tools/cross/cross_compile.sh --local-only
+./tools/cross/cross_compile.sh --clean
+./tools/cross/cross_compile.sh --skip-sync
+./tools/cross/cross_compile.sh --skip-image-build
+./tools/cross/cross_compile.sh --host pi@artemis-pi.local
+./tools/cross/cross_compile.sh --remote-dir /home/pi/artemis/cross
 ```
 
 Use `--clean` for a deliberate full refresh. It refreshes the sysroot,
@@ -186,10 +187,10 @@ throws away incremental compile state.
 
 Local verification outputs are written to:
 
-- `ArtemisRpiTeensy_N2/cross/pi-zero-w/verify/file.txt`
-- `ArtemisRpiTeensy_N2/cross/pi-zero-w/verify/readelf-A.txt`
-- `ArtemisRpiTeensy_N2/cross/pi-zero-w/verify/readelf-l.txt`
-- `ArtemisRpiTeensy_N2/cross/pi-zero-w/verify/binary-path.txt`
+- `tools/cross/verify/<project>/<deployment>/file.txt`
+- `tools/cross/verify/<project>/<deployment>/readelf-A.txt`
+- `tools/cross/verify/<project>/<deployment>/readelf-l.txt`
+- `tools/cross/verify/<project>/<deployment>/binary-path.txt`
 
 Expected ISA signals:
 

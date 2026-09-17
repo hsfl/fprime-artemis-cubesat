@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HOST="${PI_ZERO_W_SSH_HOST:-pi@raspberrypi-zero-w}"
-DEST="${PI_ZERO_W_SYSROOT_DIR:-$ROOT_DIR/cross/pi-zero-w/sysroot}"
+CROSS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOST="${PI_SSH_HOST:-${PI_ZERO_W_SSH_HOST:-pi@raspberrypi-zero-w}}"
+DEST="${PI_SYSROOT_DIR:-${PI_ZERO_W_SYSROOT_DIR:-$CROSS_DIR/sysroot}}"
 
 usage() {
   cat <<'EOF'
-Usage: sync_pi_zero_w_sysroot.sh [options]
+Usage: tools/cross/sync_sysroot.sh [options]
 
 Copy the minimum Raspberry Pi userspace needed for Pi Zero W cross-linking.
 
 Before using this on a different machine, update the SSH target:
-  export PI_ZERO_W_SSH_HOST=pi@192.168.1.44
-  ./tools/sync_pi_zero_w_sysroot.sh
+  export PI_SSH_HOST=pi@192.168.1.44
+  ./tools/cross/sync_sysroot.sh
 
 The SSH target must:
   - be reachable with key-based SSH or another non-interactive SSH setup
@@ -22,7 +22,7 @@ The SSH target must:
 
 Options:
   --host <ssh-host>   SSH host alias or user@host
-  --dest <path>       Destination sysroot directory
+  --dest <path>       Destination sysroot directory (default: tools/cross/sysroot)
   -h, --help          Show this help text
 EOF
 }
@@ -51,9 +51,9 @@ done
 
 mkdir -p "$DEST"
 
-echo "Syncing Pi Zero W sysroot from $HOST"
+echo "Syncing Pi sysroot from $HOST"
 echo "  destination: $DEST"
-echo "  note: change --host or PI_ZERO_W_SSH_HOST for your own Pi"
+echo "  note: change --host or PI_SSH_HOST for your own Pi"
 
 rsync -aH --delete --delete-excluded \
   --rsync-path="sudo rsync" \
@@ -85,7 +85,7 @@ rsync -aH --delete --delete-excluded \
 
 # The Pi GCC directory supplies ARMv6-safe runtime/startup objects, but its
 # compiler helper programs and LTO plugin are ARM executables. If they remain
-# under a `-B<sysroot-gcc-dir>` search path, the x86_64 Docker cross-compiler
+# under a `-B<sysroot-gcc-dir>` search path, the Docker cross-compiler
 # may try to execute/load them and fail under qemu. Keep only link/runtime
 # inputs here; the container provides its own host-side compiler helpers.
 find "$DEST/usr/lib/gcc/arm-linux-gnueabihf" -type f \

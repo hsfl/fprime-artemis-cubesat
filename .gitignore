@@ -46,3 +46,9 @@ ArtemisTeensy_N2_Baremetal/build/
 *.swp
 *.swo
 *.bak
+
+# Cross-compile local build data (regenerable; never commit)
+/tools/cross/sysroot/
+/tools/cross/verify/
+/tools/cross/venv/
+.cross-venv-linux/

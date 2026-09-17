@@ -138,7 +138,7 @@ fprime-gds  # Opens web UI at http://127.0.0.1:5000
 
 ## Cross-Compilation (Raspberry Pi)
 
-**THIS REPO'S TARGET IS A PI ZERO W (ARMv6).** Do NOT use `aarch64-linux` or standard `arm-hf-linux` for it — both target ARMv7+ and produce binaries that SIGILL on the Pi Zero W. Use the `fprime-cross-compilation` skill, which documents the ARMv6 toolchain and the repo's `tools/docker_cross_compile_pi_zero_w.sh` workflow.
+**THIS REPO'S TARGET IS A PI ZERO W (ARMv6).** Do NOT use `aarch64-linux` or standard `arm-hf-linux` for it — both target ARMv7+ and produce binaries that SIGILL on the Pi Zero W. Use the `fprime-cross-compilation` skill, which documents the ARMv6 toolchain and the repo's `tools/cross/cross_compile.sh` workflow.
 
 Generic F' cross-compilation (for ARMv7+/ARMv8 targets only):
 

@@ -88,15 +88,15 @@ From local CLI help (`fprime-gds --help`):
 Preferred path:
 
 ```bash
-cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-./tools/docker_cross_compile_pi_zero_w.sh
+cd ~/Developer/fprime-artemis-cubesat
+./tools/cross/cross_compile.sh
 ```
 
 Windows WSL2:
 
 ```bash
-cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
-./tools/docker_cross_compile_pi_zero_w.sh
+cd ~/fprime-artemis-cubesat
+./tools/cross/cross_compile.sh
 ```
 
 Native Pi fallback is documented in `docs/RPI_BUILD.md`.

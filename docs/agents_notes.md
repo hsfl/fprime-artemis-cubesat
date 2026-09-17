@@ -634,7 +634,8 @@ The current top-level target is the shortened FlatSat FSR end-to-end demo shown 
 - Revalidated Pi Zero W cross-build locally in Docker with ARMv6 verification.
 - `docs/CROSS_COMPILE_HANDOFF_PI_ZERO_W.md` remains the source-of-truth rationale for sysroot/runtime object handling.
 - Updated script:
-  - `ArtemisRpiTeensy_N2/tools/docker_cross_compile_pi_zero_w.sh`
+  - `tools/cross/cross_compile.sh` (moved to the repo root and generalized
+    with `--project` / `--deployment`; see the handoff doc)
 - Script updates applied:
   - added `--local-only` mode (skip SSH deploy/smoke and reuse local sysroot)
   - changed container mount to repo root (`/repo`) so F' version generation can see real git metadata
