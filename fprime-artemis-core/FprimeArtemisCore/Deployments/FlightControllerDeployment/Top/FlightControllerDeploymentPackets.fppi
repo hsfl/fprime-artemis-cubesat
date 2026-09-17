@@ -6,13 +6,6 @@ telemetry packets FlightControllerDeploymentPackets {
     CdhCore.events.EventsDropped
     #CdhCore.tlmSend.SendLevel # uncomment when using TlmPacketizer
 
-    FileHandling.fileUplink.FilesReceived
-    FileHandling.fileUplink.PacketsReceived
-    FileHandling.fileUplink.FilesReceivedFailed
-    DataProducts.dpBufferAccumulator.BA_NumQueuedBuffers
-    FileHandling.fileDownlink.FilesSent
-    FileHandling.fileDownlink.PacketsSent
-    FileHandling.fileManager.CommandsExecuted
 
     FprimeArtemisCore.cmdSeq.CS_LoadCommands
     FprimeArtemisCore.cmdSeq.CS_CancelCommands
@@ -34,9 +27,6 @@ telemetry packets FlightControllerDeploymentPackets {
   packet CDHErrors id 2 group 1 {
     CdhCore.$health.PingLateWarnings
 
-    FileHandling.fileUplink.Warnings
-    FileHandling.fileDownlink.Warnings
-    FileHandling.fileManager.Errors
 
     FprimeArtemisCore.cmdSeq.CS_Errors
     ComCcsds.commsBufferManager.NoBuffs
@@ -74,27 +64,6 @@ telemetry packets FlightControllerDeploymentPackets {
     FprimeArtemisCore.systemResources.CPU_15
   }
 
-  packet DataProducts id 21 group 3 {
-    DataProducts.dpCat.CatalogDps
-    DataProducts.dpCat.DpsSent
-
-    DataProducts.dpMgr.NumSuccessfulAllocations
-    DataProducts.dpMgr.NumFailedAllocations
-    DataProducts.dpMgr.NumDataProducts
-    DataProducts.dpMgr.NumBytes
-
-    DataProducts.dpWriter.NumBuffersReceived
-    DataProducts.dpWriter.NumBytesWritten
-    DataProducts.dpWriter.NumSuccessfulWrites
-    DataProducts.dpWriter.NumFailedWrites
-    DataProducts.dpWriter.NumErrors
-
-    DataProducts.dpBufferManager.TotalBuffs
-    DataProducts.dpBufferManager.CurrBuffs
-    DataProducts.dpBufferManager.HiBuffs
-    DataProducts.dpBufferManager.NoBuffs
-    DataProducts.dpBufferManager.EmptyBuffs
-  }
 
   packet Version1 id 22 group 2 {
     CdhCore.version.FrameworkVersion

@@ -19,7 +19,7 @@ module FprimeArtemisCore {
 
   module Default {
     constant QUEUE_SIZE = 10
-    constant STACK_SIZE = 64 * 1024
+    constant STACK_SIZE = 8 * 1024 # Must match prj.conf CONFIG_DYNAMIC_THREAD_STACK_SIZE
   }
 
   # ----------------------------------------------------------------------
@@ -67,5 +67,7 @@ module FprimeArtemisCore {
   instance timer: Zephyr.ZephyrRateDriver base id 0x10013000
 
   instance comDriver: Zephyr.ZephyrUartDriver base id 0x10014000
+
+  instance nullPrmDb: Components.NullPrmDb base id 0x10015000
 
 }
