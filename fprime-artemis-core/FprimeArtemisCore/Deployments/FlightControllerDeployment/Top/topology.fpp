@@ -49,7 +49,7 @@ module FprimeArtemisCore {
   # Telemetry packets (only used when TlmPacketizer is used)
   # ----------------------------------------------------------------------
 
-    # include "FlightControllerDeploymentPackets.fppi"
+    include "FlightControllerDeploymentPackets.fppi"
 
   # ----------------------------------------------------------------------
   # Direct graph specifiers

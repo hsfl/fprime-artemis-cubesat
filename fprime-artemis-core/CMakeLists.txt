@@ -4,9 +4,22 @@
 ####
 
 cmake_minimum_required(VERSION 3.24.2)
-# Only enable Zephyr package when not testing. F Prime unit tests run on Linux typically.
+# Zephyr applies only to the Teensy flight target. F Prime unit tests run on
+# Linux, and so do deployments like PayloadComputerDeployment, which is
+# cross-compiled for the Raspberry Pi -- find_package(Zephyr) cannot succeed
+# there. The toolchain file is the only signal available this early, since
+# project() below is what actually reads it.
+set(ARTEMIS_TARGET_ZEPHYR FALSE)
 if (NOT BUILD_TESTING)
+    if (NOT DEFINED CMAKE_TOOLCHAIN_FILE OR "${CMAKE_TOOLCHAIN_FILE}" MATCHES "[Zz]ephyr")
+        set(ARTEMIS_TARGET_ZEPHYR TRUE)
+    endif()
+endif()
+
+if (ARTEMIS_TARGET_ZEPHYR)
     find_package(Zephyr HINTS "${CMAKE_CURRENT_LIST_DIR}/lib/zephyr-workspace")
+else()
+    message(STATUS "Building without Zephyr (toolchain: ${CMAKE_TOOLCHAIN_FILE})")
 endif()
 project(fprime-artemis-core C CXX)
 
@@ -29,4 +42,6 @@ fprime_setup_included_code()
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/FprimeArtemisCore")
 
 set_target_properties(Svc_FatalHandler PROPERTIES EXCLUDE_FROM_ALL TRUE)
-set_target_properties(fprime-zephyr_Drv_ZephyrSpiDriver PROPERTIES EXCLUDE_FROM_ALL TRUE)
+if (ARTEMIS_TARGET_ZEPHYR)
+    set_target_properties(fprime-zephyr_Drv_ZephyrSpiDriver PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()

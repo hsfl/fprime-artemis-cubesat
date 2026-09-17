@@ -100,3 +100,9 @@ void teardownTopology(const TopologyState& state) {
     deinitComponents(state);
 }
 };  // namespace FprimeArtemisCore
+
+namespace FprimeArtemisConfig {
+const Svc::TlmPacketizerPacketList& tlmPacketList() {
+    return FprimeArtemisCore::FlightControllerDeployment_FlightControllerDeploymentPacketsTlmPackets::packetList;
+}
+}  // namespace FprimeArtemisConfig

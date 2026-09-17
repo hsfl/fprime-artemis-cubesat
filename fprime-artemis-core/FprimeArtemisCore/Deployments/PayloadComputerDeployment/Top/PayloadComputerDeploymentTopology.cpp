@@ -6,10 +6,11 @@
 // Provides access to autocoded functions
 #include <FprimeArtemisCore/Deployments/PayloadComputerDeployment/Top/PayloadComputerDeploymentTopologyAc.hpp>
 // Note: Uncomment when using Svc:TlmPacketizer
-//#include <FprimeArtemisCore/Deployments/PayloadComputerDeployment/Top/PayloadComputerDeploymentPacketsAc.hpp>
+#include <FprimeArtemisCore/Deployments/PayloadComputerDeployment/Top/PayloadComputerDeployment_PayloadComputerDeploymentPacketsTlmPacketsAc.hpp>
 
 // Necessary project-specified types
 #include <Fw/Types/MallocAllocator.hpp>
+#include <cstdio>  // for printf
 
 // Public functions for use in main program are namespaced with deployment module PayloadComputerDeployment
 // This is also the namespace where the topology components are instantiated by FPP.
@@ -77,8 +78,8 @@ void setupTopology(const TopologyState& state) {
     if (state.uartDevice != nullptr) {
         Os::TaskString name("ReceiveTask");
         // Uplink is configured for receive so a socket task is started
-        if (comDriver.open(state.uartDevice, static_cast<Drv::LinuxUartDriver::UartBaudRate>(state.baudRate), 
-                           Drv::LinuxUartDriver::NO_FLOW, Drv::LinuxUartDriver::PARITY_NONE, 2048)) {
+        if (comDriver.open(state.uartDevice, static_cast<Drv::PosixUartDriver::UartBaudRate>(state.baudRate), 
+                           Drv::PosixUartDriver::NO_FLOW, Drv::PosixUartDriver::PARITY_NONE, 2048)) {
             comDriver.start(COMM_PRIORITY, Default::STACK_SIZE);
         } else {
             printf("Failed to open UART device %s at baud rate %" PRIu32 "\n", state.uartDevice, state.baudRate);
@@ -111,3 +112,9 @@ void teardownTopology(const TopologyState& state) {
     deinitComponents(state);
 }
 };  // namespace PayloadComputerDeployment
+
+namespace FprimeArtemisConfig {
+const Svc::TlmPacketizerPacketList& tlmPacketList() {
+    return PayloadComputerDeployment::PayloadComputerDeployment_PayloadComputerDeploymentPacketsTlmPackets::packetList;
+}
+}  // namespace FprimeArtemisConfig

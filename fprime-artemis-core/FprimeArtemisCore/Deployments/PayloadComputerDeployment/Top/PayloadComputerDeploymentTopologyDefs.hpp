@@ -73,4 +73,14 @@ struct TopologyState {
 namespace PingEntries = ::PingEntries;
 }  // namespace PayloadComputerDeployment
 
+// Deployment-supplied telemetry packet list accessor.
+//
+// The shared CdhCore tlmSend config calls this from configComponents(). Each
+// deployment defines it in its own Topology.cpp, returning its own packet
+// list, so the shared config stays deployment-agnostic.
+#include "Svc/TlmPacketizer/TlmPacketizerTypes.hpp"
+namespace FprimeArtemisConfig {
+const Svc::TlmPacketizerPacketList& tlmPacketList();
+}
+
 #endif

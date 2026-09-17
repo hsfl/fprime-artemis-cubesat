@@ -6,14 +6,14 @@ This guide assumes that the initial setup steps have been completed, and will wa
 > [!Note]
 > This step can be skipped if the setup.sh script is run. However, any changes made will require you to run `fprime-util build` and may require `fprime-util generate`
 
-1. In order to build the ReferenceDeployment application, or any other F´ application, we first need to generate a build directory. This can be done with the following commands:
+1. In order to build the FlightControllerDeployment application, or any other F´ application, we first need to generate a build directory. This can be done with the following commands:
 
 ```sh
 # In fprime-artemis-core (fprime-venv)
 fprime-util generate
 ```
 
-2. The next step is to build the ReferenceDeployment application's code.
+2. The next step is to build the FlightControllerDeployment application's code.
 ```sh
 # In fprime-artemis-core (fprime-venv)
 fprime-util build
@@ -45,10 +45,10 @@ The following command will spin up the F' GDS as well as run the application bin
 
 ```sh
 # In fprime-artemis-core (fprime-venv)
-fprime-gds -n --dictionary ./build-artifacts/zephyr/fprime-zephyr-deployment/dict/ReferenceDeploymentTopologyDictionary.json --communication-selection uart --uart-baud 115200 --output-unframed-data
+fprime-gds -n --dictionary ./build-artifacts/zephyr/fprime-zephyr-deployment/dict/FlightControllerDeploymentTopologyDictionary.json --communication-selection uart --uart-baud 115200 --output-unframed-data
 
 # Or
-fprime-gds -n --dictionary ./build-artifacts/zephyr/fprime-zephyr-deployment/dict/ReferenceDeploymentTopologyDictionary.json --communication-selection uart --uart-device /dev/cu.usbmodem142101 --uart-baud 115200 
+fprime-gds -n --dictionary ./build-artifacts/zephyr/fprime-zephyr-deployment/dict/FlightControllerDeploymentTopologyDictionary.json --communication-selection uart --uart-device /dev/cu.usbmodem142101 --uart-baud 115200 
 
 ```
 

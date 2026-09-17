@@ -95,3 +95,9 @@ void teardownTopology(const TopologyState& state) {
     tearDownComponents(state);
 }
 };  // namespace ReferenceDeployment
+
+namespace FprimeArtemisConfig {
+const Svc::TlmPacketizerPacketList& tlmPacketList() {
+    return ReferenceDeployment::ReferenceDeployment_ReferenceDeploymentPacketsTlmPackets::packetList;
+}
+}  // namespace FprimeArtemisConfig

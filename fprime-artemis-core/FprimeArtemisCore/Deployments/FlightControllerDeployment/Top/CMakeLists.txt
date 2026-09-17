@@ -19,4 +19,7 @@ register_fprime_module(
         "${CMAKE_CURRENT_LIST_DIR}/FlightControllerDeploymentTopology.cpp"
     DEPENDS
         Fw_Logger
+        # Pulls in the raised TlmPacketizer limits. Note that
+        # CONFIGURATION_OVERRIDES applies tree-wide, not just to this target.
+        FlightControllerCdhCoreTlmConfig
 )

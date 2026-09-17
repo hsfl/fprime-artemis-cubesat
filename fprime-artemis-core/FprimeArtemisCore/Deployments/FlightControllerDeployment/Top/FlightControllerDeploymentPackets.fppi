@@ -3,10 +3,13 @@ telemetry packets FlightControllerDeploymentPackets {
   packet CDH id 1 group 1 {
     CdhCore.cmdDisp.CommandsDispatched
     CdhCore.cmdDisp.CommandsDropped
+    CdhCore.events.EventsDropped
     #CdhCore.tlmSend.SendLevel # uncomment when using TlmPacketizer
 
     FileHandling.fileUplink.FilesReceived
     FileHandling.fileUplink.PacketsReceived
+    FileHandling.fileUplink.FilesReceivedFailed
+    DataProducts.dpBufferAccumulator.BA_NumQueuedBuffers
     FileHandling.fileDownlink.FilesSent
     FileHandling.fileDownlink.PacketsSent
     FileHandling.fileManager.CommandsExecuted
@@ -17,6 +20,8 @@ telemetry packets FlightControllerDeploymentPackets {
     FprimeArtemisCore.cmdSeq.CS_SequencesCompleted
     ComCcsds.comQueue.comQueueDepth
     ComCcsds.comQueue.buffQueueDepth
+    CdhCore.tlmSend.GroupConfigs
+    CdhCore.tlmSend.SectionEnabled
     ComCcsds.commsBufferManager.TotalBuffs
     ComCcsds.commsBufferManager.CurrBuffs
     ComCcsds.commsBufferManager.HiBuffs
@@ -163,6 +168,6 @@ telemetry packets FlightControllerDeploymentPackets {
 
 } omit {
   CdhCore.cmdDisp.CommandErrors
-  comDriver.BytesRecv
-  comDriver.BytesSent
+  # String channel: TlmPacketizer cannot packetize variable-length strings
+  FprimeArtemisCore.cmdSeq.CS_CurrentSequence
 }
