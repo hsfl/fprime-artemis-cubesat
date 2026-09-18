@@ -15,6 +15,20 @@
 // SubtopologyTopologyDefs includes
 #include "Svc/Subtopologies/CdhCore/SubtopologyTopologyDefs.hpp"
 #include "Svc/Subtopologies/ComCcsds/SubtopologyTopologyDefs.hpp"
+
+// FC<->PC link: framing chain support
+#include <Fw/Types/MallocAllocator.hpp>
+#include <Svc/BufferManager/BufferManager.hpp>
+#include <Svc/FrameAccumulator/FrameDetector/FprimeFrameDetector.hpp>
+
+//! Sizing for the GenericHub link to the FlightController over /dev/serial0.
+//! Must stay consistent with PcLink:: on the flight controller side.
+namespace FcLink {
+static constexpr FwSizeType bufferSize = 512;       //!< bytes per hub transport buffer
+static constexpr FwSizeType bufferCount = 6;        //!< hub transport buffers in the pool
+static constexpr FwSizeType accumulatorSize = 1024; //!< frame reassembly ring capacity
+static constexpr FwEnumStoreType bufferManagerId = 400;
+}  // namespace FcLink
 #include "Svc/Subtopologies/DataProducts/SubtopologyTopologyDefs.hpp"
 #include "Svc/Subtopologies/FileHandling/SubtopologyTopologyDefs.hpp"
 
@@ -69,6 +83,9 @@ struct TopologyState {
     DataProducts::SubtopologyState dataProducts; //!< Subtopology state for DataProducts
     FileHandling::SubtopologyState fileHandling; //!< Subtopology state for FileHandling
 };
+
+//! Allocator backing the link buffer manager and frame accumulator
+extern Fw::MallocAllocator fcLinkAllocator;
 
 namespace PingEntries = ::PingEntries;
 }  // namespace PayloadComputerDeployment

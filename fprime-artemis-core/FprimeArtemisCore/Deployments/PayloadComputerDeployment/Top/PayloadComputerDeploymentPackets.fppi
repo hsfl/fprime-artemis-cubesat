@@ -166,10 +166,19 @@ telemetry packets PayloadComputerDeploymentPackets {
     CdhCore.version.CustomVersion10
   }
 
+  packet FcLink id 3 group 1 {
+    fcLinkManager.HeartbeatsSent
+    fcLinkBufferManager.TotalBuffs
+    fcLinkBufferManager.CurrBuffs
+    fcLinkBufferManager.HiBuffs
+    fcLinkBufferManager.NoBuffs
+    fcLinkBufferManager.EmptyBuffs
+  }
+
 } omit {
   CdhCore.cmdDisp.CommandErrors
   # String channel: TlmPacketizer cannot packetize variable-length strings
   cmdSeq.CS_CurrentSequence
-  comDriver.BytesRecv
-  comDriver.BytesSent
+  fcLinkDriver.BytesRecv
+  fcLinkDriver.BytesSent
 }

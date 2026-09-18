@@ -31,6 +31,16 @@ module FprimeArtemisCore {
     instance comDriver
     instance cmdSeq
     instance nullPrmDb
+    instance rpiPowerManager
+    instance rpiPowerDriver
+    instance pcLinkHub
+    instance pcLinkAdapter
+    instance pcLinkFramer
+    instance pcLinkDeframer
+    instance pcLinkComStub
+    instance pcLinkDriver
+    instance pcLinkAccumulator
+    instance pcLinkBufferManager
 
   # ----------------------------------------------------------------------
   # Pattern graph specifiers
@@ -93,6 +103,8 @@ module FprimeArtemisCore {
       rateGroup_1Hz.RateGroupMemberOut[3] -> ComCcsds.aggregator.timeout
       rateGroup_1Hz.RateGroupMemberOut[4] -> CdhCore.cmdDisp.run
       rateGroup_1Hz.RateGroupMemberOut[5] -> comDriver.schedIn
+      rateGroup_1Hz.RateGroupMemberOut[6] -> pcLinkDriver.schedIn
+      rateGroup_1Hz.RateGroupMemberOut[7] -> rpiPowerManager.run
 
       # 0.5Hz rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_0_5Hz] -> rateGroup_0_5Hz.CycleIn
@@ -102,12 +114,56 @@ module FprimeArtemisCore {
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_0_25Hz] -> rateGroup_0_25Hz.CycleIn
       rateGroup_0_25Hz.RateGroupMemberOut[0] -> CdhCore.$health.Run
       rateGroup_0_25Hz.RateGroupMemberOut[1] -> ComCcsds.commsBufferManager.schedIn
+      rateGroup_0_25Hz.RateGroupMemberOut[2] -> pcLinkBufferManager.schedIn
     }
 
     connections CdhCore_cmdSeq {
       # Command Sequencer
       cmdSeq.comCmdOut -> CdhCore.cmdDisp.seqCmdBuff
       CdhCore.cmdDisp.seqCmdStatus -> cmdSeq.cmdResponseIn
+    }
+
+    connections RpiPower {
+      # Manager tier drives the pin through the Drv.Gpio driver tier.
+      # peerAliveIn is fed by the payload computer heartbeat; see connections PcLink.
+      rpiPowerManager.gpioSet -> rpiPowerDriver.gpioWrite
+    }
+
+    connections PcLink {
+      # --- Payload computer heartbeat (serial port 0 must match the peer) ---
+      pcLinkHub.serialOut[0]            -> rpiPowerManager.peerAliveIn
+
+      # --- Downlink: pcLinkHub -> framer -> ComStub -> UART ---
+      pcLinkHub.allocate                      -> pcLinkBufferManager.bufferGetCallee
+      pcLinkHub.deallocate                    -> pcLinkBufferManager.bufferSendIn
+      pcLinkHub.toBufferDriver                -> pcLinkAdapter.bufferIn
+      pcLinkAdapter.comDataOut         -> pcLinkFramer.dataIn
+      pcLinkFramer.dataReturnOut           -> pcLinkAdapter.comDataReturnIn
+      pcLinkAdapter.bufferInReturn     -> pcLinkHub.toBufferDriverReturn
+      pcLinkFramer.bufferAllocate          -> pcLinkBufferManager.bufferGetCallee
+      pcLinkFramer.bufferDeallocate        -> pcLinkBufferManager.bufferSendIn
+      pcLinkFramer.dataOut                 -> pcLinkComStub.dataIn
+      pcLinkComStub.dataReturnOut          -> pcLinkFramer.dataReturnIn
+
+      # --- Uplink: UART -> accumulator -> deframer -> pcLinkHub ---
+      pcLinkComStub.dataOut                -> pcLinkAccumulator.dataIn
+      pcLinkAccumulator.dataReturnOut      -> pcLinkComStub.dataReturnIn
+      pcLinkAccumulator.bufferAllocate     -> pcLinkBufferManager.bufferGetCallee
+      pcLinkAccumulator.bufferDeallocate   -> pcLinkBufferManager.bufferSendIn
+      pcLinkAccumulator.dataOut            -> pcLinkDeframer.dataIn
+      pcLinkDeframer.dataReturnOut         -> pcLinkAccumulator.dataReturnIn
+      pcLinkDeframer.dataOut               -> pcLinkAdapter.comDataIn
+      pcLinkAdapter.bufferOut          -> pcLinkHub.fromBufferDriver
+      pcLinkHub.fromBufferDriverReturn        -> pcLinkAdapter.bufferOutReturn
+      pcLinkAdapter.comDataReturnOut   -> pcLinkDeframer.dataReturnIn
+
+      # --- ComStub <-> ZephyrUartDriver ---
+      pcLinkDriver.allocate            -> pcLinkBufferManager.bufferGetCallee
+      pcLinkDriver.deallocate          -> pcLinkBufferManager.bufferSendIn
+      pcLinkDriver.$recv               -> pcLinkComStub.drvReceiveIn
+      pcLinkComStub.drvReceiveReturnOut    -> pcLinkDriver.recvReturnIn
+      pcLinkComStub.drvSendOut             -> pcLinkDriver.$send
+      pcLinkDriver.ready               -> pcLinkComStub.drvConnected
     }
 
     connections FlightControllerDeployment {

@@ -30,7 +30,15 @@ module PayloadComputerDeployment {
     instance rateGroupDriver
     instance systemResources
     instance timer
-    instance comDriver
+    instance fcLinkDriver
+    instance fcLinkManager
+    instance fcLinkHub
+    instance fcLinkAdapter
+    instance fcLinkFramer
+    instance fcLinkDeframer
+    instance fcLinkComStub
+    instance fcLinkAccumulator
+    instance fcLinkBufferManager
     instance cmdSeq
 
   # ----------------------------------------------------------------------
@@ -76,18 +84,41 @@ module PayloadComputerDeployment {
       FileHandling.fileUplink.bufferSendOut -> ComCcsds.fprimeRouter.fileBufferReturnIn
     }
 
-    connections Communications {
-      # ComDriver buffer allocations
-      comDriver.allocate      -> ComCcsds.commsBufferManager.bufferGetCallee
-      comDriver.deallocate    -> ComCcsds.commsBufferManager.bufferSendIn
-      
-      # ComDriver <-> ComStub (Uplink)
-      comDriver.$recv                     -> ComCcsds.comStub.drvReceiveIn
-      ComCcsds.comStub.drvReceiveReturnOut -> comDriver.recvReturnIn
-      
-      # ComStub <-> ComDriver (Downlink)
-      ComCcsds.comStub.drvSendOut      -> comDriver.$send
-      comDriver.ready         -> ComCcsds.comStub.drvConnected
+    connections FcLink {
+      # --- Heartbeat into the hub (serial port 0 must match the peer) ---
+      fcLinkManager.peerAliveOut        -> fcLinkHub.serialIn[0]
+
+      # --- Downlink: hub -> framer -> ComStub -> UART ---
+      fcLinkHub.allocate                -> fcLinkBufferManager.bufferGetCallee
+      fcLinkHub.deallocate              -> fcLinkBufferManager.bufferSendIn
+      fcLinkHub.toBufferDriver          -> fcLinkAdapter.bufferIn
+      fcLinkAdapter.comDataOut          -> fcLinkFramer.dataIn
+      fcLinkFramer.dataReturnOut        -> fcLinkAdapter.comDataReturnIn
+      fcLinkAdapter.bufferInReturn      -> fcLinkHub.toBufferDriverReturn
+      fcLinkFramer.bufferAllocate       -> fcLinkBufferManager.bufferGetCallee
+      fcLinkFramer.bufferDeallocate     -> fcLinkBufferManager.bufferSendIn
+      fcLinkFramer.dataOut              -> fcLinkComStub.dataIn
+      fcLinkComStub.dataReturnOut       -> fcLinkFramer.dataReturnIn
+
+      # --- Uplink: UART -> accumulator -> deframer -> hub ---
+      fcLinkComStub.dataOut             -> fcLinkAccumulator.dataIn
+      fcLinkAccumulator.dataReturnOut   -> fcLinkComStub.dataReturnIn
+      fcLinkAccumulator.bufferAllocate  -> fcLinkBufferManager.bufferGetCallee
+      fcLinkAccumulator.bufferDeallocate -> fcLinkBufferManager.bufferSendIn
+      fcLinkAccumulator.dataOut         -> fcLinkDeframer.dataIn
+      fcLinkDeframer.dataReturnOut      -> fcLinkAccumulator.dataReturnIn
+      fcLinkDeframer.dataOut            -> fcLinkAdapter.comDataIn
+      fcLinkAdapter.bufferOut           -> fcLinkHub.fromBufferDriver
+      fcLinkHub.fromBufferDriverReturn  -> fcLinkAdapter.bufferOutReturn
+      fcLinkAdapter.comDataReturnOut    -> fcLinkDeframer.dataReturnIn
+
+      # --- ComStub <-> PosixUartDriver ---
+      fcLinkDriver.allocate             -> fcLinkBufferManager.bufferGetCallee
+      fcLinkDriver.deallocate           -> fcLinkBufferManager.bufferSendIn
+      fcLinkDriver.$recv                -> fcLinkComStub.drvReceiveIn
+      fcLinkComStub.drvReceiveReturnOut -> fcLinkDriver.recvReturnIn
+      fcLinkComStub.drvSendOut          -> fcLinkDriver.$send
+      fcLinkDriver.ready                -> fcLinkComStub.drvConnected
     }
 
     connections FileHandling_DataProducts {
@@ -108,6 +139,7 @@ module PayloadComputerDeployment {
       rateGroup_1Hz.RateGroupMemberOut[3] -> ComCcsds.comQueue.run
       rateGroup_1Hz.RateGroupMemberOut[4] -> ComCcsds.aggregator.timeout
       rateGroup_1Hz.RateGroupMemberOut[5] -> CdhCore.cmdDisp.run
+      rateGroup_1Hz.RateGroupMemberOut[6] -> fcLinkManager.run
 
       # 0.5Hz rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_0_5Hz] -> rateGroup_0_5Hz.CycleIn
@@ -120,6 +152,7 @@ module PayloadComputerDeployment {
       rateGroup_0_25Hz.RateGroupMemberOut[2] -> DataProducts.dpBufferManager.schedIn
       rateGroup_0_25Hz.RateGroupMemberOut[3] -> DataProducts.dpWriter.schedIn
       rateGroup_0_25Hz.RateGroupMemberOut[4] -> DataProducts.dpMgr.schedIn
+      rateGroup_0_25Hz.RateGroupMemberOut[5] -> fcLinkBufferManager.schedIn
     }
 
     connections CdhCore_cmdSeq {

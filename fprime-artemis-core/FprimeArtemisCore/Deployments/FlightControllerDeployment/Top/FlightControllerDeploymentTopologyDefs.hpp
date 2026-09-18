@@ -14,12 +14,27 @@
 #include "Svc/Subtopologies/CdhCore/SubtopologyTopologyDefs.hpp"
 #include "Svc/Subtopologies/ComCcsds/SubtopologyTopologyDefs.hpp"
 
+// FC↔PC link: framing chain support
+#include <Fw/Types/MallocAllocator.hpp>
+#include <Svc/BufferManager/BufferManager.hpp>
+#include <Svc/FrameAccumulator/FrameDetector/FprimeFrameDetector.hpp>
+
+//! Sizing for the GenericHub link to the PayloadComputer over lpuart4.
+//! Buffers must hold a whole pcLinkHub message plus its F Prime frame.
+namespace PcLink {
+static constexpr FwSizeType bufferSize = 512;       //!< bytes per pcLinkHub transport buffer
+static constexpr FwSizeType bufferCount = 6;        //!< pcLinkHub transport buffers in the pool
+static constexpr FwSizeType accumulatorSize = 1024; //!< frame reassembly ring capacity
+static constexpr FwEnumStoreType bufferManagerId = 400;
+}  // namespace PcLink
+
 //ComCcsds Enum Includes
 #include "Svc/Subtopologies/ComCcsds/Ports_ComPacketQueueEnumAc.hpp"
 #include "Svc/Subtopologies/ComCcsds/Ports_ComBufferQueueEnumAc.hpp"
 
-// Zephyr device handle type for the UART driver
+// Zephyr device handle types for the UART and GPIO drivers
 #include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
 
 // Include autocoded FPP constants
 #include "FprimeArtemisCore/Deployments/FlightControllerDeployment/Top/FppConstantsAc.hpp"
@@ -61,11 +76,16 @@ namespace FprimeArtemisCore {
  * contents are entirely up to the definition of the project. This deployment uses subtopologies.
  */
 struct TopologyState {
-    const struct device* uartDevice; //!< Zephyr UART device handle for communication
-    U32 baudRate;          //!< Baud rate for UART communication
+    const struct device* uartDevice; //!< Zephyr UART device handle for the ground link
+    U32 baudRate;          //!< Baud rate for the ground link
+    const struct device* pcLinkDevice; //!< Zephyr UART device handle for the PayloadComputer pcLinkHub link
+    U32 pcLinkBaud;       //!< Baud rate for the pcLinkHub link
     CdhCore::SubtopologyState cdhCore;           //!< Subtopology state for CdhCore
     ComCcsds::SubtopologyState comCcsds;         //!< Subtopology state for ComCcsds 
 };
+
+//! Allocator backing the pcLinkHub buffer manager and frame accumulator
+extern Fw::MallocAllocator pcLinkAllocator;
 
 namespace PingEntries = ::PingEntries;
 }  // namespace FprimeArtemisCore

@@ -19,6 +19,9 @@ namespace PayloadComputerDeployment {
 // Instantiate a malloc allocator for cmdSeq buffer allocation
 Fw::MallocAllocator mallocator;
 
+// Allocator for the FC<->PC link buffer manager and frame accumulator
+Fw::MallocAllocator fcLinkAllocator;
+
 // Rate group timing: base clock interval and divisors are coupled to rate group names
 const Fw::TimeInterval rateGroupInterval(1, 0);  // 1Hz base clock
 Svc::RateGroupDriver::DividerSet rateGroupDivisorsSet{{{1, 0}, {2, 0}, {4, 0}}};
@@ -78,9 +81,9 @@ void setupTopology(const TopologyState& state) {
     if (state.uartDevice != nullptr) {
         Os::TaskString name("ReceiveTask");
         // Uplink is configured for receive so a socket task is started
-        if (comDriver.open(state.uartDevice, static_cast<Drv::PosixUartDriver::UartBaudRate>(state.baudRate), 
+        if (fcLinkDriver.open(state.uartDevice, static_cast<Drv::PosixUartDriver::UartBaudRate>(state.baudRate), 
                            Drv::PosixUartDriver::NO_FLOW, Drv::PosixUartDriver::PARITY_NONE, 2048)) {
-            comDriver.start(COMM_PRIORITY, Default::STACK_SIZE);
+            fcLinkDriver.start(COMM_PRIORITY, Default::STACK_SIZE);
         } else {
             printf("Failed to open UART device %s at baud rate %" PRIu32 "\n", state.uartDevice, state.baudRate);
         }
@@ -102,8 +105,8 @@ void teardownTopology(const TopologyState& state) {
     freeThreads(state);
 
     // Other task clean-up.
-    comDriver.quitReadThread();
-    (void)comDriver.join();
+    fcLinkDriver.quitReadThread();
+    (void)fcLinkDriver.join();
 
     // Resource deallocation
     cmdSeq.deallocateBuffer(mallocator);

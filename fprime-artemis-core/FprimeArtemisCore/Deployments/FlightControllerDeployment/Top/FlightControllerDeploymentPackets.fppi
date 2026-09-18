@@ -37,6 +37,11 @@ telemetry packets FlightControllerDeploymentPackets {
     FprimeArtemisCore.rateGroup_0_25Hz.RgCycleSlips
   }
 
+  packet RpiPower id 3 group 1 {
+    FprimeArtemisCore.rpiPowerManager.RpiState
+    FprimeArtemisCore.rpiPowerManager.RpiPowerCycles
+  }
+
   packet SystemRes1 id 5 group 2 {
     FprimeArtemisCore.systemResources.MEMORY_TOTAL
     FprimeArtemisCore.systemResources.MEMORY_USED
@@ -139,4 +144,10 @@ telemetry packets FlightControllerDeploymentPackets {
   CdhCore.cmdDisp.CommandErrors
   # String channel: TlmPacketizer cannot packetize variable-length strings
   FprimeArtemisCore.cmdSeq.CS_CurrentSequence
+  # FC↔PC link buffer pool health: not downlinked during MVP bring-up
+  FprimeArtemisCore.pcLinkBufferManager.TotalBuffs
+  FprimeArtemisCore.pcLinkBufferManager.CurrBuffs
+  FprimeArtemisCore.pcLinkBufferManager.HiBuffs
+  FprimeArtemisCore.pcLinkBufferManager.NoBuffs
+  FprimeArtemisCore.pcLinkBufferManager.EmptyBuffs
 }

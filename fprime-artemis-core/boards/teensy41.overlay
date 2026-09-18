@@ -131,7 +131,7 @@
         zephyr,sram = &ocram2;
     };
 
-    rpi_power {
+    rpi_power: rpi_power {
         compatible = "artemis,rpi-power";
         rpi-enable-gpios = <&gpio2 18 GPIO_ACTIVE_HIGH>; /* pin 36, RPi power enable */
     };

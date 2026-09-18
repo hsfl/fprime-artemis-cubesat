@@ -18,6 +18,9 @@ namespace FprimeArtemisCore {
 // Instantiate a malloc allocator for cmdSeq buffer allocation
 Fw::MallocAllocator mallocator;
 
+// Allocator for the pcLinkHub link buffer manager and frame accumulator
+Fw::MallocAllocator pcLinkAllocator;
+
 // Rate group timing: base clock interval and divisors are coupled to rate group names
 constexpr U32 BASE_RATEGROUP_PERIOD_MS = 1000;  // 1Hz base clock
 Svc::RateGroupDriver::DividerSet rateGroupDivisorsSet{{{1, 0}, {2, 0}, {4, 0}}};
@@ -70,6 +73,12 @@ void setupTopology(const TopologyState& state) {
     // Uplink is configured for receive; the Zephyr driver uses an interrupt callback,
     // so no separate receive task is started.
     comDriver.configure(state.uartDevice, state.baudRate);
+    // FC↔PC link to the PayloadComputer over lpuart4
+    pcLinkDriver.configure(state.pcLinkDevice, state.pcLinkBaud);
+
+    // Payload computer power-enable pin (rpi_power node, Teensy pin 36)
+    static const struct gpio_dt_spec rpiPowerPin = GPIO_DT_SPEC_GET(DT_NODELABEL(rpi_power), rpi_enable_gpios);
+    (void)rpiPowerDriver.open(rpiPowerPin, Zephyr::ZephyrGpioDriver::GpioConfiguration::OUT);
 }
 
 void startRateGroups() {

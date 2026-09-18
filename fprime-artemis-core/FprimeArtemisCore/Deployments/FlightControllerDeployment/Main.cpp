@@ -14,6 +14,9 @@
 // UART used for the ground link. Exposed over USB CDC ACM on the Teensy 4.1.
 const struct device* serial = DEVICE_DT_GET(DT_NODELABEL(cdc_acm_uart0));
 
+// UART to the PayloadComputer (Raspberry Pi). Teensy TX=8 / RX=7.
+const struct device* pcLinkSerial = DEVICE_DT_GET(DT_NODELABEL(lpuart4));
+
 int main(int argc, char* argv[]) {
     // ** DO NOT REMOVE **//
     //
@@ -27,6 +30,8 @@ int main(int argc, char* argv[]) {
     FprimeArtemisCore::TopologyState inputs;
     inputs.uartDevice = serial;
     inputs.baudRate = 115200;
+    inputs.pcLinkDevice = pcLinkSerial;
+    inputs.pcLinkBaud = 115200;
 
     // Setup, cycle, and teardown topology
     FprimeArtemisCore::setupTopology(inputs);
