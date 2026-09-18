@@ -72,7 +72,7 @@ module PayloadComputerDeployment {
   #
   # This is the payload computer's only serial path: its USB port carries the
   # payload camera, so the link to the flight controller is also its only route
-  # to the ground. See docs/N2_DUAL_DEPLOYMENT_REFACTOR_PLAN_2026-09-17.md.
+  # to the ground.
 
   instance fcLinkDriver: Drv.PosixUartDriver base id 0x10014000
 

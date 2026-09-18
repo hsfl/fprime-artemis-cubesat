@@ -25,6 +25,7 @@ BUILD_IMAGE="auto"
 CLEAN="false"
 LOCAL_ONLY="false"
 COPY_ONLY="false"
+SKIP_SMOKE="false"
 
 usage() {
   cat <<'EOF'
@@ -80,6 +81,9 @@ Options:
   --skip-sync           Reuse an existing sysroot without rsync
   --skip-image-build    Reuse the existing Docker image tag
   --local-only          Build + verify locally only (skip SSH deploy/smoke)
+  --skip-smoke          Deploy to the Pi but do not run the remote smoke test.
+                        Use when the deployment is managed by systemd, or when
+                        a run would contend for a device the service holds.
   --copy-only           Skip sync/build; deploy the previously verified binary
                         for this project/deployment and smoke test only
   -h, --help            Show this help text
@@ -130,6 +134,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --copy-only)
       COPY_ONLY="true"
+      shift
+      ;;
+    --skip-smoke)
+      SKIP_SMOKE="true"
       shift
       ;;
     -h|--help)
@@ -207,6 +215,7 @@ echo "  verify dir: $VERIFY_DIR"
 echo "  clean: $CLEAN"
 echo "  local only: $LOCAL_ONLY"
 echo "  copy only: $COPY_ONLY"
+echo "  skip smoke: $SKIP_SMOKE"
 echo
 
 if [[ "$COPY_ONLY" != "true" ]]; then
@@ -485,27 +494,41 @@ REMOTE_BIN="$REMOTE_DIR/$(basename "$BIN_PATH")"
 ssh "$HOST" "mkdir -p '$REMOTE_DIR'"
 scp "$BIN_PATH" "$HOST:$REMOTE_BIN"
 
-ssh "$HOST" "
-  set -euo pipefail
-  chmod +x '$REMOTE_BIN'
-  echo 'remote file:'
-  file '$REMOTE_BIN'
-  echo
-  echo 'remote ldd:'
-  ldd '$REMOTE_BIN'
-  echo
-  echo 'smoke test:'
-  set +e
-  timeout 8s '$REMOTE_BIN' -d /dev/null > '$REMOTE_DIR/smoke.log' 2>&1
-  status=\$?
-  set -e
-  cat '$REMOTE_DIR/smoke.log'
-  if [[ \$status -ne 0 && \$status -ne 124 ]]; then
+if [[ "$SKIP_SMOKE" == "true" ]]; then
+  ssh "$HOST" "
+    set -euo pipefail
+    chmod +x '$REMOTE_BIN'
+    echo 'remote file:'
+    file '$REMOTE_BIN'
     echo
-    echo \"Smoke test failed with exit status \$status\" >&2
-    exit \$status
-  fi
-"
+    echo 'remote ldd:'
+    ldd '$REMOTE_BIN'
+    echo
+    echo 'smoke test: skipped (--skip-smoke)'
+  "
+else
+  ssh "$HOST" "
+    set -euo pipefail
+    chmod +x '$REMOTE_BIN'
+    echo 'remote file:'
+    file '$REMOTE_BIN'
+    echo
+    echo 'remote ldd:'
+    ldd '$REMOTE_BIN'
+    echo
+    echo 'smoke test:'
+    set +e
+    timeout 8s '$REMOTE_BIN' -d /dev/null > '$REMOTE_DIR/smoke.log' 2>&1
+    status=\$?
+    set -e
+    cat '$REMOTE_DIR/smoke.log'
+    if [[ \$status -ne 0 && \$status -ne 124 ]]; then
+      echo
+      echo \"Smoke test failed with exit status \$status\" >&2
+      exit \$status
+    fi
+  "
+fi
 
 echo
 echo "Smoke test completed successfully on $HOST"

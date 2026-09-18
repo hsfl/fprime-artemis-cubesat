@@ -64,9 +64,20 @@ module PayloadComputerDeployment {
   # ----------------------------------------------------------------------
 
     connections ComCcsds_CdhCore {
-      # Core events and telemetry to communication queue
-      CdhCore.events.PktSend -> ComCcsds.comQueue.comPacketQueueIn[ComCcsds.Ports_ComPacketQueue.EVENTS]
-      CdhCore.tlmSend.PktSend -> ComCcsds.comQueue.comPacketQueueIn[ComCcsds.Ports_ComPacketQueue.TELEMETRY]
+      # Core events and telemetry are NOT queued for downlink on this computer.
+      #
+      # /dev/serial0 belongs to the FC<->PC link, so ComCcsds.comStub has no
+      # driver and comQueue has no outlet. Feeding it just overflows the queue
+      # once per second. Events remain visible on the console through
+      # CdhCore.textLogger, which is the intended window into this computer
+      # during bring-up.
+      #
+      # The eventual fix is to point comQueue at a Svc.ComLogger and downlink
+      # the resulting file over the hub, so this computer's full event and
+      # telemetry stream is recoverable on the ground after the fact.
+      #
+      # CdhCore.events.PktSend -> ComCcsds.comQueue.comPacketQueueIn[ComCcsds.Ports_ComPacketQueue.EVENTS]
+      # CdhCore.tlmSend.PktSend -> ComCcsds.comQueue.comPacketQueueIn[ComCcsds.Ports_ComPacketQueue.TELEMETRY]
 
       # Router to Command Dispatcher
       ComCcsds.fprimeRouter.commandOut -> CdhCore.cmdDisp.seqCmdBuff
@@ -99,6 +110,11 @@ module PayloadComputerDeployment {
       fcLinkFramer.bufferDeallocate     -> fcLinkBufferManager.bufferSendIn
       fcLinkFramer.dataOut              -> fcLinkComStub.dataIn
       fcLinkComStub.dataReturnOut       -> fcLinkFramer.dataReturnIn
+
+      # ComStub invokes comStatusOut unconditionally and asserts if it is
+      # unconnected. FprimeFramer guards its own comStatusOut, so the
+      # backpressure chain terminates safely there.
+      fcLinkComStub.comStatusOut           -> fcLinkFramer.comStatusIn
 
       # --- Uplink: UART -> accumulator -> deframer -> hub ---
       fcLinkComStub.dataOut             -> fcLinkAccumulator.dataIn

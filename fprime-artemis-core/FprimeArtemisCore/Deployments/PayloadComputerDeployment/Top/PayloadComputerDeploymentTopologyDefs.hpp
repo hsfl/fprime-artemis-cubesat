@@ -24,7 +24,7 @@
 //! Sizing for the GenericHub link to the FlightController over /dev/serial0.
 //! Must stay consistent with PcLink:: on the flight controller side.
 namespace FcLink {
-static constexpr FwSizeType bufferSize = 512;       //!< bytes per hub transport buffer
+static constexpr FwSizeType bufferSize = 2048;      //!< must be >= the PosixUartDriver receive size passed to open()
 static constexpr FwSizeType bufferCount = 6;        //!< hub transport buffers in the pool
 static constexpr FwSizeType accumulatorSize = 1024; //!< frame reassembly ring capacity
 static constexpr FwEnumStoreType bufferManagerId = 400;

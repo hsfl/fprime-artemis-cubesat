@@ -145,6 +145,11 @@ module FprimeArtemisCore {
       pcLinkFramer.dataOut                 -> pcLinkComStub.dataIn
       pcLinkComStub.dataReturnOut          -> pcLinkFramer.dataReturnIn
 
+      # ComStub invokes comStatusOut unconditionally and asserts if it is
+      # unconnected. FprimeFramer guards its own comStatusOut, so the
+      # backpressure chain terminates safely there.
+      pcLinkComStub.comStatusOut           -> pcLinkFramer.comStatusIn
+
       # --- Uplink: UART -> accumulator -> deframer -> pcLinkHub ---
       pcLinkComStub.dataOut                -> pcLinkAccumulator.dataIn
       pcLinkAccumulator.dataReturnOut      -> pcLinkComStub.dataReturnIn

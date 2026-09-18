@@ -86,7 +86,7 @@ module FprimeArtemisCore {
   #
   # The framing chain is required because a UART has no message boundaries and
   # GenericHub drops any message whose declared size does not match the buffer
-  # it receives. See docs/HUB_UART_DEPLOYMENT_LINK_PLAN_2026-09-16.md.
+  # it receives.
 
   instance pcLinkHub: Svc.GenericHub base id 0x10020000
 

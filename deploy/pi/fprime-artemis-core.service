@@ -1,0 +1,36 @@
+# PayloadComputerDeployment Raspberry Pi service.
+#
+# Install on the Pi as /etc/systemd/system/fprime-artemis-core.service.
+#
+# This is the payload computer half of the two-deployment architecture. Its
+# only serial path is /dev/serial0 to the flight controller Teensy, so it has
+# no independent ground link: journalctl is the window into this computer.
+
+
+[Unit]
+Description=Artemis CubeSat Kit Payload Computer F Prime deployment
+After=local-fs.target
+ConditionPathExists=/home/artemis4/artemis/current/FprimeArtemisCore_Deployments_PayloadComputerDeployment
+
+[Service]
+Type=simple
+User=artemis4
+Group=artemis4
+SupplementaryGroups=dialout
+WorkingDirectory=/home/artemis4/artemis/current
+ExecStart=/home/artemis4/artemis/current/FprimeArtemisCore_Deployments_PayloadComputerDeployment -d /dev/serial0 -b 115200
+# F Prime's FatalHandler deliberately exits and expects a supervisor to restart
+# it ("FatalHandler: exiting for supervisor restart"). This unit is that supervisor.
+Restart=always
+RestartSec=5
+# Lets F Prime set task priorities. Without this the deployment still runs, but
+# logs "insufficient permissions to create a task with priority" and every
+# active component gets default scheduling.
+AmbientCapabilities=CAP_SYS_NICE
+# Send stdout/stderr to journald for triage with journalctl.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fprime-artemis-core
+
+[Install]
+WantedBy=multi-user.target

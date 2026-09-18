@@ -22,7 +22,7 @@
 //! Sizing for the GenericHub link to the PayloadComputer over lpuart4.
 //! Buffers must hold a whole pcLinkHub message plus its F Prime frame.
 namespace PcLink {
-static constexpr FwSizeType bufferSize = 512;       //!< bytes per pcLinkHub transport buffer
+static constexpr FwSizeType bufferSize = 512;       //!< >= ZephyrUartDriver SERIAL_BUFFER_SIZE (64); the Pi side needs 2048 for its driver
 static constexpr FwSizeType bufferCount = 6;        //!< pcLinkHub transport buffers in the pool
 static constexpr FwSizeType accumulatorSize = 1024; //!< frame reassembly ring capacity
 static constexpr FwEnumStoreType bufferManagerId = 400;

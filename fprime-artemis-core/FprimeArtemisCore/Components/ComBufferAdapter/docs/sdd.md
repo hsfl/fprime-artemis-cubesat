@@ -186,8 +186,7 @@ constants in `FlightControllerDeploymentTopologyDefs.hpp`.
 
 - [`Svc::GenericHub` SDD](../../../../lib/fprime/Svc/GenericHub/docs/sdd.md)
 - [Hub pattern](../../../../lib/fprime/docs/user-manual/design-patterns/hub-pattern.md)
-- [`docs/HUB_UART_DEPLOYMENT_LINK_PLAN_2026-09-16.md`](../../../../../docs/HUB_UART_DEPLOYMENT_LINK_PLAN_2026-09-16.md) — why this transport was chosen
-- [`docs/N2_DUAL_DEPLOYMENT_REFACTOR_PLAN_2026-09-17.md`](../../../../../docs/N2_DUAL_DEPLOYMENT_REFACTOR_PLAN_2026-09-17.md) — the two-computer architecture this link serves
+- [`Drv::ByteStreamBufferAdapter`](../../../../lib/fprime/Drv/ByteStreamBufferAdapter/ByteStreamBufferAdapter.fpp) — the framework adapter this one parallels
 
 ## Change log
 
