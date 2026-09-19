@@ -18,7 +18,7 @@ module Components {
 
     @ Heartbeat to the flight controller. Connect to a GenericHub serialIn
     @ port; the matching serialOut index on the peer hub delivers it.
-    output port peerAliveOut: Svc.Ping
+    output port peerAliveOut: FcPcLink.Heartbeat
 
     # ----------------------------------------------------------------------
     # Scheduling

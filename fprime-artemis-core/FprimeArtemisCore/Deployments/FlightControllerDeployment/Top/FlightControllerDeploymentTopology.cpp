@@ -15,20 +15,17 @@
 // This is also the namespace where the topology components are instantiated by FPP.
 namespace FprimeArtemisCore {
 
-// Instantiate a malloc allocator for cmdSeq buffer allocation
-Fw::MallocAllocator mallocator;
-
 // Allocator for the pcLinkHub link buffer manager and frame accumulator
 Fw::MallocAllocator pcLinkAllocator;
 
 // Rate group timing: base clock interval and divisors are coupled to rate group names
-constexpr U32 BASE_RATEGROUP_PERIOD_MS = 1000;  // 1Hz base clock
-Svc::RateGroupDriver::DividerSet rateGroupDivisorsSet{{{1, 0}, {2, 0}, {4, 0}}};
-// Divisors: 1Hz, 0.5Hz, 0.25Hz
+constexpr U32 BASE_RATEGROUP_PERIOD_MS = 100;  // 10Hz base clock
+Svc::RateGroupDriver::DividerSet rateGroupDivisorsSet{{{1, 0}, {10, 0}, {40, 0}}};
+// Divisors: 10Hz, 1Hz, 0.25Hz
 
 // Context tokens for rate group members (unused, set to zero)
+Svc::ActiveRateGroup::ContextArray rateGroup_10HzContext(0);
 Svc::ActiveRateGroup::ContextArray rateGroup_1HzContext(0);
-Svc::ActiveRateGroup::ContextArray rateGroup_0_5HzContext(0);
 Svc::ActiveRateGroup::ContextArray rateGroup_0_25HzContext(0);
 
 /**
@@ -43,12 +40,10 @@ void configureTopology() {
     rateGroupDriver.configure(rateGroupDivisorsSet);
 
     // Rate groups require context arrays.
+    rateGroup_10Hz.configure(rateGroup_10HzContext);
     rateGroup_1Hz.configure(rateGroup_1HzContext);
-    rateGroup_0_5Hz.configure(rateGroup_0_5HzContext);
     rateGroup_0_25Hz.configure(rateGroup_0_25HzContext);
 
-    // Command sequencer needs to allocate memory to hold contents of command sequences
-    cmdSeq.allocateBuffer(0, mallocator, 5 * 1024);
 }
 
 void setupTopology(const TopologyState& state) {
@@ -99,8 +94,6 @@ void teardownTopology(const TopologyState& state) {
     stopTasks(state);
     freeThreads(state);
 
-    // Resource deallocation
-    cmdSeq.deallocateBuffer(mallocator);
 
     tearDownComponents(state);
     deinitComponents(state);

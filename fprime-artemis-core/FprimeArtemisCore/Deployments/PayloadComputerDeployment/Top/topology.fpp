@@ -96,8 +96,8 @@ module PayloadComputerDeployment {
     }
 
     connections FcLink {
-      # --- Heartbeat into the hub (serial port 0 must match the peer) ---
-      fcLinkManager.peerAliveOut        -> fcLinkHub.serialIn[0]
+      # --- Heartbeat into the hub ---
+      fcLinkManager.peerAliveOut        -> fcLinkHub.serialIn[FcPcLink.HEARTBEAT]
 
       # --- Downlink: hub -> framer -> ComStub -> UART ---
       fcLinkHub.allocate                -> fcLinkBufferManager.bufferGetCallee

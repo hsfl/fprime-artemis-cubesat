@@ -26,28 +26,38 @@ module FprimeArtemisCore {
   # Active component instances
   # ----------------------------------------------------------------------
 
-  # 1Hz rate group (divisor 1 of 1Hz base clock)
-  instance rateGroup_1Hz: Svc.ActiveRateGroup base id 0x10001000 \
+  # Rate groups run off a 10Hz base clock (100 ms). Zephyr priorities are
+  # 0..14, lower = more urgent.
+  #
+  # The RateGroupDriver has exactly three outputs (RateGroupDriverRateGroupPorts
+  # in the framework's AcConstants.fpp), so there are exactly three groups.
+
+  # 10Hz rate group (divisor 1). UART reads only: ZephyrUartDriver reads at most
+  # 64 bytes per schedIn, so 10Hz gives each link a 640 B/s read ceiling.
+  instance rateGroup_10Hz: Svc.ActiveRateGroup base id 0x10001000 \
     queue size Default.QUEUE_SIZE \
     stack size Default.STACK_SIZE \
-    priority 1  # Zephyr: 0..14, lower = more urgent. Drives pcLinkDriver/comDriver reads
+    priority 1
 
-  # 0.5Hz rate group (divisor 2 of 1Hz base clock)
-  instance rateGroup_0_5Hz: Svc.ActiveRateGroup base id 0x10002000 \
+  # 1Hz rate group (divisor 10). Anything with a timeout counted in ticks lives
+  # here: RpiPowerManager::PEER_TIMEOUT_TICKS means seconds only at 1Hz.
+  instance rateGroup_1Hz: Svc.ActiveRateGroup base id 0x10002000 \
     queue size Default.QUEUE_SIZE \
     stack size Default.STACK_SIZE \
     priority 2
 
-  # 0.25Hz rate group (divisor 4 of 1Hz base clock)
+  # 0.25Hz rate group (divisor 40)
   instance rateGroup_0_25Hz: Svc.ActiveRateGroup base id 0x10003000 \
     queue size Default.QUEUE_SIZE \
     stack size Default.STACK_SIZE \
     priority 3
 
-  instance cmdSeq: Svc.CmdSequencer base id 0x10004000 \
+  # Application tier: the mission operator's interface. Priority 6 sits
+  # below the rate groups (1-3) and ComCcsds (4-5), above CdhCore (10-13).
+  instance missionApp: Components.MissionApp base id 0x10004000 \
     queue size Default.QUEUE_SIZE \
     stack size Default.STACK_SIZE \
-    priority 14 # least urgent: cmdSeq cannot load sequences without a filesystem
+    priority 6
 
   # ----------------------------------------------------------------------
   # Queued component instances
@@ -77,6 +87,12 @@ module FprimeArtemisCore {
   instance rpiPowerManager: Components.RpiPowerManager base id 0x10016000
 
   instance rpiPowerDriver: Zephyr.ZephyrGpioDriver base id 0x10017000
+
+  # ----------------------------------------------------------------------
+  # FC<->PC link manager
+  # ----------------------------------------------------------------------
+
+  instance pcLinkManager: Components.PayloadComputerLinkManager base id 0x10018000
 
   # ----------------------------------------------------------------------
   # FC↔PC link to the PayloadComputer (Raspberry Pi) over lpuart4

@@ -2,6 +2,7 @@
 # This allows for reuse between deployments, or other projects.
 
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/project/config")
+add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/Types")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/Components")
 # Deployments are registered per target. The Zephyr ones need the Zephyr
 # package; PayloadComputerDeployment targets Linux/RPi and is built with the

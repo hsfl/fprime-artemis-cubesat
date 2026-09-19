@@ -13,7 +13,7 @@ namespace Svc {
 // across 93 non-omitted channel entries, which overflows the project-wide
 // values of 5/40. Sized with a small margin rather than copying
 // PayloadComputerDeployment's 32/128, because this target is the Teensy 4.1.
-static const FwChanIdType MAX_PACKETIZER_PACKETS = 24;
+static const FwChanIdType MAX_PACKETIZER_PACKETS = 32;
 
 //! Maximum number of channels that the packetizer can handle. Must be >= number of non-omitted channels
 static const FwChanIdType MAX_PACKETIZER_CHANNELS = 96;

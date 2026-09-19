@@ -10,6 +10,17 @@ module Components {
     READY = 2
   }
 
+  @ Request to enable or disable the payload computer power rail.
+  @ Returns SUCCESS if the driver accepted the pin write.
+  port RpiPowerRequest(
+                        $state: Fw.On @< ON enables the rail, OFF disables it
+                      ) -> Fw.Success
+
+  @ Notification that the payload computer power state changed
+  port RpiPowerStateUpdate(
+                            $state: Components.RpiPowerState @< the new state
+                          )
+
   @ Manager tier for Raspberry Pi payload-computer power.
   @
   @ Owns the hardware-independent contract for powering the payload computer up
@@ -21,6 +32,17 @@ module Components {
   @ payload computer to report in, which arrives on peerAliveIn once the
   @ FC<->PC link carries status.
   passive component RpiPowerManager {
+
+    # ----------------------------------------------------------------------
+    # Application interface (MissionApp)
+    # ----------------------------------------------------------------------
+
+    @ Power the payload computer on or off. This is the operator path:
+    @ MissionApp drives it. SET_RPI_POWER is the engineering equivalent.
+    sync input port powerRequestIn: Components.RpiPowerRequest
+
+    @ Reports every RpiPowerState change, so MissionApp can wait for READY
+    output port stateOut: Components.RpiPowerStateUpdate
 
     # ----------------------------------------------------------------------
     # Driver interface
@@ -35,7 +57,7 @@ module Components {
 
     @ Heartbeat from the payload computer, arriving over the FC<->PC link.
     @ Receiving one while powered promotes BOOT to READY.
-    sync input port peerAliveIn: Svc.Ping
+    sync input port peerAliveIn: FcPcLink.Heartbeat
 
     # ----------------------------------------------------------------------
     # Scheduling
@@ -48,7 +70,8 @@ module Components {
     # Commands
     # ----------------------------------------------------------------------
 
-    @ Enable or disable the payload computer power rail
+    @ Engineering command: enable or disable the payload computer power rail.
+    @ Not part of routine operations; operators use MissionApp.
     sync command SET_RPI_POWER(
                                 $state: Fw.On @< ON enables the rail, OFF disables it
                               )

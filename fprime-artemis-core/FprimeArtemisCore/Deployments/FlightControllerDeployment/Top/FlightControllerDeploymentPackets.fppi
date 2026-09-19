@@ -7,10 +7,6 @@ telemetry packets FlightControllerDeploymentPackets {
     #CdhCore.tlmSend.SendLevel # uncomment when using TlmPacketizer
 
 
-    FprimeArtemisCore.cmdSeq.CS_LoadCommands
-    FprimeArtemisCore.cmdSeq.CS_CancelCommands
-    FprimeArtemisCore.cmdSeq.CS_CommandsExecuted
-    FprimeArtemisCore.cmdSeq.CS_SequencesCompleted
     ComCcsds.comQueue.comQueueDepth
     ComCcsds.comQueue.buffQueueDepth
     CdhCore.tlmSend.GroupConfigs
@@ -19,8 +15,8 @@ telemetry packets FlightControllerDeploymentPackets {
     ComCcsds.commsBufferManager.CurrBuffs
     ComCcsds.commsBufferManager.HiBuffs
 
+    FprimeArtemisCore.rateGroup_10Hz.RgMaxTime
     FprimeArtemisCore.rateGroup_1Hz.RgMaxTime
-    FprimeArtemisCore.rateGroup_0_5Hz.RgMaxTime
     FprimeArtemisCore.rateGroup_0_25Hz.RgMaxTime
   }
 
@@ -28,18 +24,26 @@ telemetry packets FlightControllerDeploymentPackets {
     CdhCore.$health.PingLateWarnings
 
 
-    FprimeArtemisCore.cmdSeq.CS_Errors
     ComCcsds.commsBufferManager.NoBuffs
     ComCcsds.commsBufferManager.EmptyBuffs
 
+    FprimeArtemisCore.rateGroup_10Hz.RgCycleSlips
     FprimeArtemisCore.rateGroup_1Hz.RgCycleSlips
-    FprimeArtemisCore.rateGroup_0_5Hz.RgCycleSlips
     FprimeArtemisCore.rateGroup_0_25Hz.RgCycleSlips
+  }
+
+  packet Mission id 7 group 1 {
+    FprimeArtemisCore.missionApp.CurrentMode
   }
 
   packet RpiPower id 3 group 1 {
     FprimeArtemisCore.rpiPowerManager.RpiState
     FprimeArtemisCore.rpiPowerManager.RpiPowerCycles
+  }
+
+  packet PcLink id 4 group 1 {
+    FprimeArtemisCore.pcLinkManager.HeartbeatsReceived
+    FprimeArtemisCore.pcLinkManager.LastHeartbeatKey
   }
 
   packet SystemRes1 id 5 group 2 {
@@ -142,8 +146,6 @@ telemetry packets FlightControllerDeploymentPackets {
 
 } omit {
   CdhCore.cmdDisp.CommandErrors
-  # String channel: TlmPacketizer cannot packetize variable-length strings
-  FprimeArtemisCore.cmdSeq.CS_CurrentSequence
   # FC↔PC link buffer pool health: not downlinked during MVP bring-up
   FprimeArtemisCore.pcLinkBufferManager.TotalBuffs
   FprimeArtemisCore.pcLinkBufferManager.CurrBuffs

@@ -5,8 +5,8 @@ module FprimeArtemisCore {
   # ----------------------------------------------------------------------
 
   enum Ports_RateGroups {
+    rateGroup_10Hz
     rateGroup_1Hz
-    rateGroup_0_5Hz
     rateGroup_0_25Hz
   }
 
@@ -22,17 +22,18 @@ module FprimeArtemisCore {
   # Instances used in the topology
   # ----------------------------------------------------------------------
     instance chronoTime
+    instance rateGroup_10Hz
     instance rateGroup_1Hz
-    instance rateGroup_0_5Hz
     instance rateGroup_0_25Hz
+    instance missionApp
     instance rateGroupDriver
     instance systemResources
     instance timer
     instance comDriver
-    instance cmdSeq
     instance nullPrmDb
     instance rpiPowerManager
     instance rpiPowerDriver
+    instance pcLinkManager
     instance pcLinkHub
     instance pcLinkAdapter
     instance pcLinkFramer
@@ -95,6 +96,11 @@ module FprimeArtemisCore {
       # timer to drive rate group
       timer.CycleOut -> rateGroupDriver.CycleIn
 
+      # 10Hz rate group: UART reads only
+      rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_10Hz] -> rateGroup_10Hz.CycleIn
+      rateGroup_10Hz.RateGroupMemberOut[0] -> comDriver.schedIn
+      rateGroup_10Hz.RateGroupMemberOut[1] -> pcLinkDriver.schedIn
+
       # 1Hz rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_1Hz] -> rateGroup_1Hz.CycleIn
       rateGroup_1Hz.RateGroupMemberOut[0] -> CdhCore.tlmSend.Run
@@ -102,13 +108,8 @@ module FprimeArtemisCore {
       rateGroup_1Hz.RateGroupMemberOut[2] -> ComCcsds.comQueue.run
       rateGroup_1Hz.RateGroupMemberOut[3] -> ComCcsds.aggregator.timeout
       rateGroup_1Hz.RateGroupMemberOut[4] -> CdhCore.cmdDisp.run
-      rateGroup_1Hz.RateGroupMemberOut[5] -> comDriver.schedIn
-      rateGroup_1Hz.RateGroupMemberOut[6] -> pcLinkDriver.schedIn
-      rateGroup_1Hz.RateGroupMemberOut[7] -> rpiPowerManager.run
-
-      # 0.5Hz rate group
-      rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_0_5Hz] -> rateGroup_0_5Hz.CycleIn
-      rateGroup_0_5Hz.RateGroupMemberOut[0] -> cmdSeq.schedIn
+      rateGroup_1Hz.RateGroupMemberOut[5] -> rpiPowerManager.run
+      rateGroup_1Hz.RateGroupMemberOut[6] -> missionApp.run
 
       # 0.25Hz rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_0_25Hz] -> rateGroup_0_25Hz.CycleIn
@@ -117,10 +118,10 @@ module FprimeArtemisCore {
       rateGroup_0_25Hz.RateGroupMemberOut[2] -> pcLinkBufferManager.schedIn
     }
 
-    connections CdhCore_cmdSeq {
-      # Command Sequencer
-      cmdSeq.comCmdOut -> CdhCore.cmdDisp.seqCmdBuff
-      CdhCore.cmdDisp.seqCmdStatus -> cmdSeq.cmdResponseIn
+    connections Mission {
+      # Application tier drives managers through their port contracts.
+      missionApp.rpiPowerRequestOut -> rpiPowerManager.powerRequestIn
+      rpiPowerManager.stateOut      -> missionApp.rpiStateIn
     }
 
     connections RpiPower {
@@ -130,8 +131,9 @@ module FprimeArtemisCore {
     }
 
     connections PcLink {
-      # --- Payload computer heartbeat (serial port 0 must match the peer) ---
-      pcLinkHub.serialOut[0]            -> rpiPowerManager.peerAliveIn
+      # --- Payload computer heartbeat, routed through the link manager ---
+      pcLinkHub.serialOut[FcPcLink.HEARTBEAT] -> pcLinkManager.peerAliveIn
+      pcLinkManager.peerAliveOut              -> rpiPowerManager.peerAliveIn
 
       # --- Downlink: pcLinkHub -> framer -> ComStub -> UART ---
       pcLinkHub.allocate                      -> pcLinkBufferManager.bufferGetCallee

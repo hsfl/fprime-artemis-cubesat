@@ -59,10 +59,10 @@ static constexpr FwEnumStoreType bufferManagerId = 400;
  * ```
  */
 namespace PingEntries {
+    namespace FprimeArtemisCore_rateGroup_10Hz {enum { WARN = 3, FATAL = 5 };}
     namespace FprimeArtemisCore_rateGroup_1Hz {enum { WARN = 3, FATAL = 5 };}
-    namespace FprimeArtemisCore_rateGroup_0_5Hz {enum { WARN = 3, FATAL = 5 };}
     namespace FprimeArtemisCore_rateGroup_0_25Hz {enum { WARN = 3, FATAL = 5 };}
-    namespace FprimeArtemisCore_cmdSeq {enum { WARN = 3, FATAL = 5 };}
+    namespace FprimeArtemisCore_missionApp {enum { WARN = 3, FATAL = 5 };}
 }  // namespace PingEntries
 
 // Definitions are placed within the same namespace as the FPP module that contains the topology.

@@ -43,27 +43,15 @@ void RpiPowerManager::peerAliveIn_handler(FwIndexType portNum, U32 key) {
 // Command handlers
 // ----------------------------------------------------------------------
 
+Fw::Success RpiPowerManager::powerRequestIn_handler(FwIndexType portNum, const Fw::On& state) {
+    return this->applyPower(state);
+}
+
 void RpiPowerManager::SET_RPI_POWER_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, const Fw::On& state) {
-    const bool turnOn = (state == Fw::On::ON);
-    const Fw::Logic level = turnOn ? Fw::Logic::HIGH : Fw::Logic::LOW;
-
-    const Drv::GpioStatus status = this->gpioSet_out(0, level);
-    if (status != Drv::GpioStatus::OP_OK) {
-        this->log_WARNING_HI_RpiGpioError(status);
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
-        return;
-    }
-
-    this->log_ACTIVITY_HI_RpiPowerCommanded(state);
-    if (turnOn) {
-        this->m_powerCycles++;
-        // The rail is up but the payload computer has not reported in yet.
-        this->m_ticksSincePeer = 0;
-        this->setState(RpiPowerState::BOOT);
-    } else {
-        this->setState(RpiPowerState::OFF);
-    }
-    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+    const Fw::Success status = this->applyPower(state);
+    this->cmdResponse_out(opCode, cmdSeq,
+                          (status == Fw::Success::SUCCESS) ? Fw::CmdResponse::OK
+                                                           : Fw::CmdResponse::EXECUTION_ERROR);
 }
 
 void RpiPowerManager::GET_RPI_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
@@ -76,11 +64,40 @@ void RpiPowerManager::GET_RPI_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq)
 // Helpers
 // ----------------------------------------------------------------------
 
+Fw::Success RpiPowerManager::applyPower(const Fw::On& state) {
+    const bool turnOn = (state == Fw::On::ON);
+    const Fw::Logic level = turnOn ? Fw::Logic::HIGH : Fw::Logic::LOW;
+
+    const Drv::GpioStatus status = this->gpioSet_out(0, level);
+    if (status != Drv::GpioStatus::OP_OK) {
+        this->log_WARNING_HI_RpiGpioError(status);
+        return Fw::Success::FAILURE;
+    }
+
+    this->log_ACTIVITY_HI_RpiPowerCommanded(state);
+    if (turnOn) {
+        // A redundant power-on (rail already up) changes nothing: it must not
+        // demote READY to BOOT or count a power cycle that did not happen.
+        if (this->m_state == RpiPowerState::OFF) {
+            this->m_powerCycles++;
+            // The rail is up but the payload computer has not reported in yet.
+            this->m_ticksSincePeer = 0;
+            this->setState(RpiPowerState::BOOT);
+        }
+    } else {
+        this->setState(RpiPowerState::OFF);
+    }
+    return Fw::Success::SUCCESS;
+}
+
 void RpiPowerManager::setState(RpiPowerState state) {
     if (state != this->m_state) {
         this->m_state = state;
         this->log_ACTIVITY_HI_RpiStateChanged(state);
         this->tlmWrite_RpiState(state);
+        if (this->isConnected_stateOut_OutputPort(0)) {
+            this->stateOut_out(0, state);
+        }
     }
 }
 

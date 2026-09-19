@@ -30,6 +30,9 @@ class RpiPowerManager final : public RpiPowerManagerComponentBase {
     //! Payload computer reported in: promote BOOT to READY
     void peerAliveIn_handler(FwIndexType portNum, U32 key) override;
 
+    //! MissionApp requests the rail on or off
+    Fw::Success powerRequestIn_handler(FwIndexType portNum, const Fw::On& state) override;
+
     // ----------------------------------------------------------------------
     // Handler implementations for commands
     // ----------------------------------------------------------------------
@@ -44,7 +47,11 @@ class RpiPowerManager final : public RpiPowerManagerComponentBase {
     // Helpers
     // ----------------------------------------------------------------------
 
-    //! Set the reported state, emitting an event and telemetry if it changed
+    //! Drive the pin and update state. Shared by the port and the command.
+    //! \return SUCCESS if the driver accepted the write
+    Fw::Success applyPower(const Fw::On& state);
+
+    //! Set the reported state, emitting an event, telemetry, and stateOut if it changed
     void setState(RpiPowerState state);
 
     //! Current reported state. The rail is off at construction.
