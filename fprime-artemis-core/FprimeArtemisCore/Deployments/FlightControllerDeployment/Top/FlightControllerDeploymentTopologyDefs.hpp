@@ -15,6 +15,7 @@
 #include "Svc/Subtopologies/ComCcsds/SubtopologyTopologyDefs.hpp"
 
 // FC↔PC link: framing chain support
+#include <Fw/Logger/Logger.hpp>
 #include <Fw/Types/MallocAllocator.hpp>
 #include <Svc/BufferManager/BufferManager.hpp>
 #include <Svc/FrameAccumulator/FrameDetector/FprimeFrameDetector.hpp>

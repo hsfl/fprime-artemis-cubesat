@@ -46,6 +46,15 @@ telemetry packets FlightControllerDeploymentPackets {
     FprimeArtemisCore.pcLinkManager.LastHeartbeatKey
   }
 
+  packet Imu id 8 group 1 {
+    FprimeArtemisCore.imuManager.ImuState
+    FprimeArtemisCore.imuManager.Acceleration
+    FprimeArtemisCore.imuManager.AngularRate
+    FprimeArtemisCore.imuManager.ImuTemperature
+    FprimeArtemisCore.imuManager.ReadErrors
+    FprimeArtemisCore.imuDriver.PowerState
+  }
+
   packet SystemRes1 id 5 group 2 {
     FprimeArtemisCore.systemResources.MEMORY_TOTAL
     FprimeArtemisCore.systemResources.MEMORY_USED

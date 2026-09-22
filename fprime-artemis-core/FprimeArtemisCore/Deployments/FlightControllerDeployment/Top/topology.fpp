@@ -42,6 +42,9 @@ module FprimeArtemisCore {
     instance pcLinkDriver
     instance pcLinkAccumulator
     instance pcLinkBufferManager
+    instance imuManager
+    instance imuDriver
+    instance imuI2cBus
 
   # ----------------------------------------------------------------------
   # Pattern graph specifiers
@@ -110,6 +113,7 @@ module FprimeArtemisCore {
       rateGroup_1Hz.RateGroupMemberOut[4] -> CdhCore.cmdDisp.run
       rateGroup_1Hz.RateGroupMemberOut[5] -> rpiPowerManager.run
       rateGroup_1Hz.RateGroupMemberOut[6] -> missionApp.run
+      rateGroup_1Hz.RateGroupMemberOut[7] -> imuManager.run
 
       # 0.25Hz rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_0_25Hz] -> rateGroup_0_25Hz.CycleIn
@@ -128,6 +132,15 @@ module FprimeArtemisCore {
       # Manager tier drives the pin through the Drv.Gpio driver tier.
       # peerAliveIn is fed by the payload computer heartbeat; see connections PcLink.
       rpiPowerManager.gpioSet -> rpiPowerDriver.gpioWrite
+    }
+
+    connections Imu {
+      # Manager tier drives the IMU through the driver's port contract
+      # (Types/Imu.fpp); the driver reaches the chip through Drv.I2c.
+      imuManager.driverPowerOut   -> imuDriver.powerRequestIn
+      imuManager.driverReadingGet -> imuDriver.readingGet
+      imuDriver.busWriteRead      -> imuI2cBus.writeRead
+      imuDriver.busWrite          -> imuI2cBus.write
     }
 
     connections PcLink {

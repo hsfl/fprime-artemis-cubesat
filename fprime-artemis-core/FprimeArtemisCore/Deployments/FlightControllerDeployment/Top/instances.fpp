@@ -95,6 +95,34 @@ module FprimeArtemisCore {
   instance pcLinkManager: Components.PayloadComputerLinkManager base id 0x10018000
 
   # ----------------------------------------------------------------------
+  # IMU (Adafruit LSM6DSOX+LIS3MDL breakout on lpi2c1, Teensy pins 18/19)
+  # ----------------------------------------------------------------------
+  #
+  #   imuManager -> imuDriver -> imuI2cBus
+  #
+  # The manager is chip-independent; imuDriver knows the LSM6DSOX registers;
+  # imuI2cBus only moves bytes. The address comes from the lsm6dsox devicetree
+  # node, so the overlay is its single source.
+
+  instance imuManager: Components.ImuManager base id 0x10028000
+
+  instance imuDriver: Components.ImuDriver_LSM6DSOX base id 0x10029000 \
+    {
+      phase Fpp.ToCpp.Phases.configComponents """
+      FprimeArtemisCore::imuDriver.configure(DT_REG_ADDR(DT_NODELABEL(lsm6dsox)));
+      """
+    }
+
+  instance imuI2cBus: Zephyr.ZephyrI2cDriver base id 0x1002A000 \
+    {
+      phase Fpp.ToCpp.Phases.configComponents """
+      if (FprimeArtemisCore::imuI2cBus.open(DEVICE_DT_GET(DT_NODELABEL(lpi2c1))) != Drv::I2cStatus::I2C_OK) {
+          Fw::Logger::log("[ERROR] IMU I2C bus (lpi2c1) not ready\\n");
+      }
+      """
+    }
+
+  # ----------------------------------------------------------------------
   # FC↔PC link to the PayloadComputer (Raspberry Pi) over lpuart4
   # ----------------------------------------------------------------------
   #
