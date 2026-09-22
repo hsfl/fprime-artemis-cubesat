@@ -26,6 +26,28 @@
     current-speed = <9600>; /* PDU Serial1, Teensy pins 0/1 */
 };
 
+/* Teensy TX=29, RX=28 - connected to GPS (Arduino Serial7, Adafruit Ultimate GPS NMEA) */
+&lpuart7 {
+    status = "okay";
+    current-speed = <9600>;
+};
+
+/* Teensy SDA=18, SCL=19 - IMU (Arduino Wire, Adafruit LSM6DSOX + LIS3MDL) */
+&lpi2c1 {
+    status = "okay";
+    clock-frequency = <I2C_BITRATE_STANDARD>;
+
+    lsm6dsox: lsm6dsox@6a {
+        compatible = "st,lsm6dso"; /* LSM6DSOX is register-compatible with LSM6DSO */
+        reg = <0x6a>;
+    };
+
+    lis3mdl: lis3mdl@1c {
+        compatible = "st,lis3mdl-magn";
+        reg = <0x1c>;
+    };
+};
+
 /* Radio SPI1 (RFM23BP). CS=38, INT=40, RX_ON=30, TX_ON=31. */
 &lpspi3 {
     status = "okay";
