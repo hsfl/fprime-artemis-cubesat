@@ -1,0 +1,366 @@
+{
+  "nodes": [
+    {
+      "id": "title",
+      "x": 30,
+      "y": 12,
+      "w": 1140,
+      "h": 40,
+      "label": "Payload topology",
+      "size": 28,
+      "bold": true,
+      "kind": "text"
+    },
+    {
+      "id": "subtitle",
+      "x": 30,
+      "y": 57,
+      "w": 1140,
+      "h": 30,
+      "label": "The Pi executes Teensy-authorized jobs through Application, Manager and Driver components.",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "core",
+      "x": 30,
+      "y": 110,
+      "w": 230,
+      "h": 95,
+      "label": "Teensy\nMissionApp\nPiSupervisor",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "bus"
+    },
+    {
+      "id": "link",
+      "x": 390,
+      "y": 110,
+      "w": 300,
+      "h": 95,
+      "label": "CompanionLink\nJobs / results / heartbeat",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "bus"
+    },
+    {
+      "id": "app",
+      "x": 870,
+      "y": 110,
+      "w": 300,
+      "h": 95,
+      "label": "PayloadApp\nAuthorized activity",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "student"
+    },
+    {
+      "id": "mgr",
+      "x": 870,
+      "y": 310,
+      "w": 300,
+      "h": 105,
+      "label": "PayloadManager\nDevice protocol + lifecycle",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "student"
+    },
+    {
+      "id": "worker",
+      "x": 440,
+      "y": 310,
+      "w": 300,
+      "h": 105,
+      "label": "ProcessingWorker\nLong-running computation",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "student"
+    },
+    {
+      "id": "store",
+      "x": 30,
+      "y": 310,
+      "w": 300,
+      "h": 125,
+      "label": "ProductStore / Transfer\nProducts + metadata\nRetain until ground receipt",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "bus"
+    },
+    {
+      "id": "sim",
+      "x": 440,
+      "y": 515,
+      "w": 300,
+      "h": 90,
+      "label": "SimDriver\nNo physical I/O",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "neutral"
+    },
+    {
+      "id": "driver",
+      "x": 870,
+      "y": 500,
+      "w": 300,
+      "h": 80,
+      "label": "Linux driver\nUSB / UART / SPI / I2C",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "neutral"
+    },
+    {
+      "id": "hw",
+      "x": 870,
+      "y": 645,
+      "w": 300,
+      "h": 55,
+      "label": "Payload hardware",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "student"
+    },
+    {
+      "id": "request-label",
+      "x": 1030,
+      "y": 245,
+      "w": 160,
+      "h": 30,
+      "label": "Request / result",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "workerlabel",
+      "x": 733,
+      "y": 315,
+      "w": 137,
+      "h": 40,
+      "label": "Start / done",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "productlabel",
+      "x": 390,
+      "y": 422,
+      "w": 260,
+      "h": 32,
+      "label": "Completed product",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "choice",
+      "x": 410,
+      "y": 625,
+      "w": 350,
+      "h": 65,
+      "label": "Select real OR simulated driver.\nWorker communicates only with manager.",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    }
+  ],
+  "edges": [
+    {
+      "id": "peer",
+      "pts": [
+        [
+          260,
+          157
+        ],
+        [
+          390,
+          157
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "core",
+      "tgt": "link"
+    },
+    {
+      "id": "job",
+      "pts": [
+        [
+          690,
+          157
+        ],
+        [
+          870,
+          157
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "link",
+      "tgt": "app"
+    },
+    {
+      "id": "request",
+      "pts": [
+        [
+          1020,
+          205
+        ],
+        [
+          1020,
+          310
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "app",
+      "tgt": "mgr"
+    },
+    {
+      "id": "workerjob",
+      "pts": [
+        [
+          870,
+          365
+        ],
+        [
+          740,
+          365
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "mgr",
+      "tgt": "worker"
+    },
+    {
+      "id": "real",
+      "pts": [
+        [
+          1020,
+          415
+        ],
+        [
+          1020,
+          500
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "mgr",
+      "tgt": "driver"
+    },
+    {
+      "id": "simjob",
+      "pts": [
+        [
+          950,
+          415
+        ],
+        [
+          950,
+          485
+        ],
+        [
+          590,
+          485
+        ],
+        [
+          590,
+          515
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": true,
+      "src": "mgr",
+      "tgt": "sim"
+    },
+    {
+      "id": "hardware",
+      "pts": [
+        [
+          1020,
+          580
+        ],
+        [
+          1020,
+          645
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "driver",
+      "tgt": "hw"
+    },
+    {
+      "id": "product",
+      "pts": [
+        [
+          920,
+          415
+        ],
+        [
+          920,
+          460
+        ],
+        [
+          180,
+          460
+        ],
+        [
+          180,
+          435
+        ]
+      ],
+      "color": "#35638a",
+      "both": false,
+      "dashed": false,
+      "src": "mgr",
+      "tgt": "store"
+    },
+    {
+      "id": "transfer",
+      "pts": [
+        [
+          180,
+          310
+        ],
+        [
+          180,
+          250
+        ],
+        [
+          540,
+          250
+        ],
+        [
+          540,
+          205
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "store",
+      "tgt": "link"
+    }
+  ]
+}

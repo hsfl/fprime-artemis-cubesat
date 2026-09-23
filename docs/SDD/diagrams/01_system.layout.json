@@ -1,0 +1,412 @@
+{
+  "nodes": [
+    {
+      "id": "title",
+      "x": 30,
+      "y": 12,
+      "w": 1140,
+      "h": 40,
+      "label": "System architecture",
+      "size": 28,
+      "bold": true,
+      "kind": "text"
+    },
+    {
+      "id": "subtitle",
+      "x": 30,
+      "y": 57,
+      "w": 1140,
+      "h": 30,
+      "label": "Teensy owns spacecraft authority; Pi serves the mission payload.",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "ground",
+      "x": 35,
+      "y": 150,
+      "w": 235,
+      "h": 115,
+      "label": "Yamcs ground\nRF bridge",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "neutral"
+    },
+    {
+      "id": "core",
+      "x": 480,
+      "y": 135,
+      "w": 280,
+      "h": 145,
+      "label": "Teensy 4.1 / Zephyr\nMissionApp + bus services\nHardware watchdog",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "bus"
+    },
+    {
+      "id": "pi",
+      "x": 930,
+      "y": 135,
+      "w": 235,
+      "h": 145,
+      "label": "Pi Zero W / Linux\nPayload software\nSoftware heartbeat",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "student"
+    },
+    {
+      "id": "sensors",
+      "x": 35,
+      "y": 450,
+      "w": 235,
+      "h": 110,
+      "label": "Bus sensors\nGPS / IMU / thermal",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "bus"
+    },
+    {
+      "id": "pdu",
+      "x": 480,
+      "y": 450,
+      "w": 280,
+      "h": 110,
+      "label": "PDU\nPower + actuation\nHardware watchdogs",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "bus"
+    },
+    {
+      "id": "piswitch",
+      "x": 810,
+      "y": 330,
+      "w": 195,
+      "h": 90,
+      "label": "OBC U2\nPi load switch",
+      "size": 20,
+      "bold": false,
+      "kind": "box",
+      "color": "neutral"
+    },
+    {
+      "id": "payload",
+      "x": 930,
+      "y": 450,
+      "w": 235,
+      "h": 110,
+      "label": "One logical payload\nMission hardware",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "student"
+    },
+    {
+      "id": "rf-label",
+      "x": 275,
+      "y": 151,
+      "w": 200,
+      "h": 35,
+      "label": "RF command / TM",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "ipc-label",
+      "x": 770,
+      "y": 154,
+      "w": 150,
+      "h": 30,
+      "label": "UART link",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "sense-label",
+      "x": 355,
+      "y": 345,
+      "w": 130,
+      "h": 40,
+      "label": "Sensor I/O",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "pductl-label",
+      "x": 635,
+      "y": 325,
+      "w": 180,
+      "h": 65,
+      "label": "PDU commands\nand status",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "data-label",
+      "x": 1063,
+      "y": 325,
+      "w": 130,
+      "h": 65,
+      "label": "Payload\ndata / control",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "paypower-label",
+      "x": 766,
+      "y": 515,
+      "w": 160,
+      "h": 40,
+      "label": "Switched power",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "pibus-label",
+      "x": 805,
+      "y": 432,
+      "w": 125,
+      "h": 35,
+      "label": "BUS_5V",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "pienable-label",
+      "x": 795,
+      "y": 270,
+      "w": 125,
+      "h": 55,
+      "label": "Pin 36\nRPI_ENABLE",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "pipower-label",
+      "x": 930,
+      "y": 280,
+      "w": 90,
+      "h": 35,
+      "label": "Pi 5 V",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "note",
+      "x": 65,
+      "y": 610,
+      "w": 1070,
+      "h": 75,
+      "label": "Blue: logical data/control. Red: power. PDU BUS_5V feeds the OBC Pi load switch.\nExact as-built rails, harnesses and reset paths require hardware verification.",
+      "size": 19,
+      "bold": false,
+      "kind": "text"
+    }
+  ],
+  "edges": [
+    {
+      "id": "rf",
+      "pts": [
+        [
+          270,
+          195
+        ],
+        [
+          480,
+          195
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "ground",
+      "tgt": "core"
+    },
+    {
+      "id": "ipc",
+      "pts": [
+        [
+          760,
+          195
+        ],
+        [
+          930,
+          195
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "core",
+      "tgt": "pi"
+    },
+    {
+      "id": "sense",
+      "pts": [
+        [
+          270,
+          500
+        ],
+        [
+          345,
+          500
+        ],
+        [
+          345,
+          250
+        ],
+        [
+          480,
+          250
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "sensors",
+      "tgt": "core"
+    },
+    {
+      "id": "pductl",
+      "pts": [
+        [
+          620,
+          280
+        ],
+        [
+          620,
+          450
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "core",
+      "tgt": "pdu"
+    },
+    {
+      "id": "data",
+      "pts": [
+        [
+          1050,
+          280
+        ],
+        [
+          1050,
+          450
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "pi",
+      "tgt": "payload"
+    },
+    {
+      "id": "paypower",
+      "pts": [
+        [
+          760,
+          500
+        ],
+        [
+          930,
+          500
+        ]
+      ],
+      "color": "#a84737",
+      "both": false,
+      "dashed": false,
+      "src": "pdu",
+      "tgt": "payload"
+    },
+    {
+      "id": "pibus",
+      "pts": [
+        [
+          760,
+          470
+        ],
+        [
+          780,
+          470
+        ],
+        [
+          780,
+          390
+        ],
+        [
+          810,
+          390
+        ]
+      ],
+      "color": "#a84737",
+      "both": false,
+      "dashed": false,
+      "src": "pdu",
+      "tgt": "piswitch"
+    },
+    {
+      "id": "pienable",
+      "pts": [
+        [
+          760,
+          250
+        ],
+        [
+          790,
+          250
+        ],
+        [
+          790,
+          345
+        ],
+        [
+          810,
+          345
+        ]
+      ],
+      "color": "#35638a",
+      "both": false,
+      "dashed": false,
+      "src": "core",
+      "tgt": "piswitch"
+    },
+    {
+      "id": "pipower",
+      "pts": [
+        [
+          907,
+          330
+        ],
+        [
+          907,
+          260
+        ],
+        [
+          930,
+          260
+        ]
+      ],
+      "color": "#a84737",
+      "both": false,
+      "dashed": false,
+      "src": "piswitch",
+      "tgt": "pi"
+    }
+  ]
+}

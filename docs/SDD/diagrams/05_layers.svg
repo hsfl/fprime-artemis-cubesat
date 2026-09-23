@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720"><rect width="1200" height="720" fill="white"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" fill="context-stroke"/></marker></defs>
+<rect x="35" y="215" width="320" height="125" rx="14" fill="#e9f4eb" stroke="#477a51" stroke-width="2"/>
+<rect x="440" y="215" width="320" height="125" rx="14" fill="#e8f1fb" stroke="#35638a" stroke-width="2"/>
+<rect x="845" y="215" width="320" height="125" rx="14" fill="#f4f6f8" stroke="#667485" stroke-width="2"/>
+<rect x="35" y="470" width="320" height="125" rx="14" fill="#e9f4eb" stroke="#477a51" stroke-width="2"/>
+<rect x="440" y="470" width="320" height="125" rx="14" fill="#e9f4eb" stroke="#477a51" stroke-width="2"/>
+<rect x="845" y="470" width="320" height="125" rx="14" fill="#f4f6f8" stroke="#667485" stroke-width="2"/>
+<path d="M 355,277 L 440,277" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<path d="M 760,277 L 845,277" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<path d="M 355,532 L 440,532" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<path d="M 760,532 L 845,532" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<text x="600.0" y="41.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#202a33">Application - Manager - Driver</text>
+<text x="600.0" y="78.3" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Three layers. Protocol knowledge belongs in the manager; the driver owns the hardware interface.</text>
+<text x="195.0" y="143.05" text-anchor="middle" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#202a33">APPLICATION</text>
+<text x="600.0" y="143.05" text-anchor="middle" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#202a33">MANAGER</text>
+<text x="1005.0" y="143.05" text-anchor="middle" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#202a33">DRIVER</text>
+<text x="195.0" y="271.725" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">MissionApp</text>
+<text x="195.0" y="297.975" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Request payload or Pi power</text>
+<text x="600.0" y="271.725" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">EpsManager</text>
+<text x="600.0" y="297.975" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Power policy + PDU protocol</text>
+<text x="1005.0" y="271.725" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">UartDriver: PDU bytes</text>
+<text x="1005.0" y="297.975" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">GPIO driver: Pi switch</text>
+<text x="195.0" y="526.725" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">PayloadApp</text>
+<text x="195.0" y="552.975" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Request acquisition</text>
+<text x="600.0" y="526.725" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">PayloadManager</text>
+<text x="600.0" y="552.975" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Device protocol + lifecycle</text>
+<text x="1005.0" y="526.725" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Linux driver</text>
+<text x="1005.0" y="552.975" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Payload interface I/O</text>
+<text x="600.0" y="404.15" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="400" fill="#202a33">Requests use manager/driver ports; callbacks return results without upward code dependencies.</text>
+<text x="600.0" y="657.275" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="400" fill="#202a33">Simulation replaces the hardware-interface driver. Managers and application contracts remain.</text>
+<text x="600.0" y="681.025" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="400" fill="#202a33">A high-level stub is permitted for demos, with reduced protocol-test coverage stated explicitly.</text>
+</svg>

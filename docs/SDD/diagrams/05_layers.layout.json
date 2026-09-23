@@ -1,0 +1,227 @@
+{
+  "nodes": [
+    {
+      "id": "title",
+      "x": 30,
+      "y": 12,
+      "w": 1140,
+      "h": 40,
+      "label": "Application - Manager - Driver",
+      "size": 28,
+      "bold": true,
+      "kind": "text"
+    },
+    {
+      "id": "subtitle",
+      "x": 30,
+      "y": 57,
+      "w": 1140,
+      "h": 30,
+      "label": "Three layers. Protocol knowledge belongs in the manager; the driver owns the hardware interface.",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "hAPPLICATION",
+      "x": 35,
+      "y": 115,
+      "w": 320,
+      "h": 40,
+      "label": "APPLICATION",
+      "size": 23,
+      "bold": true,
+      "kind": "text"
+    },
+    {
+      "id": "hMANAGER",
+      "x": 440,
+      "y": 115,
+      "w": 320,
+      "h": 40,
+      "label": "MANAGER",
+      "size": 23,
+      "bold": true,
+      "kind": "text"
+    },
+    {
+      "id": "hDRIVER",
+      "x": 845,
+      "y": 115,
+      "w": 320,
+      "h": 40,
+      "label": "DRIVER",
+      "size": 23,
+      "bold": true,
+      "kind": "text"
+    },
+    {
+      "id": "app",
+      "x": 35,
+      "y": 215,
+      "w": 320,
+      "h": 125,
+      "label": "MissionApp\nRequest payload or Pi power",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "student"
+    },
+    {
+      "id": "mgr",
+      "x": 440,
+      "y": 215,
+      "w": 320,
+      "h": 125,
+      "label": "EpsManager\nPower policy + PDU protocol",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "bus"
+    },
+    {
+      "id": "drv",
+      "x": 845,
+      "y": 215,
+      "w": 320,
+      "h": 125,
+      "label": "UartDriver: PDU bytes\nGPIO driver: Pi switch",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "neutral"
+    },
+    {
+      "id": "papp",
+      "x": 35,
+      "y": 470,
+      "w": 320,
+      "h": 125,
+      "label": "PayloadApp\nRequest acquisition",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "student"
+    },
+    {
+      "id": "pmgr",
+      "x": 440,
+      "y": 470,
+      "w": 320,
+      "h": 125,
+      "label": "PayloadManager\nDevice protocol + lifecycle",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "student"
+    },
+    {
+      "id": "pdrv",
+      "x": 845,
+      "y": 470,
+      "w": 320,
+      "h": 125,
+      "label": "Linux driver\nPayload interface I/O",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "neutral"
+    },
+    {
+      "id": "return",
+      "x": 90,
+      "y": 370,
+      "w": 1020,
+      "h": 55,
+      "label": "Requests use manager/driver ports; callbacks return results without upward code dependencies.",
+      "size": 19,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "sim",
+      "x": 80,
+      "y": 635,
+      "w": 1040,
+      "h": 55,
+      "label": "Simulation replaces the hardware-interface driver. Managers and application contracts remain.\nA high-level stub is permitted for demos, with reduced protocol-test coverage stated explicitly.",
+      "size": 19,
+      "bold": false,
+      "kind": "text"
+    }
+  ],
+  "edges": [
+    {
+      "id": "appmgr",
+      "pts": [
+        [
+          355,
+          277
+        ],
+        [
+          440,
+          277
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "app",
+      "tgt": "mgr"
+    },
+    {
+      "id": "mgrdrv",
+      "pts": [
+        [
+          760,
+          277
+        ],
+        [
+          845,
+          277
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "mgr",
+      "tgt": "drv"
+    },
+    {
+      "id": "papppmgr",
+      "pts": [
+        [
+          355,
+          532
+        ],
+        [
+          440,
+          532
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "papp",
+      "tgt": "pmgr"
+    },
+    {
+      "id": "pmgrpdrv",
+      "pts": [
+        [
+          760,
+          532
+        ],
+        [
+          845,
+          532
+        ]
+      ],
+      "color": "#35638a",
+      "both": true,
+      "dashed": false,
+      "src": "pmgr",
+      "tgt": "pdrv"
+    }
+  ]
+}

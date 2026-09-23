@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720"><rect width="1200" height="720" fill="white"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" fill="context-stroke"/></marker></defs>
+<circle cx="65.0" cy="185.0" r="9" fill="#202a33"/>
+<rect x="130" y="135" width="280" height="100" rx="14" fill="#e8f1fb" stroke="#35638a" stroke-width="2"/>
+<rect x="800" y="135" width="300" height="100" rx="14" fill="#e8f1fb" stroke="#35638a" stroke-width="2"/>
+<rect x="800" y="480" width="300" height="100" rx="14" fill="#e8f1fb" stroke="#35638a" stroke-width="2"/>
+<rect x="130" y="480" width="280" height="100" rx="14" fill="#fff0ed" stroke="#a74c40" stroke-width="2"/>
+<path d="M 74,185 L 130,185" fill="none" stroke="#202a33" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 410,185 L 800,185" fill="none" stroke="#202a33" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 950,235 L 950,480" fill="none" stroke="#202a33" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 800,530 L 410,530" fill="none" stroke="#a84737" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 190,235 L 190,480" fill="none" stroke="#a84737" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 345,480 L 345,235" fill="none" stroke="#202a33" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 850,235 L 410,500" fill="none" stroke="#a84737" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="600.0" y="41.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#202a33">Spacecraft mode state machine</text>
+<text x="600.0" y="78.3" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Bus-owned mode logic hosted by MissionApp; hardware protection has a separate deadline.</text>
+<text x="65.0" y="185.35" text-anchor="middle" font-family="Arial, sans-serif" font-size="1" font-weight="400" fill="#202a33"></text>
+<text x="270.0" y="179.225" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">STARTUP</text>
+<text x="270.0" y="205.475" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Establish safe readiness</text>
+<text x="950.0" y="179.225" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">DETUMBLE</text>
+<text x="950.0" y="205.475" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Bounded rate reduction</text>
+<text x="950.0" y="524.225" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">NOMINAL</text>
+<text x="950.0" y="550.475" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Admit mission activities</text>
+<text x="270.0" y="511.1" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">SAFE</text>
+<text x="270.0" y="537.35" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Protect bus</text>
+<text x="270.0" y="563.6" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Retain commanding</text>
+<text x="605.0" y="163.3" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">ready [no latch; inhibits satisfied]</text>
+<text x="1080.0" y="342.55" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">rates low</text>
+<text x="1080.0" y="365.05" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">[dwell complete]</text>
+<text x="610.0" y="508.3" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">critical fault or ground Safe</text>
+<text x="97.5" y="357.55" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">fault / ground Safe</text>
+<text x="97.5" y="380.05" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">or boot lockout</text>
+<text x="500.0" y="306.3" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">recover [clear dwell;</text>
+<text x="500.0" y="328.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">latch cleared by ground</text>
+<text x="500.0" y="351.3" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">when required]</text>
+<text x="755.0" y="382.55" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">fault / ground Safe / timeout</text>
+<text x="755.0" y="405.05" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">or invalid sensing: request coast</text>
+<text x="600.0" y="647.275" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="400" fill="#202a33">Startup lockout: persistent latch, reset limit or invalid reset record selects Safe.</text>
+<text x="600.0" y="671.025" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="400" fill="#202a33">Ground clearance never bypasses inhibits or current recovery guards.</text>
+</svg>

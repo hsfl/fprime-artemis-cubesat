@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900"><rect width="1200" height="900" fill="white"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" fill="context-stroke"/></marker></defs>
+<rect x="10" y="105" width="200" height="65" rx="14" fill="#f4f6f8" stroke="#667485" stroke-width="2"/>
+<rect x="250" y="105" width="200" height="65" rx="14" fill="#f4f6f8" stroke="#667485" stroke-width="2"/>
+<rect x="485" y="105" width="200" height="65" rx="14" fill="#f4f6f8" stroke="#667485" stroke-width="2"/>
+<rect x="725" y="105" width="200" height="65" rx="14" fill="#f4f6f8" stroke="#667485" stroke-width="2"/>
+<rect x="990" y="105" width="200" height="65" rx="14" fill="#f4f6f8" stroke="#667485" stroke-width="2"/>
+<path d="M 110,170 L 110,842" fill="none" stroke="#9ba7b4" stroke-width="2.3" stroke-dasharray="7 5"/>
+<path d="M 350,170 L 350,842" fill="none" stroke="#9ba7b4" stroke-width="2.3" stroke-dasharray="7 5"/>
+<path d="M 585,170 L 585,842" fill="none" stroke="#9ba7b4" stroke-width="2.3" stroke-dasharray="7 5"/>
+<path d="M 825,170 L 825,842" fill="none" stroke="#9ba7b4" stroke-width="2.3" stroke-dasharray="7 5"/>
+<path d="M 1090,170 L 1090,842" fill="none" stroke="#9ba7b4" stroke-width="2.3" stroke-dasharray="7 5"/>
+<path d="M 110,202 L 350,202" fill="none" stroke="#a66520" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 350,235 L 585,235" fill="none" stroke="#a66520" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 585,268 L 825,268" fill="none" stroke="#a66520" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 825,301 L 585,301" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 585,334 L 1090,334" fill="none" stroke="#a66520" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 1090,367 L 585,367" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 585,400 L 350,400" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 350,433 L 110,433" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 1090,466 L 1145,466 L 1145,478 L 1090,478" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 1090,517 L 585,517" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 110,550 L 350,550" fill="none" stroke="#a66520" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 350,583 L 585,583" fill="none" stroke="#a66520" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 585,616 L 1090,616" fill="none" stroke="#a66520" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 1090,649 L 585,649" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 585,682 L 350,682" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 350,715 L 110,715" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 110,748 L 350,748" fill="none" stroke="#a66520" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 350,781 L 585,781" fill="none" stroke="#a66520" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 585,814 L 1090,814" fill="none" stroke="#a66520" stroke-width="2.3" marker-end="url(#arrow)"/>
+<text x="600.0" y="41.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#202a33">Reference mission sequence</text>
+<text x="600.0" y="78.3" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Yamcs uses the RF/ground receiver to reach the Teensy bus authority.</text>
+<text x="110.0" y="144.15" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="400" fill="#202a33">Yamcs / operator</text>
+<text x="350.0" y="144.15" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="400" fill="#202a33">RF / ground receiver</text>
+<text x="585.0" y="132.275" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="400" fill="#202a33">Teensy</text>
+<text x="585.0" y="156.025" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="400" fill="#202a33">MissionApp + bus</text>
+<text x="825.0" y="144.15" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="400" fill="#202a33">PDU</text>
+<text x="1090.0" y="132.275" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="400" fill="#202a33">Pi</text>
+<text x="1090.0" y="156.025" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" font-weight="400" fill="#202a33">Payload + storage</text>
+<text x="230.0" y="192.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Schedule / command</text>
+<text x="467.5" y="225.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Command frame</text>
+<text x="705.0" y="258.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Enable payload power</text>
+<text x="705.0" y="291.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Applied-state reply</text>
+<text x="837.5" y="324.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Authorize acquisition (job ID)</text>
+<text x="837.5" y="357.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Accepted + progress</text>
+<text x="467.5" y="390.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Job status telemetry</text>
+<text x="230.0" y="423.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Job status event</text>
+<text x="932.5" y="462.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Acquire sample</text>
+<text x="837.5" y="507.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Product ready + metadata</text>
+<text x="230.0" y="540.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Request downlink</text>
+<text x="467.5" y="573.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Downlink request</text>
+<text x="837.5" y="606.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Grant bounded transfer</text>
+<text x="837.5" y="639.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Bounded product chunks</text>
+<text x="467.5" y="672.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Chunks + bus telemetry</text>
+<text x="230.0" y="705.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Verified product</text>
+<text x="230.0" y="738.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Integrity receipt</text>
+<text x="467.5" y="771.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Receipt frame</text>
+<text x="837.5" y="804.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Receipt: eligible for reclamation</text>
+<text x="600.0" y="867.825" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="400" fill="#202a33">Orange: requests / authorization / receipts. Blue: status / data.</text>
+<text x="600.0" y="889.075" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="400" fill="#202a33">Teensy checks mode, time and limits before authorization. Timeout: event + cancel + reconcile.</text>
+</svg>

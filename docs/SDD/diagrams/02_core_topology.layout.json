@@ -1,0 +1,215 @@
+{
+  "nodes": [
+    {
+      "id": "title",
+      "x": 30,
+      "y": 12,
+      "w": 1140,
+      "h": 40,
+      "label": "Core topology",
+      "size": 28,
+      "bold": true,
+      "kind": "text"
+    },
+    {
+      "id": "subtitle",
+      "x": 30,
+      "y": 57,
+      "w": 1140,
+      "h": 30,
+      "label": "Functional groups organize reusable services around one mission application.",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "mission",
+      "x": 420,
+      "y": 100,
+      "w": 360,
+      "h": 105,
+      "label": "Mission\nMissionApp\nBus modes + student activities",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "student"
+    },
+    {
+      "id": "power",
+      "x": 35,
+      "y": 310,
+      "w": 340,
+      "h": 155,
+      "label": "PowerThermal\nEpsManager: PDU + Pi switch\nThermalManager\nDeploymentManager",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "bus"
+    },
+    {
+      "id": "att",
+      "x": 430,
+      "y": 310,
+      "w": 340,
+      "h": 155,
+      "label": "AttitudeNavigation\nAdcsManager / GpsManager\nSensor managers\nTimeCoordinator",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "bus"
+    },
+    {
+      "id": "radio",
+      "x": 825,
+      "y": 310,
+      "w": 340,
+      "h": 155,
+      "label": "GroundLink\nCommsManager / ComQueue\nRadioManager / CCSDS\nSPI / GPIO drivers",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "bus"
+    },
+    {
+      "id": "services",
+      "x": 35,
+      "y": 570,
+      "w": 735,
+      "h": 115,
+      "label": "CoreServices: CdhCore / Health / FaultManager\nRate groups / parameters / time service / watchdog driver\nShared UART, SPI, I2C and GPIO drivers: one owner per interface",
+      "size": 20,
+      "bold": false,
+      "kind": "box",
+      "color": "neutral"
+    },
+    {
+      "id": "companion",
+      "x": 825,
+      "y": 570,
+      "w": 340,
+      "h": 115,
+      "label": "CompanionLink\nPiSupervisor + peer transport\nPi jobs / results / heartbeat",
+      "size": 20,
+      "bold": false,
+      "kind": "box",
+      "color": "bus"
+    },
+    {
+      "id": "shared",
+      "x": 45,
+      "y": 495,
+      "w": 1100,
+      "h": 55,
+      "label": "Shared-service and protective connections are omitted here for clarity (Sections 3 and 10).\nFaultManager requests Safe and bounded protection; PiSupervisor requests EPS recovery.",
+      "size": 19,
+      "bold": false,
+      "kind": "text"
+    }
+  ],
+  "edges": [
+    {
+      "id": "mission-power",
+      "pts": [
+        [
+          600,
+          205
+        ],
+        [
+          600,
+          260
+        ],
+        [
+          205,
+          260
+        ],
+        [
+          205,
+          310
+        ]
+      ],
+      "color": "#35638a",
+      "both": false,
+      "dashed": false,
+      "src": "mission",
+      "tgt": "power"
+    },
+    {
+      "id": "mission-att",
+      "pts": [
+        [
+          600,
+          205
+        ],
+        [
+          600,
+          260
+        ],
+        [
+          600,
+          260
+        ],
+        [
+          600,
+          310
+        ]
+      ],
+      "color": "#35638a",
+      "both": false,
+      "dashed": false,
+      "src": "mission",
+      "tgt": "att"
+    },
+    {
+      "id": "mission-radio",
+      "pts": [
+        [
+          600,
+          205
+        ],
+        [
+          600,
+          260
+        ],
+        [
+          995,
+          260
+        ],
+        [
+          995,
+          310
+        ]
+      ],
+      "color": "#35638a",
+      "both": false,
+      "dashed": false,
+      "src": "mission",
+      "tgt": "radio"
+    },
+    {
+      "id": "jobs",
+      "pts": [
+        [
+          780,
+          155
+        ],
+        [
+          1190,
+          155
+        ],
+        [
+          1190,
+          625
+        ],
+        [
+          1165,
+          625
+        ]
+      ],
+      "color": "#35638a",
+      "both": false,
+      "dashed": false,
+      "src": "mission",
+      "tgt": "companion"
+    }
+  ]
+}

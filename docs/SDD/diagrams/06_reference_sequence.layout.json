@@ -1,0 +1,748 @@
+{
+  "nodes": [
+    {
+      "id": "title",
+      "x": 30,
+      "y": 12,
+      "w": 1140,
+      "h": 40,
+      "label": "Reference mission sequence",
+      "size": 28,
+      "bold": true,
+      "kind": "text"
+    },
+    {
+      "id": "subtitle",
+      "x": 30,
+      "y": 57,
+      "w": 1140,
+      "h": 30,
+      "label": "Yamcs uses the RF/ground receiver to reach the Teensy bus authority.",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "ground",
+      "x": 10,
+      "y": 105,
+      "w": 200,
+      "h": 65,
+      "label": "Yamcs / operator",
+      "size": 19,
+      "bold": false,
+      "kind": "box",
+      "color": "neutral"
+    },
+    {
+      "id": "rf",
+      "x": 250,
+      "y": 105,
+      "w": 200,
+      "h": 65,
+      "label": "RF / ground receiver",
+      "size": 19,
+      "bold": false,
+      "kind": "box",
+      "color": "neutral"
+    },
+    {
+      "id": "core",
+      "x": 485,
+      "y": 105,
+      "w": 200,
+      "h": 65,
+      "label": "Teensy\nMissionApp + bus",
+      "size": 19,
+      "bold": false,
+      "kind": "box",
+      "color": "neutral"
+    },
+    {
+      "id": "pdu",
+      "x": 725,
+      "y": 105,
+      "w": 200,
+      "h": 65,
+      "label": "PDU",
+      "size": 19,
+      "bold": false,
+      "kind": "box",
+      "color": "neutral"
+    },
+    {
+      "id": "pi",
+      "x": 990,
+      "y": 105,
+      "w": 200,
+      "h": 65,
+      "label": "Pi\nPayload + storage",
+      "size": 19,
+      "bold": false,
+      "kind": "box",
+      "color": "neutral"
+    },
+    {
+      "id": "s0-label",
+      "x": 110,
+      "y": 174,
+      "w": 240,
+      "h": 25,
+      "label": "Schedule / command",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s1-label",
+      "x": 350,
+      "y": 207,
+      "w": 235,
+      "h": 25,
+      "label": "Command frame",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s2-label",
+      "x": 585,
+      "y": 240,
+      "w": 240,
+      "h": 25,
+      "label": "Enable payload power",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s3-label",
+      "x": 585,
+      "y": 273,
+      "w": 240,
+      "h": 25,
+      "label": "Applied-state reply",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s4-label",
+      "x": 585,
+      "y": 306,
+      "w": 505,
+      "h": 25,
+      "label": "Authorize acquisition (job ID)",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s5-label",
+      "x": 585,
+      "y": 339,
+      "w": 505,
+      "h": 25,
+      "label": "Accepted + progress",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s6-label",
+      "x": 350,
+      "y": 372,
+      "w": 235,
+      "h": 25,
+      "label": "Job status telemetry",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s7-label",
+      "x": 110,
+      "y": 405,
+      "w": 240,
+      "h": 25,
+      "label": "Job status event",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s8-label",
+      "x": 800,
+      "y": 444,
+      "w": 265,
+      "h": 25,
+      "label": "Acquire sample",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s9-label",
+      "x": 585,
+      "y": 489,
+      "w": 505,
+      "h": 25,
+      "label": "Product ready + metadata",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s10-label",
+      "x": 110,
+      "y": 522,
+      "w": 240,
+      "h": 25,
+      "label": "Request downlink",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s11-label",
+      "x": 350,
+      "y": 555,
+      "w": 235,
+      "h": 25,
+      "label": "Downlink request",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s12-label",
+      "x": 585,
+      "y": 588,
+      "w": 505,
+      "h": 25,
+      "label": "Grant bounded transfer",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s13-label",
+      "x": 585,
+      "y": 621,
+      "w": 505,
+      "h": 25,
+      "label": "Bounded product chunks",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s14-label",
+      "x": 350,
+      "y": 654,
+      "w": 235,
+      "h": 25,
+      "label": "Chunks + bus telemetry",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s15-label",
+      "x": 110,
+      "y": 687,
+      "w": 240,
+      "h": 25,
+      "label": "Verified product",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s16-label",
+      "x": 110,
+      "y": 720,
+      "w": 240,
+      "h": 25,
+      "label": "Integrity receipt",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s17-label",
+      "x": 350,
+      "y": 753,
+      "w": 235,
+      "h": 25,
+      "label": "Receipt frame",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "s18-label",
+      "x": 585,
+      "y": 786,
+      "w": 505,
+      "h": 25,
+      "label": "Receipt: eligible for reclamation",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "failure",
+      "x": 35,
+      "y": 850,
+      "w": 1130,
+      "h": 45,
+      "label": "Orange: requests / authorization / receipts. Blue: status / data.\nTeensy checks mode, time and limits before authorization. Timeout: event + cancel + reconcile.",
+      "size": 17,
+      "bold": false,
+      "kind": "text"
+    }
+  ],
+  "edges": [
+    {
+      "id": "ground-life",
+      "pts": [
+        [
+          110,
+          170
+        ],
+        [
+          110,
+          842
+        ]
+      ],
+      "color": "#9ba7b4",
+      "both": false,
+      "dashed": true,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "rf-life",
+      "pts": [
+        [
+          350,
+          170
+        ],
+        [
+          350,
+          842
+        ]
+      ],
+      "color": "#9ba7b4",
+      "both": false,
+      "dashed": true,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "core-life",
+      "pts": [
+        [
+          585,
+          170
+        ],
+        [
+          585,
+          842
+        ]
+      ],
+      "color": "#9ba7b4",
+      "both": false,
+      "dashed": true,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "pdu-life",
+      "pts": [
+        [
+          825,
+          170
+        ],
+        [
+          825,
+          842
+        ]
+      ],
+      "color": "#9ba7b4",
+      "both": false,
+      "dashed": true,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "pi-life",
+      "pts": [
+        [
+          1090,
+          170
+        ],
+        [
+          1090,
+          842
+        ]
+      ],
+      "color": "#9ba7b4",
+      "both": false,
+      "dashed": true,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s0",
+      "pts": [
+        [
+          110,
+          202
+        ],
+        [
+          350,
+          202
+        ]
+      ],
+      "color": "#a66520",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s1",
+      "pts": [
+        [
+          350,
+          235
+        ],
+        [
+          585,
+          235
+        ]
+      ],
+      "color": "#a66520",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s2",
+      "pts": [
+        [
+          585,
+          268
+        ],
+        [
+          825,
+          268
+        ]
+      ],
+      "color": "#a66520",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s3",
+      "pts": [
+        [
+          825,
+          301
+        ],
+        [
+          585,
+          301
+        ]
+      ],
+      "color": "#35638a",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s4",
+      "pts": [
+        [
+          585,
+          334
+        ],
+        [
+          1090,
+          334
+        ]
+      ],
+      "color": "#a66520",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s5",
+      "pts": [
+        [
+          1090,
+          367
+        ],
+        [
+          585,
+          367
+        ]
+      ],
+      "color": "#35638a",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s6",
+      "pts": [
+        [
+          585,
+          400
+        ],
+        [
+          350,
+          400
+        ]
+      ],
+      "color": "#35638a",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s7",
+      "pts": [
+        [
+          350,
+          433
+        ],
+        [
+          110,
+          433
+        ]
+      ],
+      "color": "#35638a",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s8",
+      "pts": [
+        [
+          1090,
+          466
+        ],
+        [
+          1145,
+          466
+        ],
+        [
+          1145,
+          478
+        ],
+        [
+          1090,
+          478
+        ]
+      ],
+      "color": "#35638a",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s9",
+      "pts": [
+        [
+          1090,
+          517
+        ],
+        [
+          585,
+          517
+        ]
+      ],
+      "color": "#35638a",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s10",
+      "pts": [
+        [
+          110,
+          550
+        ],
+        [
+          350,
+          550
+        ]
+      ],
+      "color": "#a66520",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s11",
+      "pts": [
+        [
+          350,
+          583
+        ],
+        [
+          585,
+          583
+        ]
+      ],
+      "color": "#a66520",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s12",
+      "pts": [
+        [
+          585,
+          616
+        ],
+        [
+          1090,
+          616
+        ]
+      ],
+      "color": "#a66520",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s13",
+      "pts": [
+        [
+          1090,
+          649
+        ],
+        [
+          585,
+          649
+        ]
+      ],
+      "color": "#35638a",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s14",
+      "pts": [
+        [
+          585,
+          682
+        ],
+        [
+          350,
+          682
+        ]
+      ],
+      "color": "#35638a",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s15",
+      "pts": [
+        [
+          350,
+          715
+        ],
+        [
+          110,
+          715
+        ]
+      ],
+      "color": "#35638a",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s16",
+      "pts": [
+        [
+          110,
+          748
+        ],
+        [
+          350,
+          748
+        ]
+      ],
+      "color": "#a66520",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s17",
+      "pts": [
+        [
+          350,
+          781
+        ],
+        [
+          585,
+          781
+        ]
+      ],
+      "color": "#a66520",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    },
+    {
+      "id": "s18",
+      "pts": [
+        [
+          585,
+          814
+        ],
+        [
+          1090,
+          814
+        ]
+      ],
+      "color": "#a66520",
+      "both": false,
+      "dashed": false,
+      "src": null,
+      "tgt": null
+    }
+  ]
+}

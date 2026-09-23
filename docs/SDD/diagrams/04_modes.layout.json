@@ -1,0 +1,290 @@
+{
+  "nodes": [
+    {
+      "id": "title",
+      "x": 30,
+      "y": 12,
+      "w": 1140,
+      "h": 40,
+      "label": "Spacecraft mode state machine",
+      "size": 28,
+      "bold": true,
+      "kind": "text"
+    },
+    {
+      "id": "subtitle",
+      "x": 30,
+      "y": 57,
+      "w": 1140,
+      "h": 30,
+      "label": "Bus-owned mode logic hosted by MissionApp; hardware protection has a separate deadline.",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "initial",
+      "x": 56,
+      "y": 176,
+      "w": 18,
+      "h": 18,
+      "label": "",
+      "size": 1,
+      "bold": false,
+      "kind": "dot"
+    },
+    {
+      "id": "startup",
+      "x": 130,
+      "y": 135,
+      "w": 280,
+      "h": 100,
+      "label": "STARTUP\nEstablish safe readiness",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "bus"
+    },
+    {
+      "id": "detumble",
+      "x": 800,
+      "y": 135,
+      "w": 300,
+      "h": 100,
+      "label": "DETUMBLE\nBounded rate reduction",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "bus"
+    },
+    {
+      "id": "nominal",
+      "x": 800,
+      "y": 480,
+      "w": 300,
+      "h": 100,
+      "label": "NOMINAL\nAdmit mission activities",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "bus"
+    },
+    {
+      "id": "safe",
+      "x": 130,
+      "y": 480,
+      "w": 280,
+      "h": 100,
+      "label": "SAFE\nProtect bus\nRetain commanding",
+      "size": 21,
+      "bold": false,
+      "kind": "box",
+      "color": "safe"
+    },
+    {
+      "id": "ready-label",
+      "x": 435,
+      "y": 137,
+      "w": 340,
+      "h": 40,
+      "label": "ready [no latch; inhibits satisfied]",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "settled-label",
+      "x": 975,
+      "y": 315,
+      "w": 210,
+      "h": 65,
+      "label": "rates low\n[dwell complete]",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "fault-label",
+      "x": 435,
+      "y": 482,
+      "w": 350,
+      "h": 40,
+      "label": "critical fault or ground Safe",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "startfault-label",
+      "x": 15,
+      "y": 330,
+      "w": 165,
+      "h": 65,
+      "label": "fault / ground Safe\nor boot lockout",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "recover-label",
+      "x": 365,
+      "y": 275,
+      "w": 270,
+      "h": 95,
+      "label": "recover [clear dwell;\nlatch cleared by ground\nwhen required]",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "detfault-label",
+      "x": 595,
+      "y": 355,
+      "w": 320,
+      "h": 65,
+      "label": "fault / ground Safe / timeout\nor invalid sensing: request coast",
+      "size": 18,
+      "bold": false,
+      "kind": "text"
+    },
+    {
+      "id": "latch",
+      "x": 50,
+      "y": 620,
+      "w": 1100,
+      "h": 65,
+      "label": "Startup lockout: persistent latch, reset limit or invalid reset record selects Safe.\nGround clearance never bypasses inhibits or current recovery guards.",
+      "size": 19,
+      "bold": false,
+      "kind": "text"
+    }
+  ],
+  "edges": [
+    {
+      "id": "init",
+      "pts": [
+        [
+          74,
+          185
+        ],
+        [
+          130,
+          185
+        ]
+      ],
+      "color": "#202a33",
+      "both": false,
+      "dashed": false,
+      "src": "initial",
+      "tgt": "startup"
+    },
+    {
+      "id": "ready",
+      "pts": [
+        [
+          410,
+          185
+        ],
+        [
+          800,
+          185
+        ]
+      ],
+      "color": "#202a33",
+      "both": false,
+      "dashed": false,
+      "src": "startup",
+      "tgt": "detumble"
+    },
+    {
+      "id": "settled",
+      "pts": [
+        [
+          950,
+          235
+        ],
+        [
+          950,
+          480
+        ]
+      ],
+      "color": "#202a33",
+      "both": false,
+      "dashed": false,
+      "src": "detumble",
+      "tgt": "nominal"
+    },
+    {
+      "id": "fault",
+      "pts": [
+        [
+          800,
+          530
+        ],
+        [
+          410,
+          530
+        ]
+      ],
+      "color": "#a84737",
+      "both": false,
+      "dashed": false,
+      "src": "nominal",
+      "tgt": "safe"
+    },
+    {
+      "id": "startfault",
+      "pts": [
+        [
+          190,
+          235
+        ],
+        [
+          190,
+          480
+        ]
+      ],
+      "color": "#a84737",
+      "both": false,
+      "dashed": false,
+      "src": "startup",
+      "tgt": "safe"
+    },
+    {
+      "id": "recover",
+      "pts": [
+        [
+          345,
+          480
+        ],
+        [
+          345,
+          235
+        ]
+      ],
+      "color": "#202a33",
+      "both": false,
+      "dashed": false,
+      "src": "safe",
+      "tgt": "startup"
+    },
+    {
+      "id": "detfault",
+      "pts": [
+        [
+          850,
+          235
+        ],
+        [
+          410,
+          500
+        ]
+      ],
+      "color": "#a84737",
+      "both": false,
+      "dashed": false,
+      "src": "detumble",
+      "tgt": "safe"
+    }
+  ]
+}

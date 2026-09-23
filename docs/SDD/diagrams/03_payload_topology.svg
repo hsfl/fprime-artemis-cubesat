@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720"><rect width="1200" height="720" fill="white"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0 0 L8 4 L0 8 z" fill="context-stroke"/></marker></defs>
+<rect x="30" y="110" width="230" height="95" rx="14" fill="#e8f1fb" stroke="#35638a" stroke-width="2"/>
+<rect x="390" y="110" width="300" height="95" rx="14" fill="#e8f1fb" stroke="#35638a" stroke-width="2"/>
+<rect x="870" y="110" width="300" height="95" rx="14" fill="#e9f4eb" stroke="#477a51" stroke-width="2"/>
+<rect x="870" y="310" width="300" height="105" rx="14" fill="#e9f4eb" stroke="#477a51" stroke-width="2"/>
+<rect x="440" y="310" width="300" height="105" rx="14" fill="#e9f4eb" stroke="#477a51" stroke-width="2"/>
+<rect x="30" y="310" width="300" height="125" rx="14" fill="#e8f1fb" stroke="#35638a" stroke-width="2"/>
+<rect x="440" y="515" width="300" height="90" rx="14" fill="#f4f6f8" stroke="#667485" stroke-width="2"/>
+<rect x="870" y="500" width="300" height="80" rx="14" fill="#f4f6f8" stroke="#667485" stroke-width="2"/>
+<rect x="870" y="645" width="300" height="55" rx="14" fill="#e9f4eb" stroke="#477a51" stroke-width="2"/>
+<path d="M 260,157 L 390,157" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<path d="M 690,157 L 870,157" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<path d="M 1020,205 L 1020,310" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<path d="M 870,365 L 740,365" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<path d="M 1020,415 L 1020,500" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<path d="M 950,415 L 950,485 L 590,485 L 590,515" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)" marker-start="url(#arrow)" stroke-dasharray="7 5"/>
+<path d="M 1020,580 L 1020,645" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<path d="M 920,415 L 920,460 L 180,460 L 180,435" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)"/>
+<path d="M 180,310 L 180,250 L 540,250 L 540,205" fill="none" stroke="#35638a" stroke-width="2.3" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+<text x="600.0" y="41.8" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#202a33">Payload topology</text>
+<text x="600.0" y="78.3" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">The Pi executes Teensy-authorized jobs through Application, Manager and Driver components.</text>
+<text x="145.0" y="138.6" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Teensy</text>
+<text x="145.0" y="164.85" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">MissionApp</text>
+<text x="145.0" y="191.1" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">PiSupervisor</text>
+<text x="540.0" y="151.725" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">CompanionLink</text>
+<text x="540.0" y="177.975" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Jobs / results / heartbeat</text>
+<text x="1020.0" y="151.725" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">PayloadApp</text>
+<text x="1020.0" y="177.975" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Authorized activity</text>
+<text x="1020.0" y="356.725" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">PayloadManager</text>
+<text x="1020.0" y="382.975" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Device protocol + lifecycle</text>
+<text x="590.0" y="356.725" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">ProcessingWorker</text>
+<text x="590.0" y="382.975" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Long-running computation</text>
+<text x="180.0" y="353.6" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">ProductStore / Transfer</text>
+<text x="180.0" y="379.85" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Products + metadata</text>
+<text x="180.0" y="406.1" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Retain until ground receipt</text>
+<text x="590.0" y="554.225" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">SimDriver</text>
+<text x="590.0" y="580.475" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">No physical I/O</text>
+<text x="1020.0" y="534.225" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Linux driver</text>
+<text x="1020.0" y="560.475" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">USB / UART / SPI / I2C</text>
+<text x="1020.0" y="679.85" text-anchor="middle" font-family="Arial, sans-serif" font-size="21" font-weight="400" fill="#202a33">Payload hardware</text>
+<text x="1110.0" y="266.3" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Request / result</text>
+<text x="801.5" y="341.3" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Start / done</text>
+<text x="520.0" y="444.3" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Completed product</text>
+<text x="585.0" y="652.55" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Select real OR simulated driver.</text>
+<text x="585.0" y="675.05" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="400" fill="#202a33">Worker communicates only with manager.</text>
+</svg>
