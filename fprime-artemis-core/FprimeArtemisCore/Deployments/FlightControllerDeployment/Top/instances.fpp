@@ -123,6 +123,44 @@ module FprimeArtemisCore {
     }
 
   # ----------------------------------------------------------------------
+  # GPS (Adafruit Mini GPS PA1010D on lpuart7, Teensy pins 28/29, 9600 baud)
+  # ----------------------------------------------------------------------
+  #
+  #   gpsManager -> gpsDriver <- gpsUartDriver -> gpsBufferManager
+  #
+  # The manager is module-independent; gpsDriver knows NMEA; gpsUartDriver only
+  # moves bytes. The module has no enable line, so nothing commands it on or
+  # off: it talks whenever it has power, and silence is how "off" is detected.
+
+  instance gpsManager: Components.GpsManager base id 0x1002B000
+
+  instance gpsDriver: Components.GpsDriver_AdafruitMiniGps base id 0x1002C000
+
+  instance gpsUartDriver: Zephyr.ZephyrUartDriver base id 0x1002D000
+
+  instance gpsBufferManager: Svc.BufferManager base id 0x1002E000 \
+    {
+      phase Fpp.ToCpp.Phases.configObjects """
+      Svc::BufferManager::BufferBins bins;
+      """
+      phase Fpp.ToCpp.Phases.configComponents """
+      memset(&ConfigObjects::FprimeArtemisCore_gpsBufferManager::bins, 0,
+             sizeof(ConfigObjects::FprimeArtemisCore_gpsBufferManager::bins));
+      ConfigObjects::FprimeArtemisCore_gpsBufferManager::bins.bins[0].bufferSize = Gps::bufferSize;
+      ConfigObjects::FprimeArtemisCore_gpsBufferManager::bins.bins[0].numBuffers = Gps::bufferCount;
+      FprimeArtemisCore::gpsBufferManager.setup(
+          Gps::bufferManagerId,
+          0,
+          FprimeArtemisCore::gpsAllocator,
+          ConfigObjects::FprimeArtemisCore_gpsBufferManager::bins
+      );
+      """
+      phase Fpp.ToCpp.Phases.tearDownComponents """
+      FprimeArtemisCore::gpsBufferManager.cleanup();
+      """
+    }
+
+  # ----------------------------------------------------------------------
   # FC↔PC link to the PayloadComputer (Raspberry Pi) over lpuart4
   # ----------------------------------------------------------------------
   #

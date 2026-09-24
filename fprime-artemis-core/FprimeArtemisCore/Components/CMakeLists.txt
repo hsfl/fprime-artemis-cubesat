@@ -9,3 +9,5 @@ add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/FlightControllerLinkManager/"
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/PayloadComputerLinkManager/")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/ImuDriver_LSM6DSOX/")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/ImuManager/")
+add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/GpsManager/")
+add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/GpsDriver_AdafruitMiniGps/")

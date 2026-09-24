@@ -45,6 +45,10 @@ module FprimeArtemisCore {
     instance imuManager
     instance imuDriver
     instance imuI2cBus
+    instance gpsManager
+    instance gpsDriver
+    instance gpsUartDriver
+    instance gpsBufferManager
 
   # ----------------------------------------------------------------------
   # Pattern graph specifiers
@@ -103,6 +107,7 @@ module FprimeArtemisCore {
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_10Hz] -> rateGroup_10Hz.CycleIn
       rateGroup_10Hz.RateGroupMemberOut[0] -> comDriver.schedIn
       rateGroup_10Hz.RateGroupMemberOut[1] -> pcLinkDriver.schedIn
+      rateGroup_10Hz.RateGroupMemberOut[2] -> gpsUartDriver.schedIn
 
       # 1Hz rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_1Hz] -> rateGroup_1Hz.CycleIn
@@ -114,12 +119,17 @@ module FprimeArtemisCore {
       rateGroup_1Hz.RateGroupMemberOut[5] -> rpiPowerManager.run
       rateGroup_1Hz.RateGroupMemberOut[6] -> missionApp.run
       rateGroup_1Hz.RateGroupMemberOut[7] -> imuManager.run
+      # The GPS emits GGA once a second: the driver ages its last sentence on
+      # the same tick the manager reads it, so both run at 1Hz.
+      rateGroup_1Hz.RateGroupMemberOut[8] -> gpsDriver.run
+      rateGroup_1Hz.RateGroupMemberOut[9] -> gpsManager.run
 
       # 0.25Hz rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_0_25Hz] -> rateGroup_0_25Hz.CycleIn
       rateGroup_0_25Hz.RateGroupMemberOut[0] -> CdhCore.$health.Run
       rateGroup_0_25Hz.RateGroupMemberOut[1] -> ComCcsds.commsBufferManager.schedIn
       rateGroup_0_25Hz.RateGroupMemberOut[2] -> pcLinkBufferManager.schedIn
+      rateGroup_0_25Hz.RateGroupMemberOut[3] -> gpsBufferManager.schedIn
     }
 
     connections Mission {
@@ -141,6 +151,24 @@ module FprimeArtemisCore {
       imuManager.driverReadingGet -> imuDriver.readingGet
       imuDriver.busWriteRead      -> imuI2cBus.writeRead
       imuDriver.busWrite          -> imuI2cBus.write
+    }
+
+    connections Gps {
+      # Manager tier reads the fix through the driver's port contract
+      # (Types/Gps.fpp); the driver takes NMEA bytes off lpuart7.
+      gpsManager.driverReadingGet -> gpsDriver.readingGet
+
+      # --- ZephyrUartDriver -> GPS driver (receive only) ---
+      gpsUartDriver.allocate      -> gpsBufferManager.bufferGetCallee
+      gpsUartDriver.deallocate    -> gpsBufferManager.bufferSendIn
+      gpsUartDriver.$recv         -> gpsDriver.drvReceiveIn
+      gpsDriver.drvReceiveReturnOut -> gpsUartDriver.recvReturnIn
+      gpsUartDriver.ready         -> gpsDriver.drvConnected
+
+      # Nothing is sent to the module today. The port is wired because the
+      # driver client interface declares it, and because PMTK configuration
+      # sentences would go out this way.
+      gpsDriver.drvSendOut        -> gpsUartDriver.$send
     }
 
     connections PcLink {

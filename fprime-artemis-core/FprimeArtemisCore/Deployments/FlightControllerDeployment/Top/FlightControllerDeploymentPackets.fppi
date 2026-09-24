@@ -55,6 +55,22 @@ telemetry packets FlightControllerDeploymentPackets {
     FprimeArtemisCore.imuDriver.PowerState
   }
 
+  packet Gps id 9 group 1 {
+    FprimeArtemisCore.gpsManager.GpsState
+    FprimeArtemisCore.gpsManager.GpsPowered
+    FprimeArtemisCore.gpsManager.Latitude
+    FprimeArtemisCore.gpsManager.Longitude
+    FprimeArtemisCore.gpsManager.Altitude
+    FprimeArtemisCore.gpsManager.Satellites
+    FprimeArtemisCore.gpsManager.GpsUtcSeconds
+    # Bring-up diagnostics live in this group 1 packet on purpose: the
+    # packetizer starts at level 1, so a group 2 packet is disabled at boot and
+    # would never reach the ground without a SET_LEVEL command.
+    FprimeArtemisCore.gpsManager.FixLostCount
+    FprimeArtemisCore.gpsDriver.SentencesParsed
+    FprimeArtemisCore.gpsDriver.SentenceErrors
+  }
+
   packet SystemRes1 id 5 group 2 {
     FprimeArtemisCore.systemResources.MEMORY_TOTAL
     FprimeArtemisCore.systemResources.MEMORY_USED
@@ -161,4 +177,10 @@ telemetry packets FlightControllerDeploymentPackets {
   FprimeArtemisCore.pcLinkBufferManager.HiBuffs
   FprimeArtemisCore.pcLinkBufferManager.NoBuffs
   FprimeArtemisCore.pcLinkBufferManager.EmptyBuffs
+  # GPS UART buffer pool health: not downlinked during MVP bring-up
+  FprimeArtemisCore.gpsBufferManager.TotalBuffs
+  FprimeArtemisCore.gpsBufferManager.CurrBuffs
+  FprimeArtemisCore.gpsBufferManager.HiBuffs
+  FprimeArtemisCore.gpsBufferManager.NoBuffs
+  FprimeArtemisCore.gpsBufferManager.EmptyBuffs
 }

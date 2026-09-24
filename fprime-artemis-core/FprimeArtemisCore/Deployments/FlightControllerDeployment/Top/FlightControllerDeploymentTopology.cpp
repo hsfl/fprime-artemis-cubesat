@@ -17,6 +17,7 @@ namespace FprimeArtemisCore {
 
 // Allocator for the pcLinkHub link buffer manager and frame accumulator
 Fw::MallocAllocator pcLinkAllocator;
+Fw::MallocAllocator gpsAllocator;
 
 // Rate group timing: base clock interval and divisors are coupled to rate group names
 constexpr U32 BASE_RATEGROUP_PERIOD_MS = 100;  // 10Hz base clock
@@ -70,6 +71,8 @@ void setupTopology(const TopologyState& state) {
     comDriver.configure(state.uartDevice, state.baudRate);
     // FC↔PC link to the PayloadComputer over lpuart4
     pcLinkDriver.configure(state.pcLinkDevice, state.pcLinkBaud);
+    // GPS NMEA stream on lpuart7 (receive only)
+    gpsUartDriver.configure(state.gpsDevice, state.gpsBaud);
 
     // Payload computer power-enable pin (rpi_power node, Teensy pin 36)
     static const struct gpio_dt_spec rpiPowerPin = GPIO_DT_SPEC_GET(DT_NODELABEL(rpi_power), rpi_enable_gpios);

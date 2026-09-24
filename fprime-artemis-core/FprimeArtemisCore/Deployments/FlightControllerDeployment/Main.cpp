@@ -17,6 +17,9 @@ const struct device* serial = DEVICE_DT_GET(DT_NODELABEL(cdc_acm_uart0));
 // UART to the PayloadComputer (Raspberry Pi). Teensy TX=8 / RX=7.
 const struct device* pcLinkSerial = DEVICE_DT_GET(DT_NODELABEL(lpuart4));
 
+// UART from the Adafruit Mini GPS PA1010D. Teensy RX=28 / TX=29.
+const struct device* gpsSerial = DEVICE_DT_GET(DT_NODELABEL(lpuart7));
+
 int main(int argc, char* argv[]) {
     // ** DO NOT REMOVE **//
     //
@@ -32,6 +35,8 @@ int main(int argc, char* argv[]) {
     inputs.baudRate = 115200;
     inputs.pcLinkDevice = pcLinkSerial;
     inputs.pcLinkBaud = 115200;
+    inputs.gpsDevice = gpsSerial;
+    inputs.gpsBaud = 9600;  // PA1010D default
 
     // Setup, cycle, and teardown topology
     FprimeArtemisCore::setupTopology(inputs);

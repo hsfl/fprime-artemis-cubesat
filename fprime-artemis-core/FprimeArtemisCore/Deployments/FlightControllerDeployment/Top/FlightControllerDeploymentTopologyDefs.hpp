@@ -29,6 +29,15 @@ static constexpr FwSizeType accumulatorSize = 1024; //!< frame reassembly ring c
 static constexpr FwEnumStoreType bufferManagerId = 400;
 }  // namespace PcLink
 
+//! Sizing for the GPS NMEA stream on lpuart7.
+//! The GPS only ever receives: buffers hold at most one ZephyrUartDriver read,
+//! and the driver reassembles sentences itself, so they can be small.
+namespace Gps {
+static constexpr FwSizeType bufferSize = 64;  //!< == ZephyrUartDriver SERIAL_BUFFER_SIZE
+static constexpr FwSizeType bufferCount = 4;  //!< reads in flight at 10Hz
+static constexpr FwEnumStoreType bufferManagerId = 500;
+}  // namespace Gps
+
 //ComCcsds Enum Includes
 #include "Svc/Subtopologies/ComCcsds/Ports_ComPacketQueueEnumAc.hpp"
 #include "Svc/Subtopologies/ComCcsds/Ports_ComBufferQueueEnumAc.hpp"
@@ -81,12 +90,17 @@ struct TopologyState {
     U32 baudRate;          //!< Baud rate for the ground link
     const struct device* pcLinkDevice; //!< Zephyr UART device handle for the PayloadComputer pcLinkHub link
     U32 pcLinkBaud;       //!< Baud rate for the pcLinkHub link
+    const struct device* gpsDevice; //!< Zephyr UART device handle for the GPS NMEA stream
+    U32 gpsBaud;          //!< Baud rate for the GPS (PA1010D default is 9600)
     CdhCore::SubtopologyState cdhCore;           //!< Subtopology state for CdhCore
     ComCcsds::SubtopologyState comCcsds;         //!< Subtopology state for ComCcsds 
 };
 
 //! Allocator backing the pcLinkHub buffer manager and frame accumulator
 extern Fw::MallocAllocator pcLinkAllocator;
+
+//! Allocator backing the GPS buffer manager
+extern Fw::MallocAllocator gpsAllocator;
 
 namespace PingEntries = ::PingEntries;
 }  // namespace FprimeArtemisCore
