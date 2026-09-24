@@ -49,6 +49,15 @@ module FprimeArtemisCore {
     instance gpsDriver
     instance gpsUartDriver
     instance gpsBufferManager
+    instance thermalManager
+    instance thermalDriver
+    instance thermalAdcObc
+    instance thermalAdcPdu
+    instance thermalAdcBattery
+    instance thermalAdcSolar1
+    instance thermalAdcSolar2
+    instance thermalAdcSolar3
+    instance thermalAdcSolar4
 
   # ----------------------------------------------------------------------
   # Pattern graph specifiers
@@ -130,6 +139,8 @@ module FprimeArtemisCore {
       rateGroup_0_25Hz.RateGroupMemberOut[1] -> ComCcsds.commsBufferManager.schedIn
       rateGroup_0_25Hz.RateGroupMemberOut[2] -> pcLinkBufferManager.schedIn
       rateGroup_0_25Hz.RateGroupMemberOut[3] -> gpsBufferManager.schedIn
+      # Board temperatures change over minutes; the 1Hz group is also full.
+      rateGroup_0_25Hz.RateGroupMemberOut[4] -> thermalManager.run
     }
 
     connections Mission {
@@ -169,6 +180,29 @@ module FprimeArtemisCore {
       # driver client interface declares it, and because PMTK configuration
       # sentences would go out this way.
       gpsDriver.drvSendOut        -> gpsUartDriver.$send
+    }
+
+    connections Thermal {
+      # Manager tier reads temperatures through the driver's port contract
+      # (Types/Thermal.fpp). The driver pulls one conversion from each ADC;
+      # port index is the Components.ThermalSensor value. The ADCs' poll
+      # ports stay unconnected: they only convert when the driver asks.
+      thermalManager.driverReadingGet -> thermalDriver.readingGet
+
+      thermalDriver.adcRead[Components.ThermalSensor.OBC] -> thermalAdcObc.readADC
+      thermalAdcObc.adcMvValue -> thermalDriver.adcMvIn[Components.ThermalSensor.OBC]
+      thermalDriver.adcRead[Components.ThermalSensor.PDU] -> thermalAdcPdu.readADC
+      thermalAdcPdu.adcMvValue -> thermalDriver.adcMvIn[Components.ThermalSensor.PDU]
+      thermalDriver.adcRead[Components.ThermalSensor.BATTERY] -> thermalAdcBattery.readADC
+      thermalAdcBattery.adcMvValue -> thermalDriver.adcMvIn[Components.ThermalSensor.BATTERY]
+      thermalDriver.adcRead[Components.ThermalSensor.SOLAR_1] -> thermalAdcSolar1.readADC
+      thermalAdcSolar1.adcMvValue -> thermalDriver.adcMvIn[Components.ThermalSensor.SOLAR_1]
+      thermalDriver.adcRead[Components.ThermalSensor.SOLAR_2] -> thermalAdcSolar2.readADC
+      thermalAdcSolar2.adcMvValue -> thermalDriver.adcMvIn[Components.ThermalSensor.SOLAR_2]
+      thermalDriver.adcRead[Components.ThermalSensor.SOLAR_3] -> thermalAdcSolar3.readADC
+      thermalAdcSolar3.adcMvValue -> thermalDriver.adcMvIn[Components.ThermalSensor.SOLAR_3]
+      thermalDriver.adcRead[Components.ThermalSensor.SOLAR_4] -> thermalAdcSolar4.readADC
+      thermalAdcSolar4.adcMvValue -> thermalDriver.adcMvIn[Components.ThermalSensor.SOLAR_4]
     }
 
     connections PcLink {

@@ -161,6 +161,35 @@ module FprimeArtemisCore {
     }
 
   # ----------------------------------------------------------------------
+  # Thermal (7x TMP36 analog sensors on adc1, temp_sensors node in the overlay)
+  # ----------------------------------------------------------------------
+  #
+  #   thermalManager -> thermalDriver -> thermalAdc* (one ZephyrADCDriver per sensor)
+  #
+  # The manager is sensor-independent; thermalDriver knows the TMP36 transfer
+  # function; each thermalAdc* converts one channel. The ADCs are configured
+  # in FlightControllerDeploymentTopology.cpp from the temp_sensors
+  # io-channels, so the overlay is the single source of the pin order.
+
+  instance thermalManager: Components.ThermalManager base id 0x1002F000
+
+  instance thermalDriver: Components.ThermalDriver_TMP36 base id 0x10030000
+
+  instance thermalAdcObc: Zephyr.ZephyrADCDriver base id 0x10031000
+
+  instance thermalAdcPdu: Zephyr.ZephyrADCDriver base id 0x10032000
+
+  instance thermalAdcBattery: Zephyr.ZephyrADCDriver base id 0x10033000
+
+  instance thermalAdcSolar1: Zephyr.ZephyrADCDriver base id 0x10034000
+
+  instance thermalAdcSolar2: Zephyr.ZephyrADCDriver base id 0x10035000
+
+  instance thermalAdcSolar3: Zephyr.ZephyrADCDriver base id 0x10036000
+
+  instance thermalAdcSolar4: Zephyr.ZephyrADCDriver base id 0x10037000
+
+  # ----------------------------------------------------------------------
   # FC↔PC link to the PayloadComputer (Raspberry Pi) over lpuart4
   # ----------------------------------------------------------------------
   #

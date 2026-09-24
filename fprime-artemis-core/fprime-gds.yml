@@ -2,6 +2,8 @@ command-line-options:
   communication-selection: uart
   uart-baud: 115200
   no-app:
+  # macOS AirPlay Receiver (Control Center) holds port 5000 and answers 403
+  gui-port: 5050
   dictionary: !PATH ./build-artifacts/zephyr/fprime-zephyr-deployment/dict/FlightControllerDeploymentTopologyDictionary.json
   output-unframed-data: "-"
 

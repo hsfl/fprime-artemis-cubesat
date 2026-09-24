@@ -11,3 +11,9 @@ add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/ImuDriver_LSM6DSOX/")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/ImuManager/")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/GpsManager/")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/GpsDriver_AdafruitMiniGps/")
+add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/ThermalManager/")
+# The TMP36 driver reads through fprime-zephyr's ZephyrADCDriver, so it only
+# builds for the Teensy. ThermalManager stays portable.
+if (ARTEMIS_TARGET_ZEPHYR)
+    add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/ThermalDriver_TMP36/")
+endif()

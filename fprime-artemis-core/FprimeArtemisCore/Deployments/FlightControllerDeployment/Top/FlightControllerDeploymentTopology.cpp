@@ -10,6 +10,7 @@
 
 // Necessary project-specified types
 #include <Fw/Types/MallocAllocator.hpp>
+#include <zephyr/drivers/adc.h>
 
 // Public functions for use in main program are namespaced with deployment module FprimeArtemisCore
 // This is also the namespace where the topology components are instantiated by FPP.
@@ -73,6 +74,27 @@ void setupTopology(const TopologyState& state) {
     pcLinkDriver.configure(state.pcLinkDevice, state.pcLinkBaud);
     // GPS NMEA stream on lpuart7 (receive only)
     gpsUartDriver.configure(state.gpsDevice, state.gpsBaud);
+
+    // TMP36 ADC channels, in temp_sensors io-channels order (= Components::ThermalSensor).
+    // ZephyrADCDriver keeps the pointer, so the specs must outlive this function.
+    static const struct adc_dt_spec thermalChannels[] = {
+        ADC_DT_SPEC_GET_BY_IDX(DT_NODELABEL(temp_sensors), 0),
+        ADC_DT_SPEC_GET_BY_IDX(DT_NODELABEL(temp_sensors), 1),
+        ADC_DT_SPEC_GET_BY_IDX(DT_NODELABEL(temp_sensors), 2),
+        ADC_DT_SPEC_GET_BY_IDX(DT_NODELABEL(temp_sensors), 3),
+        ADC_DT_SPEC_GET_BY_IDX(DT_NODELABEL(temp_sensors), 4),
+        ADC_DT_SPEC_GET_BY_IDX(DT_NODELABEL(temp_sensors), 5),
+        ADC_DT_SPEC_GET_BY_IDX(DT_NODELABEL(temp_sensors), 6),
+    };
+    static_assert(DT_PROP_LEN(DT_NODELABEL(temp_sensors), io_channels) == Components::THERMAL_SENSOR_COUNT,
+                  "temp_sensors io-channels must match Components::THERMAL_SENSOR_COUNT");
+    thermalAdcObc.configure(&thermalChannels[Components::ThermalSensor::OBC]);
+    thermalAdcPdu.configure(&thermalChannels[Components::ThermalSensor::PDU]);
+    thermalAdcBattery.configure(&thermalChannels[Components::ThermalSensor::BATTERY]);
+    thermalAdcSolar1.configure(&thermalChannels[Components::ThermalSensor::SOLAR_1]);
+    thermalAdcSolar2.configure(&thermalChannels[Components::ThermalSensor::SOLAR_2]);
+    thermalAdcSolar3.configure(&thermalChannels[Components::ThermalSensor::SOLAR_3]);
+    thermalAdcSolar4.configure(&thermalChannels[Components::ThermalSensor::SOLAR_4]);
 
     // Payload computer power-enable pin (rpi_power node, Teensy pin 36)
     static const struct gpio_dt_spec rpiPowerPin = GPIO_DT_SPEC_GET(DT_NODELABEL(rpi_power), rpi_enable_gpios);

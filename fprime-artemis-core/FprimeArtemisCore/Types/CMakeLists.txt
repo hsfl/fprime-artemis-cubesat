@@ -9,10 +9,13 @@
 # either component so the manager does not depend on a specific driver.
 #
 # Gps.fpp: the same idea for the GpsManager <-> GPS driver contract.
+#
+# Thermal.fpp: the same idea for the ThermalManager <-> thermal driver contract.
 ####
 register_fprime_module(
     AUTOCODER_INPUTS
         "${CMAKE_CURRENT_LIST_DIR}/FcPcLink.fpp"
         "${CMAKE_CURRENT_LIST_DIR}/Imu.fpp"
         "${CMAKE_CURRENT_LIST_DIR}/Gps.fpp"
+        "${CMAKE_CURRENT_LIST_DIR}/Thermal.fpp"
 )

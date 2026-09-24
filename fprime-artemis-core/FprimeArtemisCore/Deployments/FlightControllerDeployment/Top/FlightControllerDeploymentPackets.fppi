@@ -71,6 +71,15 @@ telemetry packets FlightControllerDeploymentPackets {
     FprimeArtemisCore.gpsDriver.SentenceErrors
   }
 
+  packet Thermal id 10 group 1 {
+    FprimeArtemisCore.thermalManager.ThermalState
+    FprimeArtemisCore.thermalManager.Temperatures
+    FprimeArtemisCore.thermalManager.ValidSensorMask
+    FprimeArtemisCore.thermalManager.ThermalMode
+    # Raw mV per sensor: group 1 for the same bring-up reason as the Gps packet
+    FprimeArtemisCore.thermalDriver.SensorMillivolts
+  }
+
   packet SystemRes1 id 5 group 2 {
     FprimeArtemisCore.systemResources.MEMORY_TOTAL
     FprimeArtemisCore.systemResources.MEMORY_USED
@@ -183,4 +192,19 @@ telemetry packets FlightControllerDeploymentPackets {
   FprimeArtemisCore.gpsBufferManager.HiBuffs
   FprimeArtemisCore.gpsBufferManager.NoBuffs
   FprimeArtemisCore.gpsBufferManager.EmptyBuffs
+  # Per-ADC last values: duplicated by thermalDriver.SensorMillivolts
+  FprimeArtemisCore.thermalAdcObc.LastMvValue
+  FprimeArtemisCore.thermalAdcObc.LastRawValue
+  FprimeArtemisCore.thermalAdcPdu.LastMvValue
+  FprimeArtemisCore.thermalAdcPdu.LastRawValue
+  FprimeArtemisCore.thermalAdcBattery.LastMvValue
+  FprimeArtemisCore.thermalAdcBattery.LastRawValue
+  FprimeArtemisCore.thermalAdcSolar1.LastMvValue
+  FprimeArtemisCore.thermalAdcSolar1.LastRawValue
+  FprimeArtemisCore.thermalAdcSolar2.LastMvValue
+  FprimeArtemisCore.thermalAdcSolar2.LastRawValue
+  FprimeArtemisCore.thermalAdcSolar3.LastMvValue
+  FprimeArtemisCore.thermalAdcSolar3.LastRawValue
+  FprimeArtemisCore.thermalAdcSolar4.LastMvValue
+  FprimeArtemisCore.thermalAdcSolar4.LastRawValue
 }
