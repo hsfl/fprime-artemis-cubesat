@@ -25,7 +25,7 @@ operator ──(SET_IMU_POWER, GET_IMU_STATUS)──┘
 
 | State | Meaning |
 |---|---|
-| `OFF` | IMU in power-down. No readings. The state at boot |
+| `OFF` | IMU in power-down. No readings. The state until the first `run` tick |
 | `ON` | IMU sampling; readings published every `run` tick |
 | `FAULT` | IMU was requested on but is not responding. No readings |
 
@@ -33,7 +33,7 @@ operator ──(SET_IMU_POWER, GET_IMU_STATUS)──┘
 
 | From | Trigger | To | Action |
 |---|---|---|---|
-| any | boot (first `run` tick) | `OFF` | request power-off |
+| `OFF` | boot (first `run` tick) | `ON` or `FAULT` | request power-on, as a power request `ON` |
 | `OFF` / `FAULT` | power request `ON`, driver returns `SUCCESS` | `ON` | clear the consecutive-error count |
 | `OFF` / `FAULT` | power request `ON`, driver returns `FAILURE` | `FAULT` | `ImuPowerFailed(ON)` |
 | `ON` | power request `ON` | `ON` | none |
@@ -45,10 +45,12 @@ operator ──(SET_IMU_POWER, GET_IMU_STATUS)──┘
 
 ### Rules behind the table
 
-**`OFF` at boot is enforced, not assumed.** A Teensy reset does not always reset
-the IMU: if the board's 3.3 V rail stays up (a reflash, `fatalHandler.RESTART`, a
-FATAL), the chip keeps its last configuration and keeps sampling. `ImuManager`
-requests power-off on its first `run` tick, so its `OFF` state matches the chip.
+**The IMU is on by default.** `ImuManager` requests power-on on its first `run`
+tick. A Teensy reset does not always reset the IMU: if the board's 3.3 V rail
+stays up (a reflash, `fatalHandler.RESTART`, a FATAL), the chip keeps its last
+configuration. Power-on software-resets the chip first, so the result is the
+same either way. With no IMU connected, every boot ends in `FAULT` with an
+`ImuPowerFailed(ON)` warning on the first tick.
 
 **"Off" is the chip's power-down mode.** The chip keeps power and still answers
 on I2C (see the driver SDD). Cutting power is an EPS job.
@@ -56,8 +58,7 @@ on I2C (see the driver SDD). Cutting power is an EPS job.
 **A failed `OFF` is still `OFF`, with a warning.** `FAULT` means "requested on
 but not responding." After a failed power-down the driver has stopped reading,
 so no reading is claimed either way. The `ImuPowerFailed(OFF)` event, plus the
-driver's `I2cError`s, say the chip may still be sampling. With no IMU connected,
-this is what every boot shows: 3 warnings on the first tick, then `OFF`.
+driver's `I2cError`s, say the chip may still be sampling.
 
 **Only a power request leaves `FAULT`.** The manager does not retry on its own. A
 flaky bus that keeps failing would otherwise flood the event log with power
@@ -77,7 +78,7 @@ any sooner. The chip itself samples at 104 Hz; each tick takes the newest sample
 | Port | Kind | Connects to | Purpose |
 |---|---|---|---|
 | `powerRequestIn` | guarded input, `Components.ImuPowerRequest` | `MissionApp` (future) | turn the IMU on or off; returns `Fw.Success` |
-| `run` | guarded input, `Svc.Sched` | `rateGroup_1Hz` | boot enforcement, reading, fault detection |
+| `run` | guarded input, `Svc.Sched` | `rateGroup_1Hz` | boot power-on, reading, fault detection |
 | `driverPowerOut` | output, `Components.ImuPowerRequest` | `imuDriver.powerRequestIn` | driver power-up / power-down |
 | `driverReadingGet` | output, `Components.ImuReadingGet` | `imuDriver.readingGet` | read the latest sample |
 
@@ -169,8 +170,8 @@ The fault threshold is 3 ticks at any rate: 3 s on `rateGroup_1Hz`.
 ## Not yet implemented
 
 - **`MissionApp` control.** Whether the IMU is on in `BASE` and off in `STANDBY`
-  is a mission decision not made yet. Until then the IMU stays off after boot
-  until `SET_IMU_POWER(ON)`.
+  is a mission decision not made yet. Until then the IMU is on after boot
+  until `SET_IMU_POWER(OFF)`.
 - **Push readings to other components.** An `ImuReadingUpdate` output port would
   let a future ADCS manager receive each reading. No consumer exists yet.
 - **Automatic retry from `FAULT`.** For example, one power-on attempt every N

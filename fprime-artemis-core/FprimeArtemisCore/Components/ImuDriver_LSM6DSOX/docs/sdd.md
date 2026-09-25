@@ -32,8 +32,9 @@ entirely is an EPS job, and this driver does not claim to do it.
 
 The chip comes out of its own power-on reset in power-down. A Teensy reset that
 leaves the 3.3 V rail up does not reset the chip, which keeps its last
-configuration, so the driver's `OFF` state at boot is only true once
-`ImuManager` has requested power-off (see the manager SDD).
+configuration. `ImuManager` requests power-on on its first tick, and power-on
+software-resets the chip first, so the result is the same either way (see the
+manager SDD).
 
 ## Requirements
 

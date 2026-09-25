@@ -24,7 +24,7 @@ class ImuManager final : public ImuManagerComponentBase {
     // Handler implementations for typed input ports
     // ----------------------------------------------------------------------
 
-    //! First tick: force the IMU off. Then read while ON and detect faults.
+    //! First tick: power the IMU on. Then read while ON and detect faults.
     void run_handler(FwIndexType portNum, U32 context) override;
 
     //! MissionApp requests the IMU on or off
@@ -45,7 +45,7 @@ class ImuManager final : public ImuManagerComponentBase {
     // ----------------------------------------------------------------------
 
     //! Ask the driver for a power state and update state. Shared by the port,
-    //! the command, and the boot power-off.
+    //! the command, and the boot power-on.
     //! \return SUCCESS if the driver carried out the request
     Fw::Success applyPower(const Fw::On& state);
 
@@ -55,12 +55,11 @@ class ImuManager final : public ImuManagerComponentBase {
     //! Set the state, emitting an event and telemetry if it changed
     void setState(ImuState state);
 
-    //! Current state. The IMU is assumed off only until the first run tick
-    //! enforces it.
+    //! Current state. OFF only until the first run tick powers the IMU on.
     ImuState m_state = ImuState::OFF;
 
-    //! Whether the boot power-off has been requested
-    bool m_bootPowerOffDone = false;
+    //! Whether the boot power-on has been requested
+    bool m_bootPowerOnDone = false;
 
     //! Failed reads in a row while ON
     U32 m_consecutiveErrors = 0;

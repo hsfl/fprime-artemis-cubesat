@@ -34,7 +34,7 @@ module Components {
     # Scheduling
     # ----------------------------------------------------------------------
 
-    @ Rate group input: boot power-off, reading, and fault detection
+    @ Rate group input: boot power-on, reading, and fault detection
     guarded input port run: Svc.Sched
 
     # ----------------------------------------------------------------------

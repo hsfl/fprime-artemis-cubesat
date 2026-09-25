@@ -16,11 +16,11 @@ ImuManager::~ImuManager() {}
 // ----------------------------------------------------------------------
 
 void ImuManager::run_handler(FwIndexType portNum, U32 context) {
-    // A Teensy reset does not reset the IMU: it may still be sampling from
-    // before. Force it off so the OFF state is true, not assumed.
-    if (!this->m_bootPowerOffDone) {
-        this->m_bootPowerOffDone = true;
-        (void)this->applyPower(Fw::On::OFF);
+    // The IMU is on by default. Power-up software-resets the chip, so this is
+    // safe whatever a Teensy reset left it doing.
+    if (!this->m_bootPowerOnDone) {
+        this->m_bootPowerOnDone = true;
+        (void)this->applyPower(Fw::On::ON);
     } else if (this->m_state == ImuState::ON) {
         this->readOnce();
     }
