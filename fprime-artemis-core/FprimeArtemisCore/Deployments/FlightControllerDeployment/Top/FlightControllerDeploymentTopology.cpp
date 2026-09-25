@@ -72,7 +72,7 @@ void setupTopology(const TopologyState& state) {
     comDriver.configure(state.uartDevice, state.baudRate);
     // FC↔PC link to the PayloadComputer over lpuart4
     pcLinkDriver.configure(state.pcLinkDevice, state.pcLinkBaud);
-    // GPS NMEA stream on lpuart7 (receive only)
+    // GPS on lpuart7: NMEA in, PMTK standby/wake out
     gpsUartDriver.configure(state.gpsDevice, state.gpsBaud);
 
     // TMP36 ADC channels, in temp_sensors io-channels order (= Components::ThermalSensor).

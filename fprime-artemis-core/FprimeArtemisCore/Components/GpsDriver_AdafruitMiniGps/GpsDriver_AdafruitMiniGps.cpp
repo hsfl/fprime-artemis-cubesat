@@ -23,6 +23,12 @@ constexpr U32 GGA_SATELLITES = 7;
 constexpr U32 GGA_ALTITUDE = 9;
 //! Fields needed before a GGA can be read at all
 constexpr U32 GGA_MIN_FIELDS = GGA_ALTITUDE + 1;
+
+//! PMTK161: enter standby. Any byte received wakes the module.
+constexpr char PMTK_STANDBY[] = "$PMTK161,0*28\r\n";
+//! PMTK000: test packet. Sent only for its bytes, which wake the module; the
+//! PMTK001 reply is not a GGA and is ignored like any other sentence.
+constexpr char PMTK_WAKE[] = "$PMTK000*32\r\n";
 }  // namespace
 
 GpsDriver_AdafruitMiniGps::GpsDriver_AdafruitMiniGps(const char* const compName)
@@ -56,7 +62,19 @@ void GpsDriver_AdafruitMiniGps::drvReceiveIn_handler(FwIndexType portNum,
 }
 
 void GpsDriver_AdafruitMiniGps::drvConnected_handler(FwIndexType portNum) {
-    // The UART is open. Nothing to configure: the module streams on its own.
+    // The UART is open. Nothing to configure: the module streams on its own,
+    // and GpsManager wakes it on its first tick.
+}
+
+Fw::Success GpsDriver_AdafruitMiniGps::powerRequestIn_handler(FwIndexType portNum, const Fw::On& state) {
+    if (state == Fw::On::ON) {
+        return this->sendSentence(PMTK_WAKE);
+    }
+    // The last fix is not current once standby is requested: go stale now
+    // rather than serving it for the rest of the staleness window.
+    this->m_hasFix = false;
+    this->m_ticksSinceSentence = STALE_TICKS;
+    return this->sendSentence(PMTK_STANDBY);
 }
 
 Components::GpsReadStatus GpsDriver_AdafruitMiniGps::readingGet_handler(FwIndexType portNum,
@@ -87,6 +105,15 @@ void GpsDriver_AdafruitMiniGps::run_handler(FwIndexType portNum, U32 context) {
 // ----------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------
+
+Fw::Success GpsDriver_AdafruitMiniGps::sendSentence(const char* sentence) {
+    // The UART driver writes synchronously and does not keep the buffer, so a
+    // buffer over the constant is enough.
+    Fw::Buffer buffer(reinterpret_cast<U8*>(const_cast<char*>(sentence)),
+                      static_cast<FwSizeType>(strlen(sentence)));
+    const Drv::ByteStreamStatus status = this->drvSendOut_out(0, buffer);
+    return (status == Drv::ByteStreamStatus::OP_OK) ? Fw::Success::SUCCESS : Fw::Success::FAILURE;
+}
 
 void GpsDriver_AdafruitMiniGps::acceptByte(U8 byte) {
     const char c = static_cast<char>(byte);

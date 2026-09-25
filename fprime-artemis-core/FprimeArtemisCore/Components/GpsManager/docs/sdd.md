@@ -5,14 +5,15 @@
 > `FlightControllerDeployment`; wired as `gpsManager` on `rateGroup_1Hz`.
 
 `GpsManager` is the manager tier for the flight controller's GPS. It owns the
-hardware-independent contract: reporting whether the module is powered and
-talking, whether it has a satellite lock, and publishing its fixes as
-telemetry. It knows nothing about the module or about NMEA. Every read goes
-through the driver's port, so replacing the PA1010D means replacing the driver
+hardware-independent contract: turning the module on and off, reporting
+whether it is talking, whether it has a satellite lock, and publishing its fixes as
+telemetry. It knows nothing about the module or about NMEA. Every read and
+power request goes through the driver's ports, so replacing the PA1010D means replacing the driver
 instance only.
 
 ```
-operator ──(GET_GPS_STATUS)──> GpsManager ──(GpsReadingGet)──> GpsDriver_AdafruitMiniGps <──(Drv.ByteStreamDriver)── ZephyrUartDriver
+MissionApp ──(GpsPowerRequest)──> GpsManager ──(GpsPowerRequest, GpsReadingGet)──> GpsDriver_AdafruitMiniGps <──(Drv.ByteStreamDriver)── ZephyrUartDriver
+operator ──(SET_GPS_POWER, GET_GPS_STATUS)──┘
 ```
 
 | Layer | Component | Owns |
@@ -25,12 +26,37 @@ operator ──(GET_GPS_STATUS)──> GpsManager ──(GpsReadingGet)──> G
 
 | State | Meaning |
 |---|---|
-| `OFF` | No sentences arriving. The module is unpowered, unplugged, or miswired. The state at boot |
+| `OFF` | No sentences arriving. The module is in standby, unpowered, unplugged, or miswired. The state at boot |
 | `ACQUIRING` | Sentences arriving, no satellite lock yet. Position is not current |
 | `READY` | Locked. Position, altitude, and satellite count published every `run` tick |
 
-`GpsPowered` telemetry is `OFF` in state `OFF` and `ON` otherwise: with no
-enable line on the module, "powered" can only be observed, never commanded.
+The state is observed, not commanded. `GpsPowered` telemetry is the commanded
+power state. The module does not acknowledge power requests, so the two are
+read together:
+
+| `GpsPowered` | `GpsState` | Meaning |
+|---|---|---|
+| `ON` | `ACQUIRING` / `READY` | Normal |
+| `ON` | `OFF` | Asked to talk and silent: unpowered, unplugged, or TX not wired. Send `SET_GPS_POWER(ON)` again to retry the wake |
+| `OFF` | `OFF` | In standby, as commanded |
+| `OFF` | `ACQUIRING` / `READY` for more than ~3 s after the command | Ignored the standby request: check the Teensy TX to module RX wire. A brief `READY` right after the command is sentences already in flight, not a fault |
+
+## Power
+
+"Off" is the module's PMTK standby mode (`$PMTK161,0`), not a power cut: the
+module keeps power and any byte on its RX line wakes it. Cutting power is an
+EPS job.
+
+**The GPS is on by default.** `GpsManager` requests `ON` on its first `run`
+tick. Standby survives a Teensy reset, so a module put to sleep before a reset
+has to be woken, not assumed awake.
+
+**A commanded standby is not a lost fix.** Leaving `READY` because of
+`SET_GPS_POWER(OFF)` emits `GpsStateChanged` but not `GpsNotReady`, and does
+not count in `FixLostCount`.
+
+**The manager keeps reading while `OFF` is commanded**, so a module that ignores
+standby is visible instead of hidden.
 
 ## Ready notification
 
@@ -52,11 +78,13 @@ collection, say -- add an output port here rather than having it read telemetry.
 
 | Command | Effect |
 |---|---|
-| `GET_GPS_STATUS` | Emits `GpsStatusReport` with the state, satellite count, and fixes lost since boot |
+| `SET_GPS_POWER(state: Fw.On)` | Engineering: wake the module or put it in standby. Responds `OK` if the request was sent, `EXECUTION_ERROR` (plus `GpsPowerFailed`) otherwise. `OK` does not mean the module obeyed: watch `GpsState` |
+| `GET_GPS_STATUS` | Emits `GpsStatusReport` with the state, commanded power, satellite count, and fixes lost since boot |
 
-There is no power command: the module has no enable line and no software
-power-down. If the GPS rail is ever put behind a PDU channel, the command
-belongs on the PDU manager, and this component keeps observing.
+**Bench check for the TX wire:** send `SET_GPS_POWER(OFF)`. `gpsDriver.SentencesParsed`
+should stop climbing within about 3 seconds (a sentence or two in flight may
+still land). Send `SET_GPS_POWER(ON)` and it
+should resume.
 
 ## Telemetry
 

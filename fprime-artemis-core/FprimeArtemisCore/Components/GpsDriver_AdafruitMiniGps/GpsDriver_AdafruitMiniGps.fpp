@@ -6,9 +6,10 @@ module Components {
   @ NMEA output. Bytes arrive from a byte stream driver, so the same component
   @ runs against any driver that speaks Drv.ByteStreamDriver.
   @
-  @ The module has no enable line and no software power-down: it talks as soon
-  @ as it has power. "Not powered" is therefore observed, not commanded --
-  @ no sentences within the staleness window means the module is treated as off.
+  @ The module has no enable line. "Off" is its PMTK standby mode, entered and
+  @ left with sentences sent over the same UART. The module does not
+  @ acknowledge either, so whether it is talking is still observed: no
+  @ sentences within the staleness window means it is treated as off.
   passive component GpsDriver_AdafruitMiniGps {
 
     # ----------------------------------------------------------------------
@@ -21,6 +22,9 @@ module Components {
     # ----------------------------------------------------------------------
     # Manager interface (GpsManager)
     # ----------------------------------------------------------------------
+
+    @ Put the module in standby or wake it
+    sync input port powerRequestIn: Components.GpsPowerRequest
 
     @ Read the latest fix
     sync input port readingGet: Components.GpsReadingGet

@@ -16,6 +16,15 @@ GpsManager::~GpsManager() {}
 // ----------------------------------------------------------------------
 
 void GpsManager::run_handler(FwIndexType portNum, U32 context) {
+    // The GPS is on by default. Standby survives a Teensy reset, so a module
+    // put to sleep before the reset must be woken, not assumed awake.
+    if (!this->m_bootPowerOnDone) {
+        this->m_bootPowerOnDone = true;
+        (void)this->applyPower(Fw::On::ON);
+    }
+
+    // Read whatever the commanded state: a module that ignored a standby
+    // request shows up as GpsPowered OFF with sentences still arriving.
     GpsFix fix;
     const GpsReadStatus status = this->driverReadingGet_out(0, fix);
 
@@ -44,17 +53,28 @@ void GpsManager::run_handler(FwIndexType portNum, U32 context) {
     }
 
     this->tlmWrite_GpsState(this->m_state);
-    this->tlmWrite_GpsPowered((this->m_state == GpsState::OFF) ? Fw::On::OFF : Fw::On::ON);
+    this->tlmWrite_GpsPowered(this->m_power);
     this->tlmWrite_FixLostCount(this->m_fixLostCount);
+}
+
+Fw::Success GpsManager::powerRequestIn_handler(FwIndexType portNum, const Fw::On& state) {
+    return this->applyPower(state);
 }
 
 // ----------------------------------------------------------------------
 // Command handlers
 // ----------------------------------------------------------------------
 
+void GpsManager::SET_GPS_POWER_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, const Fw::On& state) {
+    const Fw::Success status = this->applyPower(state);
+    this->cmdResponse_out(opCode, cmdSeq,
+                          (status == Fw::Success::SUCCESS) ? Fw::CmdResponse::OK
+                                                           : Fw::CmdResponse::EXECUTION_ERROR);
+}
+
 void GpsManager::GET_GPS_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     const U8 satellites = this->m_hasEverFixed ? this->m_fix.get_satellites() : 0;
-    this->log_ACTIVITY_LO_GpsStatusReport(this->m_state, satellites, this->m_fixLostCount);
+    this->log_ACTIVITY_LO_GpsStatusReport(this->m_state, this->m_power, satellites, this->m_fixLostCount);
     this->tlmWrite_GpsState(this->m_state);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
@@ -62,6 +82,19 @@ void GpsManager::GET_GPS_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
 // ----------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------
+
+Fw::Success GpsManager::applyPower(const Fw::On& state) {
+    // No redundant-request check: resending a wake is harmless, and it is the
+    // retry when GpsPowered is ON but the module is silent.
+    const Fw::Success status = this->driverPowerOut_out(0, state);
+    if (status != Fw::Success::SUCCESS) {
+        this->log_WARNING_HI_GpsPowerFailed(state);
+        return Fw::Success::FAILURE;
+    }
+    this->m_power = state;
+    this->tlmWrite_GpsPowered(state);
+    return Fw::Success::SUCCESS;
+}
 
 void GpsManager::setState(GpsState state) {
     if (state == this->m_state) {
@@ -77,7 +110,8 @@ void GpsManager::setState(GpsState state) {
     // software watches; the state change above is the audit trail.
     if (state == GpsState::READY) {
         this->log_ACTIVITY_HI_GpsReady(this->m_fix.get_satellites());
-    } else if (wasReady) {
+    } else if (wasReady && (this->m_power == Fw::On::ON)) {
+        // A fix dropped by a commanded standby was not lost
         this->m_fixLostCount++;
         this->log_WARNING_LO_GpsNotReady(state);
         this->tlmWrite_FixLostCount(this->m_fixLostCount);

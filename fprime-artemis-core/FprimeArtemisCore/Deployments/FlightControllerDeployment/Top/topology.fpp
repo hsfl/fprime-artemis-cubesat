@@ -165,20 +165,19 @@ module FprimeArtemisCore {
     }
 
     connections Gps {
-      # Manager tier reads the fix through the driver's port contract
+      # Manager tier drives the GPS through the driver's port contract
       # (Types/Gps.fpp); the driver takes NMEA bytes off lpuart7.
+      gpsManager.driverPowerOut   -> gpsDriver.powerRequestIn
       gpsManager.driverReadingGet -> gpsDriver.readingGet
 
-      # --- ZephyrUartDriver -> GPS driver (receive only) ---
+      # --- ZephyrUartDriver <-> GPS driver ---
       gpsUartDriver.allocate      -> gpsBufferManager.bufferGetCallee
       gpsUartDriver.deallocate    -> gpsBufferManager.bufferSendIn
       gpsUartDriver.$recv         -> gpsDriver.drvReceiveIn
       gpsDriver.drvReceiveReturnOut -> gpsUartDriver.recvReturnIn
       gpsUartDriver.ready         -> gpsDriver.drvConnected
 
-      # Nothing is sent to the module today. The port is wired because the
-      # driver client interface declares it, and because PMTK configuration
-      # sentences would go out this way.
+      # PMTK standby and wake sentences go out this way
       gpsDriver.drvSendOut        -> gpsUartDriver.$send
     }
 

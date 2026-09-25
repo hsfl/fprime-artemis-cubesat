@@ -41,6 +41,13 @@ module Components {
   # Port types
   # ----------------------------------------------------------------------
 
+  @ Put the GPS in standby or wake it.
+  @ Returns SUCCESS if the request was sent. The module does not acknowledge
+  @ it: whether it obeyed shows up as sentences stopping or resuming.
+  port GpsPowerRequest(
+                        $state: Fw.On @< ON wakes the module, OFF puts it in standby
+                      ) -> Fw.Success
+
   @ Read the latest GPS fix into fix.
   @ fix is valid only when the return value is OK.
   port GpsReadingGet(

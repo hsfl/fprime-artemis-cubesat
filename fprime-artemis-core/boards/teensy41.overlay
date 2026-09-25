@@ -26,7 +26,7 @@
     current-speed = <9600>; /* PDU Serial1, Teensy pins 0/1 */
 };
 
-/* Teensy RX=29, TX=28 - connected to GPS (Arduino Serial7, Adafruit Mini GPS PA1010D) */
+/* Teensy RX=28, TX=29 - connected to GPS (Arduino Serial7, Adafruit Mini GPS PA1010D) */
 &lpuart7 {
     status = "okay";
     current-speed = <9600>;

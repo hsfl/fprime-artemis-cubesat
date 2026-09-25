@@ -2,22 +2,33 @@ module Components {
 
   @ Manager tier for the flight controller's GPS.
   @
-  @ Owns the hardware-independent contract: reporting whether the module is
-  @ powered and talking, whether it has a satellite lock, and publishing its
-  @ fixes. Every hardware action goes through a GPS driver (Types/Gps.fpp), so
+  @ Owns the hardware-independent contract: turning the module on and off,
+  @ reporting whether it is talking, whether it has a satellite lock, and
+  @ publishing its fixes. Every hardware action goes through a GPS driver (Types/Gps.fpp), so
   @ swapping the GPS means swapping the driver instance only.
   @
-  @ The Adafruit Mini GPS has no enable line and no software power-down, so
-  @ "powered" is observed rather than commanded: sentences arriving means
-  @ powered, silence means not.
+  @ The module does not acknowledge power requests, so GpsPowered is the
+  @ commanded state and GpsState is what is observed: sentences arriving
+  @ means talking, silence means not.
   @
   @ Inputs and commands are guarded: commands run on the dispatcher's thread
   @ and run on the rate group's.
   passive component GpsManager {
 
     # ----------------------------------------------------------------------
+    # Application interface (MissionApp)
+    # ----------------------------------------------------------------------
+
+    @ Turn the GPS on or off. This is the operator path once MissionApp drives
+    @ it; SET_GPS_POWER is the engineering equivalent.
+    guarded input port powerRequestIn: Components.GpsPowerRequest
+
+    # ----------------------------------------------------------------------
     # Driver interface
     # ----------------------------------------------------------------------
+
+    @ Put the module in standby or wake it
+    output port driverPowerOut: Components.GpsPowerRequest
 
     @ Read the latest fix
     output port driverReadingGet: Components.GpsReadingGet
@@ -26,12 +37,18 @@ module Components {
     # Scheduling
     # ----------------------------------------------------------------------
 
-    @ Rate group input: read the fix and update the state
+    @ Rate group input: boot power-on, reading the fix, and updating the state
     guarded input port run: Svc.Sched
 
     # ----------------------------------------------------------------------
     # Commands
     # ----------------------------------------------------------------------
+
+    @ Engineering command: turn the GPS on or off.
+    @ Not part of routine operations once MissionApp drives the GPS.
+    guarded command SET_GPS_POWER(
+                                   $state: Fw.On @< ON wakes the module, OFF puts it in standby
+                                 )
 
     @ Report the current state, satellite count, and last fix as events
     guarded command GET_GPS_STATUS
@@ -43,7 +60,8 @@ module Components {
     @ OFF, ACQUIRING, or READY. The fix is current only while READY.
     telemetry GpsState: Components.GpsState update on change
 
-    @ Whether the module is powered and talking
+    @ Commanded power state. ON with GpsState OFF means the module was asked
+    @ to talk and is silent.
     telemetry GpsPowered: Fw.On update on change
 
     @ Degrees, positive north, updated each tick while READY
@@ -89,14 +107,22 @@ module Components {
       severity warning low \
       format "GPS not ready: state is now {}"
 
+    @ The power request could not be sent to the module
+    event GpsPowerFailed(
+                          $state: Fw.On @< the requested state
+                        ) \
+      severity warning high \
+      format "GPS power {} request failed"
+
     @ Response to GET_GPS_STATUS
     event GpsStatusReport(
                            $state: Components.GpsState @< the current state
+                           powered: Fw.On @< the commanded power state
                            satellites: U8 @< satellites in the last fix
                            fixesLost: U32 @< fixes lost since boot
                          ) \
       severity activity low \
-      format "GPS state: {}, satellites: {}, fixes lost since boot: {}"
+      format "GPS state: {}, commanded power: {}, satellites: {}, fixes lost since boot: {}"
 
     ##########################################################
     # Standard AC ports

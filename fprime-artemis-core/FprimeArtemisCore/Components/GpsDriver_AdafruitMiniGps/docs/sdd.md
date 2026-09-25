@@ -12,9 +12,12 @@ contract (`Types/Gps.fpp`) against the module's NMEA output: bytes arrive from
 a byte stream driver, sentences are reassembled and checked, and the latest fix
 is handed to the manager in SI units.
 
-The module has no enable line and no software power-down. It talks as soon as
-it has power, so this driver never commands it: "not powered" is observed as
-silence.
+The module has no enable line. `powerRequestIn(OFF)` sends `$PMTK161,0*28`
+(standby) and marks the last fix stale at once. `powerRequestIn(ON)` sends
+`$PMTK000*32` (test packet): its first byte is what wakes the module, and the
+`PMTK001` reply is ignored like any non-GGA sentence. The module acknowledges
+neither, so "talking" is still observed: silence means off. `SUCCESS` means the
+UART driver accepted the bytes, nothing more.
 
 ## Data path
 

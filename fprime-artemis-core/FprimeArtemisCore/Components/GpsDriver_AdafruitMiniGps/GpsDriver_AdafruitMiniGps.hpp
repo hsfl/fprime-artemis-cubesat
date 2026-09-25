@@ -41,6 +41,9 @@ class GpsDriver_AdafruitMiniGps final : public GpsDriver_AdafruitMiniGpsComponen
     //! The UART driver reports it is ready
     void drvConnected_handler(FwIndexType portNum) override;
 
+    //! GpsManager asks for standby or wake
+    Fw::Success powerRequestIn_handler(FwIndexType portNum, const Fw::On& state) override;
+
     //! GpsManager asks for the latest fix
     Components::GpsReadStatus readingGet_handler(FwIndexType portNum, Components::GpsFix& fix) override;
 
@@ -50,6 +53,10 @@ class GpsDriver_AdafruitMiniGps final : public GpsDriver_AdafruitMiniGpsComponen
     // ----------------------------------------------------------------------
     // Helpers
     // ----------------------------------------------------------------------
+
+    //! Send one complete sentence to the module
+    //! \return SUCCESS if the UART driver accepted it
+    Fw::Success sendSentence(const char* sentence);
 
     //! Feed one received byte into the line buffer, parsing a completed line
     void acceptByte(U8 byte);

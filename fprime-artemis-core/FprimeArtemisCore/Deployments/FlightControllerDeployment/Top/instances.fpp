@@ -129,8 +129,8 @@ module FprimeArtemisCore {
   #   gpsManager -> gpsDriver <- gpsUartDriver -> gpsBufferManager
   #
   # The manager is module-independent; gpsDriver knows NMEA; gpsUartDriver only
-  # moves bytes. The module has no enable line, so nothing commands it on or
-  # off: it talks whenever it has power, and silence is how "off" is detected.
+  # moves bytes. The module has no enable line: "off" is PMTK standby, sent over
+  # the UART, and silence is how a module that is not talking is detected.
 
   instance gpsManager: Components.GpsManager base id 0x1002B000
 
