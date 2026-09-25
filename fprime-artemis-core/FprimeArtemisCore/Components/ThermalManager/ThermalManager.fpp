@@ -7,6 +7,9 @@ module Components {
   @ temperatures. Every read goes through a thermal driver (Types/Thermal.fpp),
   @ so swapping the sensors means swapping the driver instance only.
   @
+  @ A sensor can be disabled by command: it drops out of the state decision
+  @ and its temperature is no longer reported. The ADC is still sampled.
+  @
   @ No heater is driven yet. SET_THERMAL_MODE records intent only.
   @
   @ Inputs and commands are guarded: commands run on the dispatcher's thread
@@ -34,6 +37,13 @@ module Components {
     @ Read the sensors now and report the state as an event
     guarded command REQUEST_THERMAL_STATUS
 
+    @ Enable or disable one sensor. A disabled sensor is left out of
+    @ ThermalState and ValidSensorMask, and its Temperatures entry reads 0.
+    guarded command SET_THERMAL_SENSOR(
+                                        sensor: Components.ThermalSensor @< the sensor, by name; the value is its index
+                                        $state: Fw.On @< ON reports the sensor, OFF stops reporting it
+                                      )
+
     @ Record the requested thermal control mode.
     @ Records intent only: no heater is driven.
     guarded command SET_THERMAL_MODE(
@@ -48,11 +58,14 @@ module Components {
     telemetry ThermalState: Components.ThermalState update on change
 
     @ Degrees C per sensor, indexed by ThermalSensor. Only entries set in
-    @ ValidSensorMask are real readings.
+    @ ValidSensorMask are real readings; disabled sensors read 0.
     telemetry Temperatures: Components.ThermalTemperatures
 
-    @ Bit i set when sensor i read inside its rated range
+    @ Bit i set when sensor i is enabled and read inside its rated range
     telemetry ValidSensorMask: U8 update on change
+
+    @ Bit i set when sensor i is enabled
+    telemetry EnabledSensorMask: U8 update on change
 
     @ Requested control mode (intent only)
     telemetry ThermalMode: Components.ThermalMode update on change
@@ -75,6 +88,14 @@ module Components {
                                ) \
       severity warning low \
       format "Thermal sensor {} valid: {}"
+
+    @ A sensor was enabled or disabled by command
+    event SensorEnableChanged(
+                               sensor: Components.ThermalSensor @< the sensor
+                               $state: Fw.On @< ON if now reported, OFF if not
+                             ) \
+      severity activity high \
+      format "Thermal sensor {} reporting {}"
 
     @ The requested control mode changed
     event ThermalModeUpdated(

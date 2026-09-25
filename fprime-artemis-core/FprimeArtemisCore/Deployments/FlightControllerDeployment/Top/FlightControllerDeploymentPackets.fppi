@@ -75,6 +75,7 @@ telemetry packets FlightControllerDeploymentPackets {
     FprimeArtemisCore.thermalManager.ThermalState
     FprimeArtemisCore.thermalManager.Temperatures
     FprimeArtemisCore.thermalManager.ValidSensorMask
+    FprimeArtemisCore.thermalManager.EnabledSensorMask
     FprimeArtemisCore.thermalManager.ThermalMode
     # Raw mV per sensor: group 1 for the same bring-up reason as the Gps packet
     FprimeArtemisCore.thermalDriver.SensorMillivolts

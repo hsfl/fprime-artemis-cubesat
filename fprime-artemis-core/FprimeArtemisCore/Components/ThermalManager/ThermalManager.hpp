@@ -36,6 +36,12 @@ class ThermalManager final : public ThermalManagerComponentBase {
     //! Read now and report the state as an event
     void REQUEST_THERMAL_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
 
+    //! Enable or disable one sensor
+    void SET_THERMAL_SENSOR_cmdHandler(FwOpcodeType opCode,
+                                       U32 cmdSeq,
+                                       const ThermalSensor& sensor,
+                                       const Fw::On& state) override;
+
     //! Record the requested mode (intent only)
     void SET_THERMAL_MODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, const ThermalMode& mode) override;
 
@@ -57,6 +63,9 @@ class ThermalManager final : public ThermalManagerComponentBase {
 
     //! Last reading, for the status report
     ThermalReading m_reading;
+
+    //! Bit i set when sensor i is enabled. Every sensor is enabled at boot.
+    U8 m_enabledMask = static_cast<U8>((1U << THERMAL_SENSOR_COUNT) - 1U);
 
     //! Valid sensors on the previous read, for SensorValidityChanged.
     //! Seeded all-valid so the first read reports only missing sensors.

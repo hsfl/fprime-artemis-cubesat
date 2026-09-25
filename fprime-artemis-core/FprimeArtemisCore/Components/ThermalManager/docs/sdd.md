@@ -13,7 +13,7 @@ It replaces the ArtemisRpiTeensy_N2 `ThermalManager`, which drove a
 deterministic fake model. The command names are kept.
 
 ```
-operator ──(REQUEST_THERMAL_STATUS, SET_THERMAL_MODE)──> ThermalManager ──(ThermalReadingGet)──> ThermalDriver_TMP36 ──(Fw.Signal / ADCMvValue)──> 7x ZephyrADCDriver
+operator ──(REQUEST_THERMAL_STATUS, SET_THERMAL_SENSOR, SET_THERMAL_MODE)──> ThermalManager ──(ThermalReadingGet)──> ThermalDriver_TMP36 ──(Fw.Signal / ADCMvValue)──> 7x ZephyrADCDriver
 ```
 
 | Layer | Component | Owns |
@@ -55,6 +55,7 @@ analysis. Nothing acts on `COLD` or `HOT` yet; they are reported only.
 | Command | Effect |
 |---|---|
 | `REQUEST_THERMAL_STATUS` | Reads now, then emits `ThermalStatusReport` with the state, valid mask, and min/max valid temperature |
+| `SET_THERMAL_SENSOR(sensor, state)` | Enables (`ON`) or disables (`OFF`) one sensor. Pick it by name (`OBC`, `PDU`, `BATTERY`, `SOLAR_1`..`SOLAR_4`); the enum value is its index, 0-6. Every sensor is enabled at boot |
 | `SET_THERMAL_MODE` | Records `OFF`, `OBSERVE`, or `HEATER_AUTO`. **Intent only: no heater is driven** |
 
 ## Telemetry
@@ -62,13 +63,20 @@ analysis. Nothing acts on `COLD` or `HOT` yet; they are reported only.
 | Channel | Meaning |
 |---|---|
 | `ThermalState` | `NO_DATA`, `NOMINAL`, `COLD`, or `HOT` |
-| `Temperatures` | Degrees C per sensor. Only entries set in `ValidSensorMask` are real |
-| `ValidSensorMask` | Bit i set when sensor i reads inside its rated range |
+| `Temperatures` | Degrees C per sensor. Only entries set in `ValidSensorMask` are real; disabled sensors read `0` |
+| `ValidSensorMask` | Bit i set when sensor i is enabled and reads inside its rated range |
+| `EnabledSensorMask` | Bit i set when sensor i is enabled |
 | `ThermalMode` | Requested mode (intent only) |
 
 `Temperatures` is written only when at least one sensor is valid. With none,
 the last values stay on the ground display with an old timestamp, and
 `ThermalState` = `NO_DATA` says they are stale.
+
+**A disabled sensor is treated as not there.** It is dropped from
+`ValidSensorMask` and from the `NOMINAL`/`COLD`/`HOT` decision, and its
+`Temperatures` entry is zeroed. The ADC is still sampled; only reporting stops.
+Use this to silence a sensor that is broken or reading garbage. Disabling every
+sensor gives `NO_DATA`. The setting is not saved: a reboot enables all sensors.
 
 ## Events
 
@@ -76,6 +84,7 @@ the last values stay on the ground display with an old timestamp, and
 |---|---|
 | `ThermalStateChanged` | Every state transition |
 | `SensorValidityChanged` | A sensor enters or leaves its rated range. Expect one per unplugged sensor on the first read |
+| `SensorEnableChanged` | `SET_THERMAL_SENSOR`. Disabling does not also emit `SensorValidityChanged` |
 | `ThermalModeUpdated` | `SET_THERMAL_MODE` |
 | `ThermalStatusReport` | `REQUEST_THERMAL_STATUS` |
 

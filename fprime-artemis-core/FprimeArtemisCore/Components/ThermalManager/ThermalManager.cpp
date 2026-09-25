@@ -45,6 +45,26 @@ void ThermalManager::REQUEST_THERMAL_STATUS_cmdHandler(FwOpcodeType opCode, U32 
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
+void ThermalManager::SET_THERMAL_SENSOR_cmdHandler(FwOpcodeType opCode,
+                                                   U32 cmdSeq,
+                                                   const ThermalSensor& sensor,
+                                                   const Fw::On& state) {
+    const U8 bit = static_cast<U8>(1U << static_cast<U8>(sensor.e));
+    if (state == Fw::On::ON) {
+        this->m_enabledMask = static_cast<U8>(this->m_enabledMask | bit);
+        // Seed it valid, as at boot, so the next read reports it only if broken
+        this->m_lastValidMask = static_cast<U8>(this->m_lastValidMask | bit);
+    } else {
+        this->m_enabledMask = static_cast<U8>(this->m_enabledMask & ~bit);
+        // Disabling is not a sensor failure: forget its validity so the next
+        // read does not report it as SensorValidityChanged(false)
+        this->m_lastValidMask = static_cast<U8>(this->m_lastValidMask & ~bit);
+    }
+    this->log_ACTIVITY_HI_SensorEnableChanged(sensor, state);
+    this->tlmWrite_EnabledSensorMask(this->m_enabledMask);
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
 void ThermalManager::SET_THERMAL_MODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, const ThermalMode& mode) {
     // Intent only: nothing downstream acts on the mode until a heater driver exists
     this->m_mode = mode;
@@ -62,8 +82,18 @@ void ThermalManager::readOnce() {
     const ThermalReadStatus status = this->driverReadingGet_out(0, reading);
     // NO_DATA still carries a valid (empty) mask, so the per-sensor
     // bookkeeping below is the same either way.
-    const U8 validMask = (status == ThermalReadStatus::OK) ? reading.get_validMask() : 0;
+    // A disabled sensor is treated as not there: out of the mask, out of the
+    // state decision, and zeroed so no stale-looking value is downlinked.
+    const U8 validMask =
+        (status == ThermalReadStatus::OK) ? static_cast<U8>(reading.get_validMask() & this->m_enabledMask) : 0;
     reading.set_validMask(validMask);
+    ThermalTemperatures temperatures = reading.get_temperatures();
+    for (FwSizeType i = 0; i < THERMAL_SENSOR_COUNT; i++) {
+        if ((this->m_enabledMask & (1U << i)) == 0) {
+            temperatures[i] = 0.0f;
+        }
+    }
+    reading.set_temperatures(temperatures);
     this->m_reading = reading;
 
     const U8 changed = static_cast<U8>(validMask ^ this->m_lastValidMask);
@@ -79,7 +109,6 @@ void ThermalManager::readOnce() {
     if (validMask != 0) {
         bool cold = false;
         bool hot = false;
-        const ThermalTemperatures& temperatures = reading.get_temperatures();
         for (FwSizeType i = 0; i < THERMAL_SENSOR_COUNT; i++) {
             if ((validMask & (1U << i)) != 0) {
                 cold = cold || (temperatures[i] < COLD_LIMIT_C);
@@ -90,12 +119,13 @@ void ThermalManager::readOnce() {
         // Temperatures are published only when something is real. With no
         // valid sensor the last values stay on the ground display with an old
         // timestamp; ThermalState says they are stale.
-        this->tlmWrite_Temperatures(reading.get_temperatures());
+        this->tlmWrite_Temperatures(temperatures);
     }
 
     this->setState(state);
     this->tlmWrite_ThermalState(this->m_state);
     this->tlmWrite_ValidSensorMask(validMask);
+    this->tlmWrite_EnabledSensorMask(this->m_enabledMask);
     this->tlmWrite_ThermalMode(this->m_mode);
 }
 
