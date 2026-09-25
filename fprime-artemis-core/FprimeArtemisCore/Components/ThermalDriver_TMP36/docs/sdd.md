@@ -16,9 +16,17 @@ temperature sensors. It implements the `ThermalManager` contract
 2. calls `adcRead[i]`, and `ZephyrADCDriver` i converts one sample and calls
    `adcMvIn[i]` back before returning
 3. if no callback arrived, uses 0 mV and emits `AdcNoResponse` (a wiring fault)
-4. converts: `temperature C = (mV - 500) / 10`
-5. marks the sensor valid if 100 mV <= mV <= 1750 mV (-40 C to +125 C, the
-   TMP36 rated range)
+4. undoes the board's voltage divider: `TMP36 mV = pin mV * 55.3 / 10`
+5. converts: `temperature C = (TMP36 mV - 500) / 10`
+6. marks the sensor valid if 100 mV <= TMP36 mV <= 1750 mV (-40 C to +125 C,
+   the TMP36 rated range; 18 to 316 mV at the pin)
+
+## Voltage divider
+
+Each TMP36 output reaches the Teensy through a 45.3 kΩ / 10 kΩ divider, the
+"Fahrenheit Thermometer Version 1" circuit (TMP36 datasheet Rev. H,
+Figure 26). The pin sees `TMP36 mV * 10 / 55.3`, about 1 mV/°F with a 58 mV
+offset. Reading the pin as a bare TMP36 gives ~-35 C at room temperature.
 
 It returns `OK` if any sensor is valid, `NO_DATA` if none is.
 
@@ -27,7 +35,7 @@ thread, so a component mutex would already be held.
 
 ## ADC configuration
 
-- `boards/teensy41.overlay`: pins, channels (10-bit, gain 1, 3.3 V internal
+- `boards/teensy41.overlay`: pins, channels (12-bit, gain 1, 3.3 V internal
   reference), and the `temp_sensors` node that lists them in sensor order.
 - `FlightControllerDeploymentTopology.cpp`: builds the `adc_dt_spec`s from
   `temp_sensors` and calls `configure()` on each `thermalAdc*`. A
@@ -44,7 +52,7 @@ The ADC drivers' `poll` ports are unconnected, and their
 
 | Item | Meaning |
 |---|---|
-| `SensorMillivolts` | Raw mV per sensor. ~750 mV at room temperature; 0 mV = failed conversion |
+| `SensorMillivolts` | ADC pin mV per sensor, after the divider. ~136 mV at room temperature; 0 mV = failed conversion |
 | `AdcNoResponse(sensor)` | An ADC did not answer: check the topology connections |
 
 ## Limits
@@ -53,6 +61,9 @@ The ADC drivers' `poll` ports are unconnected, and their
   reliable; "valid" only means the voltage looks like a TMP36.
 - Zephyr-only: the driver depends on `fprime-zephyr_Drv_ZephyrADCDriver`, so
   `Components/CMakeLists.txt` registers it only when `ARTEMIS_TARGET_ZEPHYR`.
-- The `epscorc3m` satellite sketch converts with 1 mV/F and a 58 mV offset,
-  which is wrong for a TMP36 (room temperature would read ~366 C). This driver
-  uses the datasheet formula, as `external/artemis-pdu` does.
+- 12-bit ADC at 3.3 V: 0.8 mV per count at the pin, so ~0.45 C per count
+  after the divider. At 10-bit it would be ~1.8 C per count.
+- The `epscorc3m` and `artemis-cubesat-examples` sketches convert with 1 mV/F
+  and a 58 mV offset: the divider's transfer function, so they agree with this
+  driver. `external/artemis-pdu` applies the bare TMP36 formula to its own
+  A1 input; check that board for a divider before trusting its numbers.

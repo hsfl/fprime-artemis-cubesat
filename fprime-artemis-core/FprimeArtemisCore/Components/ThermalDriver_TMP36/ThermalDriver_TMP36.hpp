@@ -20,10 +20,16 @@ class ThermalDriver_TMP36 final : public ThermalDriver_TMP36ComponentBase {
     static constexpr F32 OFFSET_MV = 500.0f;
     static constexpr F32 MV_PER_DEGREE_C = 10.0f;
 
-    //! Rated range, -40 C to +125 C. Anything outside it is not a TMP36
-    //! reading: 0 mV is a failed conversion, near 3300 mV is a rail.
-    static constexpr U32 MIN_VALID_MV = 100;
-    static constexpr U32 MAX_VALID_MV = 1750;
+    //! Each TMP36 output reaches the ADC through a 45.3k/10k divider
+    //! (TMP36 datasheet Rev. H, Figure 26): pin mV = TMP36 mV * 10 / 55.3.
+    static constexpr F32 DIVIDER_R_TOP_KOHM = 45.3f;
+    static constexpr F32 DIVIDER_R_BOTTOM_KOHM = 10.0f;
+    static constexpr F32 DIVIDER_GAIN = (DIVIDER_R_TOP_KOHM + DIVIDER_R_BOTTOM_KOHM) / DIVIDER_R_BOTTOM_KOHM;
+
+    //! Rated range at the TMP36 output, -40 C to +125 C. Anything outside it
+    //! is not a TMP36 reading: 0 mV is a failed conversion or open input.
+    static constexpr F32 MIN_VALID_MV = 100.0f;
+    static constexpr F32 MAX_VALID_MV = 1750.0f;
 
   private:
     static constexpr FwSizeType SENSOR_COUNT = THERMAL_SENSOR_COUNT;

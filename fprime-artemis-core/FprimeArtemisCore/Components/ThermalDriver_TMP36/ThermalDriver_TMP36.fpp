@@ -35,8 +35,9 @@ module Components {
     # Telemetry
     # ----------------------------------------------------------------------
 
-    @ Raw sensor voltage in mV, before conversion. Bring-up diagnostic:
-    @ ~750 mV at room temperature, 0 mV for a failed conversion.
+    @ ADC pin voltage in mV, after the 45.3k/10k divider and before
+    @ conversion. Bring-up diagnostic: ~136 mV at room temperature (750 mV
+    @ at the TMP36), 0 mV for a failed conversion.
     telemetry SensorMillivolts: Components.Tmp36Millivolts
 
     # ----------------------------------------------------------------------

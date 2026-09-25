@@ -34,10 +34,11 @@ ThermalReadStatus ThermalDriver_TMP36::readingGet_handler(FwIndexType portNum, T
             this->log_WARNING_HI_AdcNoResponse(static_cast<ThermalSensor::T>(i));
         }
 
-        const U32 mv = this->m_millivolts[i];
-        millivolts[i] = mv;
-        temperatures[i] = (static_cast<F32>(mv) - OFFSET_MV) / MV_PER_DEGREE_C;
-        if ((mv >= MIN_VALID_MV) && (mv <= MAX_VALID_MV)) {
+        const U32 pinMv = this->m_millivolts[i];
+        millivolts[i] = pinMv;
+        const F32 sensorMv = static_cast<F32>(pinMv) * DIVIDER_GAIN;
+        temperatures[i] = (sensorMv - OFFSET_MV) / MV_PER_DEGREE_C;
+        if ((sensorMv >= MIN_VALID_MV) && (sensorMv <= MAX_VALID_MV)) {
             validMask = static_cast<U8>(validMask | (1U << i));
         }
     }
