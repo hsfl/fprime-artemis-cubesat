@@ -112,11 +112,13 @@ module FprimeArtemisCore {
       # timer to drive rate group
       timer.CycleOut -> rateGroupDriver.CycleIn
 
-      # 10Hz rate group: UART reads only
+      # 10Hz rate group: UART reads, plus thermal
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_10Hz] -> rateGroup_10Hz.CycleIn
       rateGroup_10Hz.RateGroupMemberOut[0] -> comDriver.schedIn
       rateGroup_10Hz.RateGroupMemberOut[1] -> pcLinkDriver.schedIn
       rateGroup_10Hz.RateGroupMemberOut[2] -> gpsUartDriver.schedIn
+      # No 2Hz group exists; thermalManager reads on every 5th tick (0.5 s).
+      rateGroup_10Hz.RateGroupMemberOut[3] -> thermalManager.run
 
       # 1Hz rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_1Hz] -> rateGroup_1Hz.CycleIn
@@ -139,8 +141,6 @@ module FprimeArtemisCore {
       rateGroup_0_25Hz.RateGroupMemberOut[1] -> ComCcsds.commsBufferManager.schedIn
       rateGroup_0_25Hz.RateGroupMemberOut[2] -> pcLinkBufferManager.schedIn
       rateGroup_0_25Hz.RateGroupMemberOut[3] -> gpsBufferManager.schedIn
-      # Board temperatures change over minutes; the 1Hz group is also full.
-      rateGroup_0_25Hz.RateGroupMemberOut[4] -> thermalManager.run
     }
 
     connections Mission {

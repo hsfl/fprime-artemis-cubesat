@@ -32,8 +32,9 @@ module FprimeArtemisCore {
   # The RateGroupDriver has exactly three outputs (RateGroupDriverRateGroupPorts
   # in the framework's AcConstants.fpp), so there are exactly three groups.
 
-  # 10Hz rate group (divisor 1). UART reads only: ZephyrUartDriver reads at most
+  # 10Hz rate group (divisor 1). UART reads: ZephyrUartDriver reads at most
   # 64 bytes per schedIn, so 10Hz gives each link a 640 B/s read ceiling.
+  # thermalManager also runs here and reads every 5th tick (2Hz).
   instance rateGroup_10Hz: Svc.ActiveRateGroup base id 0x10001000 \
     queue size Default.QUEUE_SIZE \
     stack size Default.STACK_SIZE \

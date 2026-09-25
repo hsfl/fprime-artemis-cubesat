@@ -27,7 +27,8 @@ module Components {
     # Scheduling
     # ----------------------------------------------------------------------
 
-    @ Rate group input: read the sensors and update the state
+    @ Rate group input: read the sensors and update the state every
+    @ RUN_TICKS_PER_READ ticks (0.5 s on the 10Hz group)
     guarded input port run: Svc.Sched
 
     # ----------------------------------------------------------------------

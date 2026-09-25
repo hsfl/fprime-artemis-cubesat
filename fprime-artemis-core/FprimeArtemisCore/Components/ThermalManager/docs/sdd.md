@@ -1,7 +1,7 @@
 # Components::ThermalManager
 
 > **Status: implemented, not yet tested on hardware.** Builds in
-> `FlightControllerDeployment`; wired as `thermalManager` on `rateGroup_0_25Hz`.
+> `FlightControllerDeployment`; wired as `thermalManager` on `rateGroup_10Hz`.
 
 `ThermalManager` is the manager tier for the flight controller's board
 temperatures. It reads every sensor, decides whether the spacecraft is
@@ -90,5 +90,9 @@ sensor gives `NO_DATA`. The setting is not saved: a reboot enables all sensors.
 
 ## Rate
 
-`run` is on `rateGroup_0_25Hz`: one read every 4 s. Board temperatures change
-over minutes, and the 1 Hz group has no free slots (10 of 10 used).
+`run` is on `rateGroup_10Hz` and reads every `RUN_TICKS_PER_READ` (5) ticks:
+one read every 0.5 s. There is no 2 Hz group (the RateGroupDriver has three
+outputs), and the 1 Hz group has no free slots (10 of 10 used).
+
+Telemetry still leaves the board at `tlmSend`'s 1 Hz: ground sees the latest
+of every two reads. State changes and events react within 0.5 s.

@@ -16,6 +16,11 @@ ThermalManager::~ThermalManager() {}
 // ----------------------------------------------------------------------
 
 void ThermalManager::run_handler(FwIndexType portNum, U32 context) {
+    this->m_ticksSinceRead++;
+    if (this->m_ticksSinceRead < RUN_TICKS_PER_READ) {
+        return;
+    }
+    this->m_ticksSinceRead = 0;
     this->readOnce();
 }
 
