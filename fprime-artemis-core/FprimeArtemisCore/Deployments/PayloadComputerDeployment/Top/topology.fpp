@@ -17,7 +17,7 @@ module PayloadComputerDeployment {
   # ----------------------------------------------------------------------
     import CdhCore.Subtopology
     import ComCcsds.Subtopology
-    import DataProducts.Subtopology
+    import ArtemisDataProducts.Subtopology
     import FileHandling.Subtopology
     
   # ----------------------------------------------------------------------
@@ -40,6 +40,9 @@ module PayloadComputerDeployment {
     instance fcLinkAccumulator
     instance fcLinkBufferManager
     instance cmdSeq
+    instance payloadManager
+    instance payloadDriverLepton
+    instance dpWrittenRouter
 
   # ----------------------------------------------------------------------
   # Pattern graph specifiers
@@ -98,6 +101,7 @@ module PayloadComputerDeployment {
     connections FcLink {
       # --- Heartbeat into the hub ---
       fcLinkManager.peerAliveOut        -> fcLinkHub.serialIn[FcPcLink.HEARTBEAT]
+      fcLinkManager.payloadStateOut     -> fcLinkHub.serialIn[FcPcLink.PAYLOAD_STATUS]
 
       # --- Downlink: hub -> framer -> ComStub -> UART ---
       fcLinkHub.allocate                -> fcLinkBufferManager.bufferGetCallee
@@ -139,8 +143,8 @@ module PayloadComputerDeployment {
 
     connections FileHandling_DataProducts {
       # Data Products to File Downlink
-      DataProducts.dpCat.fileOut -> FileHandling.fileDownlink.SendFile
-      FileHandling.fileDownlink.FileComplete -> DataProducts.dpCat.fileDone
+      ArtemisDataProducts.dpCat.fileOut -> FileHandling.fileDownlink.SendFile
+      FileHandling.fileDownlink.FileComplete -> ArtemisDataProducts.dpCat.fileDone
     }
 
     connections RateGroups {
@@ -156,6 +160,8 @@ module PayloadComputerDeployment {
       rateGroup_1Hz.RateGroupMemberOut[4] -> ComCcsds.aggregator.timeout
       rateGroup_1Hz.RateGroupMemberOut[5] -> CdhCore.cmdDisp.run
       rateGroup_1Hz.RateGroupMemberOut[6] -> fcLinkManager.run
+      rateGroup_1Hz.RateGroupMemberOut[7] -> payloadDriverLepton.run
+      rateGroup_1Hz.RateGroupMemberOut[8] -> payloadManager.run
 
       # 0.5Hz rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_0_5Hz] -> rateGroup_0_5Hz.CycleIn
@@ -165,9 +171,9 @@ module PayloadComputerDeployment {
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_0_25Hz] -> rateGroup_0_25Hz.CycleIn
       rateGroup_0_25Hz.RateGroupMemberOut[0] -> CdhCore.$health.Run
       rateGroup_0_25Hz.RateGroupMemberOut[1] -> ComCcsds.commsBufferManager.schedIn
-      rateGroup_0_25Hz.RateGroupMemberOut[2] -> DataProducts.dpBufferManager.schedIn
-      rateGroup_0_25Hz.RateGroupMemberOut[3] -> DataProducts.dpWriter.schedIn
-      rateGroup_0_25Hz.RateGroupMemberOut[4] -> DataProducts.dpMgr.schedIn
+      rateGroup_0_25Hz.RateGroupMemberOut[2] -> ArtemisDataProducts.dpBufferManager.schedIn
+      rateGroup_0_25Hz.RateGroupMemberOut[3] -> ArtemisDataProducts.dpWriter.schedIn
+      rateGroup_0_25Hz.RateGroupMemberOut[4] -> ArtemisDataProducts.dpMgr.schedIn
       rateGroup_0_25Hz.RateGroupMemberOut[5] -> fcLinkBufferManager.schedIn
     }
 
@@ -177,8 +183,27 @@ module PayloadComputerDeployment {
       CdhCore.cmdDisp.seqCmdStatus -> cmdSeq.cmdResponseIn
     }
 
-    connections PayloadComputerDeployment {
+    connections Payload {
+      # Capture requests down, product status and readiness back up
+      payloadManager.driverRequestOut   -> payloadDriverLepton.requestIn
+      payloadDriverLepton.statusOut     -> payloadManager.driverStatusIn
+      payloadDriverLepton.stateOut      -> payloadManager.driverStateIn
 
+      # Readiness to the flight controller. fcLinkManager caches it and sends
+      # it from its rate group tick.
+      payloadManager.stateOut           -> fcLinkManager.payloadStateIn
+
+      # Lepton frames are stored as data products
+      payloadDriverLepton.productGetOut  -> ArtemisDataProducts.dpMgr.productGetIn
+      payloadDriverLepton.productSendOut -> ArtemisDataProducts.dpMgr.productSendIn
+    }
+
+    connections DataProducts_DpWritten {
+      # dpWriter's notification goes to the catalog and to the driver that
+      # produced the file, which reports the capture once it is on disk.
+      ArtemisDataProducts.dpWriter.dpWrittenOut -> dpWrittenRouter.dpWrittenIn
+      dpWrittenRouter.catalogOut                -> ArtemisDataProducts.dpCat.addToCat
+      dpWrittenRouter.leptonNotifyOut           -> payloadDriverLepton.dpWrittenIn
     }
 
   }

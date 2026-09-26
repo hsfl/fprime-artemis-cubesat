@@ -9,7 +9,7 @@
 // Subtopology PingEntries includes
 #include "Svc/Subtopologies/CdhCore/PingEntries.hpp"
 #include "Svc/Subtopologies/ComCcsds/PingEntries.hpp"
-#include "Svc/Subtopologies/DataProducts/PingEntries.hpp"
+#include "FprimeArtemisCore/Subtopologies/ArtemisDataProducts/PingEntries.hpp"
 #include "Svc/Subtopologies/FileHandling/PingEntries.hpp"
 
 // SubtopologyTopologyDefs includes
@@ -29,7 +29,7 @@ static constexpr FwSizeType bufferCount = 6;        //!< hub transport buffers i
 static constexpr FwSizeType accumulatorSize = 1024; //!< frame reassembly ring capacity
 static constexpr FwEnumStoreType bufferManagerId = 400;
 }  // namespace FcLink
-#include "Svc/Subtopologies/DataProducts/SubtopologyTopologyDefs.hpp"
+#include "FprimeArtemisCore/Subtopologies/ArtemisDataProducts/SubtopologyTopologyDefs.hpp"
 #include "Svc/Subtopologies/FileHandling/SubtopologyTopologyDefs.hpp"
 
 //ComCcsds Enum Includes
@@ -63,6 +63,8 @@ namespace PingEntries {
     namespace PayloadComputerDeployment_rateGroup_0_5Hz {enum { WARN = 3, FATAL = 5 };}
     namespace PayloadComputerDeployment_rateGroup_0_25Hz {enum { WARN = 3, FATAL = 5 };}
     namespace PayloadComputerDeployment_cmdSeq {enum { WARN = 3, FATAL = 5 };}
+    namespace PayloadComputerDeployment_payloadManager {enum { WARN = 3, FATAL = 5 };}
+    namespace PayloadComputerDeployment_payloadDriverLepton {enum { WARN = 3, FATAL = 5 };}
 }  // namespace PingEntries
 
 // Definitions are placed within the same namespace as the FPP module that contains the topology.
@@ -80,7 +82,7 @@ struct TopologyState {
     U32 baudRate;          //!< Baud rate for UART communication
     CdhCore::SubtopologyState cdhCore;           //!< Subtopology state for CdhCore
     ComCcsds::SubtopologyState comCcsds;         //!< Subtopology state for ComCcsds 
-    DataProducts::SubtopologyState dataProducts; //!< Subtopology state for DataProducts
+    ArtemisDataProducts::SubtopologyState dataProducts; //!< Subtopology state for ArtemisDataProducts
     FileHandling::SubtopologyState fileHandling; //!< Subtopology state for FileHandling
 };
 

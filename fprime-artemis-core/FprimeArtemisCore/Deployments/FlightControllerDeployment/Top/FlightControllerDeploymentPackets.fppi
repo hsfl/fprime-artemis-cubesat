@@ -44,6 +44,7 @@ telemetry packets FlightControllerDeploymentPackets {
   packet PcLink id 4 group 1 {
     FprimeArtemisCore.pcLinkManager.HeartbeatsReceived
     FprimeArtemisCore.pcLinkManager.LastHeartbeatKey
+    FprimeArtemisCore.pcLinkManager.PayloadState
   }
 
   packet Imu id 8 group 1 {

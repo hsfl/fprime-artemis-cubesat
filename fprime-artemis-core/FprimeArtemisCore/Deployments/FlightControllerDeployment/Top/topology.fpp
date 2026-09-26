@@ -119,6 +119,8 @@ module FprimeArtemisCore {
       rateGroup_10Hz.RateGroupMemberOut[2] -> gpsUartDriver.schedIn
       # No 2Hz group exists; thermalManager reads on every 5th tick (0.5 s).
       rateGroup_10Hz.RateGroupMemberOut[3] -> thermalManager.run
+      # Same thread as pcLinkDriver.schedIn, which delivers payloadStateIn
+      rateGroup_10Hz.RateGroupMemberOut[4] -> pcLinkManager.run
 
       # 1Hz rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_1Hz] -> rateGroup_1Hz.CycleIn
@@ -208,6 +210,7 @@ module FprimeArtemisCore {
       # --- Payload computer heartbeat, routed through the link manager ---
       pcLinkHub.serialOut[FcPcLink.HEARTBEAT] -> pcLinkManager.peerAliveIn
       pcLinkManager.peerAliveOut              -> rpiPowerManager.peerAliveIn
+      pcLinkHub.serialOut[FcPcLink.PAYLOAD_STATUS] -> pcLinkManager.payloadStateIn
 
       # --- Downlink: pcLinkHub -> framer -> ComStub -> UART ---
       pcLinkHub.allocate                      -> pcLinkBufferManager.bufferGetCallee

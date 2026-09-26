@@ -18,6 +18,9 @@ User=artemis4
 Group=artemis4
 SupplementaryGroups=dialout
 WorkingDirectory=/home/artemis4/artemis/current
+# Require the real Lepton camera. Without this the driver's auto backend falls
+# back to synthetic frames and reports the payload READY with no camera attached.
+Environment=LEPTON_CAMERA_BACKEND=uvc
 ExecStart=/home/artemis4/artemis/current/FprimeArtemisCore_Deployments_PayloadComputerDeployment -d /dev/serial0 -b 115200
 # F Prime's FatalHandler deliberately exits and expects a supervisor to restart
 # it ("FatalHandler: exiting for supervisor restart"). This unit is that supervisor.

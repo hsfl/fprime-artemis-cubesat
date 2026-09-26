@@ -1,0 +1,72 @@
+#ifndef Components_PayloadDriver_Lepton_HPP
+#define Components_PayloadDriver_Lepton_HPP
+
+#include "FprimeArtemisCore/Components/PayloadDriver_Lepton/LeptonCamera.hpp"
+#include "FprimeArtemisCore/Components/PayloadDriver_Lepton/PayloadDriver_LeptonComponentAc.hpp"
+
+#include <string>
+
+namespace Components {
+
+class PayloadDriver_Lepton final : public PayloadDriver_LeptonComponentBase {
+  public:
+    PayloadDriver_Lepton(const char* const compName);
+    ~PayloadDriver_Lepton();
+
+  private:
+    enum CaptureStatus : U32 {
+        CAPTURE_OK = 0,
+        CAPTURE_BUSY = 1,
+        CAPTURE_CAMERA_ERROR = 2,
+        CAPTURE_DP_NOT_CONNECTED = 3,
+        CAPTURE_DP_NO_MEMORY = 4,
+        CAPTURE_SERIALIZE_ERROR = 5,
+        CAPTURE_WRITE_MISMATCH = 6,
+        CAPTURE_CRC_ERROR = 7,
+        CAPTURE_WRITE_TIMEOUT = 8,
+    };
+
+    void pingIn_handler(FwIndexType portNum, U32 key) override;
+    void requestIn_handler(FwIndexType portNum, U32 durationSeconds) override;
+    void run_handler(FwIndexType portNum, U32 context) override;
+    void deactivateIn_handler(FwIndexType portNum) override;
+    void previewRequestIn_handler(FwIndexType portNum) override;
+    void dpWrittenIn_handler(FwIndexType portNum,
+                             const Fw::StringBase& fileName,
+                             FwDpPriorityType priority,
+                             FwSizeType size) override;
+
+    bool captureThermalImage(U32 durationSeconds);
+    bool publishLatestPreview();
+    void downsampleLatestPreview();
+    bool ensureCameraOpen(char* reason, U32 reasonSize);
+    void publishFailure(CaptureStatus status, const char* reason);
+    void writeTelemetry();
+    //! Report the current readiness on stateOut, emitting events on change
+    void reportState(Components::PayloadState state);
+    //! Readiness derived from the camera and pending writes
+    Components::PayloadState currentState() const;
+    static U32 clampSize(FwSizeType size);
+    static bool computeFileCrc16(const std::string& outputPath, U32& crcOut);
+
+    LeptonCamera m_camera;
+    // Preview streaming owns one stable latest source and one stable preview
+    // buffer. previewOut is synchronous, so the buffer remains valid through
+    // a complete response-paced upload without a ring or queued copies.
+    U16 m_latestPreviewSource[LeptonCamera::NUM_PIXELS];
+    U8 m_previewBuffer[80U * 60U];
+    U32 m_lastDurationSeconds;
+    U32 m_lastProductId;
+    U32 m_lastDataBytes;
+    U32 m_lastFileBytes;
+    U32 m_lastCaptureStatus;
+    U32 m_pendingWrites;
+    U32 m_pendingProductId;
+    U32 m_pendingWriteTicks;
+    std::string m_pendingPath;
+    Components::PayloadState m_state;
+};
+
+}  // namespace Components
+
+#endif

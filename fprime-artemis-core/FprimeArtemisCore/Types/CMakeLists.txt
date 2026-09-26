@@ -11,6 +11,9 @@
 # Gps.fpp: the same idea for the GpsManager <-> GPS driver contract.
 #
 # Thermal.fpp: the same idea for the ThermalManager <-> thermal driver contract.
+#
+# Payload.fpp: the same idea for the PayloadManager <-> payload driver
+# contract. PayloadState also crosses the FC<->PC link.
 ####
 register_fprime_module(
     AUTOCODER_INPUTS
@@ -18,4 +21,5 @@ register_fprime_module(
         "${CMAKE_CURRENT_LIST_DIR}/Imu.fpp"
         "${CMAKE_CURRENT_LIST_DIR}/Gps.fpp"
         "${CMAKE_CURRENT_LIST_DIR}/Thermal.fpp"
+        "${CMAKE_CURRENT_LIST_DIR}/Payload.fpp"
 )

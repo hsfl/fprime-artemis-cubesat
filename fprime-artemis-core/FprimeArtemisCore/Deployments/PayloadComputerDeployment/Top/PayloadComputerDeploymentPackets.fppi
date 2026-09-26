@@ -9,7 +9,7 @@ telemetry packets PayloadComputerDeploymentPackets {
     FileHandling.fileUplink.FilesReceived
     FileHandling.fileUplink.PacketsReceived
     FileHandling.fileUplink.FilesReceivedFailed
-    DataProducts.dpBufferAccumulator.BA_NumQueuedBuffers
+    ArtemisDataProducts.dpBufferAccumulator.BA_NumQueuedBuffers
     FileHandling.fileDownlink.FilesSent
     FileHandling.fileDownlink.PacketsSent
     FileHandling.fileManager.CommandsExecuted
@@ -75,25 +75,25 @@ telemetry packets PayloadComputerDeploymentPackets {
   }
 
   packet DataProducts id 21 group 3 {
-    DataProducts.dpCat.CatalogDps
-    DataProducts.dpCat.DpsSent
+    ArtemisDataProducts.dpCat.CatalogDps
+    ArtemisDataProducts.dpCat.DpsSent
 
-    DataProducts.dpMgr.NumSuccessfulAllocations
-    DataProducts.dpMgr.NumFailedAllocations
-    DataProducts.dpMgr.NumDataProducts
-    DataProducts.dpMgr.NumBytes
+    ArtemisDataProducts.dpMgr.NumSuccessfulAllocations
+    ArtemisDataProducts.dpMgr.NumFailedAllocations
+    ArtemisDataProducts.dpMgr.NumDataProducts
+    ArtemisDataProducts.dpMgr.NumBytes
 
-    DataProducts.dpWriter.NumBuffersReceived
-    DataProducts.dpWriter.NumBytesWritten
-    DataProducts.dpWriter.NumSuccessfulWrites
-    DataProducts.dpWriter.NumFailedWrites
-    DataProducts.dpWriter.NumErrors
+    ArtemisDataProducts.dpWriter.NumBuffersReceived
+    ArtemisDataProducts.dpWriter.NumBytesWritten
+    ArtemisDataProducts.dpWriter.NumSuccessfulWrites
+    ArtemisDataProducts.dpWriter.NumFailedWrites
+    ArtemisDataProducts.dpWriter.NumErrors
 
-    DataProducts.dpBufferManager.TotalBuffs
-    DataProducts.dpBufferManager.CurrBuffs
-    DataProducts.dpBufferManager.HiBuffs
-    DataProducts.dpBufferManager.NoBuffs
-    DataProducts.dpBufferManager.EmptyBuffs
+    ArtemisDataProducts.dpBufferManager.TotalBuffs
+    ArtemisDataProducts.dpBufferManager.CurrBuffs
+    ArtemisDataProducts.dpBufferManager.HiBuffs
+    ArtemisDataProducts.dpBufferManager.NoBuffs
+    ArtemisDataProducts.dpBufferManager.EmptyBuffs
   }
 
   packet Version1 id 22 group 2 {
@@ -164,6 +164,24 @@ telemetry packets PayloadComputerDeploymentPackets {
 
   packet Version_Custom10 id 37 group 2 {
     CdhCore.version.CustomVersion10
+  }
+
+  packet Payload id 4 group 1 {
+    payloadManager.PayloadState
+    payloadManager.LastPayloadValue
+    payloadManager.LastCollectionId
+    payloadManager.LastCaptureDurationSeconds
+    payloadManager.SampleCount
+    payloadManager.SamplePeriodMs
+    payloadManager.ManagerHeartbeat
+
+    payloadDriverLepton.PayloadState
+    payloadDriverLepton.LastDurationSeconds
+    payloadDriverLepton.LastProductId
+    payloadDriverLepton.LastDataBytes
+    payloadDriverLepton.LastFileBytes
+    payloadDriverLepton.LastCaptureStatus
+    payloadDriverLepton.PendingWrites
   }
 
   packet FcLink id 3 group 1 {

@@ -17,3 +17,11 @@ add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/ThermalManager/")
 if (ARTEMIS_TARGET_ZEPHYR)
     add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/ThermalDriver_TMP36/")
 endif()
+# Payload computer components. PayloadManager and DpWrittenRouter are portable,
+# but only PayloadComputerDeployment uses them, and the Lepton driver links
+# libuvc, so all three are kept out of the Zephyr build.
+if (NOT ARTEMIS_TARGET_ZEPHYR)
+    add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/PayloadManager/")
+    add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/PayloadDriver_Lepton/")
+    add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/DpWrittenRouter/")
+endif()

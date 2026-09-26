@@ -20,19 +20,34 @@ module Components {
     @ port; the matching serialOut index on the peer hub delivers it.
     output port peerAliveOut: FcPcLink.Heartbeat
 
+    @ Payload readiness to the flight controller. Connect to the GenericHub's
+    @ serialIn[FcPcLink.PAYLOAD_STATUS]. Sent from run alongside the
+    @ heartbeat, never from payloadStateIn: every hub send must come from the
+    @ rate group thread so frames on the UART cannot interleave.
+    output port payloadStateOut: Components.PayloadStateReport
+
+    # ----------------------------------------------------------------------
+    # Local producers
+    # ----------------------------------------------------------------------
+
+    @ Latest payload readiness from PayloadManager. Cached only; called on
+    @ the payload driver's thread, so it is guarded against run.
+    guarded input port payloadStateIn: Components.PayloadStateReport
+
     # ----------------------------------------------------------------------
     # Scheduling
     # ----------------------------------------------------------------------
 
-    @ Rate group input: emits one heartbeat per invocation
-    sync input port run: Svc.Sched
+    @ Rate group input: emits one heartbeat and the latest payload state per
+    @ invocation
+    guarded input port run: Svc.Sched
 
     # ----------------------------------------------------------------------
     # Commands
     # ----------------------------------------------------------------------
 
     @ Emit a heartbeat immediately rather than waiting for the next tick
-    sync command SEND_HEARTBEAT
+    guarded command SEND_HEARTBEAT
 
     # ----------------------------------------------------------------------
     # Telemetry

@@ -49,6 +49,18 @@ module PayloadComputerDeployment {
     stack size Default.STACK_SIZE \
     priority 40
 
+  instance payloadManager: Components.PayloadManager base id 0x10030000 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 30
+
+  # A capture blocks this task for up to 5 s while it waits for a frame, so it
+  # runs below the manager and the rate groups.
+  instance payloadDriverLepton: Components.PayloadDriver_Lepton base id 0x10031000 \
+    queue size Default.QUEUE_SIZE \
+    stack size Default.STACK_SIZE \
+    priority 29
+
   # ----------------------------------------------------------------------
   # Queued component instances
   # ----------------------------------------------------------------------
@@ -65,6 +77,8 @@ module PayloadComputerDeployment {
   instance systemResources: Svc.SystemResources base id 0x10012000
 
   instance timer: Svc.LinuxTimer base id 0x10013000
+
+  instance dpWrittenRouter: Components.DpWrittenRouter base id 0x10032000
 
   # ----------------------------------------------------------------------
   # FC<->PC link to the FlightController (Teensy 4.1) over /dev/serial0

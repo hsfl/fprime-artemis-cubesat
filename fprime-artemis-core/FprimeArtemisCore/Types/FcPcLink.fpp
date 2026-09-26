@@ -27,7 +27,7 @@ module FcPcLink {
   # Each index carries one logical flow in one direction. GenericHubCfg
   # provides 10 serial ports each way by default.
 
-  @ Pi -> Teensy: payload computer heartbeat (Svc.Ping, key = heartbeat count)
+  @ Pi -> Teensy: payload computer heartbeat (FcPcLink.Heartbeat, key = heartbeat count)
   constant HEARTBEAT = 0
 
   @ Teensy -> Pi: link check request
@@ -41,5 +41,9 @@ module FcPcLink {
 
   @ Pi -> Teensy: payload computer lifecycle report (exiting / started)
   constant LIFECYCLE = 4
+
+  @ Pi -> Teensy: payload readiness (Components.PayloadStateReport), resent at
+  @ 1 Hz with the heartbeat so a missed message heals itself
+  constant PAYLOAD_STATUS = 5
 
 }
