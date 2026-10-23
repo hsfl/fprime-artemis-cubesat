@@ -32,6 +32,10 @@ module Components {
         @ Cancel pending collection and return to base mode
         async command CANCEL_COLLECTION
 
+        @ Report the current mission mode as one ModeReport event.
+        @ Read-only: changes no mode, telemetry or output port, so it is safe to send in every mode.
+        async command REPORT_MODE
+
         @ Current mission mode
         telemetry CurrentMode: Components.MissionMode update on change
 
@@ -58,6 +62,9 @@ module Components {
 
         @ Collection scheduling event
         event CollectionScheduled(delaySeconds: U32) severity activity high format "Collection scheduled in {}s"
+
+        @ Answer to REPORT_MODE: the mission mode at the moment the command ran.
+        event ModeReport(mode: Components.MissionMode) severity activity high format "Mission mode is {}"
 
         @ Port for requesting the current time
         time get port timeCaller

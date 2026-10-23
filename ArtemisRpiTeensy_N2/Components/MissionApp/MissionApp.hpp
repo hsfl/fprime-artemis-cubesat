@@ -18,6 +18,8 @@ class MissionApp final : public MissionAppComponentBase {
     void PING_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 token) override;
     void SCHEDULE_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 delaySeconds) override;
     void CANCEL_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+    //! Read-only: emits one ModeReport event with the current mode, then replies OK.
+    void REPORT_MODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
 
     bool isAllowedTransition(Components::MissionMode requested) const;
     bool transitionToMode(Components::MissionMode requested, U32 detail);

@@ -35,6 +35,16 @@ TEST(Nominal, CancelCollectionReturnsBaseAndCancels) {
     tester.testCancelCollectionReturnsBaseAndCancels();
 }
 
+TEST(Nominal, ReportModeAnswersOnceAndChangesNothing) {
+    Components::MissionAppTester tester;
+    tester.testReportModeAnswersOnceAndChangesNothing();
+}
+
+TEST(Nominal, ReportModeTracksEveryDemoStoryMode) {
+    Components::MissionAppTester tester;
+    tester.testReportModeTracksEveryDemoStoryMode();
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

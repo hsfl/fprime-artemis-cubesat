@@ -22,10 +22,14 @@ class MissionAppTester final : public MissionAppGTestBase {
     void testAcceptsManualDownlinkRetryFromBase();
     void testEnterBaseModeCancelsPendingCollection();
     void testCancelCollectionReturnsBaseAndCancels();
+    void testReportModeAnswersOnceAndChangesNothing();
+    void testReportModeTracksEveryDemoStoryMode();
 
   private:
     void connectPorts();
     void initComponents();
+    //! Sends REPORT_MODE and checks the answer is `expected`, with no side effects.
+    void assertReportModeAnswers(U32 cmdSeq, Components::MissionMode expected);
 
     MissionApp component;
 };

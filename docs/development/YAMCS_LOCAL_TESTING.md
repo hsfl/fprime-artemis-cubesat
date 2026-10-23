@@ -62,6 +62,17 @@ The script waits for the Yamcs instance, resolves the current `missionApp.PING` 
 
 To stop this checkout's recorded stack, press Ctrl+C in its foreground terminal or run `./tools/yamcs/stop.sh` from another terminal. The helper checks the recorded PID's command path before signaling it. A deliberate restart creates fresh native application state while retaining the local Yamcs archive; the probe checks fresh reception/acquisition times so archived successes do not satisfy a new run.
 
+## Mode report check through Yamcs
+
+With the foreground runner still active and no other operator commands in flight, from a second terminal at the repository root:
+
+```sh
+tools/yamcs/.venv/bin/python tools/yamcs/report_mode.py
+tools/yamcs/.venv/bin/python tools/yamcs/report_mode.py --expect-mode BASE
+```
+
+The script sends the read-only `missionApp.REPORT_MODE` command through the Yamcs HTTP API. It then checks the Yamcs event archive for exactly one `missionApp.ModeReport` answer, plus the stock `CdhCore.cmdDisp` `OpCodeDispatched` and `OpCodeCompleted` events for its opcode. It prints the reported mode and saves a JSON record under the active `yamcs/run/<timestamp>/` directory. `--expect-mode` also requires a specific mode; a freshly started stack is in `BASE`. For the CDR TCP stack ([CDR_TCP.md](../operations/CDR_TCP.md)), whose launcher does not write `yamcs/run/current.json`, add `--dictionary <matching dictionary>`; the record then goes to `yamcs/run/report-mode-<time>/` unless `--run-dir` is given. Operators can send the same command from the Yamcs web UI Commanding page; the answer appears under Events as `Mission mode is BASE`. This is local software evidence only.
+
 ## Existing collection/file compatibility probe
 
 On a freshly started, otherwise idle local stack, run:

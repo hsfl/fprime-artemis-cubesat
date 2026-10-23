@@ -17,6 +17,8 @@ Base case: coordinate RFM23BP downlink and RPi-emulated payload collection.
 - `ENTER_BASE_MODE`
 - `PING(token)`
 - `SCHEDULE_COLLECTION(delaySeconds)`
+- `CANCEL_COLLECTION`
+- `REPORT_MODE` (read-only: emits one `ModeReport` event with the current mode)
 
 ## Abstraction Rule
 

@@ -171,4 +171,91 @@ void MissionAppTester::testCancelCollectionReturnsBaseAndCancels() {
     ASSERT_TLM_LastScheduledDelaySeconds(1, 0);
 }
 
+void MissionAppTester::testReportModeAnswersOnceAndChangesNothing() {
+    this->clearHistory();
+
+    // A fresh MissionApp starts in BASE. Ask it which mode it is in.
+    this->sendCmd_REPORT_MODE(0, 7);
+    this->component.doDispatch();
+
+    // One reply: OK, matched to sequence number 7.
+    ASSERT_CMD_RESPONSE_SIZE(1);
+    ASSERT_CMD_RESPONSE(0, MissionAppComponentBase::OPCODE_REPORT_MODE, 7, Fw::CmdResponse::OK);
+    // Exactly one event in total, and it is the answer: BASE.
+    ASSERT_EVENTS_SIZE(1);
+    ASSERT_EVENTS_ModeReport_SIZE(1);
+    ASSERT_EVENTS_ModeReport(0, Components::MissionMode::BASE);
+    // Read-only: no telemetry written, nothing sent to ScienceApp.
+    ASSERT_TLM_SIZE(0);
+    ASSERT_from_collectionRequestOut_SIZE(0);
+    ASSERT_from_cancelRequestOut_SIZE(0);
+
+    // Asking again gives the same answer and still changes nothing.
+    this->sendCmd_REPORT_MODE(0, 8);
+    this->component.doDispatch();
+
+    ASSERT_CMD_RESPONSE_SIZE(2);
+    ASSERT_CMD_RESPONSE(1, MissionAppComponentBase::OPCODE_REPORT_MODE, 8, Fw::CmdResponse::OK);
+    ASSERT_EVENTS_SIZE(2);
+    ASSERT_EVENTS_ModeReport_SIZE(2);
+    ASSERT_EVENTS_ModeReport(1, Components::MissionMode::BASE);
+    ASSERT_EVENTS_ModeChanged_SIZE(0);
+    ASSERT_TLM_SIZE(0);
+    ASSERT_from_collectionRequestOut_SIZE(0);
+    ASSERT_from_cancelRequestOut_SIZE(0);
+}
+
+void MissionAppTester::testReportModeTracksEveryDemoStoryMode() {
+    // Walk the same demo story as testAcceptsNominalDemoStoryTransitions and ask
+    // for the mode at every stop. Each stop must answer with the mode just reached.
+
+    // BASE: where every MissionApp starts.
+    ASSERT_NO_FATAL_FAILURE(this->assertReportModeAnswers(10, Components::MissionMode::BASE));
+
+    // COLLECTION_PENDING: the ground scheduled a collection 10 s from now.
+    this->sendCmd_SCHEDULE_COLLECTION(0, 11, 10);
+    this->component.doDispatch();
+    ASSERT_NO_FATAL_FAILURE(this->assertReportModeAnswers(12, Components::MissionMode::COLLECTION_PENDING));
+
+    // COLLECTING: ScienceApp (port 0) says the capture started.
+    this->invoke_to_modeUpdateIn(0, Components::MissionMode::COLLECTING, 10);
+    this->component.doDispatch();
+    ASSERT_NO_FATAL_FAILURE(this->assertReportModeAnswers(13, Components::MissionMode::COLLECTING));
+
+    // SCIENCE_READY: ScienceApp says a science product is stored.
+    this->invoke_to_modeUpdateIn(0, Components::MissionMode::SCIENCE_READY, 128);
+    this->component.doDispatch();
+    ASSERT_NO_FATAL_FAILURE(this->assertReportModeAnswers(14, Components::MissionMode::SCIENCE_READY));
+
+    // DOWNLINKING: CommsApp (port 1) says the downlink started.
+    this->invoke_to_modeUpdateIn(1, Components::MissionMode::DOWNLINKING, 128);
+    this->component.doDispatch();
+    ASSERT_NO_FATAL_FAILURE(this->assertReportModeAnswers(15, Components::MissionMode::DOWNLINKING));
+
+    // BASE again: CommsApp says the downlink finished.
+    this->invoke_to_modeUpdateIn(1, Components::MissionMode::BASE, 0);
+    this->component.doDispatch();
+    ASSERT_NO_FATAL_FAILURE(this->assertReportModeAnswers(16, Components::MissionMode::BASE));
+}
+
+void MissionAppTester::assertReportModeAnswers(U32 cmdSeq, Components::MissionMode expected) {
+    // Forget earlier steps so the counts below only see this one REPORT_MODE.
+    this->clearHistory();
+
+    this->sendCmd_REPORT_MODE(0, cmdSeq);
+    this->component.doDispatch();
+
+    // The reply is OK and belongs to this command.
+    ASSERT_CMD_RESPONSE_SIZE(1);
+    ASSERT_CMD_RESPONSE(0, MissionAppComponentBase::OPCODE_REPORT_MODE, cmdSeq, Fw::CmdResponse::OK);
+    // The only event is the answer, and it names the expected mode.
+    ASSERT_EVENTS_SIZE(1);
+    ASSERT_EVENTS_ModeReport_SIZE(1);
+    ASSERT_EVENTS_ModeReport(0, expected);
+    // Nothing else happened: no telemetry, no request or cancel sent to ScienceApp.
+    ASSERT_TLM_SIZE(0);
+    ASSERT_from_collectionRequestOut_SIZE(0);
+    ASSERT_from_cancelRequestOut_SIZE(0);
+}
+
 }  // namespace Components

@@ -98,6 +98,25 @@ void MissionApp::CANCEL_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
+// REPORT_MODE answers one question from the ground: "which mission mode are you in?"
+//
+// It is read-only on purpose. It does not change m_currentMode, write telemetry,
+// or call any output port, so an operator can send it in every mode, at any time,
+// as often as needed, without disturbing a scheduled collection or a downlink.
+//
+// The command is async, so this runs on MissionApp's own thread, one queued
+// message at a time. Every mode change also runs on this thread, so the value
+// read here is never caught halfway through a transition.
+void MissionApp::REPORT_MODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    // The answer: one ModeReport event carrying the mode MissionApp owns right now.
+    // The ground shows it as "Mission mode is BASE" (C&T Modes row 3).
+    this->log_ACTIVITY_HI_ModeReport(this->m_currentMode);
+
+    // Reply last. By the time F' reports this command complete (C&T Modes row 2),
+    // the ModeReport event has already been handed to the event system.
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
 bool MissionApp::isAllowedTransition(Components::MissionMode requested) const {
     if (requested == this->m_currentMode) {
         return true;
