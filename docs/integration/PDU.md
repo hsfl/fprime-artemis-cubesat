@@ -37,8 +37,9 @@ metadata. Rebuild the N2 binary and its matching Yamcs dictionary together.
 
 Readback is the PDU's enable-pin state, not measured rail voltage or proof that
 the payload is ready. The October 21 record established Pi/Teensy UART byte flow
-but still reported PDU UNKNOWN. These software changes do not close that hardware
-gate; a valid real PDU response and measured payload on/off remain required.
+but still reported PDU UNKNOWN. A later real PDU response and one-rail switching
+were observed on October 27, as recorded below; measured payload on/off remains
+required for the CDR sequence.
 
 Local verification: PDU host smoke and address/undefined-behavior sanitizer
 checks passed; EPS driver 4/4 and manager 2/2 unit tests passed. The native CDR
@@ -46,10 +47,23 @@ deployment built, listened on loopback TCP with a pseudo-terminal UART, remained
 running, and exited with status 0 after SIGINT. No target MPLAB build, flashing,
 physical UART or power switching was performed for this change.
 
+## Readable PDU operations — October 27, 2026
+
+The October 26 local readability slice adds named PDU commands, validated
+readback/error events and nine enum state channels (`UNKNOWN`, `OFF`, `ON`,
+`STALE`). It preserves the PDU v2 wire contract and numeric EPS commands. Only
+the F′ binary and matching Yamcs dictionary change; no PDU/Teensy flash is
+required. See the [operator and local QA guide](../operations/PDU_READABILITY.md).
+The [live deployment record](../verification/evidence/n2-pdu-deployment-2026-10-27/README.md)
+shows protocol 2 / firmware 2.2.2 and all nine named readbacks through the Pi 5
+GUI, with 3V3_1 SET ON → GET ON → SET OFF → GET OFF and a final all-OFF
+readback. This validates the exercised UART/RPC path and enable readback only;
+it does not measure rail voltage or establish payload readiness.
+
 ## Inputs to agree
 
 - Selected hardware is Artemis PDU v2.2; verify exact populated board, running firmware and payload output/rail mapping; harness, connector/pinout, voltage and current requirements.
-- Selected path: Pi Zero W F′ → UART mux channel 2/local RPC → satellite Teensy → UART → PDU v2 protocol. Dennis reports the bench mostly wired; this is not an observed HIL result. Firmware reference: [`codex/n2-cdr-pdu`](https://github.com/hsfl/artemis-cubesat-pdu-firmware/tree/codex/n2-cdr-pdu), pinned by `external/artemis-pdu`. Hardware v2.2, firmware version, and protocol v2 are distinct.
+- Selected path: Pi Zero W F′ → UART mux channel 2/local RPC → satellite Teensy → UART → PDU v2 protocol. The October 27 test exercised this path for version, status, and one switched rail. Firmware reference: [`codex/n2-cdr-pdu`](https://github.com/hsfl/artemis-cubesat-pdu-firmware/tree/codex/n2-cdr-pdu), pinned by `external/artemis-pdu`. Hardware v2.2, firmware version, and protocol v2 are distinct.
 - Payload startup/readiness and shutdown/standby timing; command order and what readback or measurement proves powered-on and powered-off states.
 - All payload supply paths, including the USB↔RS-422 adapter, so the intended PDU-controlled off state can be verified.
 - Timeout, missing readback, payload-not-ready, failed collection and failed retrieval behavior. Agree whether/when power is removed on each failure and how retained data are protected.
@@ -61,4 +75,4 @@ physical UART or power switching was performed for this change.
 - [EpsManager](../../ArtemisRpiTeensy_N2/Components/EpsManager/EpsManager.fpp), [EpsDriver_Artemis](../../ArtemisRpiTeensy_N2/Components/EpsDriver_Artemis/EpsDriver_Artemis.fpp) and [topology](../../ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Top/topology.fpp) own current software wiring.
 - [Payload contract](PAYLOAD.md) owns the USB↔RS-422 command/lifecycle and raw-product boundary.
 
-Record exact board/firmware, F′ binary/dictionary, command outcomes, payload rail/readiness observations, retained-product integrity and off-state evidence for the CDR sequence. The current software tests do not establish real-PDU HIL. Hardware operations follow a revision-matched runbook and separate task-specific authorization.
+Record exact board/firmware, F′ binary/dictionary, command outcomes, payload rail/readiness observations, retained-product integrity and off-state evidence for the CDR sequence. The October 27 PDU bench check is bounded hardware evidence, not acceptance of the full payload sequence. Hardware operations follow a revision-matched runbook and separate task-specific authorization.

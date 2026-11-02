@@ -33,6 +33,13 @@ class EpsManager final : public EpsManagerComponentBase {
         U8 buildFlags,
         const Fw::StringBase& gitHash
     ) override;
+    void railSnapshotIn_handler(FwIndexType portNum, U16 bitmap, U16 knownMask, U16 freshMask, U32 maximumAgeTicks) override;
+    void GET_PDU_INFO_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+    void GET_PDU_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+    void GET_PDU_RAIL_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, Components::PduRail rail) override;
+    void GET_ALL_PDU_RAILS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+    void SET_PDU_RAIL_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, Components::PduSwitchableRail rail, Components::PduDesiredState state, Components::PduConfirmation confirmation) override;
+    Components::PduRailState railState(U8 bit) const;
     void REQUEST_EPS_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void PING_EPS_DRIVER_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void REQUEST_EPS_DRIVER_INFO_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
@@ -78,6 +85,10 @@ class EpsManager final : public EpsManagerComponentBase {
     U8 m_buildFlags;
     Fw::String m_gitHash;
     U32 m_managerHeartbeat;
+    U16 m_snapshotBitmap;
+    U16 m_knownMask;
+    U16 m_freshMask;
+    U32 m_maximumAgeTicks;
 };
 
 }  // namespace Components

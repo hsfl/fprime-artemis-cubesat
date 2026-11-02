@@ -161,6 +161,8 @@ void EpsDriver_ArtemisTester::testOutputReadbackValidationAndBitmapMapping() {
     this->deliverResponse(PDU_V2_OP_GET_OUTPUT_STATE, PDU_V2_STATUS_OK,
                           std::vector<U8>{PDU_V2_OUTPUT_ALL, PDU_V2_OUTPUT_COUNT, 1, 0, 1, 0, 0, 1, 0, 0, 1});
     const U16 expectedBitmap = static_cast<U16>((1U << 0U) | (1U << 2U) | (1U << 5U) | (1U << 8U));
+    ASSERT_EVENTS_PduRailReadback_SIZE(9);
+    ASSERT_from_railSnapshotOut(0, expectedBitmap, 0x1FFU, 0x1FFU, 0);
     ASSERT_from_statusOut_SIZE(2);
     ASSERT_from_statusOut(
         1,
@@ -183,6 +185,7 @@ void EpsDriver_ArtemisTester::testOutputReadbackValidationAndBitmapMapping() {
 
     this->invoke_to_requestIn(0, Components::EpsRequest::SET_OUTPUT_STATE, PDU_OUTPUT_12V, 1, 0);
     this->deliverResponse(PDU_V2_OP_SET_OUTPUT_STATE, PDU_V2_STATUS_OK, std::vector<U8>{PDU_OUTPUT_12V, 1});
+    ASSERT_EVENTS_PduRailSetResult_SIZE(1);
     ASSERT_from_statusOut(
         3,
         Components::HealthState::OK,
@@ -246,6 +249,31 @@ void EpsDriver_ArtemisTester::testOutputReadbackValidationAndBitmapMapping() {
         Fw::String("000000000000"));
 }
 
+void EpsDriver_ArtemisTester::testReadableEventsAndFreshness() {
+    this->clearHistory();
+    this->invoke_to_run(0, 0);
+    ASSERT_from_railSnapshotOut(0, 0, 0, 0, 0);
+    this->invoke_to_requestIn(0, Components::EpsRequest::GET_OUTPUT_STATE, PDU_OUTPUT_5V_1, 0, 0);
+    this->deliverResponse(PDU_V2_OP_GET_OUTPUT_STATE, PDU_V2_STATUS_OK, {PDU_OUTPUT_5V_1, 1});
+    ASSERT_EVENTS_PduRailReadback_SIZE(1);
+    ASSERT_from_railSnapshotOut(1, 4, 4, 4, 0);
+    for (unsigned i = 0; i < 4; ++i) { this->invoke_to_run(0, 0); }
+    ASSERT_from_railSnapshotOut(5, 4, 4, 0, 4);
+
+    this->invoke_to_requestIn(0, Components::EpsRequest::SET_OUTPUT_STATE, PDU_OUTPUT_5V_1, 1, 0);
+    this->deliverResponse(PDU_V2_OP_SET_OUTPUT_STATE, PDU_V2_STATUS_OK, {PDU_OUTPUT_5V_1, 0});
+    ASSERT_EVENTS_PduRailSetResult_SIZE(0);
+    ASSERT_EVENTS_PduRailSetMismatch_SIZE(1);
+    ASSERT_EVENTS_PduOperationError_SIZE(1);
+    ASSERT_from_railSnapshotOut(6, 0, 4, 4, 0);
+
+    this->invoke_to_requestIn(0, Components::EpsRequest::GET_OUTPUT_STATE, PDU_V2_OUTPUT_ALL, 0, 0);
+    this->deliverResponse(PDU_V2_OP_GET_OUTPUT_STATE, PDU_V2_STATUS_OK,
+                          {PDU_V2_OUTPUT_ALL, PDU_V2_OUTPUT_COUNT, 1, 0, 0, 0, 0, 0, 0, 0, 2});
+    ASSERT_from_railSnapshotOut(7, 0, 4, 0, 0);
+    ASSERT_EVENTS_PduRailReadback_SIZE(1);
+}
+
 void EpsDriver_ArtemisTester::testLegacyAndExtendedProtocolInfo() {
     this->clearHistory();
     this->m_requests.clear();
@@ -253,6 +281,7 @@ void EpsDriver_ArtemisTester::testLegacyAndExtendedProtocolInfo() {
     this->invoke_to_requestIn(0, Components::EpsRequest::GET_PROTOCOL_INFO, 0, 0, 0);
     this->deliverResponse(PDU_V2_OP_GET_PROTOCOL_INFO, PDU_V2_STATUS_OK,
                           std::vector<U8>{PDU_V2_VERSION, 0x0F, 96, PDU_V2_OUTPUT_COUNT, 1, 2, 3});
+    ASSERT_EVENTS_PduInfoReadback_SIZE(1);
     ASSERT_from_statusOut(
         1,
         Components::HealthState::OK,

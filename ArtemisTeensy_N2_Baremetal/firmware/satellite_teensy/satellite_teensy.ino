@@ -1,17 +1,22 @@
 #include <Arduino.h>
 
+#include "src/firmware_profile.hpp"
 #include "src/link_counters.hpp"
 #include "src/local_teensy_router.hpp"
 #include "src/pdu_proxy.hpp"
 #include "src/relay_uart_rf.hpp"
+#if !defined(ARTEMIS_CDR_NO_RADIO)
 #include "src/rf23_driver.hpp"
+#endif
 #include "src/wdt_guard.hpp"
 
+#if !defined(ARTEMIS_CDR_NO_RADIO)
 // Teensy 4.1 + RF23BP pinout from EPSCOR demo baseline.
 static constexpr int RADIO_CS = 38;
 static constexpr int RADIO_INT = 40;
 static constexpr uint8_t RADIO_RX_ON_PIN = 30;
 static constexpr uint8_t RADIO_TX_ON_PIN = 31;
+#endif
 static constexpr uint8_t RPI_ENABLE_PIN = 36;
 static constexpr uint8_t TEENSY_LED_PIN = 13;
 
@@ -27,13 +32,19 @@ static constexpr size_t RPI_UART_RX_BUFFER_SIZE = 4096;
 static constexpr uint16_t CCSDS_TM_FRAME_BYTES = 128;
 
 LinkCounters g_linkCounters;
+#if !defined(ARTEMIS_CDR_NO_RADIO)
 Rf23Driver g_rfDriver(RADIO_CS, RADIO_INT, RADIO_RX_ON_PIN, RADIO_TX_ON_PIN);
+#endif
 PduProxy g_pduProxy(Serial1);
+#if defined(ARTEMIS_CDR_NO_RADIO)
+LocalTeensyRouter g_localRouter(g_pduProxy, g_linkCounters);
+#else
 LocalTeensyRouter g_localRouter(g_pduProxy, g_rfDriver, g_linkCounters);
+#endif
 static uint8_t g_rpiUartRxBuffer[RPI_UART_RX_BUFFER_SIZE];
-// Channelized bridge mode:
-// - channel 0: CCSDS/GDS bytes forwarded over RF
-// - channel 1: payload blob packets forwarded over RF
+// Channelized bridge mode (legacy RF profile):
+// - channel 0: CCSDS/GDS bytes forwarded over RFM23BP
+// - channel 1: payload blob packets forwarded over RFM23BP
 // - channel 2: Teensy-local subsystem RPC, terminated on this Teensy
 RelayConfig g_relayConfig{
     true,
@@ -45,7 +56,12 @@ RelayConfig g_relayConfig{
     DOWNLINK_QUEUE_DEPTH,
     CCSDS_TM_FRAME_BYTES,
     link_protocol::CHANNEL_CCSDS};
+#if defined(ARTEMIS_CDR_NO_RADIO)
+RelayUartRf g_relay(Serial2, g_linkCounters, g_relayConfig, nullptr, &g_localRouter);
+#else
 RelayUartRf g_relay(Serial2, g_rfDriver, g_linkCounters, g_relayConfig, nullptr, &g_localRouter);
+#endif
+#if !defined(ARTEMIS_CDR_NO_RADIO)
 static uint32_t g_radioTrafficLedUntilMs = 0;
 
 struct RadioTrafficSnapshot {
@@ -87,6 +103,7 @@ void updateRadioTrafficLed(uint32_t now) {
     digitalWrite(TEENSY_LED_PIN, HIGH);
   }
 }
+#endif
 
 void debugPrintCounters(const char* prefix) {
   Serial.print(prefix);
@@ -158,6 +175,11 @@ void setup() {
   Serial2.addMemoryForRead(g_rpiUartRxBuffer, sizeof(g_rpiUartRxBuffer));
   Serial2.begin(UART_BAUD);
   g_pduProxy.begin(PDU_UART_BAUD);
+#if defined(ARTEMIS_CDR_NO_RADIO)
+  g_relay.begin();
+  Serial.println("[ArtemisTeensy] PROFILE=CDR_NO_RADIO");
+  Serial.println("[ArtemisTeensy] channel-2 UART + local PDU proxy ready");
+#else
   const bool radioOk = g_rfDriver.begin();
   g_relay.begin();
 
@@ -166,6 +188,7 @@ void setup() {
   } else {
     Serial.println("[ArtemisTeensy] RF23 init failed; relay running without RF");
   }
+#endif
   debugPrintCounters("[ArtemisTeensy] counters");
 }
 
@@ -174,9 +197,11 @@ void loop() {
 
   g_relay.poll();
   wdt_guard::feed();
-
   const uint32_t now = millis();
+
+#if !defined(ARTEMIS_CDR_NO_RADIO)
   updateRadioTrafficLed(now);
+#endif
 
   if ((now - lastDebugStatusMs) >= DEBUG_STATUS_PERIOD_MS) {
     debugPrintCounters("[ArtemisTeensy] counters");

@@ -112,4 +112,45 @@ void EpsManagerTester::testNegativeMalformedAndTimeoutStatusesFailCommand() {
                         Fw::CmdResponse::EXECUTION_ERROR);
 }
 
+void EpsManagerTester::testNamedCommandsAndGuards() {
+    this->clearHistory();
+    this->m_requests.clear();
+    this->sendCmd_SET_PDU_RAIL(0, 30, Components::PduSwitchableRail::RAIL_12V, Components::PduDesiredState::ON, Components::PduConfirmation::CONFIRM);
+    this->component.doDispatch();
+    ASSERT_EQ(this->m_requests.size(), 1U);
+    ASSERT_EQ(this->m_requests[0].request, Components::EpsRequest::SET_OUTPUT_STATE);
+    ASSERT_EQ(this->m_requests[0].outputId, 7U);
+    ASSERT_EQ(this->m_requests[0].state, 1U);
+    this->sendStatus(Components::EpsRequest::SET_OUTPUT_STATE, 2, 0);
+    this->sendCmd_SET_PDU_RAIL(0, 31, Components::PduSwitchableRail::RAIL_12V, Components::PduDesiredState::OFF, Components::PduConfirmation::CANCEL);
+    this->component.doDispatch();
+    ASSERT_EQ(this->m_requests.size(), 1U);
+    this->sendCmd_GET_PDU_RAIL(0, 32, Components::PduRail::ALL);
+    this->component.doDispatch();
+    ASSERT_EQ(this->m_requests.size(), 1U);
+    this->sendCmd_GET_PDU_RAIL(0, 33, Components::PduRail::RAIL_BURN1);
+    this->component.doDispatch();
+    ASSERT_EQ(this->m_requests.size(), 2U);
+    ASSERT_EQ(this->m_requests[1].outputId, 9U);
+    this->sendStatus(Components::EpsRequest::GET_OUTPUT_STATE, 2, 0);
+    this->sendCmd_GET_ALL_PDU_RAILS(0, 34);
+    this->component.doDispatch();
+    ASSERT_EQ(this->m_requests.size(), 3U);
+    ASSERT_EQ(this->m_requests[2].outputId, 255U);
+}
+
+void EpsManagerTester::testSnapshotStates() {
+    this->clearHistory();
+    // Unknown wins over a set bit; fresh off and on, then stale, all in summary order.
+    this->invoke_to_railSnapshotIn(0, 0x0005, 0x000E, 0x0006, 42);
+    this->component.doDispatch();
+    ASSERT_TLM_Rail3V3_1(0, Components::PduRailState::UNKNOWN);
+    ASSERT_TLM_Rail3V3_2(0, Components::PduRailState::OFF);
+    ASSERT_TLM_Rail5V_1(0, Components::PduRailState::ON);
+    ASSERT_TLM_Rail5V_2(0, Components::PduRailState::STALE);
+    ASSERT_TLM_RailKnownMask(0, 0x000E);
+    ASSERT_TLM_RailFreshMask(0, 0x0006);
+    ASSERT_TLM_RailMaximumAgeTicks(0, 42);
+}
+
 }  // namespace Components

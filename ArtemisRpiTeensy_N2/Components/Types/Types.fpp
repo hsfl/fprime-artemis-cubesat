@@ -86,6 +86,63 @@ module Components {
     SET_CHARGER_STATE = 7
   }
 
+  @ Readable PDU output identities. Values match the existing PDU v2 wire IDs.
+  enum PduRail : U8 {
+    UNKNOWN = 0
+    RAIL_3V3_1 = 1
+    RAIL_3V3_2 = 2
+    RAIL_5V_1 = 3
+    RAIL_5V_2 = 4
+    RAIL_5V_3 = 5
+    RAIL_12V = 7
+    RAIL_VBATT = 8
+    RAIL_BURN1 = 9
+    RAIL_BURN2 = 10
+    ALL = 255
+  }
+
+  @ Only the seven public switched rails accepted by the existing SET guard.
+  enum PduSwitchableRail : U8 {
+    RAIL_3V3_1 = 1
+    RAIL_3V3_2 = 2
+    RAIL_5V_1 = 3
+    RAIL_5V_2 = 4
+    RAIL_5V_3 = 5
+    RAIL_12V = 7
+    RAIL_VBATT = 8
+  }
+
+  @ Requested enable state; this is not a command result code.
+  enum PduDesiredState : U8 {
+    OFF = 0
+    ON = 1
+  }
+
+  @ Enable-pin readback, never a voltage measurement. STALE retains no current-state claim.
+  enum PduRailState : U8 {
+    UNKNOWN = 0
+    OFF = 1
+    ON = 2
+    STALE = 3
+  }
+
+  @ Explicit confirmation for a named power command; never supplied by a default.
+  enum PduConfirmation : U8 {
+    CANCEL = 0
+    CONFIRM = 1
+  }
+
+  @ Numeric errors are meaningful only together with the layer that produced them.
+  enum PduErrorOrigin : U8 {
+    DRIVER = 0
+    TEENSY_RPC = 1
+    PDU = 2
+  }
+
+  @ Rail validity from the hardware driver, independent of request admission/completion.
+  @ Masks use the existing nine-output summary bitmap order. Ages count driver scheduler ticks.
+  port EpsRailSnapshot(railStateBitmap: U16, knownMask: U16, freshMask: U16, maximumAgeTicks: U32)
+
   @ Mission collection request from MissionApp to ScienceApp.
   port CollectionRequest(delaySeconds: U32)
 

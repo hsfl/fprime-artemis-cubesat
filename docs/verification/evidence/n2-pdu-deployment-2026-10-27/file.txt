@@ -1,0 +1,1 @@
+/repo/ArtemisRpiTeensy_N2/build-artifacts/pi-zero-w-armv6hf/ArtemisRpiTeensyDeployment/bin/ArtemisRpiTeensyDeployment: ELF 32-bit LSB pie executable, ARM, EABI5 version 1 (GNU/Linux), dynamically linked, interpreter /lib/ld-linux-armhf.so.3, BuildID[sha1]=e7b21974c23ee4ab774be6e223d189eab98f5615, for GNU/Linux 3.2.0, not stripped

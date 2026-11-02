@@ -1,4 +1,76 @@
-# Raspberry Pi Provisioning
+> **N2 CDR service (2026-10-26):** The current `artemis-fprime.service` uses
+> account `n2-obc`, `/home/n2-obc/artemis/state`, TCP port 50000, and
+> `/dev/serial0`; the older `pi` instructions below are historical. Install
+> `artemis-supervisor.py` as `/home/n2-obc/artemis/artemis-supervisor.py` and
+> the unit as `/etc/systemd/system/artemis-fprime.service` together. The
+> supervisor waits for the UART and declares readiness after a fresh EPS status
+> text event and a TCP listener on port 50000 owned by the F′ process. It
+> restarts a child that exits or stops producing that event (90 s
+> startup grace, 30 s progress timeout). This detects EPS polling/log progress,
+> not TCP commands, payload, PDU, or full-system health. It depends on the CDR
+> topology and ACTIVITY_LO text events remaining enabled. The listener is checked
+> for startup readiness only; runtime supervision continues to monitor EPS
+> progress. Systemd's 45 s
+> watchdog also detects a stalled supervisor after readiness. Check with
+> `python3 deploy/pi/test_supervisor.py` on Linux; those tests use no hardware
+> and require Linux `/proc` for socket ownership checks.
+
+## Current release installer
+
+For the Pi Zero W `n2-obc` only, stage a verified ARMv6 CDR Release binary,
+its matching dictionary, `build-manifest.json`, the supervisor, service unit,
+installer, and a basename-relative `SHA256SUMS`. Run on the Pi:
+
+```sh
+sudo bash /path/to/staging/install-n2-release.sh /path/to/staging
+```
+
+The current installer selects `d4fe283-cdr-tcp-20261026`, validates hashes and
+shared libraries, preserves persistent state/science data, records rollback
+files, and selects the paired release. It refuses an existing release directory
+so a repeated install cannot overwrite the artifacts needed by rollback.
+Choose a new release name in the installer for a subsequent release. Executable
+rollback helpers are prepared before configuration changes; newly created
+runtime directories belong to `n2-obc`. Active NFS mounts and unresolved
+shared libraries stop installation explicitly. It uses supported zram-only swap,
+masks unused NFS/display-test/EEPROM helpers and user audio services, disables
+unused audio/camera/DSI autodetection, and caps persistent journals at 32 MiB.
+HDMI console, Wi-Fi, SSH, Avahi, and the OS hardware watchdog remain available.
+Reboot after applying the swap configuration. NetworkManager/Netplan packages
+and network profiles are retained. The Pi 5 is outside this installer's scope.
+
+The installer prints a `setup-backup-...-n2-update` directory containing
+`rollback.sh`; run it with sudo, then reboot, to restore the prior release and
+configuration. It retains all releases and science/state data.
+
+For a desktop Raspberry Pi OS image, the additional
+`disable-desktop-services.sh` helper masks installed GUI/VNC, printing,
+Bluetooth, desktop disk/power/package helpers, keyrings, portals and GVFS
+services. Run it with sudo on `n2-obc`, then reboot. It preserves packages,
+network/SSH services and the text console, and prints a separate
+`desktop-backup-.../rollback.sh` path. Most of these services are already idle
+under `multi-user.target`, so masking them prevents later desktop activation
+without implying a large additional boot or RAM saving.
+
+The tests require Linux `/proc` socket ownership information:
+
+```sh
+python3 deploy/pi/test_supervisor.py
+```
+
+Run them on Linux or in a Linux container when developing from macOS. Readiness
+requires an F′-owned listener on TCP 50000 plus fresh EPS polling progress.
+A delayed UART waits in the same supervisor, without consuming restart attempts.
+After readiness, EPS progress silence for 30 seconds triggers child cleanup and
+restart. This is a partial application liveness check; it does not prove PDU,
+payload, or end-to-end TCP command health. The 45-second systemd watchdog checks
+the supervisor itself. See the dated deployment record for actual target checks.
+
+# Historical MVP provisioning reference
+
+All remaining instructions below describe the older user `pi` / UART-only
+MVP deployment. Do not apply them over the current N2 CDR installation.
+
 
 > Earlier Artemis/GDS/RFM23BP workflow reference. For current N2 Yamcs operations and integration status, start at [the documentation index](../../docs/README.md). This page does not establish deployment of the new N2 software baseline.
 
@@ -272,3 +344,19 @@ ssh pi@artemis-pi.local 'readlink -f /home/pi/artemis/current/ArtemisRpiTeensyDe
 ssh pi@artemis-pi.local 'systemctl is-active artemis-fprime.service; pgrep -af ArtemisRpiTeensyDeployment || true'
 ssh pi@artemis-pi.local 'journalctl -u artemis-fprime.service --since "2 minutes ago" --no-pager | tail -100'
 ```
+
+## Pre-commit review, October 26
+
+Installer review fixed release overwrite on repeat installs, ineffective Bash
+negated preflight checks, late rollback-helper generation, and ownership of
+new runtime directories. Desktop cleanup now snapshots every selected mask and
+writes its rollback helper before applying masks. These revisions were reviewed
+and checked locally; they were not reapplied to either Pi.
+
+Seven supervisor lifecycle tests passed again in a Linux Python 3.11 container.
+An isolated container with mocked platform/service commands verified rejection
+of an existing release, active NFS mounts and unresolved libraries; an injected
+unit-verification failure left an executable rollback helper, account-owned
+runtime directories, and successfully restored the old supervisor/release link.
+Shell syntax checks passed. These checks do not replace target installer or
+power-loss qualification.

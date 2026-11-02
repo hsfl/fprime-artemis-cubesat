@@ -20,6 +20,7 @@ class EpsDriver_ArtemisTester final : public EpsDriver_ArtemisGTestBase {
     void testBusyRequestDoesNotReplacePendingIdentity();
     void testOutputReadbackValidationAndBitmapMapping();
     void testLegacyAndExtendedProtocolInfo();
+    void testReadableEventsAndFreshness();
 
   private:
     void connectPorts();

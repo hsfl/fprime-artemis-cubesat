@@ -1,0 +1,23 @@
+# Install as /etc/systemd/system/n2-yamcs.service on the ground Pi.
+
+[Unit]
+Description=Neutron 2 Ground Yamcs Server
+Wants=network-online.target
+After=network-online.target local-fs.target
+
+[Service]
+Type=simple
+User=n2-fprime-yamcs
+Group=n2-fprime-yamcs
+Environment=HOME=/home/n2-fprime-yamcs
+Environment=PYTHONUNBUFFERED=1
+WorkingDirectory=/home/n2-fprime-yamcs/fprime-artemis-cubesat
+ExecStart=/home/n2-fprime-yamcs/fprime-artemis-cubesat/tools/yamcs/.venv/bin/python /home/n2-fprime-yamcs/fprime-artemis-cubesat/deploy/ground/station.py --repo /home/n2-fprime-yamcs/fprime-artemis-cubesat --station /home/n2-fprime-yamcs/yamcs-station --address n2-obc.local
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=n2-yamcs
+
+[Install]
+WantedBy=multi-user.target

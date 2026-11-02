@@ -29,7 +29,11 @@ EpsManager::EpsManager(const char* const compName)
       m_firmwarePatch(0),
       m_buildFlags(0),
       m_gitHash("000000000000"),
-      m_managerHeartbeat(0) {}
+      m_managerHeartbeat(0),
+      m_snapshotBitmap(0),
+      m_knownMask(0),
+      m_freshMask(0),
+      m_maximumAgeTicks(0) {}
 
 EpsManager::~EpsManager() {}
 
@@ -111,8 +115,68 @@ void EpsManager::driverStatusIn_handler(
     if (respond) {
         const Fw::CmdResponse response = ((linkState == LINK_PROTOCOL_OK) && (driverStatus == 0U)) ?
                                              Fw::CmdResponse::OK : Fw::CmdResponse::EXECUTION_ERROR;
+        if (response == Fw::CmdResponse::OK) {
+            if (driverRequest == Components::EpsRequest::GET_SUMMARY_STATUS) {
+                const Components::PduRail::T rails[] = {Components::PduRail::RAIL_3V3_1, Components::PduRail::RAIL_3V3_2,
+                    Components::PduRail::RAIL_5V_1, Components::PduRail::RAIL_5V_2, Components::PduRail::RAIL_5V_3,
+                    Components::PduRail::RAIL_12V, Components::PduRail::RAIL_VBATT, Components::PduRail::RAIL_BURN1, Components::PduRail::RAIL_BURN2};
+                for (U8 i = 0; i < 9U; ++i) {
+                    const Components::PduRailState state = (railStateBitmap & (1U << i)) ? Components::PduRailState::ON : Components::PduRailState::OFF;
+                    this->log_ACTIVITY_HI_PduSummaryRail(completedCommandSequence, completedCommandOpcode, rails[i], state);
+                }
+            } else if (driverRequest == Components::EpsRequest::GET_PROTOCOL_INFO) {
+                this->log_ACTIVITY_HI_PduInfoResult(completedCommandSequence, completedCommandOpcode, driverProtocolVersion,
+                    firmwareMajor, firmwareMinor, firmwarePatch, buildFlags, gitHash);
+            }
+        } else {
+            this->log_WARNING_LO_PduCommandFailed(completedCommandSequence, completedCommandOpcode, linkState, driverStatus);
+        }
         this->cmdResponse_out(completedCommandOpcode, completedCommandSequence, response);
     }
+}
+
+void EpsManager::railSnapshotIn_handler(FwIndexType portNum, U16 bitmap, U16 knownMask, U16 freshMask, U32 maximumAgeTicks) {
+    static_cast<void>(portNum);
+    this->m_snapshotBitmap = bitmap;
+    this->m_knownMask = knownMask;
+    this->m_freshMask = freshMask;
+    this->m_maximumAgeTicks = maximumAgeTicks;
+    this->writeTelemetry();
+}
+
+Components::PduRailState EpsManager::railState(U8 bit) const {
+    const U16 mask = static_cast<U16>(1U << bit);
+    if ((this->m_knownMask & mask) == 0U) return Components::PduRailState::UNKNOWN;
+    if ((this->m_freshMask & mask) == 0U) return Components::PduRailState::STALE;
+    return (this->m_snapshotBitmap & mask) ? Components::PduRailState::ON : Components::PduRailState::OFF;
+}
+
+void EpsManager::GET_PDU_INFO_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    this->beginCommand(opCode, cmdSeq, Components::EpsRequest::GET_PROTOCOL_INFO, 0, 0, 0);
+}
+void EpsManager::GET_PDU_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    this->beginCommand(opCode, cmdSeq, Components::EpsRequest::GET_SUMMARY_STATUS, 0, 0, 0);
+}
+void EpsManager::GET_PDU_RAIL_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, Components::PduRail rail) {
+    const U8 id = static_cast<U8>(rail);
+    if (!rail.isValid() || !((id >= 1U && id <= 5U) || (id >= 7U && id <= 10U))) {
+        this->log_WARNING_LO_PduCommandRejected(cmdSeq, opCode, Fw::String("INVALID_RAIL"));
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+        return;
+    }
+    this->beginCommand(opCode, cmdSeq, Components::EpsRequest::GET_OUTPUT_STATE, id, 0, 0);
+}
+void EpsManager::GET_ALL_PDU_RAILS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
+    this->beginCommand(opCode, cmdSeq, Components::EpsRequest::GET_OUTPUT_STATE, 255U, 0, 0);
+}
+void EpsManager::SET_PDU_RAIL_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, Components::PduSwitchableRail rail, Components::PduDesiredState state, Components::PduConfirmation confirmation) {
+    const U8 id = static_cast<U8>(rail);
+    if (!rail.isValid() || !state.isValid() || !confirmation.isValid() || !this->isSafeOutputId(id) || confirmation != Components::PduConfirmation::CONFIRM) {
+        this->log_WARNING_LO_PduCommandRejected(cmdSeq, opCode, Fw::String("INVALID_OR_CANCELLED"));
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+        return;
+    }
+    this->beginCommand(opCode, cmdSeq, Components::EpsRequest::SET_OUTPUT_STATE, id, static_cast<U8>(state), 0);
 }
 
 void EpsManager::REQUEST_EPS_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
@@ -231,10 +295,12 @@ void EpsManager::beginCommand(
     U16 durationMs
 ) {
     if (this->m_requestPending || this->m_commandPending) {
+        this->log_WARNING_LO_PduCommandRejected(cmdSeq, opCode, Fw::String("BUSY"));
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::BUSY);
         return;
     }
     if (!this->isConnected_driverRequestOut_OutputPort(0)) {
+        this->log_WARNING_LO_PduCommandRejected(cmdSeq, opCode, Fw::String("DRIVER_UNAVAILABLE"));
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
         return;
     }
@@ -271,6 +337,18 @@ void EpsManager::writeTelemetry() {
     this->tlmWrite_DriverFirmwarePatch(this->m_firmwarePatch);
     this->tlmWrite_DriverBuildFlags(this->m_buildFlags);
     this->tlmWrite_DriverGitHash(this->m_gitHash);
+    this->tlmWrite_Rail3V3_1(this->railState(0));
+    this->tlmWrite_Rail3V3_2(this->railState(1));
+    this->tlmWrite_Rail5V_1(this->railState(2));
+    this->tlmWrite_Rail5V_2(this->railState(3));
+    this->tlmWrite_Rail5V_3(this->railState(4));
+    this->tlmWrite_Rail12V(this->railState(5));
+    this->tlmWrite_RailVBatt(this->railState(6));
+    this->tlmWrite_RailBurn1(this->railState(7));
+    this->tlmWrite_RailBurn2(this->railState(8));
+    this->tlmWrite_RailKnownMask(this->m_knownMask);
+    this->tlmWrite_RailFreshMask(this->m_freshMask);
+    this->tlmWrite_RailMaximumAgeTicks(this->m_maximumAgeTicks);
 }
 
 }  // namespace Components

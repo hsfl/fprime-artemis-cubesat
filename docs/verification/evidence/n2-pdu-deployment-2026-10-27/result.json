@@ -1,0 +1,41 @@
+{
+  "result": "PASS",
+  "date_hst": "2026-10-27",
+  "evidence_level": "real Pi Zero W to satellite Teensy UART RPC to PDU; commands issued via Pi 5 Yamcs GUI",
+  "checks": {
+    "pdu_info": true,
+    "nine_rail_summary": true,
+    "final_nine_rail_readback_off": true,
+    "cancel_rejected": true,
+    "busy_visible": true,
+    "set_on": true,
+    "get_on": true,
+    "set_off": true,
+    "get_off": true,
+    "terminal_successes": true,
+    "terminal_rejections": true,
+    "paired_hashes": true,
+    "services_active": true
+  },
+  "rail_test": "3V3_1 ON / GET ON / OFF / GET OFF",
+  "final_rails": {
+    "RAIL_12V": "OFF",
+    "RAIL_3V3_1": "OFF",
+    "RAIL_3V3_2": "OFF",
+    "RAIL_5V_1": "OFF",
+    "RAIL_5V_2": "OFF",
+    "RAIL_5V_3": "OFF",
+    "RAIL_BURN1": "OFF",
+    "RAIL_BURN2": "OFF",
+    "RAIL_VBATT": "OFF"
+  },
+  "pdu_firmware": "2.2.2",
+  "pdu_protocol": 2,
+  "pdu_git_prefix": "e94ee066442a",
+  "software_only_fault_cases": "prior local PTY tests only, no hardware fault injection",
+  "known_issues": [
+    "Polling contention returned BUSY once; successful retry",
+    "Yamcs .local IPv6-scope command IDs cause URLDecoder report errors; IPv4 GUI report verified working",
+    "General PDU Yamcs terminal-verifier integration remains deferred; terminal F Prime events verified separately"
+  ]
+}

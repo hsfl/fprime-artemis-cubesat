@@ -1,0 +1,251 @@
+Start testing: Oct 26 16:03 HST
+----------------------------------------------------------
+1/7 Testing: Components_UartChannelMux_ut_exe
+1/7 Test: Components_UartChannelMux_ut_exe
+Command: "/Users/sozodennis/Developer/Artemis-Cubesat-Kit/neutron_2/ArtemisRpiTeensy_N2/build-fprime-automatic-native-ut/bin/Darwin/Components_UartChannelMux_ut_exe"
+Directory: /Users/sozodennis/Developer/Artemis-Cubesat-Kit/neutron_2/ArtemisRpiTeensy_N2/Components/UartChannelMux
+"Components_UartChannelMux_ut_exe" start time: Oct 26 16:03 HST
+Output:
+----------------------------------------------------------
+[==========] Running 2 tests from 2 test suites.
+[----------] Global test environment set-up.
+[----------] 1 test from Nominal
+[ RUN      ] Nominal.WrapsAndRoutesChannelFrames
+[       OK ] Nominal.WrapsAndRoutesChannelFrames (0 ms)
+[----------] 1 test from Nominal (0 ms total)
+
+[----------] 1 test from Defensive
+[ RUN      ] Defensive.DropsUnconnectedCcsdsReceive
+[       OK ] Defensive.DropsUnconnectedCcsdsReceive (0 ms)
+[----------] 1 test from Defensive (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 2 tests from 2 test suites ran. (0 ms total)
+[  PASSED  ] 2 tests.
+<end of output>
+Test time =   0.42 sec
+----------------------------------------------------------
+Test Passed.
+"Components_UartChannelMux_ut_exe" end time: Oct 26 16:03 HST
+"Components_UartChannelMux_ut_exe" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/7 Testing: Components_PayloadDownlinkApp_ut_exe
+2/7 Test: Components_PayloadDownlinkApp_ut_exe
+Command: "/Users/sozodennis/Developer/Artemis-Cubesat-Kit/neutron_2/ArtemisRpiTeensy_N2/build-fprime-automatic-native-ut/bin/Darwin/Components_PayloadDownlinkApp_ut_exe"
+Directory: /Users/sozodennis/Developer/Artemis-Cubesat-Kit/neutron_2/ArtemisRpiTeensy_N2/Components/PayloadDownlinkApp
+"Components_PayloadDownlinkApp_ut_exe" start time: Oct 26 16:03 HST
+Output:
+----------------------------------------------------------
+[==========] Running 6 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 6 tests from Nominal
+[ RUN      ] Nominal.FileBackedVariableLengthPackets
+[       OK ] Nominal.FileBackedVariableLengthPackets (1 ms)
+[ RUN      ] Nominal.ProgressEventsEveryTenPercent
+[       OK ] Nominal.ProgressEventsEveryTenPercent (0 ms)
+[ RUN      ] Nominal.QueuesRetryPacketsForScheduledResend
+[       OK ] Nominal.QueuesRetryPacketsForScheduledResend (0 ms)
+[ RUN      ] Nominal.DescriptorSnapshotAndExactSourceValidation
+[       OK ] Nominal.DescriptorSnapshotAndExactSourceValidation (0 ms)
+[ RUN      ] Nominal.BusyRejectionConsumesTransferIdSequence
+[       OK ] Nominal.BusyRejectionConsumesTransferIdSequence (0 ms)
+[ RUN      ] Nominal.TransferIdWrapSkipsZeroAndConsumesFailedRequestOnce
+[       OK ] Nominal.TransferIdWrapSkipsZeroAndConsumesFailedRequestOnce (1 ms)
+[----------] 6 tests from Nominal (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 6 tests from 1 test suite ran. (4 ms total)
+[  PASSED  ] 6 tests.
+<end of output>
+Test time =   0.28 sec
+----------------------------------------------------------
+Test Passed.
+"Components_PayloadDownlinkApp_ut_exe" end time: Oct 26 16:03 HST
+"Components_PayloadDownlinkApp_ut_exe" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/7 Testing: Components_MissionApp_ut_exe
+3/7 Test: Components_MissionApp_ut_exe
+Command: "/Users/sozodennis/Developer/Artemis-Cubesat-Kit/neutron_2/ArtemisRpiTeensy_N2/build-fprime-automatic-native-ut/bin/Darwin/Components_MissionApp_ut_exe"
+Directory: /Users/sozodennis/Developer/Artemis-Cubesat-Kit/neutron_2/ArtemisRpiTeensy_N2/Components/MissionApp
+"Components_MissionApp_ut_exe" start time: Oct 26 16:03 HST
+Output:
+----------------------------------------------------------
+[==========] Running 7 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 7 tests from Nominal
+[ RUN      ] Nominal.RejectsInvalidManagerTransition
+[       OK ] Nominal.RejectsInvalidManagerTransition (0 ms)
+[ RUN      ] Nominal.RejectsInvalidScheduleCommandInputs
+[       OK ] Nominal.RejectsInvalidScheduleCommandInputs (0 ms)
+[ RUN      ] Nominal.RejectsInvalidCommandTransition
+[       OK ] Nominal.RejectsInvalidCommandTransition (0 ms)
+[ RUN      ] Nominal.AcceptsNominalDemoStoryTransitions
+[       OK ] Nominal.AcceptsNominalDemoStoryTransitions (0 ms)
+[ RUN      ] Nominal.AcceptsManualDownlinkRetryFromBase
+[       OK ] Nominal.AcceptsManualDownlinkRetryFromBase (0 ms)
+[ RUN      ] Nominal.EnterBaseModeCancelsPendingCollection
+[       OK ] Nominal.EnterBaseModeCancelsPendingCollection (0 ms)
+[ RUN      ] Nominal.CancelCollectionReturnsBaseAndCancels
+[       OK ] Nominal.CancelCollectionReturnsBaseAndCancels (0 ms)
+[----------] 7 tests from Nominal (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 7 tests from 1 test suite ran. (1 ms total)
+[  PASSED  ] 7 tests.
+<end of output>
+Test time =   0.24 sec
+----------------------------------------------------------
+Test Passed.
+"Components_MissionApp_ut_exe" end time: Oct 26 16:03 HST
+"Components_MissionApp_ut_exe" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/7 Testing: Components_ScienceApp_ut_exe
+4/7 Test: Components_ScienceApp_ut_exe
+Command: "/Users/sozodennis/Developer/Artemis-Cubesat-Kit/neutron_2/ArtemisRpiTeensy_N2/build-fprime-automatic-native-ut/bin/Darwin/Components_ScienceApp_ut_exe"
+Directory: /Users/sozodennis/Developer/Artemis-Cubesat-Kit/neutron_2/ArtemisRpiTeensy_N2/Components/ScienceApp
+"Components_ScienceApp_ut_exe" start time: Oct 26 16:03 HST
+Output:
+----------------------------------------------------------
+[==========] Running 9 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 9 tests from Nominal
+[ RUN      ] Nominal.DefaultDurationIsThirty
+[       OK ] Nominal.DefaultDurationIsThirty (1 ms)
+[ RUN      ] Nominal.ScheduledCountdownFiresExactlyOnce
+[       OK ] Nominal.ScheduledCountdownFiresExactlyOnce (0 ms)
+[ RUN      ] Nominal.RejectsZeroDelayAndBadDurations
+[       OK ] Nominal.RejectsZeroDelayAndBadDurations (0 ms)
+[ RUN      ] Nominal.CancelClearsCountdown
+[       OK ] Nominal.CancelClearsCountdown (0 ms)
+[ RUN      ] Nominal.QueuedCancelAtFinalTickBoundaryPreventsCollection
+[       OK ] Nominal.QueuedCancelAtFinalTickBoundaryPreventsCollection (0 ms)
+[ RUN      ] Nominal.ScienceCaptureDoesNotPersistDuration
+[       OK ] Nominal.ScienceCaptureDoesNotPersistDuration (0 ms)
+[ RUN      ] Nominal.ParamSeedsDurationAtInit
+[       OK ] Nominal.ParamSeedsDurationAtInit (0 ms)
+[ RUN      ] Nominal.InvalidParamFallsBackToThirty
+[       OK ] Nominal.InvalidParamFallsBackToThirty (0 ms)
+[ RUN      ] Nominal.CdrRejectsAutomaticDownlinkBeforeCaptureOrTokenAllocation
+[       OK ] Nominal.CdrRejectsAutomaticDownlinkBeforeCaptureOrTokenAllocation (0 ms)
+[----------] 9 tests from Nominal (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 9 tests from 1 test suite ran. (2 ms total)
+[  PASSED  ] 9 tests.
+<end of output>
+Test time =   0.26 sec
+----------------------------------------------------------
+Test Passed.
+"Components_ScienceApp_ut_exe" end time: Oct 26 16:03 HST
+"Components_ScienceApp_ut_exe" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/7 Testing: Components_CommsApp_ut_exe
+5/7 Test: Components_CommsApp_ut_exe
+Command: "/Users/sozodennis/Developer/Artemis-Cubesat-Kit/neutron_2/ArtemisRpiTeensy_N2/build-fprime-automatic-native-ut/bin/Darwin/Components_CommsApp_ut_exe"
+Directory: /Users/sozodennis/Developer/Artemis-Cubesat-Kit/neutron_2/ArtemisRpiTeensy_N2/Components/CommsApp
+"Components_CommsApp_ut_exe" start time: Oct 26 16:03 HST
+Output:
+----------------------------------------------------------
+[==========] Running 9 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 9 tests from Nominal
+[ RUN      ] Nominal.RejectsDownlinkWithoutScience
+[       OK ] Nominal.RejectsDownlinkWithoutScience (1 ms)
+[ RUN      ] Nominal.RequestsScienceDownlinkAndCompletionClearsState
+[       OK ] Nominal.RequestsScienceDownlinkAndCompletionClearsState (0 ms)
+[ RUN      ] Nominal.DownlinkFailureReturnsBase
+[       OK ] Nominal.DownlinkFailureReturnsBase (0 ms)
+[ RUN      ] Nominal.IgnoresPayloadStatusWhenInactive
+[       OK ] Nominal.IgnoresPayloadStatusWhenInactive (0 ms)
+[ RUN      ] Nominal.OldCompletionCannotFinishNewProductAndNewPendingSurvives
+[       OK ] Nominal.OldCompletionCannotFinishNewProductAndNewPendingSurvives (0 ms)
+[ RUN      ] Nominal.AutomaticDeliveryUsesSharedDownlinkGate
+[       OK ] Nominal.AutomaticDeliveryUsesSharedDownlinkGate (0 ms)
+[ RUN      ] Nominal.BusyRejectionSequenceAllowsSubsequentDownlinks
+[       OK ] Nominal.BusyRejectionSequenceAllowsSubsequentDownlinks (0 ms)
+[ RUN      ] Nominal.DriverStatusPollingAndRssiPing
+[       OK ] Nominal.DriverStatusPollingAndRssiPing (0 ms)
+[ RUN      ] Nominal.RunPublishesHealthFromLinkState
+[       OK ] Nominal.RunPublishesHealthFromLinkState (0 ms)
+[----------] 9 tests from Nominal (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 9 tests from 1 test suite ran. (2 ms total)
+[  PASSED  ] 9 tests.
+<end of output>
+Test time =   0.25 sec
+----------------------------------------------------------
+Test Passed.
+"Components_CommsApp_ut_exe" end time: Oct 26 16:03 HST
+"Components_CommsApp_ut_exe" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/7 Testing: Components_EpsManager_ut_exe
+6/7 Test: Components_EpsManager_ut_exe
+Command: "/Users/sozodennis/Developer/Artemis-Cubesat-Kit/neutron_2/ArtemisRpiTeensy_N2/build-fprime-automatic-native-ut/bin/Darwin/Components_EpsManager_ut_exe"
+Directory: /Users/sozodennis/Developer/Artemis-Cubesat-Kit/neutron_2/ArtemisRpiTeensy_N2/Components/EpsManager
+"Components_EpsManager_ut_exe" start time: Oct 26 16:03 HST
+Output:
+----------------------------------------------------------
+[==========] Running 4 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 4 tests from Nominal
+[ RUN      ] Nominal.CommandWaitsForTerminalResponseAndBusyDoesNotCompleteIt
+[       OK ] Nominal.CommandWaitsForTerminalResponseAndBusyDoesNotCompleteIt (1 ms)
+[ RUN      ] Nominal.NegativeMalformedAndTimeoutStatusesFailCommand
+[       OK ] Nominal.NegativeMalformedAndTimeoutStatusesFailCommand (0 ms)
+[ RUN      ] Nominal.NamedCommandsAndGuards
+[       OK ] Nominal.NamedCommandsAndGuards (0 ms)
+[ RUN      ] Nominal.SnapshotStates
+[       OK ] Nominal.SnapshotStates (0 ms)
+[----------] 4 tests from Nominal (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 4 tests from 1 test suite ran. (1 ms total)
+[  PASSED  ] 4 tests.
+<end of output>
+Test time =   0.27 sec
+----------------------------------------------------------
+Test Passed.
+"Components_EpsManager_ut_exe" end time: Oct 26 16:03 HST
+"Components_EpsManager_ut_exe" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/7 Testing: Components_EpsDriver_Artemis_ut_exe
+7/7 Test: Components_EpsDriver_Artemis_ut_exe
+Command: "/Users/sozodennis/Developer/Artemis-Cubesat-Kit/neutron_2/ArtemisRpiTeensy_N2/build-fprime-automatic-native-ut/bin/Darwin/Components_EpsDriver_Artemis_ut_exe"
+Directory: /Users/sozodennis/Developer/Artemis-Cubesat-Kit/neutron_2/ArtemisRpiTeensy_N2/Components/EpsDriver_Artemis
+"Components_EpsDriver_Artemis_ut_exe" start time: Oct 26 16:03 HST
+Output:
+----------------------------------------------------------
+[==========] Running 5 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 5 tests from Nominal
+[ RUN      ] Nominal.TimeoutClearsPendingRequest
+[       OK ] Nominal.TimeoutClearsPendingRequest (1 ms)
+[ RUN      ] Nominal.BusyRequestDoesNotReplacePendingIdentity
+[       OK ] Nominal.BusyRequestDoesNotReplacePendingIdentity (0 ms)
+[ RUN      ] Nominal.OutputReadbackValidationAndBitmapMapping
+[       OK ] Nominal.OutputReadbackValidationAndBitmapMapping (0 ms)
+[ RUN      ] Nominal.LegacyAndExtendedProtocolInfo
+[       OK ] Nominal.LegacyAndExtendedProtocolInfo (0 ms)
+[ RUN      ] Nominal.ReadableEventsAndFreshness
+[       OK ] Nominal.ReadableEventsAndFreshness (0 ms)
+[----------] 5 tests from Nominal (4 ms total)
+
+[----------] Global test environment tear-down
+[==========] 5 tests from 1 test suite ran. (4 ms total)
+[  PASSED  ] 5 tests.
+<end of output>
+Test time =   0.27 sec
+----------------------------------------------------------
+Test Passed.
+"Components_EpsDriver_Artemis_ut_exe" end time: Oct 26 16:03 HST
+"Components_EpsDriver_Artemis_ut_exe" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 26 16:03 HST

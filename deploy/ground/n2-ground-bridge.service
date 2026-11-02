@@ -1,0 +1,23 @@
+# Install as /etc/systemd/system/n2-ground-bridge.service on the ground Pi.
+
+[Unit]
+Description=Neutron 2 Ground F Prime TCP/UDP Bridge
+Wants=network-online.target n2-yamcs.service
+After=network-online.target n2-yamcs.service local-fs.target
+
+[Service]
+Type=simple
+User=n2-fprime-yamcs
+Group=n2-fprime-yamcs
+Environment=HOME=/home/n2-fprime-yamcs
+Environment=PYTHONUNBUFFERED=1
+WorkingDirectory=/home/n2-fprime-yamcs/fprime-artemis-cubesat
+ExecStart=/home/n2-fprime-yamcs/fprime-artemis-cubesat/tools/yamcs/.venv/bin/python -u /home/n2-fprime-yamcs/fprime-artemis-cubesat/tools/yamcs/cdr_comm_bridge.py --dictionary /home/n2-fprime-yamcs/yamcs-station/dictionary.json --address n2-obc.local --port 50000 --frame-interval-ms 5
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=n2-ground-bridge
+
+[Install]
+WantedBy=multi-user.target

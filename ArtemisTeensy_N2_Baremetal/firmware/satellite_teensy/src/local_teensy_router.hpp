@@ -5,11 +5,17 @@
 
 #include "pdu_proxy.hpp"
 #include "relay_uart_rf.hpp"
+#if !defined(ARTEMIS_CDR_NO_RADIO)
 #include "rf23_driver.hpp"
+#endif
 
 class LocalTeensyRouter : public LocalChannelHandler {
  public:
+#if defined(ARTEMIS_CDR_NO_RADIO)
+  LocalTeensyRouter(PduProxy& pduProxy, LinkCounters& counters);
+#else
   LocalTeensyRouter(PduProxy& pduProxy, Rf23Driver& rfDriver, LinkCounters& counters);
+#endif
 
   bool beginLocalFrame(const uint8_t* payload, uint16_t length) override;
   bool pollLocalResponse(uint8_t* payload, uint16_t& length) override;
@@ -24,7 +30,9 @@ class LocalTeensyRouter : public LocalChannelHandler {
   static void writeLe32(uint8_t* out, uint32_t value);
 
   PduProxy& m_pduProxy;
+#if !defined(ARTEMIS_CDR_NO_RADIO)
   Rf23Driver& m_rfDriver;
+#endif
   LinkCounters& m_counters;
   uint8_t m_rfResponse[LOCAL_MAX_RESPONSE_LEN];
   uint16_t m_rfResponseLen;

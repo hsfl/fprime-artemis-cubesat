@@ -1,3 +1,6 @@
+#include "firmware_profile.hpp"
+
+#if !defined(ARTEMIS_CDR_NO_RADIO)
 #include "rf23_driver.hpp"
 
 Rf23Driver::Rf23Driver(int csPin, int irqPin, uint8_t rxOnPin, uint8_t txOnPin)
@@ -31,3 +34,4 @@ bool Rf23Driver::send(const uint8_t* data, uint8_t len) {
 artemis::rf23bp::LinkStats Rf23Driver::linkStats() {
   return artemis::rf23bp::readLinkStats(m_radio);
 }
+#endif

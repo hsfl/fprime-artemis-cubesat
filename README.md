@@ -1,8 +1,8 @@
 # Neutron 2 — F′ on the Artemis CubeSat Kit
 
-**BLUF:** This repository develops the Neutron 2 UNP FlatSat demo on Artemis prototype hardware. The **October 2026 CDR target** is OBC integration with the real payload and PDU: turn payload power on, collect and return raw data, then turn payload power off. CDR connects Pi Zero W F′ directly to Pi 5 Yamcs using stock ComCcsds over TCP and stock FileDownlink; it does not use a network mux or SatNOGS/SDR/RF. The physical Pi↔Teensy UART mux channel 2 remains for PDU RPC. The **December 2026 FSR target** adds the full Yamcs/SDR/SatNOGS chain around payload + PDU, with the previously planned scheduling and nominal modes. Final local native CDR and legacy Yamcs regressions pass; Pi deployment and real payload/PDU acceptance remain open. See the [portable CDR evidence pack](docs/verification/evidence/n2-cdr-tcp-2026-10-20/README.md).
+**BLUF:** This repository develops the Neutron 2 UNP FlatSat demo on Artemis prototype hardware. The **October 2026 CDR target** is OBC integration with the real payload and PDU: turn payload power on, collect and return raw data, then turn payload power off. CDR connects Pi Zero W F′ directly to Pi 5 Yamcs using stock ComCcsds over TCP and stock FileDownlink; it does not use a network mux or SatNOGS/SDR/RF. The physical Pi↔Teensy UART mux channel 2 remains for PDU RPC. The **December 2026 FSR target** adds the full Yamcs/SDR/SatNOGS chain around payload + PDU, with the previously planned scheduling and nominal modes. Local CDR regressions pass; on October 27 the two Pis and real PDU passed a bounded GUI version/readback and 3V3_1 ON/OFF test. The real payload sequence, measured voltage, RF and flight qualification remain open. See the [live PDU record](docs/verification/evidence/n2-pdu-deployment-2026-10-27/README.md) and [local CDR evidence](docs/verification/evidence/n2-cdr-tcp-2026-10-20/README.md).
 
-Updated October 20, 2026; incorporates the CDR TCP selection. Dennis confirmed USB↔RS-422 payload command/telemetry, the Pi Zero W/Teensy split, Pi 5 Ubuntu/Yamcs ground hosting, and Sam/Zach SatNOGS firmware/SPI and SDR ownership. Work in `neutron2-develop`; preserve the frozen July `neutron_2` / `v1.0.0-mvp-demo` baseline for comparison. Check the actual branch and local changes before editing.
+Updated October 27, 2026; incorporates the CDR TCP selection and bounded live PDU acceptance. Dennis confirmed USB↔RS-422 payload command/telemetry, the Pi Zero W/Teensy split, Pi 5 Ubuntu/Yamcs ground hosting, and Sam/Zach SatNOGS firmware/SPI and SDR ownership. Work in `neutron2-develop`; preserve the frozen July `neutron_2` / `v1.0.0-mvp-demo` baseline for comparison. Check the actual branch and local changes before editing.
 
 ## UNP demo targets
 
@@ -19,7 +19,7 @@ Updated October 20, 2026; incorporates the CDR TCP selection. Dennis confirmed U
 
 ## Target hardware and data flow
 
-CDR uses the stock F′ TCP server on the Pi Zero W and the Yamcs tcp-fast-client on Pi 5. ComCcsds carries command, telemetry, and stock FileDownlink directly over TCP; there is no network mux. The Pi 5 ground bridge composes stock TCP/UDP adapters, the TM frame aggregator, and PacketBridge with a small 5 ms TM pacing wrapper. The independent physical UART mux channel 2 remains connected to the satellite Teensy for PDU v2 RPC. Final local native loopback, file checks and legacy regression passed; Pi deployment and hardware acceptance remain open. The diagram below is the **full FSR target**; its SatNOGS/SDR/RF path is deferred from CDR.
+CDR uses the stock F′ TCP server on the Pi Zero W and the Yamcs tcp-fast-client on Pi 5. ComCcsds carries command, telemetry, and stock FileDownlink directly over TCP; there is no network mux. The Pi 5 ground bridge composes stock TCP/UDP adapters, the TM frame aggregator, and PacketBridge with a small 5 ms TM pacing wrapper. The independent physical UART mux channel 2 remains connected to the satellite Teensy for PDU v2 RPC. Final local native loopback and file checks passed; the [October 27 Pi/PDU bench check](docs/verification/evidence/n2-pdu-deployment-2026-10-27/README.md) covers version and named rail readback, not the full payload sequence. The diagram below is the **full FSR target**; its SatNOGS/SDR/RF path is deferred from CDR.
 
 ```mermaid
 flowchart LR
@@ -33,7 +33,7 @@ flowchart LR
     PDU -->|"Payload power on/off"| PLD
 ```
 
-This is the intended integration path, not an accepted wiring diagram. The satellite Pi Zero W runs the spacecraft F′ binary with the Teensy as its embedded partner; the Pi 5 runs Yamcs/F′ ground services and serves browsers over the router LAN. The [ground-host plan](docs/integration/GROUND_HOST.md) still needs deployment/resource validation. USB↔RS-422 is selected for payload command/telemetry; adapter/settings and payload file boundary remain to be agreed. CDR uses stock ComCcsds and FileDownlink over TCP; the earlier custom channel-1 science flow remains a separate local software acceptance. SatNOGS is FSR scope. Sam and Zach handle SatNOGS firmware/SPI and SDR; the Pi Zero W SPI controller is selected; exact firmware, harness pinout, MCU packet endpoint and SDR software handoff remain open.
+This is the intended integration path, not an accepted wiring diagram. The satellite Pi Zero W runs the spacecraft F′ binary with the Teensy as its embedded partner; the Pi 5 runs Yamcs/F′ ground services and serves browsers over the router LAN. The [ground-host plan](docs/integration/GROUND_HOST.md) retains additional resource and multi-client gates beyond the October 27 deployment. USB↔RS-422 is selected for payload command/telemetry; adapter/settings and payload file boundary remain to be agreed. CDR uses stock ComCcsds and FileDownlink over TCP; the earlier custom channel-1 science flow remains a separate local software acceptance. SatNOGS is FSR scope. Sam and Zach handle SatNOGS firmware/SPI and SDR; the Pi Zero W SPI controller is selected; exact firmware, harness pinout, MCU packet endpoint and SDR software handoff remain open.
 
 F′ owns command handling, mission coordination, raw-product retention, and downlink policy. Applications use managers and drivers so hardware protocols stay below mission logic. The payload team's JAR owns actual science interpretation; FSW handles opaque raw files. Synthetic plots are software regression fixtures, not calibrated detector science. See [system architecture](docs/architecture/SYSTEM_ARCHITECTURE.md).
 
@@ -49,11 +49,11 @@ The accepted macOS arm64 software profile runs **Yamcs + host-native F′ + simu
 
 [Software baseline](docs/verification/SOFTWARE_BASELINE.md) records October 8–14 acceptance and its limits. The October 18 setup rerun at source `5429a2f` passed the native local-Yamcs build, six C++ component suites, 26 Python tests, transport checks, Yamcs PING/Pong, exact synthetic pass-through, and two pulse captures with independent raw readback plus invalid-duration/failure checks. This rerun did not replay every historical lifecycle or restart scenario. Local evidence is under ignored `yamcs/run/20261018-145218/` on the setup host; it is not a portable checked-in acceptance package.
 
-**Still open:** Pi Zero W ARMv6 build/runtime and Pi 5 LAN deployment; real payload command/data contract; and real PDU power, readiness, acquisition, and off-state acceptance. The FSR COMMS/mode/scheduling sequence also remains open. See [hardware integration](docs/integration/README.md). Prior July RFM23BP HIL evidence does not close these gates.
+**Still open:** real payload command/data contract; measured payload power and readiness; and the complete acquisition, retrieval and off-state sequence. The FSR COMMS/mode/scheduling sequence also remains open. The [October 27 PDU check](docs/verification/evidence/n2-pdu-deployment-2026-10-27/README.md) verified the deployed Pi path and one rail's enable readback, not those gates. See [hardware integration](docs/integration/README.md).
 
 ## Local setup and demo
 
-Use Python 3.11 and a native C++ toolchain. F′ is pinned to v4.2.1 (`a750219`); the PDU reference is pinned to `f287924`. Follow [one-time setup](docs/operations/LOCAL_SETUP.md) for checkout/submodule preparation. From this repository root:
+Use Python 3.11 and a native C++ toolchain. F′ is pinned to v4.2.1 (`a750219`); the PDU reference is pinned to `e94ee06`. Follow [one-time setup](docs/operations/LOCAL_SETUP.md) for checkout/submodule preparation. From this repository root:
 
 ```sh
 ./tools/yamcs/bootstrap.sh

@@ -178,6 +178,7 @@ module ArtemisRpiTeensyDeployment {
     connections ManagerDriverBindings {
       epsManager.driverRequestOut -> epsDriverArtemis.requestIn
       epsDriverArtemis.statusOut -> epsManager.driverStatusIn
+      epsDriverArtemis.railSnapshotOut -> epsManager.railSnapshotIn
       epsDriverArtemis.teensyRequestOut -> uartChannelMux.localSendIn
       uartChannelMux.localRecvOut -> epsDriverArtemis.teensyResponseIn
 

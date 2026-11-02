@@ -1,5 +1,17 @@
 # CDR TCP/Yamcs implementation plan
 
+## October 27 Pi/PDU checkpoint
+
+The [live deployment record](../verification/evidence/n2-pdu-deployment-2026-10-27/README.md)
+now establishes ARMv6 Pi Zero W runtime, the paired Pi 5 Yamcs dictionary, real
+PDU protocol 2 / firmware 2.2.2, nine named rail readbacks, and 3V3_1
+ON → GET ON → OFF → GET OFF. Final readback was all nine OFF. No PDU or Teensy
+flash was needed for the readability slice. This closes the exercised Pi/UART/RPC
+functional checks; measured payload power/readiness, real payload collection and
+raw-file return, RF and flight qualification remain open. The October 20 local
+acceptance below retains its original software-only scope. Further hardware
+operations require their own task-specific authorization.
+
 **Selected scope, October 20, 2026:** connect Yamcs on the Pi 5 to the F′ deployment on the Pi Zero W over the LAN using stock ComCcsds and TCP. The Zero W runs the stock F′ TCP server; the Pi 5 Yamcs client uses tcp-fast-client. CCSDS carries commands, telemetry, and stock FileDownlink. Do not add a network mux.
 
 CDR retains OBC + real payload + PDU-controlled payload on/off and raw-data acquisition. SatNOGS/SDR/RF is deferred from CDR. The physical Pi Zero W UART and UartChannelMux channel 2 remain connected to the Teensy for local PDU RPC. TCP and UART must work independently.

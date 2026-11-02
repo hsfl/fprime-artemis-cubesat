@@ -2,7 +2,7 @@
 
 Plan recorded October 8, 2026; CDR TCP/FileDownlink path selected October 20, 2026.
 
-**BLUF:** Use a Raspberry Pi 5 running **64-bit Ubuntu Linux** as the dedicated Yamcs ground host. For CDR it runs the Yamcs tcp-fast-client and receives stock FileDownlink over LAN TCP from F′ on the Pi Zero W. SDR connection is FSR scope. Students join the router's LAN and use Yamcs in a browser; operating the station does not require a local repository, Java, or Yamcs installation. Final local native F′/Yamcs CDR loopback and legacy checks pass; the Pi 5 deployment is not yet accepted.
+**BLUF:** The dedicated Pi 5 ground station is now installed at `192.168.0.203` on **64-bit Raspberry Pi OS / Debian 13** (the earlier plan selected Ubuntu). For CDR it runs the Yamcs tcp-fast-client and receives stock FileDownlink over LAN TCP from F′ on the Pi Zero W. SDR connection is FSR scope. Students join the router's LAN and use Yamcs in a browser; operating the station does not require a local repository, Java, or Yamcs installation. Final local native F′/Yamcs CDR loopback and legacy checks pass. The October 21 station has Yamcs, persistent archives, admin/viewer access and startup services; subsequent October 26 two-Pi PING and synthetic GUI capture/FileDownlink checks passed. See the [actual deployment and checks](N2_GROUND_DEPLOYMENT_2026-10-21.md); the remaining sections retain the earlier hosting plan.
 
 For the concepts behind this plan, read the [Yamcs primer](../operations/YAMCS_BASICS.md). For the existing software test environment, use the [local Yamcs runbook](../development/YAMCS_LOCAL_TESTING.md).
 
@@ -97,9 +97,9 @@ If the SDR instead outputs bare CCSDS space packets, select a packet link. A TCP
 
 Skip the **simulator launcher** when using hardware. The separate CDR ground-only launcher starts Yamcs and its TCP client without a second spacecraft deployment. The existing `run.sh` calls `local_stack.py`, which requires a native F′ executable and launches it through PTYs; it remains the local simulator workflow. The CDR launcher passed local loopback and startup-cancellation checks; cancellation exited in 0.444 seconds with both exact process groups gone. See the [CDR runbook](../operations/CDR_TCP.md) and [simulator launcher](../../tools/yamcs/local_stack.py).
 
-Moving the web server does not require a major refactor of `MissionApp`, `ScienceApp`, or `PayloadManager`. The local CDR TCP bridge has final native acceptance, but Pi target/LAN deployment remains unvalidated. Real payload and FSR SPI/radio and science-delivery paths need their own implementation and acceptance; the host move does not complete them.
+Moving the web server does not require a major refactor of `MissionApp`, `ScienceApp`, or `PayloadManager`. The local CDR TCP bridge has final native acceptance, and the subsequent two-Pi LAN deployment passed the synthetic checks described in the ground record. Real payload and FSR SPI/radio and science-delivery paths need their own implementation and acceptance; the host move does not complete them.
 
-## Deployment work to implement separately
+## Historical deployment work plan
 
 1. **Install on Ubuntu/aarch64:** create fresh environments from the dependency pins; do not copy the Mac venv or executable. Current bootstrap requires Python 3.11, which must be provisioned or the requirement deliberately revised and validated. The pinned [Java runtime](https://pypi.org/project/fprime-jre/25.0.4.1.0/) publishes Linux aarch64 wheels, and the [Yamcs bundle](https://pypi.org/project/fprime-yamcs-bundle/5.12.8.0/) supplies packaged runtime dependencies. Package availability is not Pi runtime acceptance.
 2. **Deploy the ground-only entry point:** the local CDR launcher and profile are implemented. Package the matching dictionary, F′ Yamcs services, selected transport, configuration, and persistent data/log directories on Pi 5; do not compile or run a second spacecraft deployment there. Keep the current local runner for development.
@@ -111,7 +111,7 @@ Moving the web server does not require a major refactor of `MissionApp`, `Scienc
 
 ## CDR TCP and FileDownlink acceptance
 
-Final local native acceptance passed both supplied opaque files (729 and 606273 bytes) with independent Yamcs GET byte/hash equality, source/product helper selection, forced fragmentation and disconnect recovery, missing-file `FileOpenError` with no received object, and 41 fake UART mux channel-2 PDU RPCs before/during transfer and while disconnected. Guard tests, startup cancellation, and legacy Yamcs regressions also passed. These results do not validate the Pi 5 LAN deployment, Pi Zero W runtime, real payload/PDU operation, SatNOGS firmware, or RF. See the [canonical TCP/Yamcs plan](../planning/CDR_TCP_YAMCS_IMPLEMENTATION_PLAN.md), [runbook](../operations/CDR_TCP.md), and [portable evidence pack](../verification/evidence/n2-cdr-tcp-2026-10-20/README.md) for exact evidence and procedures.
+Final local native acceptance passed both supplied opaque files (729 and 606273 bytes) with independent Yamcs GET byte/hash equality, source/product helper selection, forced fragmentation and disconnect recovery, missing-file `FileOpenError` with no received object, and 41 fake UART mux channel-2 PDU RPCs before/during transfer and while disconnected. Guard tests, startup cancellation, and legacy Yamcs regressions also passed. These local results alone did not validate the Pi deployment. Subsequent two-Pi PING and synthetic capture/downlink checks passed; real payload/PDU operation, SatNOGS firmware and RF remain unvalidated. See the [canonical TCP/Yamcs plan](../planning/CDR_TCP_YAMCS_IMPLEMENTATION_PLAN.md), [runbook](../operations/CDR_TCP.md), and [portable evidence pack](../verification/evidence/n2-cdr-tcp-2026-10-20/README.md) for exact evidence and procedures.
 
 ## Acceptance sequence
 

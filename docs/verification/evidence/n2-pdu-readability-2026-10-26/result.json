@@ -1,0 +1,2134 @@
+{
+  "result": "PASS",
+  "scope": "native F\u2032, loopback Yamcs, fake PTY PDU only; no hardware",
+  "binary_sha256": "c9c8ca3c9cc9868ebcf507acbf69d6078d676c0ef3f002bea96fe4d78c5fd7d0",
+  "dictionary_sha256": "88b2ec7cb5ea403e9094070691e8358ebcadcda28b19a0c788c2e4c84a719abc",
+  "checks": {
+    "legacy_dictionary_unchanged": {
+      "commands": 84,
+      "events": 267,
+      "telemetryChannels": 187
+    },
+    "startup_all_off": {
+      "Rail3V3_1": {
+        "id": {
+          "name": "Rail3V3_1",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:05:52.852Z",
+        "generationTime": "2026-10-27T02:05:51.830Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "Rail3V3_2": {
+        "id": {
+          "name": "Rail3V3_2",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:05:52.853Z",
+        "generationTime": "2026-10-27T02:05:51.830Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "Rail5V_1": {
+        "id": {
+          "name": "Rail5V_1",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:05:52.853Z",
+        "generationTime": "2026-10-27T02:05:51.830Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "Rail5V_2": {
+        "id": {
+          "name": "Rail5V_2",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:05:52.854Z",
+        "generationTime": "2026-10-27T02:05:51.830Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "Rail5V_3": {
+        "id": {
+          "name": "Rail5V_3",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:05:52.855Z",
+        "generationTime": "2026-10-27T02:05:51.830Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "Rail12V": {
+        "id": {
+          "name": "Rail12V",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:05:52.855Z",
+        "generationTime": "2026-10-27T02:05:51.830Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "RailVBatt": {
+        "id": {
+          "name": "RailVBatt",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:05:52.856Z",
+        "generationTime": "2026-10-27T02:05:51.830Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "RailBurn1": {
+        "id": {
+          "name": "RailBurn1",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:05:52.857Z",
+        "generationTime": "2026-10-27T02:05:51.830Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "RailBurn2": {
+        "id": {
+          "name": "RailBurn2",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:05:52.857Z",
+        "generationTime": "2026-10-27T02:05:51.830Z",
+        "acquisitionStatus": "ACQUIRED"
+      }
+    },
+    "info": {
+      "command": {
+        "binary": "EADAAAAAAAAQAKAI",
+        "id": "1793066790033-n2-local-yamcs-smoke-1793066753",
+        "generationTime": "2026-10-27T02:05:53.033Z",
+        "origin": "n2-local-yamcs-smoke",
+        "sequenceNumber": 1793066753,
+        "commandName": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager/GET_PDU_INFO",
+        "queue": "default",
+        "username": "guest",
+        "assignments": [
+          {
+            "name": "CCSDS_Version",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Type",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": true
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Sec_Hdr_Flag",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": false
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_APID",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Group_Flags",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "Standalone",
+              "sint64Value": "3"
+            },
+            "userInput": false
+          },
+          {
+            "name": "OpCode",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 268476424
+            },
+            "userInput": false
+          }
+        ],
+        "unprocessedBinary": "EADAAAAAAAAQAKAI"
+      },
+      "event": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:05:54.042Z",
+        "receptionTime": "2026-10-27T02:05:53.848Z",
+        "seqNumber": 14,
+        "type": "ArtemisRpiTeensyDeployment.epsManager.PduInfoResult",
+        "message": "[PduInfoResult] PDU INFO sequence=0 opcode=268476424 protocol=2 firmware=2.2.2 flags=0 git=000000000000",
+        "severity": "WATCH",
+        "createdBy": "guest",
+        "extra": {
+          "sequence": "0",
+          "commandOpcode": "268476424",
+          "protocol": "2",
+          "major": "2",
+          "minor": "2",
+          "patch": "2",
+          "flags": "0",
+          "hash": "000000000000",
+          "fprime_severity": "ACTIVITY_HI",
+          "fprime_event_id": "268476419",
+          "fprime_event_name": "ArtemisRpiTeensyDeployment.epsManager.PduInfoResult"
+        }
+      },
+      "terminal": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:05:54.042Z",
+        "receptionTime": "2026-10-27T02:05:53.851Z",
+        "seqNumber": 15,
+        "type": "CdhCore.cmdDisp.OpCodeCompleted",
+        "message": "[OpCodeCompleted] Opcode 0x1000a008 completed",
+        "severity": "INFO",
+        "createdBy": "guest",
+        "extra": {
+          "Opcode": "268476424",
+          "fprime_severity": "COMMAND",
+          "fprime_event_id": "16777218",
+          "fprime_event_name": "CdhCore.cmdDisp.OpCodeCompleted"
+        }
+      }
+    },
+    "get_all": {
+      "command": {
+        "binary": "EADAAAAAAAAQAKAL",
+        "id": "1793066791083-n2-local-yamcs-smoke-1793066754",
+        "generationTime": "2026-10-27T02:05:54.083Z",
+        "origin": "n2-local-yamcs-smoke",
+        "sequenceNumber": 1793066754,
+        "commandName": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager/GET_ALL_PDU_RAILS",
+        "queue": "default",
+        "username": "guest",
+        "assignments": [
+          {
+            "name": "CCSDS_Version",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Type",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": true
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Sec_Hdr_Flag",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": false
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_APID",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Group_Flags",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "Standalone",
+              "sint64Value": "3"
+            },
+            "userInput": false
+          },
+          {
+            "name": "OpCode",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 268476427
+            },
+            "userInput": false
+          }
+        ],
+        "unprocessedBinary": "EADAAAAAAAAQAKAL"
+      },
+      "event": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:05:55.085Z",
+        "receptionTime": "2026-10-27T02:05:54.096Z",
+        "seqNumber": 22,
+        "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback",
+        "message": "[PduRailReadback] PDU GET_OUTPUT_STATE rail=RAIL_3V3_1 readback=OFF result=OK local_request=5",
+        "severity": "WATCH",
+        "createdBy": "guest",
+        "extra": {
+          "epsRequest": "GET_OUTPUT_STATE",
+          "rail": "RAIL_3V3_1",
+          "readback": "OFF",
+          "requestId": "5",
+          "fprime_severity": "ACTIVITY_HI",
+          "fprime_event_id": "268566532",
+          "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback"
+        }
+      },
+      "terminal": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:05:55.085Z",
+        "receptionTime": "2026-10-27T02:05:54.095Z",
+        "seqNumber": 21,
+        "type": "CdhCore.cmdDisp.OpCodeCompleted",
+        "message": "[OpCodeCompleted] Opcode 0x1000a00b completed",
+        "severity": "INFO",
+        "createdBy": "guest",
+        "extra": {
+          "Opcode": "268476427",
+          "fprime_severity": "COMMAND",
+          "fprime_event_id": "16777218",
+          "fprime_event_name": "CdhCore.cmdDisp.OpCodeCompleted"
+        }
+      },
+      "all_nine_events": [
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:05:55.085Z",
+          "receptionTime": "2026-10-27T02:05:54.864Z",
+          "seqNumber": 30,
+          "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback",
+          "message": "[PduRailReadback] PDU GET_OUTPUT_STATE rail=RAIL_BURN2 readback=OFF result=OK local_request=5",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "epsRequest": "GET_OUTPUT_STATE",
+            "rail": "RAIL_BURN2",
+            "readback": "OFF",
+            "requestId": "5",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268566532",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:05:55.085Z",
+          "receptionTime": "2026-10-27T02:05:54.863Z",
+          "seqNumber": 29,
+          "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback",
+          "message": "[PduRailReadback] PDU GET_OUTPUT_STATE rail=RAIL_BURN1 readback=OFF result=OK local_request=5",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "epsRequest": "GET_OUTPUT_STATE",
+            "rail": "RAIL_BURN1",
+            "readback": "OFF",
+            "requestId": "5",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268566532",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:05:55.085Z",
+          "receptionTime": "2026-10-27T02:05:54.861Z",
+          "seqNumber": 28,
+          "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback",
+          "message": "[PduRailReadback] PDU GET_OUTPUT_STATE rail=RAIL_VBATT readback=OFF result=OK local_request=5",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "epsRequest": "GET_OUTPUT_STATE",
+            "rail": "RAIL_VBATT",
+            "readback": "OFF",
+            "requestId": "5",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268566532",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:05:55.085Z",
+          "receptionTime": "2026-10-27T02:05:54.859Z",
+          "seqNumber": 27,
+          "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback",
+          "message": "[PduRailReadback] PDU GET_OUTPUT_STATE rail=RAIL_12V readback=OFF result=OK local_request=5",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "epsRequest": "GET_OUTPUT_STATE",
+            "rail": "RAIL_12V",
+            "readback": "OFF",
+            "requestId": "5",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268566532",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:05:55.085Z",
+          "receptionTime": "2026-10-27T02:05:54.857Z",
+          "seqNumber": 26,
+          "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback",
+          "message": "[PduRailReadback] PDU GET_OUTPUT_STATE rail=RAIL_5V_3 readback=OFF result=OK local_request=5",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "epsRequest": "GET_OUTPUT_STATE",
+            "rail": "RAIL_5V_3",
+            "readback": "OFF",
+            "requestId": "5",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268566532",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:05:55.085Z",
+          "receptionTime": "2026-10-27T02:05:54.854Z",
+          "seqNumber": 25,
+          "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback",
+          "message": "[PduRailReadback] PDU GET_OUTPUT_STATE rail=RAIL_5V_2 readback=OFF result=OK local_request=5",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "epsRequest": "GET_OUTPUT_STATE",
+            "rail": "RAIL_5V_2",
+            "readback": "OFF",
+            "requestId": "5",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268566532",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:05:55.085Z",
+          "receptionTime": "2026-10-27T02:05:54.852Z",
+          "seqNumber": 24,
+          "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback",
+          "message": "[PduRailReadback] PDU GET_OUTPUT_STATE rail=RAIL_5V_1 readback=OFF result=OK local_request=5",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "epsRequest": "GET_OUTPUT_STATE",
+            "rail": "RAIL_5V_1",
+            "readback": "OFF",
+            "requestId": "5",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268566532",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:05:55.085Z",
+          "receptionTime": "2026-10-27T02:05:54.850Z",
+          "seqNumber": 23,
+          "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback",
+          "message": "[PduRailReadback] PDU GET_OUTPUT_STATE rail=RAIL_3V3_2 readback=OFF result=OK local_request=5",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "epsRequest": "GET_OUTPUT_STATE",
+            "rail": "RAIL_3V3_2",
+            "readback": "OFF",
+            "requestId": "5",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268566532",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:05:55.085Z",
+          "receptionTime": "2026-10-27T02:05:54.096Z",
+          "seqNumber": 22,
+          "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback",
+          "message": "[PduRailReadback] PDU GET_OUTPUT_STATE rail=RAIL_3V3_1 readback=OFF result=OK local_request=5",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "epsRequest": "GET_OUTPUT_STATE",
+            "rail": "RAIL_3V3_1",
+            "readback": "OFF",
+            "requestId": "5",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268566532",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback"
+          }
+        }
+      ]
+    },
+    "set_on": {
+      "command": {
+        "binary": "EADAAAAAAAAQAKAMAwEB",
+        "id": "1793066791882-n2-local-yamcs-smoke-1793066754",
+        "generationTime": "2026-10-27T02:05:54.882Z",
+        "origin": "n2-local-yamcs-smoke",
+        "sequenceNumber": 1793066754,
+        "commandName": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager/SET_PDU_RAIL",
+        "queue": "default",
+        "username": "guest",
+        "assignments": [
+          {
+            "name": "CCSDS_Version",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Type",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": true
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Sec_Hdr_Flag",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": false
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_APID",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Group_Flags",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "Standalone",
+              "sint64Value": "3"
+            },
+            "userInput": false
+          },
+          {
+            "name": "OpCode",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 268476428
+            },
+            "userInput": false
+          },
+          {
+            "name": "rail",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "RAIL_5V_1",
+              "sint64Value": "3"
+            },
+            "userInput": true
+          },
+          {
+            "name": "desiredState",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "ON",
+              "sint64Value": "1"
+            },
+            "userInput": true
+          },
+          {
+            "name": "confirmation",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "CONFIRM",
+              "sint64Value": "1"
+            },
+            "userInput": true
+          }
+        ],
+        "unprocessedBinary": "EADAAAAAAAAQAKAMAwEB"
+      },
+      "event": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:05:55.884Z",
+        "receptionTime": "2026-10-27T02:05:55.866Z",
+        "seqNumber": 39,
+        "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailSetResult",
+        "message": "[PduRailSetResult] PDU SET rail=RAIL_5V_1 desired=ON readback=ON result=OK local_request=7",
+        "severity": "WATCH",
+        "createdBy": "guest",
+        "extra": {
+          "rail": "RAIL_5V_1",
+          "desired": "ON",
+          "readback": "ON",
+          "requestId": "7",
+          "fprime_severity": "ACTIVITY_HI",
+          "fprime_event_id": "268566533",
+          "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailSetResult"
+        }
+      },
+      "terminal": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:05:55.884Z",
+        "receptionTime": "2026-10-27T02:05:55.870Z",
+        "seqNumber": 41,
+        "type": "CdhCore.cmdDisp.OpCodeCompleted",
+        "message": "[OpCodeCompleted] Opcode 0x1000a00c completed",
+        "severity": "INFO",
+        "createdBy": "guest",
+        "extra": {
+          "Opcode": "268476428",
+          "fprime_severity": "COMMAND",
+          "fprime_event_id": "16777218",
+          "fprime_event_name": "CdhCore.cmdDisp.OpCodeCompleted"
+        }
+      }
+    },
+    "on_telemetry": {
+      "id": {
+        "name": "Rail5V_1",
+        "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+      },
+      "rawValue": {
+        "type": "UINT32",
+        "uint32Value": 2
+      },
+      "engValue": {
+        "type": "ENUMERATED",
+        "stringValue": "ON",
+        "sint64Value": "2"
+      },
+      "acquisitionTime": "2026-10-27T02:05:56.861Z",
+      "generationTime": "2026-10-27T02:05:55.884Z",
+      "acquisitionStatus": "ACQUIRED"
+    },
+    "single_get": {
+      "command": {
+        "binary": "EADAAAAAAAAQAKAKAw==",
+        "id": "1793066793953-n2-local-yamcs-smoke-1793066756",
+        "generationTime": "2026-10-27T02:05:56.953Z",
+        "origin": "n2-local-yamcs-smoke",
+        "sequenceNumber": 1793066756,
+        "commandName": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager/GET_PDU_RAIL",
+        "queue": "default",
+        "username": "guest",
+        "assignments": [
+          {
+            "name": "CCSDS_Version",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Type",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": true
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Sec_Hdr_Flag",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": false
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_APID",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Group_Flags",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "Standalone",
+              "sint64Value": "3"
+            },
+            "userInput": false
+          },
+          {
+            "name": "OpCode",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 268476426
+            },
+            "userInput": false
+          },
+          {
+            "name": "rail",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "RAIL_5V_1",
+              "sint64Value": "3"
+            },
+            "userInput": true
+          }
+        ],
+        "unprocessedBinary": "EADAAAAAAAAQAKAKAw=="
+      },
+      "event": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:05:57.955Z",
+        "receptionTime": "2026-10-27T02:05:57.872Z",
+        "seqNumber": 50,
+        "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback",
+        "message": "[PduRailReadback] PDU GET_OUTPUT_STATE rail=RAIL_5V_1 readback=ON result=OK local_request=9",
+        "severity": "WATCH",
+        "createdBy": "guest",
+        "extra": {
+          "epsRequest": "GET_OUTPUT_STATE",
+          "rail": "RAIL_5V_1",
+          "readback": "ON",
+          "requestId": "9",
+          "fprime_severity": "ACTIVITY_HI",
+          "fprime_event_id": "268566532",
+          "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailReadback"
+        }
+      },
+      "terminal": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:05:57.955Z",
+        "receptionTime": "2026-10-27T02:05:57.876Z",
+        "seqNumber": 52,
+        "type": "CdhCore.cmdDisp.OpCodeCompleted",
+        "message": "[OpCodeCompleted] Opcode 0x1000a00a completed",
+        "severity": "INFO",
+        "createdBy": "guest",
+        "extra": {
+          "Opcode": "268476426",
+          "fprime_severity": "COMMAND",
+          "fprime_event_id": "16777218",
+          "fprime_event_name": "CdhCore.cmdDisp.OpCodeCompleted"
+        }
+      }
+    },
+    "set_off": {
+      "command": {
+        "binary": "EADAAAAAAAAQAKAMAwAB",
+        "id": "1793066794986-n2-local-yamcs-smoke-1793066757",
+        "generationTime": "2026-10-27T02:05:57.986Z",
+        "origin": "n2-local-yamcs-smoke",
+        "sequenceNumber": 1793066757,
+        "commandName": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager/SET_PDU_RAIL",
+        "queue": "default",
+        "username": "guest",
+        "assignments": [
+          {
+            "name": "CCSDS_Version",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Type",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": true
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Sec_Hdr_Flag",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": false
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_APID",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Group_Flags",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "Standalone",
+              "sint64Value": "3"
+            },
+            "userInput": false
+          },
+          {
+            "name": "OpCode",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 268476428
+            },
+            "userInput": false
+          },
+          {
+            "name": "rail",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "RAIL_5V_1",
+              "sint64Value": "3"
+            },
+            "userInput": true
+          },
+          {
+            "name": "desiredState",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "OFF",
+              "sint64Value": "0"
+            },
+            "userInput": true
+          },
+          {
+            "name": "confirmation",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "CONFIRM",
+              "sint64Value": "1"
+            },
+            "userInput": true
+          }
+        ],
+        "unprocessedBinary": "EADAAAAAAAAQAKAMAwAB"
+      },
+      "event": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:05:58.988Z",
+        "receptionTime": "2026-10-27T02:05:58.870Z",
+        "seqNumber": 57,
+        "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailSetResult",
+        "message": "[PduRailSetResult] PDU SET rail=RAIL_5V_1 desired=OFF readback=OFF result=OK local_request=10",
+        "severity": "WATCH",
+        "createdBy": "guest",
+        "extra": {
+          "rail": "RAIL_5V_1",
+          "desired": "OFF",
+          "readback": "OFF",
+          "requestId": "10",
+          "fprime_severity": "ACTIVITY_HI",
+          "fprime_event_id": "268566533",
+          "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailSetResult"
+        }
+      },
+      "terminal": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:05:58.988Z",
+        "receptionTime": "2026-10-27T02:05:58.872Z",
+        "seqNumber": 59,
+        "type": "CdhCore.cmdDisp.OpCodeCompleted",
+        "message": "[OpCodeCompleted] Opcode 0x1000a00c completed",
+        "severity": "INFO",
+        "createdBy": "guest",
+        "extra": {
+          "Opcode": "268476428",
+          "fprime_severity": "COMMAND",
+          "fprime_event_id": "16777218",
+          "fprime_event_name": "CdhCore.cmdDisp.OpCodeCompleted"
+        }
+      }
+    },
+    "off_telemetry": {
+      "id": {
+        "name": "Rail5V_1",
+        "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+      },
+      "rawValue": {
+        "type": "UINT32",
+        "uint32Value": 1
+      },
+      "engValue": {
+        "type": "ENUMERATED",
+        "stringValue": "OFF",
+        "sint64Value": "1"
+      },
+      "acquisitionTime": "2026-10-27T02:05:59.866Z",
+      "generationTime": "2026-10-27T02:05:58.988Z",
+      "acquisitionStatus": "ACQUIRED"
+    },
+    "cancel": {
+      "command": {
+        "binary": "EADAAAAAAAAQAKAMAwEA",
+        "id": "1793066797049-n2-local-yamcs-smoke-1793066760",
+        "generationTime": "2026-10-27T02:06:00.049Z",
+        "origin": "n2-local-yamcs-smoke",
+        "sequenceNumber": 1793066760,
+        "commandName": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager/SET_PDU_RAIL",
+        "queue": "default",
+        "username": "guest",
+        "assignments": [
+          {
+            "name": "CCSDS_Version",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Type",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": true
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Sec_Hdr_Flag",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": false
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_APID",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Group_Flags",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "Standalone",
+              "sint64Value": "3"
+            },
+            "userInput": false
+          },
+          {
+            "name": "OpCode",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 268476428
+            },
+            "userInput": false
+          },
+          {
+            "name": "rail",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "RAIL_5V_1",
+              "sint64Value": "3"
+            },
+            "userInput": true
+          },
+          {
+            "name": "desiredState",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "ON",
+              "sint64Value": "1"
+            },
+            "userInput": true
+          },
+          {
+            "name": "confirmation",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "CANCEL",
+              "sint64Value": "0"
+            },
+            "userInput": true
+          }
+        ],
+        "unprocessedBinary": "EADAAAAAAAAQAKAMAwEA"
+      },
+      "event": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:06:01.051Z",
+        "receptionTime": "2026-10-27T02:06:00.877Z",
+        "seqNumber": 65,
+        "type": "ArtemisRpiTeensyDeployment.epsManager.PduCommandRejected",
+        "message": "[PduCommandRejected] PDU command sequence=5 opcode=268476428 rejected=INVALID_OR_CANCELLED",
+        "severity": "WARNING",
+        "createdBy": "guest",
+        "extra": {
+          "sequence": "5",
+          "commandOpcode": "268476428",
+          "reason": "INVALID_OR_CANCELLED",
+          "fprime_severity": "WARNING_LO",
+          "fprime_event_id": "268476420",
+          "fprime_event_name": "ArtemisRpiTeensyDeployment.epsManager.PduCommandRejected"
+        }
+      },
+      "terminal": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:06:01.051Z",
+        "receptionTime": "2026-10-27T02:06:00.880Z",
+        "seqNumber": 66,
+        "type": "CdhCore.cmdDisp.OpCodeError",
+        "message": "[OpCodeError] Opcode 0x1000a00c completed with error VALIDATION_ERROR",
+        "severity": "INFO",
+        "createdBy": "guest",
+        "extra": {
+          "Opcode": "268476428",
+          "error": "VALIDATION_ERROR",
+          "fprime_severity": "COMMAND",
+          "fprime_event_id": "16777219",
+          "fprime_event_name": "CdhCore.cmdDisp.OpCodeError"
+        }
+      }
+    },
+    "status": {
+      "command": {
+        "binary": "EADAAAAAAAAQAKAJ",
+        "id": "1793066798084-n2-local-yamcs-smoke-1793066761",
+        "generationTime": "2026-10-27T02:06:01.084Z",
+        "origin": "n2-local-yamcs-smoke",
+        "sequenceNumber": 1793066761,
+        "commandName": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager/GET_PDU_STATUS",
+        "queue": "default",
+        "username": "guest",
+        "assignments": [
+          {
+            "name": "CCSDS_Version",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Type",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": true
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Sec_Hdr_Flag",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": false
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_APID",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Group_Flags",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "Standalone",
+              "sint64Value": "3"
+            },
+            "userInput": false
+          },
+          {
+            "name": "OpCode",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 268476425
+            },
+            "userInput": false
+          }
+        ],
+        "unprocessedBinary": "EADAAAAAAAAQAKAJ"
+      },
+      "event": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:06:02.086Z",
+        "receptionTime": "2026-10-27T02:06:01.104Z",
+        "seqNumber": 80,
+        "type": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail",
+        "message": "[PduSummaryRail] PDU STATUS sequence=6 opcode=268476425 rail=RAIL_5V_3 readback=OFF",
+        "severity": "WATCH",
+        "createdBy": "guest",
+        "extra": {
+          "sequence": "6",
+          "commandOpcode": "268476425",
+          "rail": "RAIL_5V_3",
+          "readback": "OFF",
+          "fprime_severity": "ACTIVITY_HI",
+          "fprime_event_id": "268476418",
+          "fprime_event_name": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail"
+        }
+      },
+      "terminal": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:06:02.086Z",
+        "receptionTime": "2026-10-27T02:06:01.880Z",
+        "seqNumber": 85,
+        "type": "CdhCore.cmdDisp.OpCodeCompleted",
+        "message": "[OpCodeCompleted] Opcode 0x1000a009 completed",
+        "severity": "INFO",
+        "createdBy": "guest",
+        "extra": {
+          "Opcode": "268476425",
+          "fprime_severity": "COMMAND",
+          "fprime_event_id": "16777218",
+          "fprime_event_name": "CdhCore.cmdDisp.OpCodeCompleted"
+        }
+      },
+      "all_nine_events": [
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:06:02.086Z",
+          "receptionTime": "2026-10-27T02:06:01.879Z",
+          "seqNumber": 84,
+          "type": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail",
+          "message": "[PduSummaryRail] PDU STATUS sequence=6 opcode=268476425 rail=RAIL_BURN2 readback=OFF",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "sequence": "6",
+            "commandOpcode": "268476425",
+            "rail": "RAIL_BURN2",
+            "readback": "OFF",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268476418",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:06:02.086Z",
+          "receptionTime": "2026-10-27T02:06:01.878Z",
+          "seqNumber": 83,
+          "type": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail",
+          "message": "[PduSummaryRail] PDU STATUS sequence=6 opcode=268476425 rail=RAIL_BURN1 readback=OFF",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "sequence": "6",
+            "commandOpcode": "268476425",
+            "rail": "RAIL_BURN1",
+            "readback": "OFF",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268476418",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:06:02.086Z",
+          "receptionTime": "2026-10-27T02:06:01.876Z",
+          "seqNumber": 82,
+          "type": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail",
+          "message": "[PduSummaryRail] PDU STATUS sequence=6 opcode=268476425 rail=RAIL_VBATT readback=OFF",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "sequence": "6",
+            "commandOpcode": "268476425",
+            "rail": "RAIL_VBATT",
+            "readback": "OFF",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268476418",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:06:02.086Z",
+          "receptionTime": "2026-10-27T02:06:01.872Z",
+          "seqNumber": 81,
+          "type": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail",
+          "message": "[PduSummaryRail] PDU STATUS sequence=6 opcode=268476425 rail=RAIL_12V readback=OFF",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "sequence": "6",
+            "commandOpcode": "268476425",
+            "rail": "RAIL_12V",
+            "readback": "OFF",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268476418",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:06:02.086Z",
+          "receptionTime": "2026-10-27T02:06:01.104Z",
+          "seqNumber": 80,
+          "type": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail",
+          "message": "[PduSummaryRail] PDU STATUS sequence=6 opcode=268476425 rail=RAIL_5V_3 readback=OFF",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "sequence": "6",
+            "commandOpcode": "268476425",
+            "rail": "RAIL_5V_3",
+            "readback": "OFF",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268476418",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:06:02.086Z",
+          "receptionTime": "2026-10-27T02:06:01.103Z",
+          "seqNumber": 79,
+          "type": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail",
+          "message": "[PduSummaryRail] PDU STATUS sequence=6 opcode=268476425 rail=RAIL_5V_2 readback=OFF",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "sequence": "6",
+            "commandOpcode": "268476425",
+            "rail": "RAIL_5V_2",
+            "readback": "OFF",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268476418",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:06:02.086Z",
+          "receptionTime": "2026-10-27T02:06:01.101Z",
+          "seqNumber": 78,
+          "type": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail",
+          "message": "[PduSummaryRail] PDU STATUS sequence=6 opcode=268476425 rail=RAIL_5V_1 readback=OFF",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "sequence": "6",
+            "commandOpcode": "268476425",
+            "rail": "RAIL_5V_1",
+            "readback": "OFF",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268476418",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:06:02.086Z",
+          "receptionTime": "2026-10-27T02:06:01.100Z",
+          "seqNumber": 77,
+          "type": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail",
+          "message": "[PduSummaryRail] PDU STATUS sequence=6 opcode=268476425 rail=RAIL_3V3_2 readback=OFF",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "sequence": "6",
+            "commandOpcode": "268476425",
+            "rail": "RAIL_3V3_2",
+            "readback": "OFF",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268476418",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail"
+          }
+        },
+        {
+          "source": "FPrimeEventProcessor",
+          "generationTime": "2026-10-27T02:06:02.086Z",
+          "receptionTime": "2026-10-27T02:06:01.098Z",
+          "seqNumber": 76,
+          "type": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail",
+          "message": "[PduSummaryRail] PDU STATUS sequence=6 opcode=268476425 rail=RAIL_3V3_1 readback=OFF",
+          "severity": "WATCH",
+          "createdBy": "guest",
+          "extra": {
+            "sequence": "6",
+            "commandOpcode": "268476425",
+            "rail": "RAIL_3V3_1",
+            "readback": "OFF",
+            "fprime_severity": "ACTIVITY_HI",
+            "fprime_event_id": "268476418",
+            "fprime_event_name": "ArtemisRpiTeensyDeployment.epsManager.PduSummaryRail"
+          }
+        }
+      ]
+    },
+    "malformed_all": {
+      "command": {
+        "binary": "EADAAAAAAAAQAKAL",
+        "id": "1793066799125-n2-local-yamcs-smoke-1793066762",
+        "generationTime": "2026-10-27T02:06:02.125Z",
+        "origin": "n2-local-yamcs-smoke",
+        "sequenceNumber": 1793066762,
+        "commandName": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager/GET_ALL_PDU_RAILS",
+        "queue": "default",
+        "username": "guest",
+        "assignments": [
+          {
+            "name": "CCSDS_Version",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Type",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": true
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Sec_Hdr_Flag",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": false
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_APID",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Group_Flags",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "Standalone",
+              "sint64Value": "3"
+            },
+            "userInput": false
+          },
+          {
+            "name": "OpCode",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 268476427
+            },
+            "userInput": false
+          }
+        ],
+        "unprocessedBinary": "EADAAAAAAAAQAKAL"
+      },
+      "event": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:06:03.126Z",
+        "receptionTime": "2026-10-27T02:06:02.133Z",
+        "seqNumber": 90,
+        "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduOperationError",
+        "message": "[PduOperationError] PDU GET_OUTPUT_STATE rail=ALL origin=DRIVER result=MALFORMED_PAYLOAD code=250 local_request=14",
+        "severity": "DISTRESS",
+        "createdBy": "guest",
+        "extra": {
+          "epsRequest": "GET_OUTPUT_STATE",
+          "rail": "ALL",
+          "origin": "DRIVER",
+          "reason": "MALFORMED_PAYLOAD",
+          "code": "250",
+          "requestId": "14",
+          "fprime_severity": "WARNING_HI",
+          "fprime_event_id": "268566536",
+          "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduOperationError"
+        }
+      },
+      "terminal": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:06:03.126Z",
+        "receptionTime": "2026-10-27T02:06:02.879Z",
+        "seqNumber": 93,
+        "type": "CdhCore.cmdDisp.OpCodeError",
+        "message": "[OpCodeError] Opcode 0x1000a00b completed with error EXECUTION_ERROR",
+        "severity": "INFO",
+        "createdBy": "guest",
+        "extra": {
+          "Opcode": "268476427",
+          "error": "EXECUTION_ERROR",
+          "fprime_severity": "COMMAND",
+          "fprime_event_id": "16777219",
+          "fprime_event_name": "CdhCore.cmdDisp.OpCodeError"
+        }
+      }
+    },
+    "set_mismatch": {
+      "command": {
+        "binary": "EADAAAAAAAAQAKAMAwEB",
+        "id": "1793066800165-n2-local-yamcs-smoke-1793066763",
+        "generationTime": "2026-10-27T02:06:03.165Z",
+        "origin": "n2-local-yamcs-smoke",
+        "sequenceNumber": 1793066763,
+        "commandName": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager/SET_PDU_RAIL",
+        "queue": "default",
+        "username": "guest",
+        "assignments": [
+          {
+            "name": "CCSDS_Version",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Type",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": true
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Sec_Hdr_Flag",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": false
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_APID",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Group_Flags",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "Standalone",
+              "sint64Value": "3"
+            },
+            "userInput": false
+          },
+          {
+            "name": "OpCode",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 268476428
+            },
+            "userInput": false
+          },
+          {
+            "name": "rail",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "RAIL_5V_1",
+              "sint64Value": "3"
+            },
+            "userInput": true
+          },
+          {
+            "name": "desiredState",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "ON",
+              "sint64Value": "1"
+            },
+            "userInput": true
+          },
+          {
+            "name": "confirmation",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "CONFIRM",
+              "sint64Value": "1"
+            },
+            "userInput": true
+          }
+        ],
+        "unprocessedBinary": "EADAAAAAAAAQAKAMAwEB"
+      },
+      "event": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:06:04.167Z",
+        "receptionTime": "2026-10-27T02:06:03.894Z",
+        "seqNumber": 104,
+        "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailSetMismatch",
+        "message": "[PduRailSetMismatch] PDU SET rail=RAIL_5V_1 desired=ON readback=OFF result=READBACK_MISMATCH local_request=16",
+        "severity": "DISTRESS",
+        "createdBy": "guest",
+        "extra": {
+          "rail": "RAIL_5V_1",
+          "desired": "ON",
+          "readback": "OFF",
+          "requestId": "16",
+          "fprime_severity": "WARNING_HI",
+          "fprime_event_id": "268566534",
+          "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduRailSetMismatch"
+        }
+      },
+      "terminal": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:06:04.167Z",
+        "receptionTime": "2026-10-27T02:06:03.897Z",
+        "seqNumber": 106,
+        "type": "CdhCore.cmdDisp.OpCodeError",
+        "message": "[OpCodeError] Opcode 0x1000a00c completed with error EXECUTION_ERROR",
+        "severity": "INFO",
+        "createdBy": "guest",
+        "extra": {
+          "Opcode": "268476428",
+          "error": "EXECUTION_ERROR",
+          "fprime_severity": "COMMAND",
+          "fprime_event_id": "16777219",
+          "fprime_event_name": "CdhCore.cmdDisp.OpCodeError"
+        }
+      }
+    },
+    "mismatch_actual_state": {
+      "id": {
+        "name": "Rail5V_1",
+        "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+      },
+      "rawValue": {
+        "type": "UINT32",
+        "uint32Value": 1
+      },
+      "engValue": {
+        "type": "ENUMERATED",
+        "stringValue": "OFF",
+        "sint64Value": "1"
+      },
+      "acquisitionTime": "2026-10-27T02:06:03.886Z",
+      "generationTime": "2026-10-27T02:06:03.873Z",
+      "acquisitionStatus": "ACQUIRED"
+    },
+    "timeout": {
+      "command": {
+        "binary": "EADAAAAAAAAQAKAKAw==",
+        "id": "1793066801210-n2-local-yamcs-smoke-1793066764",
+        "generationTime": "2026-10-27T02:06:04.210Z",
+        "origin": "n2-local-yamcs-smoke",
+        "sequenceNumber": 1793066764,
+        "commandName": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager/GET_PDU_RAIL",
+        "queue": "default",
+        "username": "guest",
+        "assignments": [
+          {
+            "name": "CCSDS_Version",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Type",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": true
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Sec_Hdr_Flag",
+            "value": {
+              "type": "BOOLEAN",
+              "booleanValue": false
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_APID",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 0
+            },
+            "userInput": false
+          },
+          {
+            "name": "CCSDS_Group_Flags",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "Standalone",
+              "sint64Value": "3"
+            },
+            "userInput": false
+          },
+          {
+            "name": "OpCode",
+            "value": {
+              "type": "UINT32",
+              "uint32Value": 268476426
+            },
+            "userInput": false
+          },
+          {
+            "name": "rail",
+            "value": {
+              "type": "ENUMERATED",
+              "stringValue": "RAIL_5V_1",
+              "sint64Value": "3"
+            },
+            "userInput": true
+          }
+        ],
+        "unprocessedBinary": "EADAAAAAAAAQAKAKAw=="
+      },
+      "event": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:06:07.883Z",
+        "receptionTime": "2026-10-27T02:06:06.893Z",
+        "seqNumber": 112,
+        "type": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduOperationError",
+        "message": "[PduOperationError] PDU GET_OUTPUT_STATE rail=RAIL_5V_1 origin=TEENSY_RPC result=TIMEOUT code=3 local_request=17",
+        "severity": "DISTRESS",
+        "createdBy": "guest",
+        "extra": {
+          "epsRequest": "GET_OUTPUT_STATE",
+          "rail": "RAIL_5V_1",
+          "origin": "TEENSY_RPC",
+          "reason": "TIMEOUT",
+          "code": "3",
+          "requestId": "17",
+          "fprime_severity": "WARNING_HI",
+          "fprime_event_id": "268566536",
+          "fprime_event_name": "ArtemisRpiTeensyDeployment.epsDriverArtemis.PduOperationError"
+        }
+      },
+      "terminal": {
+        "source": "FPrimeEventProcessor",
+        "generationTime": "2026-10-27T02:06:07.883Z",
+        "receptionTime": "2026-10-27T02:06:06.897Z",
+        "seqNumber": 115,
+        "type": "CdhCore.cmdDisp.OpCodeError",
+        "message": "[OpCodeError] Opcode 0x1000a00a completed with error EXECUTION_ERROR",
+        "severity": "INFO",
+        "createdBy": "guest",
+        "extra": {
+          "Opcode": "268476426",
+          "error": "EXECUTION_ERROR",
+          "fprime_severity": "COMMAND",
+          "fprime_event_id": "16777219",
+          "fprime_event_name": "CdhCore.cmdDisp.OpCodeError"
+        }
+      }
+    },
+    "timeout_stale": {
+      "Rail3V3_1": {
+        "id": {
+          "name": "Rail3V3_1",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 3
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "STALE",
+          "sint64Value": "3"
+        },
+        "acquisitionTime": "2026-10-27T02:06:07.890Z",
+        "generationTime": "2026-10-27T02:06:07.884Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "Rail3V3_2": {
+        "id": {
+          "name": "Rail3V3_2",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 3
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "STALE",
+          "sint64Value": "3"
+        },
+        "acquisitionTime": "2026-10-27T02:06:07.891Z",
+        "generationTime": "2026-10-27T02:06:07.884Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "Rail5V_1": {
+        "id": {
+          "name": "Rail5V_1",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 3
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "STALE",
+          "sint64Value": "3"
+        },
+        "acquisitionTime": "2026-10-27T02:06:07.891Z",
+        "generationTime": "2026-10-27T02:06:07.884Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "Rail5V_2": {
+        "id": {
+          "name": "Rail5V_2",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 3
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "STALE",
+          "sint64Value": "3"
+        },
+        "acquisitionTime": "2026-10-27T02:06:07.891Z",
+        "generationTime": "2026-10-27T02:06:07.883Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "Rail5V_3": {
+        "id": {
+          "name": "Rail5V_3",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 3
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "STALE",
+          "sint64Value": "3"
+        },
+        "acquisitionTime": "2026-10-27T02:06:07.891Z",
+        "generationTime": "2026-10-27T02:06:07.883Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "Rail12V": {
+        "id": {
+          "name": "Rail12V",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 3
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "STALE",
+          "sint64Value": "3"
+        },
+        "acquisitionTime": "2026-10-27T02:06:07.891Z",
+        "generationTime": "2026-10-27T02:06:07.883Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "RailVBatt": {
+        "id": {
+          "name": "RailVBatt",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 3
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "STALE",
+          "sint64Value": "3"
+        },
+        "acquisitionTime": "2026-10-27T02:06:07.891Z",
+        "generationTime": "2026-10-27T02:06:07.883Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "RailBurn1": {
+        "id": {
+          "name": "RailBurn1",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 3
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "STALE",
+          "sint64Value": "3"
+        },
+        "acquisitionTime": "2026-10-27T02:06:07.891Z",
+        "generationTime": "2026-10-27T02:06:07.883Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "RailBurn2": {
+        "id": {
+          "name": "RailBurn2",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 3
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "STALE",
+          "sint64Value": "3"
+        },
+        "acquisitionTime": "2026-10-27T02:06:07.891Z",
+        "generationTime": "2026-10-27T02:06:07.883Z",
+        "acquisitionStatus": "ACQUIRED"
+      }
+    },
+    "recovered_all_off": {
+      "Rail3V3_1": {
+        "id": {
+          "name": "Rail3V3_1",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:06:12.910Z",
+        "generationTime": "2026-10-27T02:06:11.899Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "Rail3V3_2": {
+        "id": {
+          "name": "Rail3V3_2",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:06:12.910Z",
+        "generationTime": "2026-10-27T02:06:11.899Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "Rail5V_1": {
+        "id": {
+          "name": "Rail5V_1",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:06:12.910Z",
+        "generationTime": "2026-10-27T02:06:11.899Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "Rail5V_2": {
+        "id": {
+          "name": "Rail5V_2",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:06:12.910Z",
+        "generationTime": "2026-10-27T02:06:11.899Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "Rail5V_3": {
+        "id": {
+          "name": "Rail5V_3",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:06:12.910Z",
+        "generationTime": "2026-10-27T02:06:11.899Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "Rail12V": {
+        "id": {
+          "name": "Rail12V",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:06:12.910Z",
+        "generationTime": "2026-10-27T02:06:11.899Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "RailVBatt": {
+        "id": {
+          "name": "RailVBatt",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:06:12.910Z",
+        "generationTime": "2026-10-27T02:06:11.899Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "RailBurn1": {
+        "id": {
+          "name": "RailBurn1",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:06:12.910Z",
+        "generationTime": "2026-10-27T02:06:11.899Z",
+        "acquisitionStatus": "ACQUIRED"
+      },
+      "RailBurn2": {
+        "id": {
+          "name": "RailBurn2",
+          "namespace": "/ArtemisRpiTeensyDeployment_ArtemisRpiTeensyDeployment/ArtemisRpiTeensyDeployment/epsManager"
+        },
+        "rawValue": {
+          "type": "UINT32",
+          "uint32Value": 1
+        },
+        "engValue": {
+          "type": "ENUMERATED",
+          "stringValue": "OFF",
+          "sint64Value": "1"
+        },
+        "acquisitionTime": "2026-10-27T02:06:12.910Z",
+        "generationTime": "2026-10-27T02:06:11.899Z",
+        "acquisitionStatus": "ACQUIRED"
+      }
+    }
+  },
+  "requests": [
+    {
+      "opcode": 2,
+      "payload": "",
+      "sequence": 1
+    },
+    {
+      "opcode": 2,
+      "payload": "",
+      "sequence": 2
+    },
+    {
+      "opcode": 2,
+      "payload": "",
+      "sequence": 3
+    },
+    {
+      "opcode": 1,
+      "payload": "",
+      "sequence": 4
+    },
+    {
+      "opcode": 16,
+      "payload": "ff",
+      "sequence": 5
+    },
+    {
+      "opcode": 2,
+      "payload": "",
+      "sequence": 6
+    },
+    {
+      "opcode": 17,
+      "payload": "0301",
+      "sequence": 7
+    },
+    {
+      "opcode": 2,
+      "payload": "",
+      "sequence": 8
+    },
+    {
+      "opcode": 16,
+      "payload": "03",
+      "sequence": 9
+    },
+    {
+      "opcode": 17,
+      "payload": "0300",
+      "sequence": 10
+    },
+    {
+      "opcode": 2,
+      "payload": "",
+      "sequence": 11
+    },
+    {
+      "opcode": 2,
+      "payload": "",
+      "sequence": 12
+    },
+    {
+      "opcode": 2,
+      "payload": "",
+      "sequence": 13
+    },
+    {
+      "opcode": 16,
+      "payload": "ff",
+      "sequence": 14
+    },
+    {
+      "opcode": 2,
+      "payload": "",
+      "sequence": 15
+    },
+    {
+      "opcode": 17,
+      "payload": "0301",
+      "sequence": 16
+    },
+    {
+      "opcode": 16,
+      "payload": "03",
+      "sequence": 17
+    },
+    {
+      "opcode": 2,
+      "payload": "",
+      "sequence": 18
+    },
+    {
+      "opcode": 2,
+      "payload": "",
+      "sequence": 19
+    },
+    {
+      "opcode": 2,
+      "payload": "",
+      "sequence": 20
+    }
+  ]
+}

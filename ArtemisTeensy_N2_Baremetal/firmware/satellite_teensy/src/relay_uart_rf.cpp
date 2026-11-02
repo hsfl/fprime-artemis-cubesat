@@ -5,6 +5,30 @@
 #include "link_protocol.hpp"
 #include "wdt_guard.hpp"
 
+#if defined(ARTEMIS_CDR_NO_RADIO)
+RelayUartRf::RelayUartRf(Stream& linkIo,
+                         LinkCounters& counters,
+                         const RelayConfig& config,
+                         Stream* payloadIo,
+                         LocalChannelHandler* localHandler)
+    : m_linkIo(linkIo),
+      m_localHandler(localHandler),
+      m_counters(counters),
+      m_config(config),
+      m_state(ParseState::WAIT_MAGIC_0),
+      m_frameChannel(link_protocol::CHANNEL_CCSDS),
+      m_frameLength(0),
+      m_frameIndex(0),
+      m_frameCrc(0),
+      m_crcLo(0),
+      m_inCommandMode(false),
+      m_commandIndex(0),
+      m_lastFrameByteMs(0) {
+  (void)payloadIo;
+  memset(m_framePayload, 0, sizeof(m_framePayload));
+  memset(m_commandBuffer, 0, sizeof(m_commandBuffer));
+}
+#else
 RelayUartRf::RelayUartRf(Stream& linkIo,
                          Rf23Driver& rfDriver,
                          LinkCounters& counters,
@@ -55,33 +79,43 @@ RelayUartRf::RelayUartRf(Stream& linkIo,
     m_config.defaultUartChannel = link_protocol::CHANNEL_CCSDS;
   }
 }
+#endif
 
 void RelayUartRf::begin() {
   resetFrameParser(false);
+#if !defined(ARTEMIS_CDR_NO_RADIO)
   for (uint8_t channel = 0; channel < link_protocol::CHANNEL_COUNT; channel++) {
     resetReassembly(channel, false, false);
   }
+#endif
 }
 
 void RelayUartRf::poll() {
   wdt_guard::feed();
-  if (m_config.enableUartToRf) {
+  if (m_config.enablePiUart) {
     while (m_linkIo.available() > 0) {
       const uint8_t b = static_cast<uint8_t>(m_linkIo.read());
       m_counters.uartRxBytes += 1;
+#if defined(ARTEMIS_CDR_NO_RADIO)
+      processUartByte(b);
+#else
       if (m_config.uartInputFramed) {
         processUartByte(b);
       } else {
         processRawUartByte(b, m_config.defaultUartChannel);
       }
+#endif
       wdt_guard::feed();
     }
 
+#if !defined(ARTEMIS_CDR_NO_RADIO)
     if (!m_config.uartInputFramed) {
       flushRawUartIfStale();
     }
+#endif
   }
 
+#if !defined(ARTEMIS_CDR_NO_RADIO)
   if (m_payloadIo != nullptr) {
     while (m_payloadIo->available() > 0) {
       const uint8_t b = static_cast<uint8_t>(m_payloadIo->read());
@@ -93,9 +127,12 @@ void RelayUartRf::poll() {
   }
 
   flushRfToUart();
+#endif
   flushLocalResponseToUart();
+#if !defined(ARTEMIS_CDR_NO_RADIO)
   serviceUplinkQueue();
   serviceDownlinkQueue();
+#endif
 }
 
 void RelayUartRf::processUartByte(uint8_t b) {
@@ -110,6 +147,7 @@ void RelayUartRf::processUartByte(uint8_t b) {
   processFrameByte(b);
 }
 
+#if !defined(ARTEMIS_CDR_NO_RADIO)
 void RelayUartRf::processRawUartByte(uint8_t b, uint8_t channel) {
   if (channel == link_protocol::CHANNEL_PAYLOAD) {
     m_counters.payloadUartRxBytes += 1;
@@ -170,6 +208,7 @@ void RelayUartRf::flushPayloadUartIfStale() {
     m_payloadUartLen = 0;
   }
 }
+#endif
 
 void RelayUartRf::flushLocalResponseToUart() {
   if (m_localHandler == nullptr) {
@@ -283,6 +322,7 @@ void RelayUartRf::processFrameByte(uint8_t b) {
   }
 }
 
+#if !defined(ARTEMIS_CDR_NO_RADIO)
 void RelayUartRf::flushRfToUart() {
   uint8_t rfBuffer[link_protocol::RF_PACKET_MAX_LEN] = {0};
   uint8_t rfLen = static_cast<uint8_t>(sizeof(rfBuffer));
@@ -303,6 +343,7 @@ void RelayUartRf::flushRfToUart() {
     }
   }
 }
+#endif
 
 void RelayUartRf::resetFrameParser(bool timeoutReset) {
   m_state = ParseState::WAIT_MAGIC_0;
@@ -333,7 +374,15 @@ void RelayUartRf::handleCompletedFrame() {
     return;
   }
 
+#if defined(ARTEMIS_CDR_NO_RADIO)
+  if (link_protocol::isRfChannel(m_frameChannel)) {
+    m_counters.rfTxDrops += 1;
+  } else {
+    m_counters.framingDrops += 1;
+  }
+#else
   enqueueUplinkMessage(m_frameChannel, m_framePayload, m_frameLength);
+#endif
 }
 
 bool RelayUartRf::sendUartFrame(uint8_t channel, const uint8_t* payload, uint16_t length) {
@@ -361,6 +410,7 @@ bool RelayUartRf::sendUartFrame(uint8_t channel, const uint8_t* payload, uint16_
   return true;
 }
 
+#if !defined(ARTEMIS_CDR_NO_RADIO)
 bool RelayUartRf::sendRawToUart(const uint8_t* payload, uint16_t length) {
   if (length == 0 || length > link_protocol::FRAME_MAX_PAYLOAD) {
     m_counters.framingDrops += 1;
@@ -633,6 +683,7 @@ void RelayUartRf::resetReassembly(uint8_t channel, bool timeoutReset, bool dropR
     m_counters.rfReassemblyDrops += 1;
   }
 }
+#endif
 
 uint16_t RelayUartRf::crc16Ccitt(const uint8_t* data, uint16_t len) const {
   uint16_t crc = 0xFFFF;
@@ -684,6 +735,7 @@ void RelayUartRf::emitLinkStatus() {
   }
 }
 
+#if !defined(ARTEMIS_CDR_NO_RADIO)
 bool RelayUartRf::enqueueUplinkMessage(uint8_t channel, const uint8_t* payload, uint16_t length) {
   if (length == 0 || length > link_protocol::FRAME_MAX_PAYLOAD) {
     m_counters.rfOversizeDrops += 1;
@@ -767,3 +819,4 @@ void RelayUartRf::serviceDownlinkQueue() {
   m_downlinkTail = static_cast<uint8_t>((m_downlinkTail + 1) % m_config.downlinkQueueDepth);
   m_downlinkCount = static_cast<uint8_t>(m_downlinkCount - 1);
 }
+#endif

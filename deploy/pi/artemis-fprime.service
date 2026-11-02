@@ -1,31 +1,27 @@
-# Neutron 2 F Prime Raspberry Pi service.
-# Install on the Pi as /etc/systemd/system/artemis-fprime.service.
-# The binary and dictionary are managed as symlinks under /home/pi/artemis/current
-# so a new release can be installed without changing this unit file.
-
+# N2 CDR TCP profile. Install supervisor as /home/n2-obc/artemis/artemis-supervisor.py.
 [Unit]
-Description=Neutron 2 Artemis F Prime deployment
-# Wait for local filesystems so /home/pi/artemis/current exists before launch.
-After=local-fs.target
-# The deployment talks to the satellite Teensy over /dev/serial0, so do not
-# block flight-software startup on Wi-Fi or network-online timing.
-# Fail clearly if the release symlink has not been installed yet.
-ConditionPathExists=/home/pi/artemis/current/ArtemisRpiTeensyDeployment
+Description=Neutron-2 CDR TCP F Prime
+After=local-fs.target systemd-udev-trigger.service
+StartLimitIntervalSec=60
+StartLimitBurst=10
 
 [Service]
-Type=simple
-# Current bench Pi docs use the default Raspberry Pi account.
-User=pi
-Group=pi
-# Keep relative paths, future dictionary references, and generated files anchored
-# next to the current release binary and dictionary symlinks.
-WorkingDirectory=/home/pi/artemis/current
-# /dev/serial0 is the Pi-to-satellite-Teensy UART used by the Artemis OBC bench.
-ExecStart=/home/pi/artemis/current/ArtemisRpiTeensyDeployment -d /dev/serial0
-# Demo hardening: bring the flight app back if it crashes or exits unexpectedly.
-Restart=always
-RestartSec=5
-# Send stdout/stderr to journald so students can use journalctl for triage.
+Type=notify
+NotifyAccess=main
+User=n2-obc
+Group=n2-obc
+SupplementaryGroups=dialout
+WorkingDirectory=/home/n2-obc/artemis/state
+Environment=N2_STORAGE_ROOT=/home/n2-obc/artemis/data/science-products
+ExecStart=/usr/bin/python3 /home/n2-obc/artemis/artemis-supervisor.py --uart /dev/serial0 --tcp-port 50000 -- /home/n2-obc/artemis/current/ArtemisRpiTeensyDeployment -a 0.0.0.0 -p 50000 -d /dev/serial0
+# UART can appear arbitrarily late; readiness requires fresh EPS progress and the child TCP listener.
+TimeoutStartSec=infinity
+WatchdogSec=45
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=10
+KillSignal=SIGTERM
+NoNewPrivileges=true
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=artemis-fprime

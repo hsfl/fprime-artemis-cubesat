@@ -1,0 +1,900 @@
+2026-10-27T12:06:01-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138761,669774) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=241
+2026-10-27T12:06:01-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138761,672429) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:01-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138761,712949) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:01-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138761,713683) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:03-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138763,673186) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=242
+2026-10-27T12:06:03-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138763,681810) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:03-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138763,708900) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:03-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138763,712608) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:05-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138765,674204) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=243
+2026-10-27T12:06:05-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138765,692303) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:05-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138765,727030) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:05-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138765,731348) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:07-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138767,666613) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=244
+2026-10-27T12:06:07-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138767,667873) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:07-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138767,703203) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:07-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138767,701850) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:09-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138769,668584) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=245
+2026-10-27T12:06:09-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138769,670489) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:09-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138769,704403) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:09-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138769,708010) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:11-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138771,666679) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=246
+2026-10-27T12:06:11-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138771,671730) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:11-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138771,703401) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:11-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138771,702046) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:13-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138773,665463) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=247
+2026-10-27T12:06:13-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138773,666729) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:13-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138773,700064) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:13-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138773,702177) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:14-10:00 n2-obc artemis-fprime[323]: [WARNING] TcpServerRead failed to recv from port with status -8 and errno 0
+2026-10-27T12:06:15-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138775,666030) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=248
+2026-10-27T12:06:15-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138775,670694) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:15-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138775,703358) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:15-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138775,704447) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:17-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138777,664174) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=249
+2026-10-27T12:06:17-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138777,665436) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:17-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138777,699243) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:17-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138777,702439) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:19-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138779,665452) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=250
+2026-10-27T12:06:19-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138779,666944) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:19-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138779,700126) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:19-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138779,703133) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:20-10:00 n2-obc artemis-fprime[323]: Accepted client at 0.0.0.0:50000
+2026-10-27T12:06:21-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138781,663983) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=251
+2026-10-27T12:06:21-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138781,665626) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:21-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138781,700115) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:21-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138781,700453) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:23-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138783,666749) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=252
+2026-10-27T12:06:23-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138783,668015) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:23-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138783,703128) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:23-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138783,701744) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:25-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138785,671745) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=253
+2026-10-27T12:06:25-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138785,680278) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:25-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138785,706934) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:25-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138785,708320) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:27-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138787,666299) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=254
+2026-10-27T12:06:27-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138787,667568) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:27-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138787,700957) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:27-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138787,702967) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:29-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138789,664162) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=255
+2026-10-27T12:06:29-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138789,665414) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:29-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138789,699324) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:29-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138789,699886) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:31-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138791,667206) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=0
+2026-10-27T12:06:31-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138791,676862) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:31-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138791,703114) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:31-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138791,706556) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:33-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138793,667817) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=1
+2026-10-27T12:06:33-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138793,680259) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:33-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138793,702789) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:33-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138793,705992) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:35-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138795,664251) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=2
+2026-10-27T12:06:35-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138795,665508) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:35-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138795,699143) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:35-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138795,700844) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:37-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138797,666995) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=3
+2026-10-27T12:06:37-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138797,668244) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:37-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138797,703349) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:37-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138797,701824) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:39-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138799,664904) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=4
+2026-10-27T12:06:39-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138799,670983) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:39-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138799,704880) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:39-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138799,707520) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:41-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138801,666017) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=5
+2026-10-27T12:06:41-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138801,667271) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:41-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138801,700580) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:41-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138801,701978) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:43-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138803,666829) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=6
+2026-10-27T12:06:43-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138803,668084) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:43-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138803,702763) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:43-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138803,701940) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:45-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138805,668337) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=7
+2026-10-27T12:06:45-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138805,669660) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:45-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138805,704002) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:45-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138805,703209) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:47-10:00 n2-obc artemis-fprime[323]: EVENT: (268566528) (2:1793138807,669567) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=8
+2026-10-27T12:06:47-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138807,682191) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:47-10:00 n2-obc artemis-fprime[323]: EVENT: (268476416) (2:1793138807,721921) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:47-10:00 n2-obc artemis-fprime[323]: EVENT: (268566529) (2:1793138807,724376) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:48-10:00 n2-obc artemis-fprime[323]: [WARNING] TcpServerRead failed to recv from port with status -8 and errno 0
+2026-10-27T12:06:48-10:00 n2-obc artemis-fprime[323]: Exiting...
+2026-10-27T12:06:48-10:00 n2-obc artemis-fprime[323]: F Prime exited with status 0
+2026-10-27T12:06:48-10:00 n2-obc systemd[1]: artemis-fprime.service: Main process exited, code=exited, status=1/FAILURE
+2026-10-27T12:06:48-10:00 n2-obc systemd[1]: artemis-fprime.service: Failed with result 'exit-code'.
+2026-10-27T12:06:48-10:00 n2-obc systemd[1]: artemis-fprime.service: Consumed 7.552s CPU time.
+2026-10-27T12:06:50-10:00 n2-obc systemd[1]: artemis-fprime.service: Scheduled restart job, restart counter is at 1.
+2026-10-27T12:06:51-10:00 n2-obc systemd[1]: Starting artemis-fprime.service - Neutron-2 CDR TCP F Prime...
+2026-10-27T12:06:51-10:00 n2-obc artemis-fprime[802]: Waiting for UART character device /dev/serial0
+2026-10-27T12:06:51-10:00 n2-obc artemis-fprime[802]: Starting /home/n2-obc/artemis/current/ArtemisRpiTeensyDeployment
+2026-10-27T12:06:51-10:00 n2-obc artemis-fprime[802]: Hit Ctrl-C to quit
+2026-10-27T12:06:51-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138811,996718) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000c000 registered to port 0 slot 0
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138811,999560) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000c001 registered to port 0 slot 1
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,1614) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000c002 registered to port 0 slot 2
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,3376) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10004000 registered to port 1 slot 3
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,5103) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10004001 registered to port 1 slot 4
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,6525) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10004002 registered to port 1 slot 5
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,6634) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10004003 registered to port 1 slot 6
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,6692) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10004004 registered to port 1 slot 7
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,6744) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10004005 registered to port 1 slot 8
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,6795) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10004006 registered to port 1 slot 9
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,6846) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10004007 registered to port 1 slot 10
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,6900) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000a000 registered to port 2 slot 11
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,6952) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000a001 registered to port 2 slot 12
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7001) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000a002 registered to port 2 slot 13
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7052) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000a003 registered to port 2 slot 14
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7104) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000a004 registered to port 2 slot 15
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7155) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000a005 registered to port 2 slot 16
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7205) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000a006 registered to port 2 slot 17
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7256) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000a007 registered to port 2 slot 18
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7308) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000a008 registered to port 2 slot 19
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7358) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000a009 registered to port 2 slot 20
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7408) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000a00a registered to port 2 slot 21
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7457) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000a00b registered to port 2 slot 22
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7510) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000a00c registered to port 2 slot 23
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7559) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000d000 registered to port 3 slot 24
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7608) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10006000 registered to port 4 slot 25
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7658) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10006001 registered to port 4 slot 26
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7708) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10006002 registered to port 4 slot 27
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7759) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10006003 registered to port 4 slot 28
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7809) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000b000 registered to port 5 slot 29
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7860) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000b001 registered to port 5 slot 30
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7911) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000b002 registered to port 5 slot 31
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,7962) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000b003 registered to port 5 slot 32
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8012) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000b004 registered to port 5 slot 33
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8061) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000b005 registered to port 5 slot 34
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8113) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10007000 registered to port 6 slot 35
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8164) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10007001 registered to port 6 slot 36
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8214) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10007002 registered to port 6 slot 37
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8274) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10007003 registered to port 6 slot 38
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8327) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10007004 registered to port 6 slot 39
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8379) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10007005 registered to port 6 slot 40
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8431) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10007006 registered to port 6 slot 41
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8483) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10008000 registered to port 7 slot 42
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8535) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000e000 registered to port 8 slot 43
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8585) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000e001 registered to port 8 slot 44
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8635) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000e002 registered to port 8 slot 45
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8685) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000e003 registered to port 8 slot 46
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8735) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000e004 registered to port 8 slot 47
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8786) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10012000 registered to port 9 slot 48
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8837) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10005000 registered to port 10 slot 49
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8887) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x10005001 registered to port 10 slot 50
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8938) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000f000 registered to port 11 slot 51
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,8990) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000f001 registered to port 11 slot 52
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9040) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000000 registered to port 12 slot 53
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9091) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000001 registered to port 12 slot 54
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9142) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000002 registered to port 12 slot 55
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9193) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1000003 registered to port 12 slot 56
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9246) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1001000 registered to port 13 slot 57
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9298) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1001002 registered to port 13 slot 58
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9348) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1001003 registered to port 13 slot 59
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9399) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1002000 registered to port 14 slot 60
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9451) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1002001 registered to port 14 slot 61
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9502) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1002002 registered to port 14 slot 62
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9555) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1003000 registered to port 15 slot 63
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9606) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x1003001 registered to port 15 slot 64
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9658) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x2000000 registered to port 16 slot 65
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9711) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x2000001 registered to port 16 slot 66
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9762) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x2000002 registered to port 16 slot 67
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9813) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x4000000 registered to port 17 slot 68
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9865) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x4000001 registered to port 17 slot 69
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9920) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x4000002 registered to port 17 slot 70
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,9974) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x4000003 registered to port 17 slot 71
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10026) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x4001000 registered to port 18 slot 72
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10080) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x4002000 registered to port 19 slot 73
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10133) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x5001000 registered to port 20 slot 74
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10186) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x5001001 registered to port 20 slot 75
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10238) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x5001002 registered to port 20 slot 76
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10291) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x5002000 registered to port 21 slot 77
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10343) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x5002001 registered to port 21 slot 78
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10395) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x5002002 registered to port 21 slot 79
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10447) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x5002003 registered to port 21 slot 80
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10499) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x5002004 registered to port 21 slot 81
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10551) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x5002005 registered to port 21 slot 82
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10602) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x5002006 registered to port 21 slot 83
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10654) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x5002007 registered to port 21 slot 84
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10706) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x5002008 registered to port 21 slot 85
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10758) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x5003000 registered to port 22 slot 86
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10810) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x5003001 registered to port 22 slot 87
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777216) (2:1793138812,10861) DIAGNOSTIC: (cmdDisp) OpCodeRegistered : Opcode 0x5003002 registered to port 22 slot 88
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16789504) (2:1793138812,10947) ACTIVITY_LO: (version) FrameworkVersion : Framework Version: [v4.2.1-dirty]
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16789505) (2:1793138812,11089) ACTIVITY_LO: (version) ProjectVersion : Project Version: [v1.0.0-mvp-demo-22-ga468d289-dirty]
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16789506) (2:1793138812,11173) ACTIVITY_LO: (version) LibraryVersions : Library Versions: [pi-zero-w@v1.0.0-mvp-demo-22-ga468d289-dirty]
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (268517380) (2:1793138812,22479) ACTIVITY_HI: (comDriver) PortOpened : UART Device /dev/serial0 configured
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: CDR TCP listen setup failed at 0.0.0.0:50000 (status -9); server thread will retry
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (83898368) (2:1793138812,22973) WARNING_LO: (prmDb) PrmIdNotFound : Parameter ID 0x10007000 not found
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: [NOTE] Task Permissions:
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: [NOTE]
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: [NOTE] You have insufficient permissions to create a task with priority and/or cpu affinity.
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: [NOTE] A task without priority and affinity will be created.
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: [NOTE]
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: [NOTE] There are three possible resolutions:
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: [NOTE] 1. Use tasks without priority and affinity using parameterless start()
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: [NOTE] 2. Run this executable as a user with task priority permission
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: [NOTE] 3. Grant capability with "setcap 'cap_sys_nice=eip'" or equivalent
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (268439552) (2:1793138812,42074) DIAGNOSTIC: (rateGroup1) RateGroupStarted : Rate group started.
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (268443648) (2:1793138812,43819) DIAGNOSTIC: (rateGroup2) RateGroupStarted : Rate group started.
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: EVENT: (268447744) (2:1793138812,45477) DIAGNOSTIC: (rateGroup3) RateGroupStarted : Rate group started.
+2026-10-27T12:06:52-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:06:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138813,80012) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=1
+2026-10-27T12:06:53-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:06:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268492809) (2:1793138813,78790) ACTIVITY_HI: (storageManager) ScienceProductRecovered : Recovered science product=1 bytes=329 CRC=11852 path='/home/n2-obc/artemis/data/science-products/product_1.bin'
+2026-10-27T12:06:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138813,94989) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138813,125944) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138813,131706) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:54-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:06:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138815,75671) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=2
+2026-10-27T12:06:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138815,76721) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:55-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:06:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138815,110070) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138815,110815) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:56-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:06:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138817,79668) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=3
+2026-10-27T12:06:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138817,82695) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:57-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:06:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138817,116517) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138817,121666) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:06:58-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:06:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138819,77613) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=4
+2026-10-27T12:06:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138819,86702) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:06:59-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:06:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138819,114088) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:06:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138819,121408) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:00-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138821,77739) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=5
+2026-10-27T12:07:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138821,79320) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:01-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138821,113193) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138821,114104) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:02-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138823,76523) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=6
+2026-10-27T12:07:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138823,78907) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:03-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138823,113510) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138823,121399) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:04-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138825,80482) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=7
+2026-10-27T12:07:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138825,83024) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:05-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138825,117349) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138825,122603) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:06-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138827,77429) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=8
+2026-10-27T12:07:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138827,79853) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:07-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138827,119358) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138827,119992) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:08-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138829,80754) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=9
+2026-10-27T12:07:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138829,83003) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:09-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138829,120753) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138829,119723) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:10-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138831,77931) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=10
+2026-10-27T12:07:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138831,79929) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:11-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138831,117913) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138831,122040) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:12-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138833,78194) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=11
+2026-10-27T12:07:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138833,79786) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:13-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138833,113312) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138833,122045) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:14-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138835,77864) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=12
+2026-10-27T12:07:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138835,79442) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:15-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138835,121707) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138835,123292) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:16-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138837,75800) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=13
+2026-10-27T12:07:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138837,84220) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:17-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138837,118672) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138837,119356) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:18-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138839,77271) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=14
+2026-10-27T12:07:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138839,82874) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:19-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138839,117933) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138839,116881) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:20-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138841,79517) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=15
+2026-10-27T12:07:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138841,90851) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138841,115194) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:21-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138841,131412) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:22-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138843,77920) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=16
+2026-10-27T12:07:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138843,79492) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138843,113386) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138843,114494) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:23-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:24-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138845,75274) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=17
+2026-10-27T12:07:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138845,88805) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138845,122736) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:25-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138845,131391) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:26-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138847,76271) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=18
+2026-10-27T12:07:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138847,77828) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138847,111740) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138847,112848) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:27-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:28-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138849,75721) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=19
+2026-10-27T12:07:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138849,77278) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138849,112110) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138849,118431) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:29-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:30-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138851,79621) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=20
+2026-10-27T12:07:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138851,81149) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138851,113636) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138851,126801) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:31-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:32-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138853,78384) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=21
+2026-10-27T12:07:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138853,80980) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138853,115566) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138853,121638) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:33-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:34-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138855,77564) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=22
+2026-10-27T12:07:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138855,83438) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138855,112746) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138855,113881) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:35-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:36-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138857,77968) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=23
+2026-10-27T12:07:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138857,79547) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138857,114537) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138857,113482) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:37-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:38-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138859,75153) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=24
+2026-10-27T12:07:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138859,76378) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138859,117597) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138859,118677) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:39-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:40-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138861,78535) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=25
+2026-10-27T12:07:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138861,79643) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138861,114256) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138861,113504) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:41-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:42-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138863,77604) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=26
+2026-10-27T12:07:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138863,79178) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138863,113709) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138863,112630) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:43-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:44-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138865,76008) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=27
+2026-10-27T12:07:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138865,77571) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138865,112326) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138865,120253) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:45-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:46-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138867,76583) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=28
+2026-10-27T12:07:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138867,78160) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138867,112054) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138867,113106) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:47-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:48-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138869,79215) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=29
+2026-10-27T12:07:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138869,91750) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138869,115841) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138869,121423) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:49-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:50-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138871,84488) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=30
+2026-10-27T12:07:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138871,85936) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138871,132370) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138871,141351) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:51-10:00 n2-obc artemis-fprime[802]: [WARNING] Failed to listen on port 50000 with status -9
+2026-10-27T12:07:52-10:00 n2-obc artemis-fprime[802]: Listening for single client at 0.0.0.0:50000
+2026-10-27T12:07:52-10:00 n2-obc artemis-fprime[802]: EPS progress and owned TCP listener observed; service ready
+2026-10-27T12:07:52-10:00 n2-obc systemd[1]: Started artemis-fprime.service - Neutron-2 CDR TCP F Prime.
+2026-10-27T12:07:52-10:00 n2-obc artemis-fprime[802]: Accepted client at 0.0.0.0:50000
+2026-10-27T12:07:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138873,78526) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=31
+2026-10-27T12:07:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138873,88460) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138873,113598) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138873,112873) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138875,77343) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=32
+2026-10-27T12:07:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138875,82448) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138875,116935) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138875,120462) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138877,76983) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=33
+2026-10-27T12:07:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138877,91838) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138877,116995) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138877,120614) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:07:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138879,79020) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=34
+2026-10-27T12:07:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138879,87947) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:07:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138879,114893) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:07:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138879,118070) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138881,78711) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=35
+2026-10-27T12:08:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138881,84776) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138881,119045) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138881,122350) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138883,79144) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=36
+2026-10-27T12:08:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138883,88528) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138883,115231) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138883,118743) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:03-10:00 n2-obc artemis-fprime[802]: EVENT: (16777217) (2:1793138883,800894) COMMAND: (cmdDisp) OpCodeDispatched : Opcode 0x1000a008 dispatched to port 2
+2026-10-27T12:08:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138883,804767) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_PROTOCOL_INFO (2) queued local request=37
+2026-10-27T12:08:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138883,809958) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138883,852845) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268476419) (2:1793138883,856752) ACTIVITY_HI: (epsManager) PduInfoResult : PDU INFO sequence=0 opcode=268476424 protocol=2 firmware=2.2.2 flags=1 git=e94ee066442a
+2026-10-27T12:08:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138883,851547) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_PROTOCOL_INFO (2) status=0
+2026-10-27T12:08:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268566537) (2:1793138883,857848) ACTIVITY_HI: (epsDriverArtemis) PduInfoReadback : PDU INFO protocol=2 firmware=2.2.2 build_flags=1 git=e94ee066442a result=OK local_request=37
+2026-10-27T12:08:03-10:00 n2-obc artemis-fprime[802]: EVENT: (16777218) (2:1793138883,859234) COMMAND: (cmdDisp) OpCodeCompleted : Opcode 0x1000a008 completed
+2026-10-27T12:08:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138885,85533) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=38
+2026-10-27T12:08:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138885,94324) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138885,128039) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138885,127034) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138887,78667) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=39
+2026-10-27T12:08:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138887,88367) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138887,115758) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138887,119462) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138889,83349) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=40
+2026-10-27T12:08:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138889,94734) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138889,119586) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138889,123534) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138891,76966) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=41
+2026-10-27T12:08:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138891,85311) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138891,115364) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138891,118408) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138893,82934) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=42
+2026-10-27T12:08:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138893,92408) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138893,118050) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138893,121313) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138895,76269) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=43
+2026-10-27T12:08:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138895,84805) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138895,115621) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138895,118604) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138897,83908) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=44
+2026-10-27T12:08:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138897,86206) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138897,120459) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138897,123979) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138899,76283) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=45
+2026-10-27T12:08:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138899,80719) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138899,115243) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138899,118512) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138901,78865) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=46
+2026-10-27T12:08:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138901,80462) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138901,114504) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138901,116161) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138903,79247) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=47
+2026-10-27T12:08:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138903,89292) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138903,115013) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138903,118495) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138905,78686) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=48
+2026-10-27T12:08:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138905,91887) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138905,113781) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138905,117209) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138907,77866) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=49
+2026-10-27T12:08:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138907,79790) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138907,114401) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138907,117424) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:28-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138908,38177) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=50
+2026-10-27T12:08:28-10:00 n2-obc artemis-fprime[802]: EVENT: (16777217) (2:1793138908,38911) COMMAND: (cmdDisp) OpCodeDispatched : Opcode 0x1000a009 dispatched to port 2
+2026-10-27T12:08:28-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138908,43477) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:28-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138908,72581) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:28-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138908,72454) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:28-10:00 n2-obc artemis-fprime[802]: EVENT: (268476418) (2:1793138908,77210) ACTIVITY_HI: (epsManager) PduSummaryRail : PDU STATUS sequence=1 opcode=268476425 rail=RAIL_3V3_1 (1) readback=OFF (1)
+2026-10-27T12:08:28-10:00 n2-obc artemis-fprime[802]: EVENT: (268476418) (2:1793138908,77400) ACTIVITY_HI: (epsManager) PduSummaryRail : PDU STATUS sequence=1 opcode=268476425 rail=RAIL_3V3_2 (2) readback=OFF (1)
+2026-10-27T12:08:28-10:00 n2-obc artemis-fprime[802]: EVENT: (268476418) (2:1793138908,77512) ACTIVITY_HI: (epsManager) PduSummaryRail : PDU STATUS sequence=1 opcode=268476425 rail=RAIL_5V_1 (3) readback=OFF (1)
+2026-10-27T12:08:28-10:00 n2-obc artemis-fprime[802]: EVENT: (268476418) (2:1793138908,77616) ACTIVITY_HI: (epsManager) PduSummaryRail : PDU STATUS sequence=1 opcode=268476425 rail=RAIL_5V_2 (4) readback=OFF (1)
+2026-10-27T12:08:28-10:00 n2-obc artemis-fprime[802]: EVENT: (268476418) (2:1793138908,77718) ACTIVITY_HI: (epsManager) PduSummaryRail : PDU STATUS sequence=1 opcode=268476425 rail=RAIL_5V_3 (5) readback=OFF (1)
+2026-10-27T12:08:28-10:00 n2-obc artemis-fprime[802]: EVENT: (268476418) (2:1793138908,77819) ACTIVITY_HI: (epsManager) PduSummaryRail : PDU STATUS sequence=1 opcode=268476425 rail=RAIL_12V (7) readback=OFF (1)
+2026-10-27T12:08:28-10:00 n2-obc artemis-fprime[802]: EVENT: (268476418) (2:1793138908,77919) ACTIVITY_HI: (epsManager) PduSummaryRail : PDU STATUS sequence=1 opcode=268476425 rail=RAIL_VBATT (8) readback=OFF (1)
+2026-10-27T12:08:28-10:00 n2-obc artemis-fprime[802]: EVENT: (268476418) (2:1793138908,78020) ACTIVITY_HI: (epsManager) PduSummaryRail : PDU STATUS sequence=1 opcode=268476425 rail=RAIL_BURN1 (9) readback=OFF (1)
+2026-10-27T12:08:28-10:00 n2-obc artemis-fprime[802]: EVENT: (268476418) (2:1793138908,78120) ACTIVITY_HI: (epsManager) PduSummaryRail : PDU STATUS sequence=1 opcode=268476425 rail=RAIL_BURN2 (10) readback=OFF (1)
+2026-10-27T12:08:28-10:00 n2-obc artemis-fprime[802]: EVENT: (16777218) (2:1793138908,81345) COMMAND: (cmdDisp) OpCodeCompleted : Opcode 0x1000a009 completed
+2026-10-27T12:08:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138909,78192) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=51
+2026-10-27T12:08:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138909,87721) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138909,120278) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138909,123698) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138911,79075) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=52
+2026-10-27T12:08:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138911,89257) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138911,115373) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138911,118835) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138913,77030) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=53
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138913,91118) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138913,117398) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138913,121102) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138913,941322) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_OUTPUT_STATE (3) queued local request=54
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (16777217) (2:1793138913,942053) COMMAND: (cmdDisp) OpCodeDispatched : Opcode 0x1000a00b dispatched to port 2
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138913,948365) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138913,979478) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138913,983257) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_OUTPUT_STATE (3) status=0
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793138913,983476) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_3V3_1 (1) readback=OFF (1) result=OK local_request=54
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793138913,983615) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_3V3_2 (2) readback=OFF (1) result=OK local_request=54
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793138913,983732) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_5V_1 (3) readback=OFF (1) result=OK local_request=54
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793138913,983842) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_5V_2 (4) readback=OFF (1) result=OK local_request=54
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793138913,983953) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_5V_3 (5) readback=OFF (1) result=OK local_request=54
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793138913,984063) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_12V (7) readback=OFF (1) result=OK local_request=54
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793138913,984172) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_VBATT (8) readback=OFF (1) result=OK local_request=54
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793138913,984281) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_BURN1 (9) readback=OFF (1) result=OK local_request=54
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793138913,984390) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_BURN2 (10) readback=OFF (1) result=OK local_request=54
+2026-10-27T12:08:33-10:00 n2-obc artemis-fprime[802]: EVENT: (16777218) (2:1793138913,985871) COMMAND: (cmdDisp) OpCodeCompleted : Opcode 0x1000a00b completed
+2026-10-27T12:08:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138915,75434) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=55
+2026-10-27T12:08:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138915,85407) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138915,119611) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138915,119275) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138917,78652) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=56
+2026-10-27T12:08:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138917,83781) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138917,118034) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138917,121620) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138919,75047) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=57
+2026-10-27T12:08:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138919,84307) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138919,118732) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138919,122006) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138921,78945) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=58
+2026-10-27T12:08:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138921,90788) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138921,123608) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138921,126597) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138923,77521) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=59
+2026-10-27T12:08:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138923,80805) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138923,114645) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138923,119148) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138925,80477) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=60
+2026-10-27T12:08:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138925,92438) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138925,115485) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138925,118735) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138927,77389) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=61
+2026-10-27T12:08:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138927,82402) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138927,114224) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138927,117466) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138929,80400) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=62
+2026-10-27T12:08:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138929,86807) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138929,120093) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138929,124257) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138931,78822) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=63
+2026-10-27T12:08:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138931,82796) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138931,116796) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138931,120254) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138933,79364) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=64
+2026-10-27T12:08:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138933,84094) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138933,118707) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138933,122273) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138935,79157) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=65
+2026-10-27T12:08:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138935,88947) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138935,115446) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138935,119058) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138937,79335) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=66
+2026-10-27T12:08:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138937,83914) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138937,118490) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138937,122548) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:08:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138939,77850) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=67
+2026-10-27T12:08:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138939,82433) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:08:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138939,115039) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:08:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138939,118786) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138941,80936) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=68
+2026-10-27T12:09:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138941,92487) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138941,116679) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138941,120132) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138943,77492) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=69
+2026-10-27T12:09:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138943,82668) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138943,116568) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138943,120204) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138945,82148) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=70
+2026-10-27T12:09:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138945,92145) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138945,118290) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138945,122196) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138947,75605) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=71
+2026-10-27T12:09:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138947,83805) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138947,116147) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138947,119617) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138949,81180) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=72
+2026-10-27T12:09:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138949,84449) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138949,119124) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138949,122979) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138951,76836) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=73
+2026-10-27T12:09:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138951,80677) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138951,114881) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138951,118546) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138953,80242) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=74
+2026-10-27T12:09:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138953,83195) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138953,117675) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138953,121435) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138955,78631) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=75
+2026-10-27T12:09:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138955,88932) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138955,115488) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138955,119190) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138957,79463) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=76
+2026-10-27T12:09:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138957,91925) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138957,115237) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138957,118870) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138959,78647) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=77
+2026-10-27T12:09:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138959,83327) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138959,113912) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138959,117530) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138961,80002) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=78
+2026-10-27T12:09:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138961,87572) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138961,118612) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138961,121589) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:23-10:00 n2-obc artemis-fprime[802]: EVENT: (16777217) (2:1793138963,81060) COMMAND: (cmdDisp) OpCodeDispatched : Opcode 0x1000a00c dispatched to port 2
+2026-10-27T12:09:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138963,76902) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=79
+2026-10-27T12:09:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138963,83325) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268476420) (2:1793138963,89199) WARNING_LO: (epsManager) PduCommandRejected : PDU command sequence=3 opcode=268476428 rejected=INVALID_OR_CANCELLED
+2026-10-27T12:09:23-10:00 n2-obc artemis-fprime[802]: EVENT: (16777219) (2:1793138963,91091) COMMAND: (cmdDisp) OpCodeError : Opcode 0x1000a00c completed with error VALIDATION_ERROR (2)
+2026-10-27T12:09:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138963,117221) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138963,119375) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138965,78247) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=80
+2026-10-27T12:09:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138965,91119) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138965,116941) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138965,120021) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138967,79142) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=81
+2026-10-27T12:09:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138967,84578) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138967,115759) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138967,119009) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138969,80591) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=82
+2026-10-27T12:09:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138969,85428) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138969,119563) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138969,123128) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138971,77711) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=83
+2026-10-27T12:09:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138971,87977) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138971,122622) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138971,126058) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138973,82360) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=84
+2026-10-27T12:09:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138973,85385) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138973,119890) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138973,124085) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138975,78939) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=85
+2026-10-27T12:09:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138975,88894) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138975,114442) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138975,117893) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138977,75839) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=86
+2026-10-27T12:09:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138977,92169) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138977,115857) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138977,118924) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138979,76015) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=87
+2026-10-27T12:09:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138979,80740) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138979,115359) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138979,118299) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138981,81556) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=88
+2026-10-27T12:09:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138981,83353) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138981,117112) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138981,120331) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138983,78604) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=89
+2026-10-27T12:09:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138983,88690) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138983,123034) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138983,126290) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138985,82948) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=90
+2026-10-27T12:09:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138985,92454) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138985,119008) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138985,125379) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138987,79185) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=91
+2026-10-27T12:09:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138987,88264) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138987,114931) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138987,118585) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138989,77674) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=92
+2026-10-27T12:09:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138989,85394) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138989,119880) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138989,123829) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138991,79210) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=93
+2026-10-27T12:09:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138991,87062) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138991,114806) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138991,116809) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:53-10:00 n2-obc artemis-fprime[802]: EVENT: (16777217) (2:1793138993,82096) COMMAND: (cmdDisp) OpCodeDispatched : Opcode 0x1000a00c dispatched to port 2
+2026-10-27T12:09:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138993,79111) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=94
+2026-10-27T12:09:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138993,92635) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268476420) (2:1793138993,94202) WARNING_LO: (epsManager) PduCommandRejected : PDU command sequence=4 opcode=268476428 rejected=BUSY
+2026-10-27T12:09:53-10:00 n2-obc artemis-fprime[802]: EVENT: (16777219) (2:1793138993,96769) COMMAND: (cmdDisp) OpCodeError : Opcode 0x1000a00c completed with error BUSY (5)
+2026-10-27T12:09:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138993,124730) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138993,124602) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138995,78716) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=95
+2026-10-27T12:09:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138995,83743) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138995,114513) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138995,118264) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138997,75833) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=96
+2026-10-27T12:09:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138997,92463) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138997,115390) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138997,118960) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:09:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793138999,78647) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=97
+2026-10-27T12:09:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138999,82572) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:09:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793138999,117107) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:09:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793138999,120598) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139001,80449) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=98
+2026-10-27T12:10:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139001,84637) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139001,114791) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139001,117317) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139003,80466) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=99
+2026-10-27T12:10:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139003,84273) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139003,118880) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139003,119965) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139005,77520) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=100
+2026-10-27T12:10:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139005,82871) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139005,116746) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139005,119775) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139007,78256) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=101
+2026-10-27T12:10:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139007,87429) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139007,113900) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139007,117293) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139009,79786) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=102
+2026-10-27T12:10:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139009,87011) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139009,116958) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139009,120635) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139011,76404) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=103
+2026-10-27T12:10:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139011,88202) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139011,113921) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139011,117631) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139013,79138) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=104
+2026-10-27T12:10:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139013,91835) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139013,118851) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139013,122339) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139015,78735) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=105
+2026-10-27T12:10:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139015,89176) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139015,114785) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139015,118051) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139017,79708) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=106
+2026-10-27T12:10:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139017,92229) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139017,114554) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139017,117568) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139019,77656) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=107
+2026-10-27T12:10:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139019,88056) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139019,114274) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:19-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139019,117795) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139021,81097) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=108
+2026-10-27T12:10:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139021,86729) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139021,118046) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:21-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139021,121807) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139023,77951) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=109
+2026-10-27T12:10:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139023,82637) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139023,113931) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:23-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139023,117454) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:24-10:00 n2-obc artemis-fprime[802]: EVENT: (16777217) (2:1793139024,845008) COMMAND: (cmdDisp) OpCodeDispatched : Opcode 0x1000a00c dispatched to port 2
+2026-10-27T12:10:24-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139024,845678) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=SET_OUTPUT_STATE (4) queued local request=110
+2026-10-27T12:10:24-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139024,846776) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:24-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139024,876416) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=1 faults=0
+2026-10-27T12:10:24-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139024,874873) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=SET_OUTPUT_STATE (4) status=0
+2026-10-27T12:10:24-10:00 n2-obc artemis-fprime[802]: EVENT: (268566533) (2:1793139024,880599) ACTIVITY_HI: (epsDriverArtemis) PduRailSetResult : PDU SET rail=RAIL_3V3_1 (1) desired=ON (1) readback=ON (2) result=OK local_request=110
+2026-10-27T12:10:24-10:00 n2-obc artemis-fprime[802]: EVENT: (16777218) (2:1793139024,881425) COMMAND: (cmdDisp) OpCodeCompleted : Opcode 0x1000a00c completed
+2026-10-27T12:10:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139025,80234) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=111
+2026-10-27T12:10:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139025,86483) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=1 faults=0
+2026-10-27T12:10:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139025,120265) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=1 faults=0
+2026-10-27T12:10:25-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139025,119004) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139027,76104) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=112
+2026-10-27T12:10:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139027,80743) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=1 faults=0
+2026-10-27T12:10:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139027,115264) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=1 faults=0
+2026-10-27T12:10:27-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139027,118978) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139029,78836) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=113
+2026-10-27T12:10:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139029,86305) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=1 faults=0
+2026-10-27T12:10:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139029,118828) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=1 faults=0
+2026-10-27T12:10:29-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139029,122835) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139031,76629) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=114
+2026-10-27T12:10:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139031,83894) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=1 faults=0
+2026-10-27T12:10:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139031,114546) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=1 faults=0
+2026-10-27T12:10:31-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139031,114821) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139033,77582) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=115
+2026-10-27T12:10:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139033,85442) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=1 faults=0
+2026-10-27T12:10:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139033,120174) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=1 faults=0
+2026-10-27T12:10:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139033,124000) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:33-10:00 n2-obc artemis-fprime[802]: EVENT: (16777217) (2:1793139033,437733) COMMAND: (cmdDisp) OpCodeDispatched : Opcode 0x1000a00a dispatched to port 2
+2026-10-27T12:10:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139033,440069) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_OUTPUT_STATE (3) queued local request=116
+2026-10-27T12:10:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139033,444984) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=1 faults=0
+2026-10-27T12:10:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139033,467570) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=1 faults=0
+2026-10-27T12:10:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139033,467843) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_OUTPUT_STATE (3) status=0
+2026-10-27T12:10:33-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793139033,471928) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_3V3_1 (1) readback=ON (2) result=OK local_request=116
+2026-10-27T12:10:33-10:00 n2-obc artemis-fprime[802]: EVENT: (16777218) (2:1793139033,473176) COMMAND: (cmdDisp) OpCodeCompleted : Opcode 0x1000a00a completed
+2026-10-27T12:10:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139035,75873) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=117
+2026-10-27T12:10:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139035,83483) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=1 faults=0
+2026-10-27T12:10:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139035,119073) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=1 faults=0
+2026-10-27T12:10:35-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139035,117517) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139037,78112) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=118
+2026-10-27T12:10:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139037,83926) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=1 faults=0
+2026-10-27T12:10:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139037,117972) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=1 faults=0
+2026-10-27T12:10:37-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139037,121879) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139039,79038) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=119
+2026-10-27T12:10:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139039,84818) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=1 faults=0
+2026-10-27T12:10:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139039,115935) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=1 faults=0
+2026-10-27T12:10:39-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139039,120422) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139041,76763) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=120
+2026-10-27T12:10:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139041,93348) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=1 faults=0
+2026-10-27T12:10:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139041,125660) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=1 faults=0
+2026-10-27T12:10:41-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139041,128843) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139043,75623) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=121
+2026-10-27T12:10:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139043,88418) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=1 faults=0
+2026-10-27T12:10:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139043,115350) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=1 faults=0
+2026-10-27T12:10:43-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139043,118293) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:44-10:00 n2-obc artemis-fprime[802]: EVENT: (16777217) (2:1793139044,39623) COMMAND: (cmdDisp) OpCodeDispatched : Opcode 0x1000a00c dispatched to port 2
+2026-10-27T12:10:44-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139044,40058) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=SET_OUTPUT_STATE (4) queued local request=122
+2026-10-27T12:10:44-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139044,41118) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=1 faults=0
+2026-10-27T12:10:44-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139044,69422) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:44-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139044,70639) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=SET_OUTPUT_STATE (4) status=0
+2026-10-27T12:10:44-10:00 n2-obc artemis-fprime[802]: EVENT: (268566533) (2:1793139044,74159) ACTIVITY_HI: (epsDriverArtemis) PduRailSetResult : PDU SET rail=RAIL_3V3_1 (1) desired=OFF (0) readback=OFF (1) result=OK local_request=122
+2026-10-27T12:10:44-10:00 n2-obc artemis-fprime[802]: EVENT: (16777218) (2:1793139044,74939) COMMAND: (cmdDisp) OpCodeCompleted : Opcode 0x1000a00c completed
+2026-10-27T12:10:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139045,79271) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=123
+2026-10-27T12:10:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139045,80606) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139045,115884) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:45-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139045,114551) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139047,77724) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=124
+2026-10-27T12:10:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139047,88845) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139047,112784) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:47-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139047,116757) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139049,75227) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=125
+2026-10-27T12:10:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139049,88182) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139049,119767) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:49-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139049,119427) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139051,77655) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=126
+2026-10-27T12:10:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139051,89429) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139051,114331) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:51-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139051,117973) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777217) (2:1793139052,396350) COMMAND: (cmdDisp) OpCodeDispatched : Opcode 0x1000a00a dispatched to port 2
+2026-10-27T12:10:52-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139052,396909) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_OUTPUT_STATE (3) queued local request=127
+2026-10-27T12:10:52-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139052,399836) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:52-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139052,424891) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_OUTPUT_STATE (3) status=0
+2026-10-27T12:10:52-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793139052,425121) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_3V3_1 (1) readback=OFF (1) result=OK local_request=127
+2026-10-27T12:10:52-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139052,424555) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:52-10:00 n2-obc artemis-fprime[802]: EVENT: (16777218) (2:1793139052,428156) COMMAND: (cmdDisp) OpCodeCompleted : Opcode 0x1000a00a completed
+2026-10-27T12:10:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139053,80221) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=128
+2026-10-27T12:10:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139053,85815) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139053,120933) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:53-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139053,119447) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139055,76387) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=129
+2026-10-27T12:10:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139055,83482) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139055,117647) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:55-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139055,121156) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139057,80148) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=130
+2026-10-27T12:10:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139057,93153) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139057,126368) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:57-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139057,128373) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:10:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139059,76428) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=131
+2026-10-27T12:10:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139059,80574) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:10:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139059,115134) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:10:59-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139059,118578) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:11:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139061,82008) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=132
+2026-10-27T12:11:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139061,91695) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:11:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139061,117995) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:11:01-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139061,121442) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:11:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139063,75187) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=133
+2026-10-27T12:11:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139063,80646) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:11:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139063,114462) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:11:03-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139063,118144) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:11:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139065,80432) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=134
+2026-10-27T12:11:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139065,91834) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:11:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139065,116226) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:11:05-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139065,119616) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:11:06-10:00 n2-obc artemis-fprime[802]: EVENT: (16777217) (2:1793139066,876919) COMMAND: (cmdDisp) OpCodeDispatched : Opcode 0x1000a00b dispatched to port 2
+2026-10-27T12:11:06-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139066,877481) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_OUTPUT_STATE (3) queued local request=135
+2026-10-27T12:11:06-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139066,878554) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:11:06-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139066,916868) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:11:06-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139066,915292) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_OUTPUT_STATE (3) status=0
+2026-10-27T12:11:06-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793139066,920591) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_3V3_1 (1) readback=OFF (1) result=OK local_request=135
+2026-10-27T12:11:06-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793139066,920822) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_3V3_2 (2) readback=OFF (1) result=OK local_request=135
+2026-10-27T12:11:06-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793139066,920949) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_5V_1 (3) readback=OFF (1) result=OK local_request=135
+2026-10-27T12:11:06-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793139066,921067) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_5V_2 (4) readback=OFF (1) result=OK local_request=135
+2026-10-27T12:11:06-10:00 n2-obc artemis-fprime[802]: EVENT: (16777218) (2:1793139066,921397) COMMAND: (cmdDisp) OpCodeCompleted : Opcode 0x1000a00b completed
+2026-10-27T12:11:06-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793139066,921179) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_5V_3 (5) readback=OFF (1) result=OK local_request=135
+2026-10-27T12:11:06-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793139066,924286) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_12V (7) readback=OFF (1) result=OK local_request=135
+2026-10-27T12:11:06-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793139066,924425) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_VBATT (8) readback=OFF (1) result=OK local_request=135
+2026-10-27T12:11:06-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793139066,924542) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_BURN1 (9) readback=OFF (1) result=OK local_request=135
+2026-10-27T12:11:06-10:00 n2-obc artemis-fprime[802]: EVENT: (268566532) (2:1793139066,924654) ACTIVITY_HI: (epsDriverArtemis) PduRailReadback : PDU GET_OUTPUT_STATE (3) rail=RAIL_BURN2 (10) readback=OFF (1) result=OK local_request=135
+2026-10-27T12:11:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139067,78596) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=136
+2026-10-27T12:11:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139067,84665) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:11:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139067,115522) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:11:07-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139067,114807) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:11:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139069,81051) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=137
+2026-10-27T12:11:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139069,86100) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:11:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139069,117325) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:11:09-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139069,120501) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:11:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139071,77491) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=138
+2026-10-27T12:11:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139071,86074) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:11:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139071,114003) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:11:11-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139071,117170) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:11:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139073,81851) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=139
+2026-10-27T12:11:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139073,83839) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:11:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139073,117859) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:11:13-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139073,120917) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:11:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139075,75321) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=140
+2026-10-27T12:11:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139075,89113) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:11:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139075,116633) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:11:15-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139075,119686) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0
+2026-10-27T12:11:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268566528) (2:1793139077,85523) ACTIVITY_LO: (epsDriverArtemis) PduRequestQueued : Artemis PDU request=GET_SUMMARY_STATUS (0) queued local request=141
+2026-10-27T12:11:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139077,92306) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=UNKNOWN (0) outputs=0 faults=0
+2026-10-27T12:11:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268476416) (2:1793139077,122094) ACTIVITY_LO: (epsManager) EpsStatusUpdated : EPS status health=OK (1) outputs=0 faults=0
+2026-10-27T12:11:17-10:00 n2-obc artemis-fprime[802]: EVENT: (268566529) (2:1793139077,124723) ACTIVITY_LO: (epsDriverArtemis) PduRequestHandled : Artemis PDU request=GET_SUMMARY_STATUS (0) status=0

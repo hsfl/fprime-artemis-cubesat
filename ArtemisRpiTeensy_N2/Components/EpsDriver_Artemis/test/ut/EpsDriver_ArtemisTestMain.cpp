@@ -20,6 +20,11 @@ TEST(Nominal, LegacyAndExtendedProtocolInfo) {
     tester.testLegacyAndExtendedProtocolInfo();
 }
 
+TEST(Nominal, ReadableEventsAndFreshness) {
+    Components::EpsDriver_ArtemisTester tester;
+    tester.testReadableEventsAndFreshness();
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

@@ -1,6 +1,18 @@
-# Neutron 2 development intent — 2026-10-07 (updated 2026-10-20)
+# Neutron 2 development intent — 2026-10-07 (updated 2026-10-27)
 
-**BLUF:** October CDR targets **OBC + real payload + PDU**, including PDU-controlled payload power on/off and raw-data acquisition. CDR skips SatNOGS/SDR/RF. Pi Zero W F′ connects directly to Pi 5 Yamcs over LAN using stock ComCcsds/TCP and stock FileDownlink; do not add a network mux. Keep the physical UART mux channel 2 for Teensy/PDU RPC. The local profile and ground-only launcher pass native F′/Yamcs loopback and legacy regression checks. This is software-only evidence; Pi deployment and real payload/PDU acceptance remain separate. December FSR adds SatNOGS/SDR/RF and the previously planned mission modes/scheduling. The accepted A → C → B work remains local software evidence on its existing custom channel-1 path. See the [canonical plan](CDR_TCP_YAMCS_IMPLEMENTATION_PLAN.md), [runbook](../operations/CDR_TCP.md), and [portable evidence pack](../verification/evidence/n2-cdr-tcp-2026-10-20/README.md).
+## October 27 Pi/PDU checkpoint
+
+The [live deployment record](../verification/evidence/n2-pdu-deployment-2026-10-27/README.md)
+now establishes ARMv6 Pi Zero W runtime, the paired Pi 5 Yamcs dictionary, real
+PDU protocol 2 / firmware 2.2.2, nine named rail readbacks, and 3V3_1
+ON → GET ON → OFF → GET OFF. Final readback was all nine OFF. No PDU or Teensy
+flash was needed for the readability slice. This closes the exercised Pi/UART/RPC
+functional checks; measured payload power/readiness, real payload collection and
+raw-file return, RF and flight qualification remain open. The October 20 local
+acceptance below retains its original software-only scope. Further hardware
+operations require their own task-specific authorization.
+
+**BLUF:** October CDR targets **OBC + real payload + PDU**, including PDU-controlled payload power on/off and raw-data acquisition. CDR skips SatNOGS/SDR/RF. Pi Zero W F′ connects directly to Pi 5 Yamcs over LAN using stock ComCcsds/TCP and stock FileDownlink; do not add a network mux. Keep the physical UART mux channel 2 for Teensy/PDU RPC. The local profile and ground-only launcher pass native F′/Yamcs loopback and legacy regression checks. The local tests remain software evidence; the October 27 checkpoint above separately validates Pi runtime and the exercised PDU commands. The complete real payload sequence remains open. December FSR adds SatNOGS/SDR/RF and the previously planned mission modes/scheduling. The accepted A → C → B work remains local software evidence on its existing custom channel-1 path. See the [canonical plan](CDR_TCP_YAMCS_IMPLEMENTATION_PLAN.md), [runbook](../operations/CDR_TCP.md), and [portable evidence pack](../verification/evidence/n2-cdr-tcp-2026-10-20/README.md).
 
 ## October 20 CDR scope and transport selection
 
@@ -21,9 +33,9 @@ Dennis confirmed payload↔OBC command/telemetry over USB↔RS-422; exact adapte
 
 ## Current decisions and boundaries
 
-- **Development stage:** Software work only for now. Yamcs is the command and observation interface for local functional scenarios. No RF operation, board bring-up, flashing, deployment, or power switching is authorized by this software task.
+- **Development stage:** Local software acceptance and the separately authorized October 27 Pi/PDU bench check are recorded above. The complete real payload sequence remains open. Further deployment, flashing, RF or power switching requires task-specific authorization.
 - **CDR FlatSat:** The planned OBC is a Raspberry Pi Zero W running F′ as the FlatSat proxy, with the Neutron 2 payload board. The revised October sequence requires the PDU to power the payload on/off; COMMS and SDR are deferred to FSR. The current software-only stage does not establish those hardware paths.
-- **Ground host:** Pi 5 Ubuntu/Yamcs serves browser operators on the LAN. For CDR it runs Yamcs and tcp-fast-client; FSR adds SDR services. The ground-only launcher passes local loopback and startup-cancellation checks; cancellation exited in 0.444 seconds with both exact process groups gone. Pi 5 LAN deployment and service setup remain separate work. See the [ground-host plan](../integration/GROUND_HOST.md) and [Yamcs primer](../operations/YAMCS_BASICS.md).
+- **Ground host:** Pi 5 Ubuntu/Yamcs serves browser operators on the LAN. For CDR it runs Yamcs and tcp-fast-client; FSR adds SDR services. The ground-only launcher passes local loopback and startup-cancellation checks; cancellation exited in 0.444 seconds with both exact process groups gone. Pi 5 deployment and dictionary reload were exercised in the October 27 record; representative load and the full payload sequence remain separate gates. See the [ground-host plan](../integration/GROUND_HOST.md) and [Yamcs primer](../operations/YAMCS_BASICS.md).
 - **CDR scope:** Real payload command/acquisition and PDU-controlled payload on/off are required. Formal mission modes, scheduling, SatNOGS/SDR/RF, SOH and ADCS/geo-based commanding are not required. Use direct stock ComCcsds/TCP and stock FileDownlink. Local software tests use fake payload/PDU interfaces; they do not establish real hardware acceptance.
 - **Payload data:** The payload supplies raw science data. Preserve the existing simulator CSV/histogram and custom channel-1 results as local software evidence, separate from CDR. Final local CDR checks passed stock FileDownlink SendFile for both opaque multi-packet fixtures with independent Yamcs GET byte/hash equality; the source/product helper was exercised. Do not claim the custom VERIFIED workflow has migrated. The real payload-side file boundary remains to be agreed.
 - **Ownership:** Dennis owns OBC F′ and Yamcs integration, including the F′ SatNOGS component/driver. Aris owns the payload. Sam and Zach own SatNOGS firmware/SPI development and SDR integration. USB↔RS-422 payload command/telemetry is selected; electrical settings, public command/lifecycle and raw-file contract remain open.

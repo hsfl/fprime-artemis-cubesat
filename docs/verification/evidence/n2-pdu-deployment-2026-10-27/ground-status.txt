@@ -1,0 +1,24 @@
+Tue Oct 27 22:11:19 UTC 2026
+51968b0cfb73320d9ab8c6eabcc9d55038576def6179651400c3f60f3985ef1f  /home/n2-fprime-yamcs/yamcs-station/dictionary.json
+MainPID=11372
+NRestarts=2
+ActiveState=active
+SubState=running
+
+MainPID=11373
+NRestarts=2
+ActiveState=active
+SubState=running
+2026-10-27T12:06:14-10:00 n2-fprime-yamcs systemd[1]: n2-ground-bridge.service: Deactivated successfully.
+2026-10-27T12:06:14-10:00 n2-fprime-yamcs systemd[1]: n2-ground-bridge.service: Consumed 18.873s CPU time.
+2026-10-27T12:06:19-10:00 n2-fprime-yamcs systemd[1]: n2-ground-bridge.service: Scheduled restart job, restart counter is at 2.
+2026-10-27T12:06:19-10:00 n2-fprime-yamcs systemd[1]: Started n2-ground-bridge.service - Neutron 2 Ground F Prime TCP/UDP Bridge.
+2026-10-27T12:06:19-10:00 n2-fprime-yamcs n2-ground-bridge[11373]: 2026-10-27 12:06:19,964 INFO udp-fast[to 127.0.0.1:50000, on 127.0.0.1:50001] receiving
+2026-10-27T12:06:19-10:00 n2-fprime-yamcs n2-ground-bridge[11373]: 2026-10-27 12:06:19,969 INFO Bridge up: downlink and uplink pumps running
+2026-10-27T12:06:19-10:00 n2-fprime-yamcs n2-ground-bridge[11373]: 2026-10-27 12:06:19,970 INFO paced F' bridge ready pid=11373 tcp=n2-obc.local:50000 frame=1024B scid=68 interval=5.000ms UDP=127.0.0.1:50000/50001
+2026-10-27T12:06:20-10:00 n2-fprime-yamcs n2-ground-bridge[11373]: 2026-10-27 12:06:20,275 INFO tcp-fast-client[n2-obc.local:50000] connected to 192.168.0.152:50000
+2026-10-27T12:06:48-10:00 n2-fprime-yamcs n2-ground-bridge[11373]: 2026-10-27 12:06:48,798 WARNING tcp-fast-client[n2-obc.local:50000] disconnected: peer closed the connection
+2026-10-27T12:07:52-10:00 n2-fprime-yamcs n2-ground-bridge[11373]: 2026-10-27 12:07:52,228 INFO tcp-fast-client[n2-obc.local:50000] connected to 192.168.0.152:50000
+2026-10-27T12:07:52-10:00 n2-fprime-yamcs n2-ground-bridge[11373]: 2026-10-27 12:07:52,613 INFO paced UDP TM egress frames=100 sent_bytes=102400 rate=1.1 frames/s 1.1 kB/s
+2026-10-27T12:09:06-10:00 n2-fprime-yamcs n2-ground-bridge[11373]: 2026-10-27 12:09:06,102 INFO paced UDP TM egress frames=200 sent_bytes=204800 rate=1.2 frames/s 1.2 kB/s
+2026-10-27T12:10:19-10:00 n2-fprime-yamcs n2-ground-bridge[11373]: 2026-10-27 12:10:19,103 INFO paced UDP TM egress frames=300 sent_bytes=307200 rate=1.3 frames/s 1.3 kB/s

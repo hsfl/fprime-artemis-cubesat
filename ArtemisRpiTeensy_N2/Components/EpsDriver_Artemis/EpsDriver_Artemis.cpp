@@ -46,6 +46,49 @@ bool isLowerHex(U8 value) {
            ((value >= static_cast<U8>('a')) && (value <= static_cast<U8>('f')));
 }
 
+const char* errorName(Components::PduErrorOrigin origin, U8 code) {
+    if (origin == Components::PduErrorOrigin::TEENSY_RPC) {
+        switch (code) {
+            case 1: return "BAD_REQUEST";
+            case 2: return "BUSY";
+            case 3: return "TIMEOUT";
+            case 4: return "TARGET_ERROR";
+            default: return "UNKNOWN";
+        }
+    }
+    if (origin == Components::PduErrorOrigin::PDU) {
+        switch (code) {
+            case 1: return "BAD_OPCODE";
+            case 2: return "BAD_LENGTH";
+            case 3: return "BAD_PARAM";
+            case 4: return "HW_FAULT";
+            case 5: return "NOT_IMPLEMENTED";
+            case 6: return "BUSY";
+            default: return "UNKNOWN";
+        }
+    }
+    switch (code) {
+        case 0xF9: return "READBACK_MISMATCH";
+        case 0xFA: return "MALFORMED_PAYLOAD";
+        case 0xFB: return "MALFORMED_FRAME";
+        case 0xFD: return "BUSY";
+        case 0xFE: return "NOT_CONFIGURED";
+        default: return "UNKNOWN";
+    }
+}
+
+Components::PduRail railFromId(U8 id) {
+    U8 index = 0;
+    if ((id != PDU_V2_OUTPUT_ALL) && !outputBitIndex(id, index)) {
+        return Components::PduRail::UNKNOWN;
+    }
+    return Components::PduRail(static_cast<Components::PduRail::T>(id));
+}
+
+Components::PduRailState railState(U16 bitmap, U8 index) {
+    return (bitmap & static_cast<U16>(1U << index)) ? Components::PduRailState::ON : Components::PduRailState::OFF;
+}
+
 }  // namespace
 
 EpsDriver_Artemis::EpsDriver_Artemis(const char* const compName)
@@ -61,6 +104,9 @@ EpsDriver_Artemis::EpsDriver_Artemis(const char* const compName)
       m_pendingState(0),
       m_protocolVersion(0),
       m_outputBitmap(0),
+      m_railKnownMask(0),
+      m_railFreshMask(0),
+      m_railAgeTicks{},
       m_resetCause(0),
       m_faultBitmap(0),
       m_uptimeSeconds(0),
@@ -87,6 +133,13 @@ void EpsDriver_Artemis::run_handler(FwIndexType portNum, U32 context) {
     bool timeout = false;
     {
         Os::ScopeLock lock(this->m_stateMutex);
+        for (U8 i = 0; i < PDU_V2_OUTPUT_COUNT; ++i) {
+            const U16 bit = static_cast<U16>(1U << i);
+            if ((this->m_railKnownMask & bit) != 0U) {
+                if (this->m_railAgeTicks[i] < 0xFFFFFFFFU) { ++this->m_railAgeTicks[i]; }
+                if (this->m_railAgeTicks[i] > RAIL_FRESH_TICKS) { this->m_railFreshMask &= static_cast<U16>(~bit); }
+            }
+        }
         if (this->m_requestPending) {
             this->m_pendingRequestTicks += 1U;
             timeout = this->m_pendingRequestTicks >= PDU_REQUEST_TIMEOUT_TICKS;
@@ -96,6 +149,7 @@ void EpsDriver_Artemis::run_handler(FwIndexType portNum, U32 context) {
         this->timeoutPendingRequest();
     }
     this->writeTelemetry();
+    this->publishRailSnapshot();
 }
 
 void EpsDriver_Artemis::requestIn_handler(
@@ -138,10 +192,14 @@ void EpsDriver_Artemis::requestIn_handler(
         this->m_transportFailureCount += 1U;
         this->m_lastPduStatus = admissionStatus;
         this->m_lastOpcode = opcode;
+        if (admissionStatus != REQUEST_STATUS_BUSY) { this->m_railFreshMask = 0; }
     }
     this->emitStatus(Components::HealthState::UNKNOWN, linkState, admissionStatus, opcode, request);
     this->log_WARNING_LO_PduRequestFailed(request, admissionStatus);
+    this->log_WARNING_HI_PduOperationError(request, railFromId(outputId), Components::PduErrorOrigin::DRIVER,
+                                           Fw::String(errorName(Components::PduErrorOrigin::DRIVER, admissionStatus)), admissionStatus, 0);
     this->writeTelemetry();
+    this->publishRailSnapshot();
 }
 
 U8 EpsDriver_Artemis::sendPduRequest(
@@ -228,13 +286,24 @@ void EpsDriver_Artemis::teensyResponseIn_handler(FwIndexType portNum, Fw::Buffer
     Components::HealthState health = Components::HealthState::UNKNOWN;
     bool report = false;
     bool handled = false;
+    U8 outputId = 0;
+    U8 desired = 0;
+    U16 bitmap = 0;
+    U16 previousBitmap = 0, previousKnown = 0;
+    U8 protocol = 0, major = 0, minor = 0, patch = 0, flags = 0;
+    Fw::String gitHash;
+    Components::PduErrorOrigin origin = Components::PduErrorOrigin::DRIVER;
 
     {
         Os::ScopeLock lock(this->m_stateMutex);
+        previousBitmap = this->m_outputBitmap;
+        previousKnown = this->m_railKnownMask;
         if (!fwBuffer.isValid() || (fwBuffer.getSize() < LOCAL_HEADER_LEN)) {
             this->m_transportFailureCount += 1U;
             if (this->m_requestPending) {
                 request = this->m_pendingRequest;
+                outputId = this->m_pendingOutputId;
+                desired = this->m_pendingState;
                 requestId = this->m_pendingRequestId;
                 opcode = this->m_pendingOpcode;
                 this->m_requestPending = false;
@@ -257,6 +326,8 @@ void EpsDriver_Artemis::teensyResponseIn_handler(FwIndexType portNum, Fw::Buffer
                 this->m_transportFailureCount += 1U;
             } else {
                 request = this->m_pendingRequest;
+                outputId = this->m_pendingOutputId;
+                desired = this->m_pendingState;
                 requestId = this->m_pendingRequestId;
                 opcode = this->m_pendingOpcode;
                 this->m_requestPending = false;
@@ -269,6 +340,7 @@ void EpsDriver_Artemis::teensyResponseIn_handler(FwIndexType portNum, Fw::Buffer
                     this->m_lastPduStatus = status;
                     this->m_lastOpcode = opcode;
                 } else if (localStatus != LinkCfg::TEENSY_STATUS_OK) {
+                    origin = Components::PduErrorOrigin::TEENSY_RPC;
                     this->m_transportFailureCount += 1U;
                     status = localStatus;
                     this->m_lastPduStatus = localStatus;
@@ -287,6 +359,7 @@ void EpsDriver_Artemis::teensyResponseIn_handler(FwIndexType portNum, Fw::Buffer
                         this->m_lastPduStatus = status;
                         this->m_lastOpcode = opcode;
                     } else if (response.status != PDU_V2_STATUS_OK) {
+                        origin = Components::PduErrorOrigin::PDU;
                         status = response.status;
                         this->m_lastPduStatus = response.status;
                         this->m_lastOpcode = response.opcode;
@@ -305,14 +378,23 @@ void EpsDriver_Artemis::teensyResponseIn_handler(FwIndexType portNum, Fw::Buffer
                         this->m_lastPduStatus = response.status;
                         this->m_lastOpcode = response.opcode;
                         linkState = LINK_PROTOCOL_OK;
-                        health = ((request == Components::EpsRequest::GET_SUMMARY_STATUS) &&
-                                  (this->m_faultBitmap != 0U)) ?
+                        health = (this->m_faultBitmap != 0U) ?
                                      Components::HealthState::WARN : Components::HealthState::OK;
                         handled = true;
                     }
                 }
             }
         }
+        if (report && !handled && status != DRIVER_STATUS_READBACK_MISMATCH) {
+            this->m_railFreshMask = 0;
+        }
+        bitmap = this->m_outputBitmap;
+        protocol = this->m_protocolVersion;
+        major = this->m_firmwareMajor;
+        minor = this->m_firmwareMinor;
+        patch = this->m_firmwarePatch;
+        flags = this->m_buildFlags;
+        gitHash = this->m_gitHash;
     }
 
     if (!report) {
@@ -322,11 +404,47 @@ void EpsDriver_Artemis::teensyResponseIn_handler(FwIndexType portNum, Fw::Buffer
     this->emitStatus(health, linkState, status, opcode, request);
     if (handled && (status == PDU_V2_STATUS_OK)) {
         this->log_ACTIVITY_LO_PduRequestHandled(request, status);
+        if (request == Components::EpsRequest::GET_OUTPUT_STATE) {
+            for (U8 i = 0; i < PDU_V2_OUTPUT_COUNT; ++i) {
+                if ((outputId == PDU_V2_OUTPUT_ALL) || (outputId == OUTPUT_IDS[i])) {
+                    this->log_ACTIVITY_HI_PduRailReadback(request, railFromId(OUTPUT_IDS[i]), railState(bitmap, i), requestId);
+                }
+            }
+        } else if ((request == Components::EpsRequest::SET_OUTPUT_STATE) ||
+                   (request == Components::EpsRequest::POWER_CYCLE_OUTPUT)) {
+            U8 index = 0;
+            if (outputBitIndex(outputId, index)) {
+                if (request == Components::EpsRequest::SET_OUTPUT_STATE) {
+                    this->log_ACTIVITY_HI_PduRailSetResult(railFromId(outputId),
+                        desired ? Components::PduDesiredState::ON : Components::PduDesiredState::OFF, railState(bitmap, index), requestId);
+                } else {
+                    this->log_ACTIVITY_HI_PduCycleStarted(railFromId(outputId), railState(bitmap, index), requestId);
+                }
+            }
+        } else if (request == Components::EpsRequest::GET_PROTOCOL_INFO) {
+            this->log_ACTIVITY_HI_PduInfoReadback(protocol, major, minor, patch, flags, gitHash, requestId);
+        } else if (request == Components::EpsRequest::GET_SUMMARY_STATUS) {
+            const U16 changed = static_cast<U16>((bitmap ^ previousBitmap) & previousKnown);
+            for (U8 i = 0; i < PDU_V2_OUTPUT_COUNT; ++i) {
+                if ((changed & static_cast<U16>(1U << i)) != 0U) {
+                    this->log_ACTIVITY_HI_PduRailReadback(request, railFromId(OUTPUT_IDS[i]), railState(bitmap, i), requestId);
+                }
+            }
+        }
     } else {
         this->log_WARNING_LO_PduRequestFailed(request, status);
+        this->log_WARNING_HI_PduOperationError(request, railFromId(outputId), origin,
+                                               Fw::String(errorName(origin, status)), status, requestId);
+        U8 index = 0;
+        if ((request == Components::EpsRequest::SET_OUTPUT_STATE) && (status == DRIVER_STATUS_READBACK_MISMATCH) &&
+            outputBitIndex(outputId, index)) {
+            this->log_WARNING_HI_PduRailSetMismatch(railFromId(outputId),
+                desired ? Components::PduDesiredState::ON : Components::PduDesiredState::OFF, railState(bitmap, index), requestId);
+        }
     }
     static_cast<void>(requestId);
     this->writeTelemetry();
+    this->publishRailSnapshot();
 }
 
 bool EpsDriver_Artemis::parsePduResponse(
@@ -383,6 +501,7 @@ bool EpsDriver_Artemis::processResponse(const Components::EpsRequest& request, c
         this->m_uptimeSeconds = readLe32(&response.payload[4]);
         this->m_capabilities = response.payload[8];
         this->m_protocolVersion = PDU_V2_VERSION;
+        this->observeRails(static_cast<U16>((1U << PDU_V2_OUTPUT_COUNT) - 1U));
         return true;
     }
 
@@ -456,6 +575,7 @@ bool EpsDriver_Artemis::processResponse(const Components::EpsRequest& request, c
             }
         }
         this->m_outputBitmap = bitmap;
+        this->observeRails(static_cast<U16>((1U << PDU_V2_OUTPUT_COUNT) - 1U));
         return true;
     }
 
@@ -468,6 +588,8 @@ bool EpsDriver_Artemis::processResponse(const Components::EpsRequest& request, c
             this->m_lastPduStatus = DRIVER_STATUS_MALFORMED_PAYLOAD;
             return false;
         }
+        U8 index = 0;
+        if (outputBitIndex(response.payload[0], index)) { this->observeRails(static_cast<U16>(1U << index)); }
         if (((request == Components::EpsRequest::SET_OUTPUT_STATE) &&
              (response.payload[1] != this->m_pendingState)) ||
             ((request == Components::EpsRequest::POWER_CYCLE_OUTPUT) && (response.payload[1] != 0U))) {
@@ -593,10 +715,36 @@ void EpsDriver_Artemis::writeTelemetry() {
     this->tlmWrite_PduGitHash(gitHash);
 }
 
+// Called only while m_stateMutex is held, after the full reply was validated.
+void EpsDriver_Artemis::observeRails(U16 mask) {
+    this->m_railKnownMask |= mask;
+    this->m_railFreshMask |= mask;
+    for (U8 i = 0; i < PDU_V2_OUTPUT_COUNT; ++i) {
+        if ((mask & static_cast<U16>(1U << i)) != 0U) { this->m_railAgeTicks[i] = 0; }
+    }
+}
+
+void EpsDriver_Artemis::publishRailSnapshot() {
+    if (!this->isConnected_railSnapshotOut_OutputPort(0)) { return; }
+    U16 bitmap, known, fresh;
+    U32 age = 0;
+    {
+        Os::ScopeLock lock(this->m_stateMutex);
+        bitmap = this->m_outputBitmap;
+        known = this->m_railKnownMask;
+        fresh = this->m_railFreshMask;
+        for (U8 i = 0; i < PDU_V2_OUTPUT_COUNT; ++i) {
+            if ((known & static_cast<U16>(1U << i)) && this->m_railAgeTicks[i] > age) { age = this->m_railAgeTicks[i]; }
+        }
+    }
+    this->railSnapshotOut_out(0, bitmap, known, fresh, age);
+}
+
 void EpsDriver_Artemis::timeoutPendingRequest() {
     Components::EpsRequest request = Components::EpsRequest::GET_SUMMARY_STATUS;
     U8 requestId = 0;
     U8 opcode = 0;
+    U8 outputId = 0;
     {
         Os::ScopeLock lock(this->m_stateMutex);
         if (!this->m_requestPending || (this->m_pendingRequestTicks < PDU_REQUEST_TIMEOUT_TICKS)) {
@@ -605,11 +753,13 @@ void EpsDriver_Artemis::timeoutPendingRequest() {
         request = this->m_pendingRequest;
         requestId = this->m_pendingRequestId;
         opcode = this->m_pendingOpcode;
+        outputId = this->m_pendingOutputId;
         this->m_requestPending = false;
         this->m_pendingRequestTicks = 0;
         this->m_transportFailureCount += 1U;
         this->m_lastPduStatus = LinkCfg::TEENSY_STATUS_TIMEOUT;
         this->m_lastOpcode = opcode;
+        this->m_railFreshMask = 0;
     }
     this->emitStatus(
         Components::HealthState::UNKNOWN,
@@ -619,6 +769,9 @@ void EpsDriver_Artemis::timeoutPendingRequest() {
         request);
     this->log_WARNING_LO_PduRequestTimedOut(request, requestId);
     this->log_WARNING_LO_PduRequestFailed(request, LinkCfg::TEENSY_STATUS_TIMEOUT);
+    this->log_WARNING_HI_PduOperationError(request, railFromId(outputId), Components::PduErrorOrigin::TEENSY_RPC,
+        Fw::String("TIMEOUT"), LinkCfg::TEENSY_STATUS_TIMEOUT, requestId);
+    this->publishRailSnapshot();
 }
 
 U16 EpsDriver_Artemis::crc16Ccitt(const U8* data, U32 length) {

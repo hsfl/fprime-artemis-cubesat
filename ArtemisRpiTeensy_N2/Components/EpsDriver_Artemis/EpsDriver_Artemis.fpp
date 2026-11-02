@@ -20,6 +20,9 @@ module Components {
         @ Driver status output
         output port statusOut: Components.EpsStatus
 
+        @ Last observed rails and freshness; ages are scheduler ticks, fresh for at most 3 ticks.
+        output port railSnapshotOut: Components.EpsRailSnapshot
+
         @ Teensy-local RPC request output to UART channel 2.
         output port teensyRequestOut: Fw.BufferSend
 
@@ -72,6 +75,24 @@ module Components {
 
         @ PDU request timeout event; keep throttled because driver/transport paths can storm.
         event PduRequestTimedOut(epsRequest: Components.EpsRequest, requestId: U32) severity warning low format "Artemis PDU request={} timed out local request={}" throttle 5
+
+        @ Validated individual readback, including each rail in an explicit GET ALL.
+        event PduRailReadback(epsRequest: Components.EpsRequest, rail: Components.PduRail, readback: Components.PduRailState, requestId: U32) severity activity high format "PDU {} rail={} readback={} result=OK local_request={}"
+
+        @ Successful SET with validated readback.
+        event PduRailSetResult(rail: Components.PduRail, desired: Components.PduDesiredState, readback: Components.PduRailState, requestId: U32) severity activity high format "PDU SET rail={} desired={} readback={} result=OK local_request={}"
+
+        @ A valid SET reply differed from the requested state.
+        event PduRailSetMismatch(rail: Components.PduRail, desired: Components.PduDesiredState, readback: Components.PduRailState, requestId: U32) severity warning high format "PDU SET rail={} desired={} readback={} result=READBACK_MISMATCH local_request={}"
+
+        @ A cycle reply confirms only the initial OFF phase.
+        event PduCycleStarted(rail: Components.PduRail, readback: Components.PduRailState, requestId: U32) severity activity high format "PDU CYCLE rail={} initial_readback={} result=STARTED local_request={}"
+
+        @ Decoded failure; local request ID wraps and is diagnostic only.
+        event PduOperationError(epsRequest: Components.EpsRequest, rail: Components.PduRail, origin: Components.PduErrorOrigin, reason: string size 32, code: U32, requestId: U32) severity warning high format "PDU {} rail={} origin={} result={} code={} local_request={}"
+
+        @ Validated firmware identity response.
+        event PduInfoReadback(protocol: U32, major: U32, minor: U32, patch: U32, flags: U32, gitHash: string size 12, requestId: U32) severity activity high format "PDU INFO protocol={} firmware={}.{}.{} build_flags={} git={} result=OK local_request={}"
 
         @ Port for requesting the current time
         time get port timeCaller

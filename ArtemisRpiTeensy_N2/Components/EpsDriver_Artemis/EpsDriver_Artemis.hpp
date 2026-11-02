@@ -51,6 +51,8 @@ class EpsDriver_Artemis final : public EpsDriver_ArtemisComponentBase {
         Components::EpsRequest request
     );
     void writeTelemetry();
+    void observeRails(U16 mask);
+    void publishRailSnapshot();
 
     static U16 crc16Ccitt(const U8* data, U32 length);
     static U32 readLe32(const U8* data);
@@ -64,6 +66,7 @@ class EpsDriver_Artemis final : public EpsDriver_ArtemisComponentBase {
     static constexpr U8 LOCAL_HEADER_LEN = 4;
     static constexpr U32 LOCAL_MAX_PACKET_LEN = LOCAL_HEADER_LEN + PDU_V2_MAX_FRAME_LEN;
     static constexpr U32 PDU_REQUEST_TIMEOUT_TICKS = 2;
+    static constexpr U8 RAIL_FRESH_TICKS = 3;
     static constexpr U8 DRIVER_STATUS_READBACK_MISMATCH = 0xF9U;
     static constexpr U8 DRIVER_STATUS_MALFORMED_PAYLOAD = 0xFAU;
     static constexpr U8 DRIVER_STATUS_MALFORMED_FRAME = 0xFB;
@@ -80,6 +83,9 @@ class EpsDriver_Artemis final : public EpsDriver_ArtemisComponentBase {
     U8 m_pendingState;
     U8 m_protocolVersion;
     U16 m_outputBitmap;
+    U16 m_railKnownMask;
+    U16 m_railFreshMask;
+    U32 m_railAgeTicks[PDU_V2_OUTPUT_COUNT];
     U8 m_resetCause;
     U8 m_faultBitmap;
     U32 m_uptimeSeconds;

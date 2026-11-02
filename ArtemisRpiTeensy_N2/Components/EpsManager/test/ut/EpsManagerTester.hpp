@@ -21,6 +21,8 @@ class EpsManagerTester final : public EpsManagerGTestBase {
 
     void testCommandWaitsForTerminalResponseAndBusyDoesNotCompleteIt();
     void testNegativeMalformedAndTimeoutStatusesFailCommand();
+    void testNamedCommandsAndGuards();
+    void testSnapshotStates();
 
   private:
     struct Request {

@@ -1,0 +1,29 @@
+
+Elf file type is DYN (Position-Independent Executable file)
+Entry point 0x16544
+There are 9 program headers, starting at offset 52
+
+Program Headers:
+  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
+  EXIDX          0x17bb4c 0x0017bb4c 0x0017bb4c 0x06470 0x06470 R   0x4
+  PHDR           0x000034 0x00000034 0x00000034 0x00120 0x00120 R   0x4
+  INTERP         0x000154 0x00000154 0x00000154 0x00019 0x00019 R   0x1
+      [Requesting program interpreter: /lib/ld-linux-armhf.so.3]
+  LOAD           0x000000 0x00000000 0x00000000 0x181fc0 0x181fc0 R E 0x1000
+  LOAD           0x182640 0x00182640 0x00182640 0x09f6c 0xdae3c RW  0x1000
+  DYNAMIC        0x18bf00 0x0018bf00 0x0018bf00 0x00100 0x00100 RW  0x4
+  NOTE           0x000170 0x00000170 0x00000170 0x00044 0x00044 R   0x4
+  GNU_STACK      0x000000 0x00000000 0x00000000 0x00000 0x00000 RW  0x10
+  GNU_RELRO      0x182640 0x00182640 0x00182640 0x099c0 0x099c0 R   0x1
+
+ Section to Segment mapping:
+  Segment Sections...
+   00     .ARM.exidx
+   01
+   02     .interp
+   03     .interp .note.gnu.build-id .note.ABI-tag .gnu.hash .dynsym .dynstr .gnu.version .gnu.version_r .rel.dyn .rel.plt .init .plt .text .fini .rodata .ARM.extab .ARM.exidx .eh_frame
+   04     .init_array .fini_array .data.rel.ro .dynamic .got .data .bss
+   05     .dynamic
+   06     .note.gnu.build-id .note.ABI-tag
+   07
+   08     .init_array .fini_array .data.rel.ro .dynamic

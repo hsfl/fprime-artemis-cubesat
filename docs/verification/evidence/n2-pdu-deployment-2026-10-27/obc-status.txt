@@ -1,0 +1,10 @@
+Tue Oct 27 22:11:18 UTC 2026
+/home/n2-obc/artemis/releases/a99e22e-pdu-readable-20261027
+e498eb77cc8b01434cd2bbf5290d328d46d51ea6eb08186290d51e8cd26c6a2f  /home/n2-obc/artemis/current/ArtemisRpiTeensyDeployment
+51968b0cfb73320d9ab8c6eabcc9d55038576def6179651400c3f60f3985ef1f  /home/n2-obc/artemis/current/ArtemisRpiTeensyDeploymentTopologyDictionary.json
+MainPID=802
+NRestarts=1
+ActiveState=active
+SubState=running
+802 /usr/bin/python3 /home/n2-obc/artemis/artemis-supervisor.py --uart /dev/serial0 --tcp-port 50000 -- /home/n2-obc/artemis/current/ArtemisRpiTeensyDeployment -a 0.0.0.0 -p 50000 -d /dev/serial0
+803 /home/n2-obc/artemis/current/ArtemisRpiTeensyDeployment -a 0.0.0.0 -p 50000 -d /dev/serial0

@@ -10,6 +10,16 @@ TEST(Nominal, NegativeMalformedAndTimeoutStatusesFailCommand) {
     tester.testNegativeMalformedAndTimeoutStatusesFailCommand();
 }
 
+TEST(Nominal, NamedCommandsAndGuards) {
+    Components::EpsManagerTester tester;
+    tester.testNamedCommandsAndGuards();
+}
+
+TEST(Nominal, SnapshotStates) {
+    Components::EpsManagerTester tester;
+    tester.testSnapshotStates();
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

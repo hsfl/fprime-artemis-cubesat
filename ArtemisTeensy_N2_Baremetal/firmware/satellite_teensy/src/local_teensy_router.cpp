@@ -2,6 +2,14 @@
 
 #include <string.h>
 
+#if defined(ARTEMIS_CDR_NO_RADIO)
+LocalTeensyRouter::LocalTeensyRouter(PduProxy& pduProxy, LinkCounters& counters)
+    : m_pduProxy(pduProxy),
+      m_counters(counters),
+      m_rfResponseLen(0) {
+  memset(m_rfResponse, 0, sizeof(m_rfResponse));
+}
+#else
 LocalTeensyRouter::LocalTeensyRouter(PduProxy& pduProxy, Rf23Driver& rfDriver, LinkCounters& counters)
     : m_pduProxy(pduProxy),
       m_rfDriver(rfDriver),
@@ -9,6 +17,7 @@ LocalTeensyRouter::LocalTeensyRouter(PduProxy& pduProxy, Rf23Driver& rfDriver, L
       m_rfResponseLen(0) {
   memset(m_rfResponse, 0, sizeof(m_rfResponse));
 }
+#endif
 
 bool LocalTeensyRouter::beginLocalFrame(const uint8_t* payload, uint16_t length) {
   if (payload == nullptr || length < LOCAL_HEADER_LEN) {
@@ -31,7 +40,11 @@ bool LocalTeensyRouter::beginLocalFrame(const uint8_t* payload, uint16_t length)
     return true;
   }
 
+#if defined(ARTEMIS_CDR_NO_RADIO)
+  prepareRfStatusResponse(requestId, link_protocol::TEENSY_STATUS_TARGET_ERROR);
+#else
   prepareRfStatusResponse(requestId, link_protocol::TEENSY_STATUS_OK);
+#endif
   return true;
 }
 
@@ -58,6 +71,7 @@ void LocalTeensyRouter::prepareRfStatusResponse(uint8_t requestId, uint8_t statu
   m_rfResponse[3] = 0;
 
   if (status == link_protocol::TEENSY_STATUS_OK) {
+#if !defined(ARTEMIS_CDR_NO_RADIO)
     const artemis::rf23bp::LinkStats stats = m_rfDriver.linkStats();
     m_rfResponse[3] = RF_STATS_PAYLOAD_LEN;
     m_rfResponse[4] = link_protocol::TEENSY_RF_OP_LINK_STATS;
@@ -68,6 +82,10 @@ void LocalTeensyRouter::prepareRfStatusResponse(uint8_t requestId, uint8_t statu
     writeLe32(&m_rfResponse[13], m_counters.rfRxPackets);
     writeLe32(&m_rfResponse[17], m_counters.rfTxPackets);
     writeLe32(&m_rfResponse[21], m_counters.rfTxDrops);
+#else
+    status = link_protocol::TEENSY_STATUS_TARGET_ERROR;
+    m_rfResponse[2] = status;
+#endif
   }
 
   m_rfResponseLen = static_cast<uint16_t>(LOCAL_HEADER_LEN + m_rfResponse[3]);

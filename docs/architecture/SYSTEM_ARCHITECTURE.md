@@ -1,8 +1,8 @@
 # System Architecture
 
-**BLUF:** Neutron 2's October UNP CDR target is **OBC + payload + PDU**, including PDU-controlled payload on/off and real raw-data acquisition. CDR skips SatNOGS/SDR/RF. The local profile uses stock ComCcsds over TCP between Pi Zero W F′ (stock TCP server) and Pi 5 Yamcs (tcp-fast-client), with stock FileDownlink. Final local native loopback and legacy Yamcs regression checks passed, including both opaque fixtures with independent GET byte/hash checks, fragmentation/disconnect recovery, and fake UART mux channel-2 PDU RPC. Pi deployment and payload/PDU hardware acceptance remain open. Do not add a network mux. The accepted custom channel-1 software demo remains separate from the CDR file path. See the [portable evidence pack](../verification/evidence/n2-cdr-tcp-2026-10-20/README.md).
+**BLUF:** Neutron 2's October UNP CDR target is **OBC + payload + PDU**, including PDU-controlled payload on/off and real raw-data acquisition. CDR skips SatNOGS/SDR/RF. The local profile uses stock ComCcsds over TCP between Pi Zero W F′ (stock TCP server) and Pi 5 Yamcs (tcp-fast-client), with stock FileDownlink. Final local native loopback and legacy Yamcs regression checks passed, including both opaque fixtures with independent GET byte/hash checks, fragmentation/disconnect recovery, and fake UART mux channel-2 PDU RPC. The October 27 ARMv6 Pi deployment and real PDU GUI version/readback plus 3V3_1 ON/OFF checks passed; measured voltage, payload readiness and the full collection sequence remain open. See the [live record](../verification/evidence/n2-pdu-deployment-2026-10-27/README.md). Do not add a network mux. The accepted custom channel-1 software demo remains separate from the CDR file path. See the [portable evidence pack](../verification/evidence/n2-cdr-tcp-2026-10-20/README.md).
 
-Updated October 20, 2026; incorporates the selected and locally validated stock TCP/FileDownlink path. The implementation builds on `neutron2-develop` source baseline `5429a2f`; use the linked CDR evidence pack for exact modified source/dictionary identity. [Development intent](../planning/DEVELOPMENT_INTENT.md) owns milestone scope; [software baseline](../verification/SOFTWARE_BASELINE.md) owns historical acceptance. Dennis confirmed the USB↔RS-422 payload interface, Pi Zero W/Teensy satellite split, and Pi 5 Ubuntu/Yamcs LAN host. SatNOGS firmware/SPI and SDR are FSR scope. Electrical settings and payload protocol details below remain open where unspecified.
+Updated October 27, 2026; incorporates the selected TCP/FileDownlink path and bounded live PDU acceptance. The implementation builds on `neutron2-develop` source baseline `5429a2f`; use the linked CDR evidence pack for exact modified source/dictionary identity. [Development intent](../planning/DEVELOPMENT_INTENT.md) owns milestone scope; [software baseline](../verification/SOFTWARE_BASELINE.md) owns historical acceptance. Dennis confirmed the USB↔RS-422 payload interface, Pi Zero W/Teensy satellite split, and Pi 5 Ubuntu/Yamcs LAN host. SatNOGS firmware/SPI and SDR are FSR scope. Electrical settings and payload protocol details below remain open where unspecified.
 
 ## Purpose
 
@@ -114,6 +114,13 @@ Keep mission policy above device protocols. F′'s [Application-Manager-Driver p
 | Ground receiver/verifier | Reconstruct raw bytes; verify Yamcs readback; update VERIFIED command history | SDR science routing, object ingestion, and independent receipt |
 
 Applications also coordinate framework services and delivery components according to topology; the tier names do not mean every packet traverses all three tiers. Hardware substitution should preserve stable contracts where possible. A new driver is not a guarantee of zero manager/topology changes: real payload and radio requirements may expose missing interface semantics.
+
+October 26 PDU readability: `EpsManager` adds named rail commands and nine
+`UNKNOWN`/`OFF`/`ON`/`STALE` channels. `EpsDriver_Artemis` validates replies,
+emits named results/errors and publishes per-rail freshness through
+`EpsRailSnapshot`. The legacy EPS port and PDU/Teensy wire protocol remain
+unchanged. Rebuild F′ and its matching Yamcs dictionary together; this local
+slice requires no PDU firmware flash. See the [operator/local QA guide](../operations/PDU_READABILITY.md).
 
 ### Payload lifecycle
 

@@ -1,0 +1,51 @@
+{
+  "release": "a99e22e-pdu-readable-20261027",
+  "built_utc": "2026-10-27T22:05:48.410954+00:00",
+  "branch": "neutron2-develop",
+  "head": "a99e22e05874f1a175aa0ac82dd71c8a13641d1f",
+  "dirty_source": true,
+  "profile": {
+    "NEUTRON2_CDR_TCP": true,
+    "NEUTRON2_LOCAL_YAMCS": false,
+    "arch": "ARMv6 v6KZ VFPv2 armhf"
+  },
+  "files": {
+    "ArtemisRpiTeensyDeployment": "e498eb77cc8b01434cd2bbf5290d328d46d51ea6eb08186290d51e8cd26c6a2f",
+    "ArtemisRpiTeensyDeploymentTopologyDictionary.json": "51968b0cfb73320d9ab8c6eabcc9d55038576def6179651400c3f60f3985ef1f"
+  },
+  "source_files": {
+    "ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Top/topology.cdr_tcp.fpp": "44eefce4bea8b7bd42f343d7b50604bc1b071b7f8e06cf4f62fff771543f3f37",
+    "ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Top/topology.fpp": "a4d8e0c5899077344212cfb5eba5bf49fb9f09b365790f342f261da9b15e7a0d",
+    "ArtemisRpiTeensy_N2/Components/EpsDriver_Artemis/EpsDriver_Artemis.cpp": "4ce89b05fba8591b652cd23cfd8f2d8c1c9f0291c7154e8f69440e35c51d2078",
+    "ArtemisRpiTeensy_N2/Components/EpsDriver_Artemis/EpsDriver_Artemis.fpp": "60d85c46e70af172f5427ba7727395ee518e0242a94867e41baa0967e21d8af5",
+    "ArtemisRpiTeensy_N2/Components/EpsDriver_Artemis/EpsDriver_Artemis.hpp": "b5fc672b00deb5dd3b5adcd56ac1a29137e08aba939acc16ff6ba30c77621ab1",
+    "ArtemisRpiTeensy_N2/Components/EpsDriver_Artemis/test/ut/EpsDriver_ArtemisTestMain.cpp": "999b99b028cbf517c883902683ec66ee93139ae2952fc7e567d78badd3947551",
+    "ArtemisRpiTeensy_N2/Components/EpsDriver_Artemis/test/ut/EpsDriver_ArtemisTester.cpp": "2cdc68bcdf22438dadc48a0a2f0fa24036d33de882a028a63c998e5f6882d225",
+    "ArtemisRpiTeensy_N2/Components/EpsDriver_Artemis/test/ut/EpsDriver_ArtemisTester.hpp": "97d1d9dbe6de101da8a755b62790c936959789af933b734c91c200215997fb08",
+    "ArtemisRpiTeensy_N2/Components/EpsManager/EpsManager.cpp": "194c4df97b31e006d55323c995335eea0a1d9170ae62f0a8f169ddd6555784d9",
+    "ArtemisRpiTeensy_N2/Components/EpsManager/EpsManager.fpp": "257392d455f28a412dd370e41df98c198b3458474b718eccb466048a4a726c90",
+    "ArtemisRpiTeensy_N2/Components/EpsManager/EpsManager.hpp": "66d9babeaec343b9bed188867291a26047aa1323aeb9717b162f09518f83a247",
+    "ArtemisRpiTeensy_N2/Components/EpsManager/test/ut/EpsManagerTestMain.cpp": "a6e14256dae8a0926ab6037adf20f00e9e9c40d5608fdfedf950c5c515079479",
+    "ArtemisRpiTeensy_N2/Components/EpsManager/test/ut/EpsManagerTester.cpp": "a2e384ead33f9b622a8e26463fc643b48edef904940f4e434f94bd94598a804b",
+    "ArtemisRpiTeensy_N2/Components/EpsManager/test/ut/EpsManagerTester.hpp": "6d590b8e472519875d8164e8f16c6a35f8b52332754e69c737ddf9c795ad756a",
+    "ArtemisRpiTeensy_N2/Components/Types/Types.fpp": "f6059a24f476be7cf1d987942a5167ed4326bdfd700f4e42144905a2df36d538",
+    "docs/architecture/SYSTEM_ARCHITECTURE.md": "b43c06f7ac8e02aaf9124dc15edef404a9a4d055ea352bf0639430d5fcc9ae02",
+    "docs/integration/PDU.md": "3fafb21c3a7dee442565e90e3337c826e7b1fd5b915f5923ce056959e4e14add",
+    "docs/operations/PDU_READABILITY.md": "12e3cff4b04aa4871baa001ee1e122ab13b6533e9a9066233eb5b7dcdf97f010",
+    "tools/yamcs/test_pdu_readability.py": "48b9c513548d16068647872520a5597d3f3438ba74f8bd63a16ef4c20e527327"
+  },
+  "compatibility_with_deployed_dictionary": {
+    "commands": {
+      "unchanged": 84,
+      "changed": []
+    },
+    "events": {
+      "unchanged": 267,
+      "changed": []
+    },
+    "telemetryChannels": {
+      "unchanged": 187,
+      "changed": []
+    }
+  }
+}

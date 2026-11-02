@@ -1,12 +1,13 @@
 # Neutron 2 documentation
 
-Start with the guide for your task. Final local native CDR profile and legacy Yamcs regression checks pass. Both opaque fixtures passed independent Yamcs GET byte/hash checks; disconnect recovery, fake UART mux channel-2 PDU RPC, guard tests, and startup cancellation passed. This is local software evidence, not Pi, payload or PDU hardware acceptance. CDR does not use a network mux or SatNOGS/SDR/RF; the physical UART mux channel 2 remains for PDU RPC, and SatNOGS/SDR/RF are deferred to FSR. See the [canonical plan](planning/CDR_TCP_YAMCS_IMPLEMENTATION_PLAN.md), [runbook](operations/CDR_TCP.md), and [portable evidence pack](verification/evidence/n2-cdr-tcp-2026-10-20/README.md).
+Start with the guide for your task. Final local native CDR profile and legacy Yamcs regression checks pass, with independent fixture checks and fake UART/PDU RPC. The separate [October 27 live PDU record](verification/evidence/n2-pdu-deployment-2026-10-27/README.md) covers the deployed Pi Zero W and Pi 5, nine real PDU readbacks and 3V3_1 ON/OFF. Measured voltage, the real payload sequence, RF and flight qualification remain open. CDR does not use a network mux or SatNOGS/SDR/RF; physical UART mux channel 2 remains for PDU RPC. See the [canonical plan](planning/CDR_TCP_YAMCS_IMPLEMENTATION_PLAN.md), [runbook](operations/CDR_TCP.md), and [local evidence](verification/evidence/n2-cdr-tcp-2026-10-20/README.md).
 
 | Your task | Start here |
 | --- | --- |
 | Mission ops: first-time local setup | [Local setup](operations/LOCAL_SETUP.md) |
 | Mission ops: run a prepared laptop | [Daily quickstart](operations/QUICKSTART.md) |
 | Mission ops: a command or display failed | [Operator troubleshooting](operations/TROUBLESHOOTING.md) |
+| PDU named rail commands and readbacks | [PDU Yamcs operator guide](operations/PDU_READABILITY.md) |
 | Develop or test N2 FSW | [Build and test](development/BUILD_AND_TEST.md) |
 | Understand the implementation | [System architecture](architecture/SYSTEM_ARCHITECTURE.md), [mission modes](architecture/MISSION_MODES.md) |
 | Connect hardware | [Integration status and contracts](integration/README.md) |
