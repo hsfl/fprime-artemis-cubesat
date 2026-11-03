@@ -29,6 +29,8 @@ class ScienceApp final : public ScienceAppComponentBase {
         U32 sourceCrc,
         bool scienceRequested
     ) override;
+    //! MissionApp's mode on every change. SAFE closes every capture path, any other mode opens them.
+    void missionModeIn_handler(FwIndexType portNum, const Components::MissionMode& mode, U32 detail) override;
     void START_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void CONFIGURE_CAPTURE_DURATION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
     void SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
@@ -39,7 +41,14 @@ class ScienceApp final : public ScienceAppComponentBase {
     void seedCaptureDurationFromParam();
     bool isValidCaptureDuration(U32 durationSeconds) const;
     void cancelPendingCollection();
-    bool startCapture(U32 durationSeconds, bool requestDownlink = false, U32* requestIdOut = nullptr);
+    //! False, with a ScienceInhibited event, while SAFE inhibits science. Every capture path asks first.
+    bool scienceAllowed(Components::ScienceInhibitSource source);
+    bool startCapture(U32 durationSeconds, Components::ScienceInhibitSource source,
+                      bool requestDownlink = false, U32* requestIdOut = nullptr);
+    //! Tells MissionApp where science work has reached. Sends nothing in SAFE, where MissionApp holds anyway.
+    void reportMissionMode(Components::MissionMode mode, U32 detail);
+    //! Forgets the active capture once it has ended, however it ended.
+    void clearActiveCapture();
     struct VerifiedCaptureRecord {
         U32 verificationToken;
         U32 requestId;
@@ -75,9 +84,13 @@ class ScienceApp final : public ScienceAppComponentBase {
     U32 m_activeCaptureRequestId;
     U32 m_activeCaptureGeneration;
     bool m_activeCaptureScienceRequested;
+    //! The active capture ran during SAFE, so its product is withheld when it ends.
+    bool m_activeCaptureInterrupted;
     static constexpr U32 DOWNLINK_INTENT_CAPACITY = 8U;
     U32 m_downlinkRequestIds[DOWNLINK_INTENT_CAPACITY];
     U32 m_downlinkRequestGenerations[DOWNLINK_INTENT_CAPACITY];
+    //! True while MissionApp reports SAFE: every capture is refused (SDD v4.0 Table 5).
+    bool m_scienceInhibited;
 };
 
 }  // namespace Components

@@ -114,6 +114,9 @@ MissionApp::~MissionApp() {}
 void MissionApp::preamble() {
     if (this->bootInSafe()) {
         this->enterSafe(Components::SafeCause::BOOT);
+    } else {
+        // Tell ScienceApp the start-up mode as well, so the two start in step.
+        this->publishMode();
     }
 }
 
@@ -396,11 +399,13 @@ bool MissionApp::transitionToMode(Components::MissionMode requested, ModeSource 
     return true;
 }
 
-// The one place a mode change takes effect: store it, update telemetry, log ModeChanged and, when the
-// MOP operations mode changes, announce what the new mode asks of the hardware.
+// The one place a mode change takes effect: store it, tell ScienceApp, update telemetry, log ModeChanged
+// and, when the MOP operations mode changes, announce what the new mode asks of the hardware.
 void MissionApp::applyMode(Components::MissionMode mode) {
     const Components::OperationsMode before = toOperationsMode(this->m_currentMode);
     this->m_currentMode = mode;
+    // First, so a SAFE entry reaches ScienceApp ahead of the cancel that enterSafe() sends after it.
+    this->publishMode();
     this->writeTelemetry();
     this->log_ACTIVITY_HI_ModeChanged(this->m_currentMode);
     const Components::OperationsMode after = toOperationsMode(mode);
@@ -413,9 +418,11 @@ void MissionApp::applyMode(Components::MissionMode mode) {
 void MissionApp::enterSafe(Components::SafeCause cause) {
     // Record the cause first so the telemetry written by applyMode already shows it.
     this->m_safeCause = cause;
+    // Science is inhibited in SAFE (SDD v4.0 Table 5). applyMode tells ScienceApp, which refuses every new
+    // capture from then on, and cancelCollection drops a queued one. A capture already running belongs to
+    // PayloadManager and payload power to the EPS rail, so neither stops here: ScienceApp withholds that
+    // capture's product when it ends.
     this->applyMode(Components::MissionMode::SAFE);
-    // Science is inhibited in SAFE: drop any queued collection. An in-flight capture is
-    // PayloadManager's, and payload power is the EPS rail's, so neither stops here.
     this->cancelCollection();
     this->log_WARNING_HI_SafeModeEntered(cause, static_cast<U8>(this->m_safeLatched ? 1U : 0U));
 }
@@ -489,6 +496,12 @@ bool MissionApp::autoReturnToBase() {
     Fw::ParamValid valid = Fw::ParamValid::INVALID;
     const U8 value = this->paramGet_AUTO_RETURN_TO_BASE(valid);
     return ((valid == Fw::ParamValid::VALID) || (valid == Fw::ParamValid::DEFAULT)) && (value != 0U);
+}
+
+void MissionApp::publishMode() {
+    if (this->isConnected_modeOut_OutputPort(0)) {
+        this->modeOut_out(0, this->m_currentMode, 0U);
+    }
 }
 
 void MissionApp::cancelCollection() {

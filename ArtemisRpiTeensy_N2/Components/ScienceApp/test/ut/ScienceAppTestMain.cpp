@@ -57,6 +57,48 @@ TEST(Nominal, CdrRejectsAutomaticDownlinkBeforeCaptureOrTokenAllocation) {
 }
 #endif
 
+TEST(SafeMode, RefusesEveryCaptureCommand) {
+    Components::ScienceAppTester tester;
+    tester.testSafeRefusesEveryCaptureCommand();
+}
+
+TEST(SafeMode, RefusesScheduledRequestAndCountdown) {
+    Components::ScienceAppTester tester;
+    tester.testSafeRefusesScheduledRequestAndCountdown();
+}
+
+TEST(SafeMode, CapturesAllowedAgainAfterSafe) {
+    Components::ScienceAppTester tester;
+    tester.testCapturesAllowedAgainAfterSafe();
+}
+
+TEST(SafeMode, CaptureRunningAtSafeEntryIsWithheld) {
+    Components::ScienceAppTester tester;
+    tester.testCaptureRunningAtSafeEntryIsWithheld();
+}
+
+TEST(SafeMode, ManagerCaptureInSafeIsWithheld) {
+    Components::ScienceAppTester tester;
+    tester.testManagerCaptureInSafeIsWithheld();
+}
+
+TEST(SafeMode, InterruptedCaptureStaysWithheldAfterSafeExit) {
+    Components::ScienceAppTester tester;
+    tester.testInterruptedCaptureStaysWithheldAfterSafeExit();
+}
+
+#ifndef NEUTRON2_CDR_TCP
+TEST(SafeMode, VerifiedCaptureInterruptedBySafeEndsFailed) {
+    Components::ScienceAppTester tester;
+    tester.testVerifiedCaptureInterruptedBySafeEndsFailed();
+}
+#endif
+
+TEST(SafeMode, ExistingIdsUnchanged) {
+    Components::ScienceAppTester tester;
+    tester.testExistingIdsUnchanged();
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

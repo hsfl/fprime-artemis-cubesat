@@ -9,9 +9,13 @@ local Yamcs build only, a simulated latching fault, the blocked exit,
 CLEAR_SAFE_LATCH, the stability wait and the exit.
 Part C, AUTO_RETURN_TO_BASE = 1 for one collection (MVP deck step 3.4: back to
 BASE once the product is on the OBC), then back to 0.
+Part D, SAFE inhibits science (SDD v4.0 Table 5): every ScienceApp capture command
+is refused in SAFE, a capture started by PayloadManager's own command in SAFE runs
+but its product is withheld, a capture already running when SAFE begins is withheld
+too, and after SAFE a capture gives a normal product again.
 
 Each step sends one command, waits for its CdhCore.cmdDisp result (OpCodeCompleted
-or OpCodeError) and for every MissionApp event the step must produce. Saves one
+or OpCodeError) and for every MissionApp or ScienceApp event the step must produce. Saves one
 JSON record. Local stack (run.sh): no options needed. CDR TCP stack
 (run_cdr_tcp.sh): pass --dictionary <its matching JSON dictionary>.
 Local software evidence only: no board, TCP, RF, payload or EPS hardware.
@@ -31,9 +35,12 @@ PROCESSOR = "realtime"
 DEPLOYMENT = "ArtemisRpiTeensyDeployment"
 MISSION = DEPLOYMENT + ".missionApp"
 SCIENCE = DEPLOYMENT + ".scienceApp"
+PAYLOAD = DEPLOYMENT + ".payloadManager"
 # Short captures keep the cycle quick. CONFIGURE_CAPTURE_DURATION is volatile (lost on restart).
 CAPTURE_SECONDS = 3
 SCHEDULE_DELAY_SECONDS = 2
+# Long enough to still be running when the next step sends SET_MODE SAFE.
+IN_FLIGHT_CAPTURE_SECONDS = 10
 
 
 def api(path, body=None):
@@ -117,13 +124,16 @@ def has_opcode(event, opcode):
 
 
 class Expect:
-    """One event a step must produce: its name, the text Yamcs can search for, and its arguments."""
+    """One event a step must produce: its name, the text Yamcs can search for, and its arguments.
 
-    def __init__(self, event, search, **extra):
-        self.event, self.search, self.extra = event, search, extra
+    The event comes from MissionApp unless `component` names another one (ScienceApp for Part D).
+    """
+
+    def __init__(self, event, search, component=MISSION, **extra):
+        self.event, self.search, self.component, self.extra = event, search, component, extra
 
     def matches(self, event, released):
-        if event.get("type") != f"{MISSION}.{self.event}":
+        if event.get("type") != f"{self.component}.{self.event}":
             return False
         if parse_time(event["receptionTime"]) < released:
             return False
@@ -145,6 +155,14 @@ def plan(mode):
 
 def refused(requested, current, reason):
     return Expect("SetModeRejected", "SET_MODE", requested=requested, current=current, reason=reason)
+
+
+def science(event, search, **extra):
+    return Expect(event, search, component=SCIENCE, **extra)
+
+
+def inhibited(source):
+    return science("ScienceInhibited", "inhibits science", source=source)
 
 
 class Scenario:
@@ -224,6 +242,21 @@ class Scenario:
         self.steps.append(record)
         print(f"{record['result']:4}  {label}")
         return value is not None
+
+    def none_since(self, label, after, unwanted, settle=3):
+        """PASS when no unwanted event arrived after `after`. unwanted: Expect objects that must not match."""
+        time.sleep(settle)  # let any late event reach the archive first
+        record = {"step": label, "must_not_see": [u.describe() for u in unwanted]}
+        found = [f"{u.describe()}: {e.get('message')}" for u in unwanted
+                 for e in archive_events(u.search) if u.matches(e, after)]
+        record["result"] = "FAIL" if found else "PASS"
+        if found:
+            record["failure"] = "; ".join(found)
+        self.steps.append(record)
+        print(f"{record['result']:4}  {label}")
+        if found:
+            print(f"        -> {record['failure']}")
+        return not found
 
 
 def latest_release(scenario):
@@ -325,6 +358,45 @@ def main():
            later=[mode_changed("COLLECTING"), mode_changed("SCIENCE_READY"), plan("SCIENCE_PROCESSING"),
                   mode_changed("BASE"), plan("BASE")])
     s.step("AUTO_RETURN_TO_BASE back to 0", M + ".AUTO_RETURN_TO_BASE_PRM_SET", {"val": 0}, True)
+
+    print("== Part D: SAFE inhibits science (SDD v4.0 Table 5)")
+    s.step("SET_MODE SAFE: ScienceApp hears it and closes every capture path", M + ".SET_MODE", {"mode": "SAFE"},
+           True, [mode_changed("SAFE"), science("ScienceInhibitChanged", "Science inhibit=", inhibited="1",
+                                                mode="SAFE")])
+    safe_from = latest_release(s)
+    s.step("scienceApp.START_COLLECTION refused in SAFE", SCIENCE + ".START_COLLECTION", {}, False,
+           [inhibited("START_COLLECTION")])
+    s.step("scienceApp.SCIENCE_CAPTURE refused in SAFE", SCIENCE + ".SCIENCE_CAPTURE",
+           {"durationSeconds": CAPTURE_SECONDS}, False, [inhibited("SCIENCE_CAPTURE")])
+    if fault_ok:  # local Yamcs build. The CDR build refuses the automatic-downlink commands anyway.
+        s.step("scienceApp.COLLECT_AND_DOWNLINK refused in SAFE", SCIENCE + ".COLLECT_AND_DOWNLINK",
+               {"durationSeconds": CAPTURE_SECONDS}, False, [inhibited("COLLECT_AND_DOWNLINK")])
+        s.step("scienceApp.VERIFIED_COLLECT_AND_DOWNLINK refused in SAFE", SCIENCE + ".VERIFIED_COLLECT_AND_DOWNLINK",
+               {"verificationToken": int(time.time()) % 1000000 + 1, "durationSeconds": CAPTURE_SECONDS}, False,
+               [inhibited("VERIFIED_COLLECT_AND_DOWNLINK")])
+    s.step("payloadManager.SCIENCE_CAPTURE in SAFE runs, but ScienceApp withholds its product",
+           PAYLOAD + ".SCIENCE_CAPTURE", {"durationSeconds": CAPTURE_SECONDS}, True,
+           [science("CaptureRunningInSafe", "running in SAFE")],
+           later=[science("CaptureWithheld", "withheld, not stored")])
+    s.none_since("No product, no COLLECTING and no SCIENCE_READY while in SAFE", safe_from,
+                 [science("ScienceProductReady", "Science product ready"), mode_changed("COLLECTING"),
+                  mode_changed("SCIENCE_READY")])
+    s.step("REPORT_MODE still answers SAFE", M + ".REPORT_MODE", {}, True,
+           [Expect("ModeReport", "Mission mode is", mode="SAFE")])
+    s.step("SET_MODE BASE leaves SAFE and opens the capture paths again", M + ".SET_MODE", {"mode": "BASE"}, True,
+           [mode_changed("BASE"), science("ScienceInhibitChanged", "Science inhibit=", inhibited="0", mode="BASE")])
+    s.step(f"scienceApp.SCIENCE_CAPTURE {IN_FLIGHT_CAPTURE_SECONDS} s starts in BASE", SCIENCE + ".SCIENCE_CAPTURE",
+           {"durationSeconds": IN_FLIGHT_CAPTURE_SECONDS}, True, [mode_changed("COLLECTING")])
+    s.step("SET_MODE SAFE while it runs: flagged, then its product is withheld", M + ".SET_MODE", {"mode": "SAFE"},
+           True, [mode_changed("SAFE"), science("CaptureRunningInSafe", "running in SAFE")],
+           later=[science("CaptureWithheld", "withheld, not stored")])
+    s.none_since("No product and no SCIENCE_READY from the interrupted capture", latest_release(s),
+                 [science("ScienceProductReady", "Science product ready"), mode_changed("SCIENCE_READY")])
+    s.step("SET_MODE BASE leaves SAFE", M + ".SET_MODE", {"mode": "BASE"}, True, [mode_changed("BASE")])
+    s.step("scienceApp.SCIENCE_CAPTURE after SAFE gives a normal product", SCIENCE + ".SCIENCE_CAPTURE",
+           {"durationSeconds": CAPTURE_SECONDS}, True, [mode_changed("COLLECTING")],
+           later=[science("ScienceProductReady", "Science product ready"), mode_changed("SCIENCE_READY")])
+    s.step("SET_MODE BASE ends the cycle", M + ".SET_MODE", {"mode": "BASE"}, True, [mode_changed("BASE")])
     s.step("REPORT_MODE answers BASE at the end", M + ".REPORT_MODE", {}, True,
            [Expect("ModeReport", "Mission mode is", mode="BASE")])
 

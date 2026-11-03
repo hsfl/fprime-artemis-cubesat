@@ -39,6 +39,8 @@ class MissionAppTester final : public MissionAppGTestBase {
     void testBootInSafeParameter();
     void testBootInBaseByDefault();
     void testSimulateSafeFaultOnlyInLocalBuild();
+    //! ScienceApp hears every accepted mode change, so it can refuse captures in SAFE.
+    void testModeSentOnEveryChange();
     // D5 demo modes: what each mode reports
     void testSubsystemPlanMatchesMopMatrix();
     void testOperationsModeTelemetryFollowsMode();

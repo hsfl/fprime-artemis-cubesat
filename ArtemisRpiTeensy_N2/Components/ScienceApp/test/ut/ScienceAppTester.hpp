@@ -27,9 +27,24 @@ class ScienceAppTester final : public ScienceAppGTestBase {
     void testCollectAndDownlinkClearsIntentOnFailure();
     void testCdrRejectsAutomaticDownlinkBeforeCaptureOrTokenAllocation();
 
+    // SAFE inhibits science (SDD v4.0 Table 5)
+    void testSafeRefusesEveryCaptureCommand();
+    void testSafeRefusesScheduledRequestAndCountdown();
+    void testCapturesAllowedAgainAfterSafe();
+    void testCaptureRunningAtSafeEntryIsWithheld();
+    void testManagerCaptureInSafeIsWithheld();
+    void testInterruptedCaptureStaysWithheldAfterSafeExit();
+    void testVerifiedCaptureInterruptedBySafeEndsFailed();
+    void testExistingIdsUnchanged();
+
   private:
     void connectPorts();
     void initComponents();
+    //! Delivers one MissionApp mode update on missionModeIn and dispatches it.
+    void setMissionMode(Components::MissionMode mode);
+    //! One PayloadManager notice for a capture, dispatched.
+    void notifyCapture(U32 requestId, U32 generation, Components::PayloadOperationState state, U32 productId,
+                       U32 productBytes, U32 sourceCrc, bool scienceRequested);
 
     ScienceApp component;
 };

@@ -1,4 +1,16 @@
 module Components {
+    @ Where a capture refused in SAFE came from (ScienceInhibited event).
+    enum ScienceInhibitSource : U8 {
+        START_COLLECTION = 0
+        SCIENCE_CAPTURE = 1
+        COLLECT_AND_DOWNLINK = 2
+        VERIFIED_COLLECT_AND_DOWNLINK = 3
+        @ A MissionApp SCHEDULE_COLLECTION request on requestIn
+        SCHEDULED_REQUEST = 4
+        @ A scheduled countdown that reached zero
+        SCHEDULED_COUNTDOWN = 5
+    }
+
     @ Coordinates collection triggers and science-product handoff.
     active component ScienceApp {
 
@@ -19,6 +31,10 @@ module Components {
 
         @ Correlated admission/completion/failure status from PayloadManager
         async input port operationNoticeIn: Components.PayloadOperationNotice
+
+        @ MissionApp's mode, sent on every change and at start-up. In SAFE every capture is refused
+        @ (SDD v4.0 Table 5: science inhibited in Safe).
+        async input port missionModeIn: Components.MissionModeUpdate
 
         @ Forwarded collection request to PayloadManager
         output port payloadRequestOut: Components.PayloadCaptureRequest
@@ -88,6 +104,22 @@ module Components {
             sourceCrc: U32,
             reasonCode: U32
         ) severity activity high format "Verified capture token={} request={} generation={} state={} product={} bytes={} crc={} reason={}"
+
+        @ A capture was refused because MissionApp is in SAFE, where science is inhibited (SDD v4.0 Table 5).
+        @ ScienceApp owns the capture commands, so the mode check sits here (SDD v4.0 §4.2).
+        event ScienceInhibited(source: Components.ScienceInhibitSource) severity warning low format "Science capture refused: SAFE mode inhibits science, source={}"
+
+        @ MissionApp moved into or out of SAFE. inhibited = 1 while SAFE inhibits science.
+        event ScienceInhibitChanged(inhibited: U8, mode: Components.MissionMode) severity activity high format "Science inhibit={} in mission mode {}"
+
+        @ A capture is running during SAFE. ScienceApp cannot stop it: PayloadManager owns the capture and
+        @ the EPS rail owns payload power. Its product will be withheld when it ends.
+        event CaptureRunningInSafe(requestId: U32) severity warning high format "Capture request {} is running in SAFE and cannot be stopped from ScienceApp: its product will be withheld"
+
+        @ A capture that ran during SAFE ended. Its product is withheld: not handed to StorageManager, not
+        @ reported as SCIENCE_READY and not sent. The attempt stays partial (SDD v4.0 §5.2) and the payload's
+        @ file stays where the payload wrote it.
+        event CaptureWithheld(requestId: U32, productId: U32, productBytes: U32) severity warning high format "Capture request {} ran during SAFE: product {} ({} bytes) withheld, not stored or sent"
 
         @ Port for requesting the current time
         time get port timeCaller

@@ -17,6 +17,10 @@ module Components {
         @ Collection cancellation output to ScienceApp
         output port cancelRequestOut: Svc.Ping
 
+        @ The current mission mode, sent on every change and at start-up. ScienceApp refuses every
+        @ capture while it reads SAFE (SDD v4.0 Table 5: science inhibited in Safe).
+        output port modeOut: Components.MissionModeUpdate
+
         @ Mission mode update input from story managers
         async input port modeUpdateIn: [2] Components.MissionModeUpdate
 

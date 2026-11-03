@@ -252,10 +252,11 @@ void MissionAppTester::assertReportModeAnswers(U32 cmdSeq, Components::MissionMo
     ASSERT_EVENTS_SIZE(1);
     ASSERT_EVENTS_ModeReport_SIZE(1);
     ASSERT_EVENTS_ModeReport(0, expected);
-    // Nothing else happened: no telemetry, no request or cancel sent to ScienceApp.
+    // Nothing else happened: no telemetry, no request, cancel or mode sent to ScienceApp.
     ASSERT_TLM_SIZE(0);
     ASSERT_from_collectionRequestOut_SIZE(0);
     ASSERT_from_cancelRequestOut_SIZE(0);
+    ASSERT_from_modeOut_SIZE(0);
 }
 
 // ----------------------------------------------------------------------
@@ -674,6 +675,9 @@ void MissionAppTester::testBootInSafeParameter() {
     ASSERT_EVENTS_ModeChanged(0, Mode::SAFE);
     ASSERT_EVENTS_SafeModeEntered(0, Components::SafeCause::BOOT, 0);
     ASSERT_TLM_SafeEntryCause(0, Components::SafeCause::BOOT);
+    // ScienceApp starts out refusing captures.
+    ASSERT_from_modeOut_SIZE(1);
+    ASSERT_from_modeOut(0, Mode::SAFE, 0U);
     ASSERT_NO_FATAL_FAILURE(this->assertReportModeAnswers(1, Mode::SAFE));
 
     // No fault and no latch at boot, so the first ground exit passes.
@@ -682,10 +686,12 @@ void MissionAppTester::testBootInSafeParameter() {
 }
 
 void MissionAppTester::testBootInBaseByDefault() {
-    // Parameters not loaded yet: start in BASE, say nothing.
+    // Parameters not loaded yet: start in BASE, say nothing, and tell ScienceApp it is BASE.
     this->clearHistory();
     this->component.preamble();
     ASSERT_EVENTS_SIZE(0);
+    ASSERT_from_modeOut_SIZE(1);
+    ASSERT_from_modeOut(0, Mode::BASE, 0U);
     ASSERT_NO_FATAL_FAILURE(this->assertReportModeAnswers(1, Mode::BASE));
 
     // Parameter loaded at its default (0): still BASE.
@@ -711,6 +717,39 @@ void MissionAppTester::testSimulateSafeFaultOnlyInLocalBuild() {
     ASSERT_EVENTS_SafeModeEntered(0, Components::SafeCause::LOW_POWER, 1);
     ASSERT_NO_FATAL_FAILURE(this->assertReportModeAnswers(2, Mode::SAFE));
 #endif
+}
+
+void MissionAppTester::testModeSentOnEveryChange() {
+    this->clearHistory();
+
+    // Ground commands: BASE -> COLLECTION_PENDING -> SAFE -> BASE. Each accepted change reaches ScienceApp.
+    this->sendCmd_SCHEDULE_COLLECTION(0, 1, 30);
+    this->component.doDispatch();
+    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(2, Ops::SAFE, Fw::CmdResponse::OK));
+    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(3, Ops::BASE, Fw::CmdResponse::OK));
+    ASSERT_from_modeOut_SIZE(3);
+    ASSERT_from_modeOut(0, Mode::COLLECTION_PENDING, 0U);
+    ASSERT_from_modeOut(1, Mode::SAFE, 0U);
+    ASSERT_from_modeOut(2, Mode::BASE, 0U);
+
+    // A refused change sends nothing.
+    this->clearHistory();
+    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(4, Ops::SCIENCE_PROCESSING, Fw::CmdResponse::VALIDATION_ERROR));
+    ASSERT_from_modeOut_SIZE(0);
+
+    // A subsystem report that moves MissionApp is sent too, and so is a fault into SAFE.
+    this->invoke_to_modeUpdateIn(0, Mode::COLLECTING, 10);
+    this->component.doDispatch();
+    this->invoke_to_faultIn(0, Components::SafeCause::LOW_POWER, false, 0);
+    this->component.doDispatch();
+    ASSERT_from_modeOut_SIZE(2);
+    ASSERT_from_modeOut(0, Mode::COLLECTING, 0U);
+    ASSERT_from_modeOut(1, Mode::SAFE, 0U);
+
+    // Reports refused in SAFE move nothing, so nothing is sent.
+    this->invoke_to_modeUpdateIn(0, Mode::SCIENCE_READY, 128);
+    this->component.doDispatch();
+    ASSERT_from_modeOut_SIZE(2);
 }
 
 void MissionAppTester::testSubsystemPlanMatchesMopMatrix() {

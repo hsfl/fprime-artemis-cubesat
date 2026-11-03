@@ -44,9 +44,11 @@ class MissionApp final : public MissionAppComponentBase {
     Components::ModeRejectReason checkSafeExit();
     //! Asks checkTransition, then refuses with the reason or moves. True when MissionApp moved.
     bool transitionToMode(Components::MissionMode requested, ModeSource source, U32 detail);
-    //! Every accepted mode change ends here: telemetry, ModeChanged, and the subsystem plan.
+    //! Every accepted mode change ends here: ScienceApp is told, then telemetry, ModeChanged, the subsystem plan.
     void applyMode(Components::MissionMode mode);
-    //! Records the cause, moves to SAFE, drops queued science, logs SafeModeEntered.
+    //! Sends the current mode on modeOut. ScienceApp refuses every capture while it reads SAFE.
+    void publishMode();
+    //! Records the cause, moves to SAFE (ScienceApp stops new captures), drops queued science, logs SafeModeEntered.
     void enterSafe(Components::SafeCause cause);
     //! A fault: restarts the stability timer, sets the latch when asked, enters SAFE.
     void handleFault(Components::SafeCause cause, bool latch);

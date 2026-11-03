@@ -105,6 +105,11 @@ TEST(SafeMode, SimulateSafeFaultOnlyInLocalBuild) {
     tester.testSimulateSafeFaultOnlyInLocalBuild();
 }
 
+TEST(SafeMode, ModeSentToScienceAppOnEveryChange) {
+    Components::MissionAppTester tester;
+    tester.testModeSentOnEveryChange();
+}
+
 TEST(DemoModes, SubsystemPlanMatchesMopMatrix) {
     Components::MissionAppTester tester;
     tester.testSubsystemPlanMatchesMopMatrix();
