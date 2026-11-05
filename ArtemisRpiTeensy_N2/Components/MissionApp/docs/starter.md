@@ -23,7 +23,7 @@ Base case: coordinate RFM23BP downlink and RPi-emulated payload collection.
 - `CLEAR_SAFE_LATCH` (clears a latched SAFE fault; leaving SAFE still needs `SET_MODE BASE`)
 - `SIMULATE_SAFE_FAULT(cause, latch)` (local Yamcs builds only: acts like a fault indication)
 
-MissionApp sends its mode to ScienceApp on every change (`modeOut`). In SAFE, ScienceApp refuses every capture (science inhibited, SDD v4.0 Table 5).
+MissionApp decides what each mode allows and tells the other components through ports: `captureControlOut` inhibits or enables captures in PayloadManager, `cancelRequestOut` cancels pending collections in ScienceApp. Both report back, and SAFE entry is complete only then.
 
 ## Abstraction Rule
 

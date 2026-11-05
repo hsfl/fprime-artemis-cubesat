@@ -17,10 +17,6 @@ constexpr U32 VERIFIED_REJECT_TABLE_FULL = 3U;
 constexpr U32 VERIFIED_REJECT_INVALID_DURATION = 4U;
 constexpr U32 VERIFIED_REJECT_NO_REQUEST_PORT = 5U;
 constexpr U32 VERIFIED_REJECT_INVALID_PRODUCT = 6U;
-// SAFE inhibits science (SDD v4.0 Table 5): the command arrived in SAFE (7), or the capture ran
-// during SAFE and its product was withheld (8).
-constexpr U32 VERIFIED_REJECT_SAFE_MODE = 7U;
-constexpr U32 VERIFIED_REJECT_SAFE_INTERRUPTED = 8U;
 }  // namespace
 
 ScienceApp::ScienceApp(const char* const compName)
@@ -36,10 +32,11 @@ ScienceApp::ScienceApp(const char* const compName)
       m_activeCaptureRequestId(0),
       m_activeCaptureGeneration(0),
       m_activeCaptureScienceRequested(false),
-      m_activeCaptureInterrupted(false),
+      m_productAwaitingStorage(0),
+      m_productAwaitingStorageBytes(0),
+      m_deliverAfterStorage(false),
       m_downlinkRequestIds{},
-      m_downlinkRequestGenerations{},
-      m_scienceInhibited(false) {}
+      m_downlinkRequestGenerations{} {}
 
 ScienceApp::~ScienceApp() {}
 
@@ -84,7 +81,7 @@ void ScienceApp::run_handler(FwIndexType portNum, U32 context) {
         this->m_pendingDelaySeconds -= 1;
         countdownChanged = true;
         if (this->m_pendingDelaySeconds == 0) {
-            this->startCapture(this->m_captureDurationSeconds, Components::ScienceInhibitSource::SCHEDULED_COUNTDOWN);
+            this->startCapture(this->m_captureDurationSeconds);
         }
     }
 
@@ -97,10 +94,6 @@ void ScienceApp::run_handler(FwIndexType portNum, U32 context) {
 
 void ScienceApp::requestIn_handler(FwIndexType portNum, U32 delaySeconds) {
     static_cast<void>(portNum);
-    // MissionApp already refuses SCHEDULE_COLLECTION in SAFE. This keeps ScienceApp safe on its own.
-    if (!this->scienceAllowed(Components::ScienceInhibitSource::SCHEDULED_REQUEST)) {
-        return;
-    }
     if (delaySeconds == 0U) {
         this->log_WARNING_LO_ScienceCommandRejected(REJECT_INVALID_DELAY_SECONDS, delaySeconds);
         return;
@@ -112,8 +105,10 @@ void ScienceApp::requestIn_handler(FwIndexType portNum, U32 delaySeconds) {
 
 void ScienceApp::cancelRequestIn_handler(FwIndexType portNum, U32 key) {
     static_cast<void>(portNum);
-    static_cast<void>(key);
     this->cancelPendingCollection();
+    if (this->isConnected_cancelReportOut_OutputPort(0)) {
+        this->cancelReportOut_out(0, key);
+    }
 }
 
 void ScienceApp::operationNoticeIn_handler(
@@ -164,19 +159,15 @@ void ScienceApp::operationNoticeIn_handler(
         if (scienceRequested) {
             this->setDownlinkIntentGeneration(requestId, generation);
         }
-        if (this->m_scienceInhibited) {
-            // Accepted during SAFE: PayloadManager's own capture command started it, or a request sent
-            // just before SAFE was accepted after. It cannot be stopped from here, so its product is withheld.
-            this->m_activeCaptureInterrupted = true;
-            this->log_WARNING_HI_CaptureRunningInSafe(requestId);
-            return;
+        if (this->isConnected_missionModeOut_OutputPort(0)) {
+            this->missionModeOut_out(0, Components::MissionMode::COLLECTING, this->m_captureDurationSeconds);
         }
-        this->reportMissionMode(Components::MissionMode::COLLECTING, this->m_captureDurationSeconds);
         return;
     }
 
     if ((generation == 0U) &&
         ((state == Components::PayloadOperationState::BUSY) ||
+         (state == Components::PayloadOperationState::INHIBITED) ||
          (state == Components::PayloadOperationState::INVALID) ||
          (state == Components::PayloadOperationState::DRIVER_UNAVAILABLE) ||
          (state == Components::PayloadOperationState::FAILED) ||
@@ -190,8 +181,10 @@ void ScienceApp::operationNoticeIn_handler(
         if (scienceRequested) {
             this->clearDownlinkIntent(requestId, generation);
         }
-        if (this->m_activeCaptureRequestId == 0U) {
-            this->reportMissionMode(Components::MissionMode::BASE, 0U);
+        // An inhibited request never started, and MissionApp is the one inhibiting: nothing to report.
+        if ((this->m_activeCaptureRequestId == 0U) && (state != Components::PayloadOperationState::INHIBITED) &&
+            this->isConnected_missionModeOut_OutputPort(0)) {
+            this->missionModeOut_out(0, Components::MissionMode::BASE, 0U);
         }
         return;
     }
@@ -204,24 +197,6 @@ void ScienceApp::operationNoticeIn_handler(
     }
 
     if (state == Components::PayloadOperationState::COMPLETED) {
-        if (this->m_activeCaptureInterrupted) {
-            // The capture ran during SAFE, where science is inhibited (SDD v4.0 Table 5), so its product is
-            // withheld even if SAFE has ended since: not handed to StorageManager, not reported as
-            // SCIENCE_READY, not delivered. The attempt stays partial (SDD v4.0 §5.2) and the payload's
-            // file stays where the payload wrote it, for the ground to decide on (OD-04).
-            this->log_WARNING_HI_CaptureWithheld(requestId, productId, productBytes);
-            if ((verified != nullptr) && !verified->terminal) {
-                verified->terminal = true;
-                this->logVerifiedCaptureStatus(verified->verificationToken, requestId, generation,
-                                               Components::PayloadOperationState::FAILED, productId,
-                                               productBytes, sourceCrc, VERIFIED_REJECT_SAFE_INTERRUPTED);
-            }
-            if (scienceRequested) {
-                this->clearDownlinkIntent(requestId, generation);
-            }
-            this->clearActiveCapture();
-            return;
-        }
         if (!this->isValidProduct(productId, productBytes, sourceKind, sourcePath, sourceCrc)) {
             this->log_WARNING_HI_ScienceOperationRejected(requestId, Components::PayloadOperationState::FAILED);
             if ((verified != nullptr) && !verified->terminal) {
@@ -230,11 +205,15 @@ void ScienceApp::operationNoticeIn_handler(
                                                Components::PayloadOperationState::FAILED, productId,
                                                productBytes, sourceCrc, VERIFIED_REJECT_INVALID_PRODUCT);
             }
+            this->m_activeCaptureRequestId = 0U;
+            this->m_activeCaptureGeneration = 0U;
             if (scienceRequested) {
                 this->clearDownlinkIntent(requestId, generation);
             }
-            this->clearActiveCapture();
-            this->reportMissionMode(Components::MissionMode::BASE, 0U);
+            this->m_activeCaptureScienceRequested = false;
+            if (this->isConnected_missionModeOut_OutputPort(0)) {
+                this->missionModeOut_out(0, Components::MissionMode::BASE, 0U);
+            }
             return;
         }
         this->publishScienceProduct(productId, productBytes, sourceKind, sourcePath, sourceCrc);
@@ -243,16 +222,13 @@ void ScienceApp::operationNoticeIn_handler(
             this->logVerifiedCaptureStatus(verified->verificationToken, requestId, generation, state,
                                            productId, productBytes, sourceCrc, 0U);
         }
-        if (scienceRequested && this->hasDownlinkIntent(requestId, generation) &&
-            this->isConnected_deliveryRequestOut_OutputPort(0)) {
-            // The two outputs target the same StorageManager actor. F' queues
-            // these in call order, so Storage stores/validates before delivery.
-            this->deliveryRequestOut_out(0, productId);
-        }
+        this->m_deliverAfterStorage = scienceRequested && this->hasDownlinkIntent(requestId, generation);
         if (scienceRequested) {
             this->clearDownlinkIntent(requestId, generation);
         }
-        this->clearActiveCapture();
+        this->m_activeCaptureRequestId = 0U;
+        this->m_activeCaptureGeneration = 0U;
+        this->m_activeCaptureScienceRequested = false;
         return;
     }
 
@@ -270,35 +246,16 @@ void ScienceApp::operationNoticeIn_handler(
         if (scienceRequested) {
             this->clearDownlinkIntent(requestId, generation);
         }
-        this->clearActiveCapture();
-        this->reportMissionMode(Components::MissionMode::BASE, 0U);
-    }
-}
-
-// MissionApp sends its mode on every change and at start-up. SAFE inhibits science (SDD v4.0 Table 5),
-// so while it reads SAFE every capture path here refuses. Leaving SAFE opens them again.
-void ScienceApp::missionModeIn_handler(FwIndexType portNum, const Components::MissionMode& mode, U32 detail) {
-    static_cast<void>(portNum);
-    static_cast<void>(detail);
-    const bool inhibit = (mode == Components::MissionMode::SAFE);
-    if (inhibit == this->m_scienceInhibited) {
-        return;
-    }
-    this->m_scienceInhibited = inhibit;
-    this->log_ACTIVITY_HI_ScienceInhibitChanged(static_cast<U8>(inhibit ? 1U : 0U), mode);
-    // A capture already running cannot be stopped from here: PayloadManager owns it and the EPS rail
-    // owns payload power. Mark it, so its product is withheld when it ends.
-    if (inhibit && (this->m_activeCaptureRequestId != 0U)) {
-        this->m_activeCaptureInterrupted = true;
-        this->log_WARNING_HI_CaptureRunningInSafe(this->m_activeCaptureRequestId);
+        this->m_activeCaptureRequestId = 0U;
+        this->m_activeCaptureGeneration = 0U;
+        this->m_activeCaptureScienceRequested = false;
+        if (this->isConnected_missionModeOut_OutputPort(0)) {
+            this->missionModeOut_out(0, Components::MissionMode::BASE, 0U);
+        }
     }
 }
 
 void ScienceApp::START_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
-    if (!this->scienceAllowed(Components::ScienceInhibitSource::START_COLLECTION)) {
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
-        return;
-    }
     this->m_pendingDelaySeconds = 0U;
     this->writeTelemetry();
     if (!this->isValidCaptureDuration(this->m_captureDurationSeconds)) {
@@ -307,8 +264,7 @@ void ScienceApp::START_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
         return;
     }
-    const bool submitted = this->startCapture(this->m_captureDurationSeconds,
-                                              Components::ScienceInhibitSource::START_COLLECTION);
+    const bool submitted = this->startCapture(this->m_captureDurationSeconds);
     this->cmdResponse_out(opCode, cmdSeq, submitted ? Fw::CmdResponse::OK : Fw::CmdResponse::EXECUTION_ERROR);
 }
 
@@ -325,10 +281,6 @@ void ScienceApp::CONFIGURE_CAPTURE_DURATION_cmdHandler(FwOpcodeType opCode, U32 
 }
 
 void ScienceApp::SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) {
-    if (!this->scienceAllowed(Components::ScienceInhibitSource::SCIENCE_CAPTURE)) {
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
-        return;
-    }
     if (!this->isValidCaptureDuration(durationSeconds)) {
         this->log_WARNING_LO_ScienceCommandRejected(REJECT_INVALID_CAPTURE_DURATION_SECONDS, durationSeconds);
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
@@ -336,7 +288,7 @@ void ScienceApp::SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32
     }
     this->m_pendingDelaySeconds = 0U;
     this->writeTelemetry();
-    const bool submitted = this->startCapture(durationSeconds, Components::ScienceInhibitSource::SCIENCE_CAPTURE);
+    const bool submitted = this->startCapture(durationSeconds);
     this->cmdResponse_out(opCode, cmdSeq, submitted ? Fw::CmdResponse::OK : Fw::CmdResponse::EXECUTION_ERROR);
 }
 
@@ -346,10 +298,6 @@ void ScienceApp::COLLECT_AND_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
     return;
 #endif
-    if (!this->scienceAllowed(Components::ScienceInhibitSource::COLLECT_AND_DOWNLINK)) {
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
-        return;
-    }
     if (!this->isValidCaptureDuration(durationSeconds)) {
         this->log_WARNING_LO_ScienceCommandRejected(REJECT_INVALID_CAPTURE_DURATION_SECONDS, durationSeconds);
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
@@ -357,8 +305,7 @@ void ScienceApp::COLLECT_AND_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq
     }
     this->m_pendingDelaySeconds = 0U;
     this->writeTelemetry();
-    const bool submitted =
-        this->startCapture(durationSeconds, Components::ScienceInhibitSource::COLLECT_AND_DOWNLINK, true);
+    const bool submitted = this->startCapture(durationSeconds, true);
     this->cmdResponse_out(opCode, cmdSeq, submitted ? Fw::CmdResponse::OK : Fw::CmdResponse::EXECUTION_ERROR);
 }
 
@@ -369,14 +316,6 @@ void ScienceApp::VERIFIED_COLLECT_AND_DOWNLINK_cmdHandler(FwOpcodeType opCode, U
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
     return;
 #endif
-    if (!this->scienceAllowed(Components::ScienceInhibitSource::VERIFIED_COLLECT_AND_DOWNLINK)) {
-        // Refused before a token-table entry is used, so the same token can be sent again after SAFE.
-        this->logVerifiedCaptureStatus(verificationToken, 0U, 0U,
-                                       Components::PayloadOperationState::INVALID, 0U, 0U, 0U,
-                                       VERIFIED_REJECT_SAFE_MODE);
-        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
-        return;
-    }
     if (verificationToken == 0U) {
         this->logVerifiedCaptureStatus(verificationToken, 0U, 0U,
                                        Components::PayloadOperationState::INVALID, 0U, 0U, 0U,
@@ -414,8 +353,7 @@ void ScienceApp::VERIFIED_COLLECT_AND_DOWNLINK_cmdHandler(FwOpcodeType opCode, U
     this->m_pendingDelaySeconds = 0U;
     this->writeTelemetry();
     U32 requestId = 0U;
-    const bool submitted = this->startCapture(
-        durationSeconds, Components::ScienceInhibitSource::VERIFIED_COLLECT_AND_DOWNLINK, true, &requestId);
+    const bool submitted = this->startCapture(durationSeconds, true, &requestId);
     record.requestId = requestId;
     if (!submitted) {
         record.terminal = true;
@@ -437,23 +375,7 @@ void ScienceApp::cancelPendingCollection() {
     this->log_ACTIVITY_HI_CollectionCancelled(remainingSeconds);
 }
 
-// SAFE inhibits science (SDD v4.0 Table 5). ScienceApp owns the capture commands, so the mode check sits
-// here (SDD v4.0 §4.2). A refusal is reported with ScienceInhibited and names where the capture came from.
-bool ScienceApp::scienceAllowed(Components::ScienceInhibitSource source) {
-    if (!this->m_scienceInhibited) {
-        return true;
-    }
-    this->log_WARNING_LO_ScienceInhibited(source);
-    return false;
-}
-
-// The command handlers ask scienceAllowed() first so they can answer VALIDATION_ERROR. The scheduled
-// countdown relies on the check below. Either way, no capture request leaves ScienceApp in SAFE.
-bool ScienceApp::startCapture(U32 durationSeconds, Components::ScienceInhibitSource source,
-                              bool requestDownlink, U32* requestIdOut) {
-    if (!this->scienceAllowed(source)) {
-        return false;
-    }
+bool ScienceApp::startCapture(U32 durationSeconds, bool requestDownlink, U32* requestIdOut) {
     U32 requestId = this->m_nextRequestId++;
     if (requestId == 0U) {
         requestId = this->m_nextRequestId++;
@@ -553,24 +475,36 @@ void ScienceApp::publishScienceProduct(
     this->writeTelemetry();
     this->log_ACTIVITY_HI_ScienceProductReady(productBytes);
     if (this->isConnected_scienceProductOut_OutputPort(0)) {
+        // SCIENCE_READY waits for StorageManager's answer on productStoredIn.
+        this->m_productAwaitingStorage = productId;
+        this->m_productAwaitingStorageBytes = productBytes;
         this->scienceProductOut_out(0, productId, productBytes, sourceKind, sourcePath, sourceCrc);
+    } else if (this->isConnected_missionModeOut_OutputPort(0)) {
+        this->missionModeOut_out(0, Components::MissionMode::SCIENCE_READY, productBytes);
     }
-    this->reportMissionMode(Components::MissionMode::SCIENCE_READY, productBytes);
 }
 
-// In SAFE, MissionApp holds against every subsystem report, so ScienceApp sends none there.
-void ScienceApp::reportMissionMode(Components::MissionMode mode, U32 detail) {
-    if (this->m_scienceInhibited || !this->isConnected_missionModeOut_OutputPort(0)) {
+void ScienceApp::productStoredIn_handler(FwIndexType portNum, U32 productId, bool stored) {
+    static_cast<void>(portNum);
+    if ((productId == 0U) || (productId != this->m_productAwaitingStorage)) {
         return;
     }
-    this->missionModeOut_out(0, mode, detail);
-}
-
-void ScienceApp::clearActiveCapture() {
-    this->m_activeCaptureRequestId = 0U;
-    this->m_activeCaptureGeneration = 0U;
-    this->m_activeCaptureScienceRequested = false;
-    this->m_activeCaptureInterrupted = false;
+    const U32 productBytes = this->m_productAwaitingStorageBytes;
+    const bool deliver = this->m_deliverAfterStorage;
+    this->m_productAwaitingStorage = 0U;
+    this->m_productAwaitingStorageBytes = 0U;
+    this->m_deliverAfterStorage = false;
+    if (!stored) {
+        this->log_WARNING_HI_ScienceProductNotStored(productId);
+    }
+    if (this->isConnected_missionModeOut_OutputPort(0)) {
+        this->missionModeOut_out(0, stored ? Components::MissionMode::SCIENCE_READY : Components::MissionMode::BASE,
+                                 stored ? productBytes : 0U);
+    }
+    // After the report above, so SCIENCE_READY reaches MissionApp ahead of CommsApp's DOWNLINKING.
+    if (stored && deliver && this->isConnected_deliveryRequestOut_OutputPort(0)) {
+        this->deliveryRequestOut_out(0, productId);
+    }
 }
 
 bool ScienceApp::isValidProduct(

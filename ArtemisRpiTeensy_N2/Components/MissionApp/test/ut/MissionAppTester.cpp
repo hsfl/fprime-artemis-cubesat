@@ -252,11 +252,10 @@ void MissionAppTester::assertReportModeAnswers(U32 cmdSeq, Components::MissionMo
     ASSERT_EVENTS_SIZE(1);
     ASSERT_EVENTS_ModeReport_SIZE(1);
     ASSERT_EVENTS_ModeReport(0, expected);
-    // Nothing else happened: no telemetry, no request, cancel or mode sent to ScienceApp.
+    // Nothing else happened: no telemetry, no request or cancel sent to ScienceApp.
     ASSERT_TLM_SIZE(0);
     ASSERT_from_collectionRequestOut_SIZE(0);
     ASSERT_from_cancelRequestOut_SIZE(0);
-    ASSERT_from_modeOut_SIZE(0);
 }
 
 // ----------------------------------------------------------------------
@@ -350,6 +349,13 @@ constexpr MopRow MOP_SAFE = {Ops::SAFE, Request::MINIMAL, Request::MINIMAL, Requ
 
 }  // namespace
 
+void MissionAppTester::finishSafeEntry() {
+    this->invoke_to_captureControlReportIn(0, Fw::Enabled::DISABLED, false);
+    this->component.doDispatch();
+    this->invoke_to_cancelReportIn(0, MissionApp::SAFE_CANCEL_KEY);
+    this->component.doDispatch();
+}
+
 void MissionAppTester::runTicks(U32 ticks) {
     for (U32 tick = 0; tick < ticks; ++tick) {
         this->invoke_to_run(0, 0);
@@ -370,6 +376,7 @@ void MissionAppTester::driveTo(Components::MissionMode mode) {
         // Ground-commanded SAFE: no fault, no latch, so the exit guard is open.
         this->sendCmd_SET_MODE(0, 900, Ops::SAFE);
         this->component.doDispatch();
+        this->finishSafeEntry();
     } else if (mode != Mode::BASE) {
         // The demo chain in order, stopping at the requested step.
         this->sendCmd_SCHEDULE_COLLECTION(0, 901, 10);
@@ -426,6 +433,9 @@ void MissionAppTester::checkSetMode(Components::MissionMode from,
     if (expected == Reason::ALLOWED) {
         const Mode reached = missionModeFor(target);
         const bool entersSafe = (reached == Mode::SAFE) && (from != Mode::SAFE);
+        if (entersSafe) {
+            this->finishSafeEntry();
+        }
         ASSERT_CMD_RESPONSE(0, MissionAppComponentBase::OPCODE_SET_MODE, 50, Fw::CmdResponse::OK);
         ASSERT_EVENTS_SetModeRejected_SIZE(0);
         ASSERT_EVENTS_SafeExitBlocked_SIZE(0);
@@ -462,6 +472,7 @@ void MissionAppTester::checkFault(Components::MissionMode from) {
         ASSERT_EVENTS_SafeFaultRepeated(0, Components::SafeCause::LOW_POWER, 0);
         ASSERT_from_cancelRequestOut_SIZE(0);
     } else {
+        this->finishSafeEntry();
         ASSERT_EVENTS_ModeChanged_SIZE(1);
         ASSERT_EVENTS_ModeChanged(0, Mode::SAFE);
         ASSERT_EVENTS_SafeModeEntered_SIZE(1);
@@ -511,6 +522,7 @@ void MissionAppTester::testSafeExitBlockedByLatchUntilCleared() {
     // A latching watchdog fault puts the spacecraft in SAFE and holds it there.
     this->invoke_to_faultIn(0, Components::SafeCause::WATCHDOG, true, 0);
     this->component.doDispatch();
+    this->finishSafeEntry();
     ASSERT_EVENTS_SafeModeEntered_SIZE(1);
     ASSERT_EVENTS_SafeModeEntered(0, Components::SafeCause::WATCHDOG, 1);
     ASSERT_TLM_SafeLatched(0, true);
@@ -554,6 +566,7 @@ void MissionAppTester::testSafeExitWaitsForStabilityInterval() {
 
     this->invoke_to_faultIn(0, Components::SafeCause::LOW_POWER, false, 0);
     this->component.doDispatch();
+    this->finishSafeEntry();
 
     // 9 of 10 seconds: too early.
     this->runTicks(9);
@@ -583,6 +596,7 @@ void MissionAppTester::testSafeExitIntervalUsesParameter() {
 
     this->invoke_to_faultIn(0, Components::SafeCause::ADCS_RATE, false, 0);
     this->component.doDispatch();
+    this->finishSafeEntry();
 
     this->runTicks(2);
     this->clearHistory();
@@ -599,6 +613,7 @@ void MissionAppTester::testCaptureFinishingInSafeDoesNotLeaveSafe() {
     ASSERT_NO_FATAL_FAILURE(this->driveTo(Mode::COLLECTING));
     this->invoke_to_faultIn(0, Components::SafeCause::LOW_POWER, false, 0);
     this->component.doDispatch();
+    this->finishSafeEntry();
     ASSERT_EVENTS_ModeChanged(0, Mode::SAFE);
     this->clearHistory();
 
@@ -654,6 +669,7 @@ void MissionAppTester::testSafeEntryCancelsQueuedCollection() {
     this->component.doDispatch();
 
     ASSERT_NO_FATAL_FAILURE(this->sendSetMode(2, Ops::SAFE, Fw::CmdResponse::OK));
+    this->finishSafeEntry();
     ASSERT_EVENTS_ModeChanged_SIZE(2);
     ASSERT_EVENTS_ModeChanged(1, Mode::SAFE);
     ASSERT_EVENTS_SafeModeEntered(0, Components::SafeCause::GROUND_COMMAND, 0);
@@ -663,6 +679,142 @@ void MissionAppTester::testSafeEntryCancelsQueuedCollection() {
     ASSERT_TLM_SafeEntryCause(1, Components::SafeCause::GROUND_COMMAND);
 }
 
+// SAFE entry is complete only after PayloadManager and ScienceApp both report back.
+void MissionAppTester::testSafeEntryWaitsForBothReports() {
+    this->clearHistory();
+    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(1, Ops::SAFE, Fw::CmdResponse::OK));
+    ASSERT_EVENTS_ModeChanged(0, Mode::SAFE);
+    ASSERT_from_captureControlOut_SIZE(1);
+    ASSERT_from_captureControlOut(0, Fw::Enabled::DISABLED);
+    ASSERT_from_cancelRequestOut_SIZE(1);
+    const U32 safeKey = MissionApp::SAFE_CANCEL_KEY;
+    ASSERT_from_cancelRequestOut(0, safeKey);
+    ASSERT_EVENTS_SafeModeEntered_SIZE(0);
+
+    this->invoke_to_captureControlReportIn(0, Fw::Enabled::DISABLED, true);
+    this->component.doDispatch();
+    ASSERT_EVENTS_SafeModeEntered_SIZE(0);
+
+    this->invoke_to_cancelReportIn(0, safeKey);
+    this->component.doDispatch();
+    ASSERT_EVENTS_SafeModeEntered_SIZE(1);
+    ASSERT_EVENTS_SafeModeEntered(0, Components::SafeCause::GROUND_COMMAND, 0);
+}
+
+// A cancel sent before SAFE can still be reporting back. Only SAFE's own cancel counts.
+void MissionAppTester::testStaleCancelReportCannotConfirmSafe() {
+    this->clearHistory();
+    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(1, Ops::SAFE, Fw::CmdResponse::OK));
+    this->invoke_to_captureControlReportIn(0, Fw::Enabled::DISABLED, false);
+    this->component.doDispatch();
+    this->invoke_to_cancelReportIn(0, 0U);  // the report of an earlier ENTER_BASE_MODE
+    this->component.doDispatch();
+    ASSERT_EVENTS_SafeModeEntered_SIZE(0);
+
+    this->invoke_to_cancelReportIn(0, MissionApp::SAFE_CANCEL_KEY);
+    this->component.doDispatch();
+    ASSERT_EVENTS_SafeModeEntered_SIZE(1);
+}
+
+// An ENABLED report, from leaving an earlier SAFE, says nothing about this inhibit.
+void MissionAppTester::testEnabledReportCannotConfirmSafe() {
+    this->clearHistory();
+    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(1, Ops::SAFE, Fw::CmdResponse::OK));
+    this->invoke_to_cancelReportIn(0, MissionApp::SAFE_CANCEL_KEY);
+    this->component.doDispatch();
+    this->invoke_to_captureControlReportIn(0, Fw::Enabled::ENABLED, false);
+    this->component.doDispatch();
+    ASSERT_EVENTS_SafeModeEntered_SIZE(0);
+
+    this->invoke_to_captureControlReportIn(0, Fw::Enabled::DISABLED, false);
+    this->component.doDispatch();
+    ASSERT_EVENTS_SafeModeEntered_SIZE(1);
+}
+
+// The late report warning counts from each SAFE entry, so a second stuck entry still raises it.
+void MissionAppTester::testSafeEntryWarningCountsFromEachEntry() {
+    this->clearHistory();
+    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(1, Ops::SAFE, Fw::CmdResponse::OK));
+    this->runTicks(6);
+    ASSERT_EVENTS_SafeEntryUnconfirmed_SIZE(1);
+    this->finishSafeEntry();
+    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(2, Ops::BASE, Fw::CmdResponse::OK));
+
+    this->clearHistory();
+    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(3, Ops::SAFE, Fw::CmdResponse::OK));
+    this->runTicks(6);
+    ASSERT_EVENTS_SafeEntryUnconfirmed_SIZE(1);
+}
+
+// Until entry is confirmed, SAFE cannot be left, and a missing report is raised once.
+void MissionAppTester::testSafeExitBlockedUntilEntryConfirmed() {
+    this->clearHistory();
+    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(1, Ops::SAFE, Fw::CmdResponse::OK));
+    this->invoke_to_cancelReportIn(0, MissionApp::SAFE_CANCEL_KEY);
+    this->component.doDispatch();
+    this->clearHistory();
+
+    // The refusal names what is missing, not the latch or the stability timer.
+    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(2, Ops::BASE, Fw::CmdResponse::VALIDATION_ERROR));
+    ASSERT_EVENTS_SafeEntryUnconfirmed_SIZE(1);
+    ASSERT_EVENTS_SafeEntryUnconfirmed(0, 1);
+    ASSERT_EVENTS_SafeExitBlocked_SIZE(0);
+    ASSERT_NO_FATAL_FAILURE(this->assertReportModeAnswers(3, Mode::SAFE));
+
+    this->clearHistory();
+    this->runTicks(6);
+    ASSERT_EVENTS_SafeEntryUnconfirmed_SIZE(1);
+    ASSERT_EVENTS_SafeEntryUnconfirmed(0, 1);
+    this->runTicks(6);
+    ASSERT_EVENTS_SafeEntryUnconfirmed_SIZE(1);
+
+    this->invoke_to_captureControlReportIn(0, Fw::Enabled::DISABLED, false);
+    this->component.doDispatch();
+    ASSERT_EVENTS_SafeModeEntered_SIZE(1);
+    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(4, Ops::BASE, Fw::CmdResponse::OK));
+}
+
+// One rule in MissionApp: captures are inhibited in SAFE and enabled again on the way out.
+void MissionAppTester::testCaptureControlFollowsSafeOnly() {
+    this->clearHistory();
+    this->sendCmd_SCHEDULE_COLLECTION(0, 1, 10);
+    this->component.doDispatch();
+    this->invoke_to_modeUpdateIn(0, Mode::COLLECTING, 10);
+    this->component.doDispatch();
+    this->invoke_to_modeUpdateIn(0, Mode::SCIENCE_READY, 128);
+    this->component.doDispatch();
+    this->invoke_to_modeUpdateIn(1, Mode::DOWNLINKING, 128);
+    this->component.doDispatch();
+    ASSERT_EVENTS_ModeChanged_SIZE(4);
+    ASSERT_from_captureControlOut_SIZE(0);
+
+    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(2, Ops::SAFE, Fw::CmdResponse::OK));
+    ASSERT_from_captureControlOut_SIZE(1);
+    ASSERT_from_captureControlOut(0, Fw::Enabled::DISABLED);
+    this->finishSafeEntry();
+    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(3, Ops::BASE, Fw::CmdResponse::OK));
+    ASSERT_from_captureControlOut_SIZE(2);
+    ASSERT_from_captureControlOut(1, Fw::Enabled::ENABLED);
+}
+
+// faultIn: an unknown cause is recorded as OTHER_FAULT, and the first latched cause is kept.
+void MissionAppTester::testFaultCausesRecordedHonestly() {
+    this->clearHistory();
+    this->invoke_to_faultIn(0, Components::SafeCause::GROUND_COMMAND, false, 0);
+    this->component.doDispatch();
+    this->finishSafeEntry();
+    ASSERT_EVENTS_SafeModeEntered(0, Components::SafeCause::OTHER_FAULT, 0);
+
+    this->invoke_to_faultIn(0, Components::SafeCause::WATCHDOG, true, 0);
+    this->component.doDispatch();
+    this->invoke_to_faultIn(0, Components::SafeCause::LOW_POWER, true, 0);
+    this->component.doDispatch();
+    this->clearHistory();
+    this->sendCmd_CLEAR_SAFE_LATCH(0, 1);
+    this->component.doDispatch();
+    ASSERT_EVENTS_SafeLatchCleared(0, Components::SafeCause::WATCHDOG);
+}
+
 void MissionAppTester::testBootInSafeParameter() {
     this->paramSet_BOOT_IN_SAFE(1, Fw::ParamValid::VALID);
     this->component.loadParameters();
@@ -670,14 +822,12 @@ void MissionAppTester::testBootInSafeParameter() {
 
     // What the component thread does first after a reset.
     this->component.preamble();
+    this->finishSafeEntry();
 
     ASSERT_EVENTS_ModeChanged_SIZE(1);
     ASSERT_EVENTS_ModeChanged(0, Mode::SAFE);
     ASSERT_EVENTS_SafeModeEntered(0, Components::SafeCause::BOOT, 0);
     ASSERT_TLM_SafeEntryCause(0, Components::SafeCause::BOOT);
-    // ScienceApp starts out refusing captures.
-    ASSERT_from_modeOut_SIZE(1);
-    ASSERT_from_modeOut(0, Mode::SAFE, 0U);
     ASSERT_NO_FATAL_FAILURE(this->assertReportModeAnswers(1, Mode::SAFE));
 
     // No fault and no latch at boot, so the first ground exit passes.
@@ -686,12 +836,10 @@ void MissionAppTester::testBootInSafeParameter() {
 }
 
 void MissionAppTester::testBootInBaseByDefault() {
-    // Parameters not loaded yet: start in BASE, say nothing, and tell ScienceApp it is BASE.
+    // Parameters not loaded yet: start in BASE, say nothing.
     this->clearHistory();
     this->component.preamble();
     ASSERT_EVENTS_SIZE(0);
-    ASSERT_from_modeOut_SIZE(1);
-    ASSERT_from_modeOut(0, Mode::BASE, 0U);
     ASSERT_NO_FATAL_FAILURE(this->assertReportModeAnswers(1, Mode::BASE));
 
     // Parameter loaded at its default (0): still BASE.
@@ -714,42 +862,10 @@ void MissionAppTester::testSimulateSafeFaultOnlyInLocalBuild() {
     ASSERT_NO_FATAL_FAILURE(this->assertReportModeAnswers(2, Mode::BASE));
 #else
     ASSERT_CMD_RESPONSE(0, MissionAppComponentBase::OPCODE_SIMULATE_SAFE_FAULT, 1, Fw::CmdResponse::OK);
+    this->finishSafeEntry();
     ASSERT_EVENTS_SafeModeEntered(0, Components::SafeCause::LOW_POWER, 1);
     ASSERT_NO_FATAL_FAILURE(this->assertReportModeAnswers(2, Mode::SAFE));
 #endif
-}
-
-void MissionAppTester::testModeSentOnEveryChange() {
-    this->clearHistory();
-
-    // Ground commands: BASE -> COLLECTION_PENDING -> SAFE -> BASE. Each accepted change reaches ScienceApp.
-    this->sendCmd_SCHEDULE_COLLECTION(0, 1, 30);
-    this->component.doDispatch();
-    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(2, Ops::SAFE, Fw::CmdResponse::OK));
-    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(3, Ops::BASE, Fw::CmdResponse::OK));
-    ASSERT_from_modeOut_SIZE(3);
-    ASSERT_from_modeOut(0, Mode::COLLECTION_PENDING, 0U);
-    ASSERT_from_modeOut(1, Mode::SAFE, 0U);
-    ASSERT_from_modeOut(2, Mode::BASE, 0U);
-
-    // A refused change sends nothing.
-    this->clearHistory();
-    ASSERT_NO_FATAL_FAILURE(this->sendSetMode(4, Ops::SCIENCE_PROCESSING, Fw::CmdResponse::VALIDATION_ERROR));
-    ASSERT_from_modeOut_SIZE(0);
-
-    // A subsystem report that moves MissionApp is sent too, and so is a fault into SAFE.
-    this->invoke_to_modeUpdateIn(0, Mode::COLLECTING, 10);
-    this->component.doDispatch();
-    this->invoke_to_faultIn(0, Components::SafeCause::LOW_POWER, false, 0);
-    this->component.doDispatch();
-    ASSERT_from_modeOut_SIZE(2);
-    ASSERT_from_modeOut(0, Mode::COLLECTING, 0U);
-    ASSERT_from_modeOut(1, Mode::SAFE, 0U);
-
-    // Reports refused in SAFE move nothing, so nothing is sent.
-    this->invoke_to_modeUpdateIn(0, Mode::SCIENCE_READY, 128);
-    this->component.doDispatch();
-    ASSERT_from_modeOut_SIZE(2);
 }
 
 void MissionAppTester::testSubsystemPlanMatchesMopMatrix() {
@@ -768,6 +884,7 @@ void MissionAppTester::testSubsystemPlanMatchesMopMatrix() {
     this->component.doDispatch();
     this->sendCmd_SET_MODE(0, 2, Ops::SAFE);                        // Safe
     this->component.doDispatch();
+    this->finishSafeEntry();
 
     const MopRow expected[] = {MOP_COLLECTION, MOP_PROCESSING, MOP_DOWNLINK, MOP_BASE, MOP_SAFE};
     ASSERT_EVENTS_SubsystemStatesRequested_SIZE(5);
@@ -794,6 +911,7 @@ void MissionAppTester::testOperationsModeTelemetryFollowsMode() {
     this->component.doDispatch();
     this->sendCmd_SET_MODE(0, 2, Ops::SAFE);
     this->component.doDispatch();
+    this->finishSafeEntry();
 
     // COLLECTION_PENDING is still Base by the MOP, so the first value is BASE.
     ASSERT_TLM_OperationsMode_SIZE(6);

@@ -50,6 +50,11 @@ TEST(Nominal, CollectAndDownlinkClearsIntentOnFailure) {
     Components::ScienceAppTester tester;
     tester.testCollectAndDownlinkClearsIntentOnFailure();
 }
+
+TEST(Safe, StorageFailureSendsNoDelivery) {
+    Components::ScienceAppTester tester;
+    tester.testStorageFailureSendsNoDelivery();
+}
 #else
 TEST(Nominal, CdrRejectsAutomaticDownlinkBeforeCaptureOrTokenAllocation) {
     Components::ScienceAppTester tester;
@@ -57,46 +62,24 @@ TEST(Nominal, CdrRejectsAutomaticDownlinkBeforeCaptureOrTokenAllocation) {
 }
 #endif
 
-TEST(SafeMode, RefusesEveryCaptureCommand) {
+TEST(Safe, ScienceReadyWaitsForStorageCommit) {
     Components::ScienceAppTester tester;
-    tester.testSafeRefusesEveryCaptureCommand();
+    tester.testScienceReadyWaitsForStorageCommit();
 }
 
-TEST(SafeMode, RefusesScheduledRequestAndCountdown) {
+TEST(Safe, StorageFailureReturnsToBaseNotReady) {
     Components::ScienceAppTester tester;
-    tester.testSafeRefusesScheduledRequestAndCountdown();
+    tester.testStorageFailureReturnsToBaseNotReady();
 }
 
-TEST(SafeMode, CapturesAllowedAgainAfterSafe) {
+TEST(Safe, InhibitedCaptureIsReportedAndChangesNoMode) {
     Components::ScienceAppTester tester;
-    tester.testCapturesAllowedAgainAfterSafe();
+    tester.testInhibitedCaptureIsReportedAndChangesNoMode();
 }
 
-TEST(SafeMode, CaptureRunningAtSafeEntryIsWithheld) {
+TEST(Safe, CancelReportsBackToMissionApp) {
     Components::ScienceAppTester tester;
-    tester.testCaptureRunningAtSafeEntryIsWithheld();
-}
-
-TEST(SafeMode, ManagerCaptureInSafeIsWithheld) {
-    Components::ScienceAppTester tester;
-    tester.testManagerCaptureInSafeIsWithheld();
-}
-
-TEST(SafeMode, InterruptedCaptureStaysWithheldAfterSafeExit) {
-    Components::ScienceAppTester tester;
-    tester.testInterruptedCaptureStaysWithheldAfterSafeExit();
-}
-
-#ifndef NEUTRON2_CDR_TCP
-TEST(SafeMode, VerifiedCaptureInterruptedBySafeEndsFailed) {
-    Components::ScienceAppTester tester;
-    tester.testVerifiedCaptureInterruptedBySafeEndsFailed();
-}
-#endif
-
-TEST(SafeMode, ExistingIdsUnchanged) {
-    Components::ScienceAppTester tester;
-    tester.testExistingIdsUnchanged();
+    tester.testCancelReportsBackToMissionApp();
 }
 
 int main(int argc, char** argv) {

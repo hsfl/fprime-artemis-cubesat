@@ -13,6 +13,11 @@ constexpr U32 REJECT_SIMULATION_NOT_LOCAL = 3U;
 constexpr U32 REJECT_INVALID_SIMULATED_FAULT = 4U;
 // Same as the FPP default of SAFE_EXIT_STABLE_SECONDS. Used until the parameter database loads.
 constexpr U32 DEFAULT_SAFE_EXIT_STABLE_SECONDS = 10U;
+// The reports SAFE entry waits for (SafeEntryUnconfirmed's waiting mask).
+constexpr U8 SAFE_WAIT_CAPTURE_CONTROL = 0x1U;
+constexpr U8 SAFE_WAIT_CANCEL = 0x2U;
+// Seconds before a missing SAFE report is raised to the ground. Both reports normally arrive within a tick.
+constexpr U32 SAFE_ENTRY_CONFIRM_TICKS = 5U;
 
 using Request = Components::SubsystemRequest;
 
@@ -77,11 +82,17 @@ bool toMissionMode(Components::OperationsMode mode, Components::MissionMode& mis
     }
 }
 
-// The two refusals that come from the SAFE exit guard: a latch is set, or the last fault is too recent.
-// They get the SafeExitBlocked event, which says what is still missing, instead of a plain refusal.
+// The refusals that come from the SAFE exit guard: entry is not confirmed, a latch is set, or the last
+// fault is too recent. reportSafeExitBlocked() says what is still missing, instead of a plain refusal.
 bool isSafeExitBlock(Components::ModeRejectReason reason) {
     return (reason == Components::ModeRejectReason::SAFE_LATCHED) ||
-           (reason == Components::ModeRejectReason::SAFE_NOT_STABLE);
+           (reason == Components::ModeRejectReason::SAFE_NOT_STABLE) ||
+           (reason == Components::ModeRejectReason::SAFE_ENTRY_UNCONFIRMED);
+}
+
+// The one rule for what each mode allows. SAFE inhibits science (SDD v4.0 Table 5).
+bool capturePermitted(Components::MissionMode mode) {
+    return mode != Components::MissionMode::SAFE;
 }
 
 // Only real fault causes may arrive on faultIn. Anything else is recorded as OTHER_FAULT.
@@ -103,7 +114,10 @@ MissionApp::MissionApp(const char* const compName)
       m_latchCause(Components::SafeCause::NONE),
       m_safeLatched(false),
       m_faultSeen(false),
-      m_ticksSinceFault(0) {}
+      m_ticksSinceFault(0),
+      m_captureControl(Fw::Enabled::ENABLED),
+      m_safeEntryWaiting(0),
+      m_safeEntryTicks(0) {}
 
 MissionApp::~MissionApp() {}
 
@@ -114,9 +128,6 @@ MissionApp::~MissionApp() {}
 void MissionApp::preamble() {
     if (this->bootInSafe()) {
         this->enterSafe(Components::SafeCause::BOOT);
-    } else {
-        // Tell ScienceApp the start-up mode as well, so the two start in step.
-        this->publishMode();
     }
 }
 
@@ -132,6 +143,12 @@ void MissionApp::run_handler(FwIndexType portNum, U32 context) {
     // rateGroup1 runs at 1 Hz, so one tick is one second of the SAFE stability interval.
     if (this->m_faultSeen && (this->m_ticksSinceFault < std::numeric_limits<U32>::max())) {
         this->m_ticksSinceFault += 1U;
+    }
+    if (this->m_safeEntryWaiting != 0U) {
+        this->m_safeEntryTicks += 1U;
+        if (this->m_safeEntryTicks == SAFE_ENTRY_CONFIRM_TICKS) {
+            this->log_WARNING_HI_SafeEntryUnconfirmed(this->m_safeEntryWaiting);
+        }
     }
     constexpr U32 TELEMETRY_PERIOD_TICKS = 30U;
     if ((this->m_modeHeartbeat - this->m_lastTelemetryHeartbeat) >= TELEMETRY_PERIOD_TICKS) {
@@ -149,6 +166,21 @@ void MissionApp::modeUpdateIn_handler(FwIndexType portNum, const Components::Mis
     // product is on the OBC, and MissionApp goes back to BASE by itself.
     if (moved && (mode == Components::MissionMode::SCIENCE_READY) && this->autoReturnToBase()) {
         static_cast<void>(this->transitionToMode(Components::MissionMode::BASE, ModeSource::SUBSYSTEM, detail));
+    }
+}
+
+void MissionApp::cancelReportIn_handler(FwIndexType portNum, U32 key) {
+    static_cast<void>(portNum);
+    if (key == SAFE_CANCEL_KEY) {
+        this->confirmSafeEntry(SAFE_WAIT_CANCEL);
+    }
+}
+
+void MissionApp::captureControlReportIn_handler(FwIndexType portNum, const Fw::Enabled& control, bool activeOperation) {
+    static_cast<void>(portNum);
+    static_cast<void>(activeOperation);  // a running capture is left to finish, PayloadManager logs it
+    if (control == Fw::Enabled::DISABLED) {
+        this->confirmSafeEntry(SAFE_WAIT_CAPTURE_CONTROL);
     }
 }
 
@@ -373,6 +405,9 @@ Components::ModeRejectReason MissionApp::checkTransition(Components::MissionMode
 // The SDD's other exit conditions (fresh health inputs within recovery limits) need
 // EPS, ADCS and watchdog inputs that no manager sends to MissionApp yet.
 Components::ModeRejectReason MissionApp::checkSafeExit() {
+    if (this->m_safeEntryWaiting != 0U) {
+        return Components::ModeRejectReason::SAFE_ENTRY_UNCONFIRMED;
+    }
     if (this->m_safeLatched) {
         return Components::ModeRejectReason::SAFE_LATCHED;
     }
@@ -399,13 +434,13 @@ bool MissionApp::transitionToMode(Components::MissionMode requested, ModeSource 
     return true;
 }
 
-// The one place a mode change takes effect: store it, tell ScienceApp, update telemetry, log ModeChanged
-// and, when the MOP operations mode changes, announce what the new mode asks of the hardware.
+// The one place a mode change takes effect: store it, update telemetry, log ModeChanged and, when the
+// MOP operations mode changes, announce what the new mode asks of the hardware.
 void MissionApp::applyMode(Components::MissionMode mode) {
     const Components::OperationsMode before = toOperationsMode(this->m_currentMode);
     this->m_currentMode = mode;
-    // First, so a SAFE entry reaches ScienceApp ahead of the cancel that enterSafe() sends after it.
-    this->publishMode();
+    // First, so a SAFE inhibit goes out ahead of everything else this mode change sends.
+    this->sendCaptureControl();
     this->writeTelemetry();
     this->log_ACTIVITY_HI_ModeChanged(this->m_currentMode);
     const Components::OperationsMode after = toOperationsMode(mode);
@@ -414,17 +449,48 @@ void MissionApp::applyMode(Components::MissionMode mode) {
     }
 }
 
-// Go to SAFE: record why, move, drop any queued collection, and log SafeModeEntered (warning high).
+// Send the capture control when it changes. Reports are checked by confirmSafeEntry().
+void MissionApp::sendCaptureControl() {
+    const Fw::Enabled control = capturePermitted(this->m_currentMode) ? Fw::Enabled::ENABLED : Fw::Enabled::DISABLED;
+    if (control == this->m_captureControl) {
+        return;
+    }
+    this->m_captureControl = control;
+    if (this->isConnected_captureControlOut_OutputPort(0)) {
+        this->captureControlOut_out(0, control);
+    }
+}
+
+void MissionApp::confirmSafeEntry(U8 confirmed) {
+    if (this->m_safeEntryWaiting == 0U) {
+        return;
+    }
+    this->m_safeEntryWaiting = static_cast<U8>(this->m_safeEntryWaiting & ~confirmed);
+    if (this->m_safeEntryWaiting == 0U) {
+        this->log_WARNING_HI_SafeModeEntered(this->m_safeCause, static_cast<U8>(this->m_safeLatched ? 1U : 0U));
+    }
+}
+
+// Go to SAFE: record why, move, tell PayloadManager to inhibit new captures and ScienceApp to cancel
+// pending collections. SAFE entry is complete, and SafeModeEntered logged, once both have reported back.
+// A capture already running is left to finish. Payload power stays with the EPS rail for now.
 void MissionApp::enterSafe(Components::SafeCause cause) {
     // Record the cause first so the telemetry written by applyMode already shows it.
     this->m_safeCause = cause;
-    // Science is inhibited in SAFE (SDD v4.0 Table 5). applyMode tells ScienceApp, which refuses every new
-    // capture from then on, and cancelCollection drops a queued one. A capture already running belongs to
-    // PayloadManager and payload power to the EPS rail, so neither stops here: ScienceApp withholds that
-    // capture's product when it ends.
+    this->m_safeEntryTicks = 0U;
+    U8 waiting = 0U;
+    if (this->isConnected_captureControlOut_OutputPort(0)) {
+        waiting = static_cast<U8>(waiting | SAFE_WAIT_CAPTURE_CONTROL);
+    }
+    if (this->isConnected_cancelRequestOut_OutputPort(0)) {
+        waiting = static_cast<U8>(waiting | SAFE_WAIT_CANCEL);
+    }
+    this->m_safeEntryWaiting = waiting;
     this->applyMode(Components::MissionMode::SAFE);
-    this->cancelCollection();
-    this->log_WARNING_HI_SafeModeEntered(cause, static_cast<U8>(this->m_safeLatched ? 1U : 0U));
+    this->cancelCollection(SAFE_CANCEL_KEY);
+    if (waiting == 0U) {
+        this->log_WARNING_HI_SafeModeEntered(cause, static_cast<U8>(this->m_safeLatched ? 1U : 0U));
+    }
 }
 
 // A fault from faultIn or SIMULATE_SAFE_FAULT. Restarts the stability timer, sets the latch when asked
@@ -450,7 +516,7 @@ void MissionApp::handleFault(Components::SafeCause cause, bool latch) {
     }
 }
 
-// Exit-guard refusals get SafeExitBlocked (what is still missing). Every other refusal gets ModeUpdateRejected.
+// Exit-guard refusals say what is still missing. Every other refusal gets ModeUpdateRejected.
 void MissionApp::reportRejectedTransition(Components::MissionMode requested, Components::ModeRejectReason reason, U32 detail) {
     if (isSafeExitBlock(reason)) {
         this->reportSafeExitBlocked();
@@ -461,6 +527,10 @@ void MissionApp::reportRejectedTransition(Components::MissionMode requested, Com
 
 // Tells the ground why SAFE cannot be left yet: the latch cause, calm seconds so far, seconds needed.
 void MissionApp::reportSafeExitBlocked() {
+    if (this->m_safeEntryWaiting != 0U) {
+        this->log_WARNING_HI_SafeEntryUnconfirmed(this->m_safeEntryWaiting);
+        return;
+    }
     const U32 healthySeconds = this->m_faultSeen ? this->m_ticksSinceFault : 0U;
     this->log_WARNING_LO_SafeExitBlocked(this->m_latchCause, healthySeconds, this->safeExitStableSeconds());
 }
@@ -498,17 +568,11 @@ bool MissionApp::autoReturnToBase() {
     return ((valid == Fw::ParamValid::VALID) || (valid == Fw::ParamValid::DEFAULT)) && (value != 0U);
 }
 
-void MissionApp::publishMode() {
-    if (this->isConnected_modeOut_OutputPort(0)) {
-        this->modeOut_out(0, this->m_currentMode, 0U);
-    }
-}
-
-void MissionApp::cancelCollection() {
+void MissionApp::cancelCollection(U32 key) {
     this->m_lastScheduledDelaySeconds = 0U;
     this->writeTelemetry();
     if (this->isConnected_cancelRequestOut_OutputPort(0)) {
-        this->cancelRequestOut_out(0, 0U);
+        this->cancelRequestOut_out(0, key);
     }
 }
 

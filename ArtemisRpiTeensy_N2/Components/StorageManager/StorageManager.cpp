@@ -372,49 +372,60 @@ void StorageManager::requestIn_handler(FwIndexType portNum,
                                        const Fw::StringBase& sourcePath,
                                        U32 sourceCrc) {
     static_cast<void>(portNum);
+    const bool stored = this->storeProduct(productId, productBytes, sourceKind, sourcePath, sourceCrc);
+    if (this->isConnected_productStoredOut_OutputPort(0)) {
+        this->productStoredOut_out(0, productId, stored);
+    }
+}
+
+bool StorageManager::storeProduct(U32 productId,
+                                  U32 productBytes,
+                                  const Components::ScienceProductSource& sourceKind,
+                                  const Fw::StringBase& sourcePath,
+                                  U32 sourceCrc) {
     this->m_lastInputProductId = 0U;
     if (!this->ensureCatalogLoaded()) {
         this->rejectProduct(productId, REJECT_STORAGE_UNAVAILABLE, sourcePath);
-        return;
+        return false;
     }
     if ((productId == 0U) || (productBytes == 0U) ||
         (sourceKind == Components::ScienceProductSource::UNKNOWN) || (sourcePath.length() == 0U) ||
         (sourceCrc > 0xFFFFU)) {
         this->rejectProduct(productId, REJECT_INVALID_DESCRIPTOR, sourcePath);
-        return;
+        return false;
     }
     if (sourcePath.length() >= SOURCE_PATH_CAPACITY) {
         this->rejectProduct(productId, REJECT_PATH_TOO_LONG, sourcePath);
-        return;
+        return false;
     }
     if (this->m_storedProducts >= HISTORY_CAPACITY) {
         this->rejectProduct(productId, REJECT_CATALOG_FULL, sourcePath);
-        return;
+        return false;
     }
     if ((this->findProduct(productId) != nullptr) ||
         (::access(productDataPath(this->m_storageRoot, productId).c_str(), F_OK) == 0) ||
         (::access(productMetadataPath(this->m_storageRoot, productId).c_str(), F_OK) == 0)) {
         this->rejectProduct(productId, REJECT_DUPLICATE_ID, sourcePath);
-        return;
+        return false;
     }
 
     const std::string dataPath = productDataPath(this->m_storageRoot, productId);
     const std::string metadataPath = productMetadataPath(this->m_storageRoot, productId);
     if (dataPath.size() >= SOURCE_PATH_CAPACITY) {
         this->rejectProduct(productId, REJECT_PATH_TOO_LONG, sourcePath);
-        return;
+        return false;
     }
     if (!this->persistNextProductId((productId == std::numeric_limits<U32>::max()) ? 0U : productId + 1U)) {
         this->rejectProduct(productId, REJECT_ID_COUNTER, sourcePath);
-        return;
+        return false;
     }
     if (!this->copyProductAtomically(sourcePath, dataPath, productBytes, sourceCrc)) {
         this->rejectProduct(productId, REJECT_COPY_OR_CRC, sourcePath);
-        return;
+        return false;
     }
     if (!this->writeMetadataAtomically(metadataPath, productId, productBytes, sourceKind, sourceCrc)) {
         this->rejectProduct(productId, REJECT_METADATA_COMMIT, Fw::String(dataPath.c_str()));
-        return;
+        return false;
     }
 
     const Fw::String storedPath(dataPath.c_str());
@@ -432,6 +443,7 @@ void StorageManager::requestIn_handler(FwIndexType portNum,
     this->tlmWrite_StorageHistoryDepth(this->historyDepth());
     this->tlmWrite_SelectedProductId(this->m_selectedProductId);
     this->tlmWrite_StorageReady(true);
+    return true;
 }
 
 void StorageManager::deliveryRequestIn_handler(FwIndexType portNum, U32 productId) {

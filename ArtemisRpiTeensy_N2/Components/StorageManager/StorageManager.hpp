@@ -57,6 +57,12 @@ class StorageManager final : public StorageManagerComponentBase {
                                  U32 sourceCrc) const;
     bool readMetadata(U32 filenameProductId, ProductRecord& record) const;
     bool isValidStoredProduct(const ProductRecord& record) const;
+    //! The catalog and file work of requestIn. True once the product is committed.
+    bool storeProduct(U32 productId,
+                      U32 productBytes,
+                      const Components::ScienceProductSource& sourceKind,
+                      const Fw::StringBase& sourcePath,
+                      U32 sourceCrc);
     void rejectProduct(U32 productId, U32 reason, const Fw::StringBase& path) const;
     void publishSelected(const ProductRecord& record, bool selectedByCommand);
     void reportLatest() const;

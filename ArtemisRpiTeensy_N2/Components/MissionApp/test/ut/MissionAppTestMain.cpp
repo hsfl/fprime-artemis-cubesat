@@ -105,11 +105,6 @@ TEST(SafeMode, SimulateSafeFaultOnlyInLocalBuild) {
     tester.testSimulateSafeFaultOnlyInLocalBuild();
 }
 
-TEST(SafeMode, ModeSentToScienceAppOnEveryChange) {
-    Components::MissionAppTester tester;
-    tester.testModeSentOnEveryChange();
-}
-
 TEST(DemoModes, SubsystemPlanMatchesMopMatrix) {
     Components::MissionAppTester tester;
     tester.testSubsystemPlanMatchesMopMatrix();
@@ -143,6 +138,41 @@ TEST(AutoReturn, OffHoldsScienceReady) {
 TEST(AutoReturn, OnGoesBackToBase) {
     Components::MissionAppTester tester;
     tester.testAutoReturnOnGoesBackToBase();
+}
+
+TEST(Safe, SafeEntryWaitsForBothReports) {
+    Components::MissionAppTester tester;
+    tester.testSafeEntryWaitsForBothReports();
+}
+
+TEST(Safe, SafeExitBlockedUntilEntryConfirmed) {
+    Components::MissionAppTester tester;
+    tester.testSafeExitBlockedUntilEntryConfirmed();
+}
+
+TEST(Safe, CaptureControlFollowsSafeOnly) {
+    Components::MissionAppTester tester;
+    tester.testCaptureControlFollowsSafeOnly();
+}
+
+TEST(Safe, FaultCausesRecordedHonestly) {
+    Components::MissionAppTester tester;
+    tester.testFaultCausesRecordedHonestly();
+}
+
+TEST(Safe, StaleCancelReportCannotConfirmSafe) {
+    Components::MissionAppTester tester;
+    tester.testStaleCancelReportCannotConfirmSafe();
+}
+
+TEST(Safe, EnabledReportCannotConfirmSafe) {
+    Components::MissionAppTester tester;
+    tester.testEnabledReportCannotConfirmSafe();
+}
+
+TEST(Safe, SafeEntryWarningCountsFromEachEntry) {
+    Components::MissionAppTester tester;
+    tester.testSafeEntryWarningCountsFromEachEntry();
 }
 
 int main(int argc, char** argv) {

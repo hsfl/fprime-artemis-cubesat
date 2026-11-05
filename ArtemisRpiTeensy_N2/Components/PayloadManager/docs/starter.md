@@ -24,6 +24,7 @@ Power note: the real payload will require 28 V. PDU owns rail control; Payload o
 ## Abstraction Rule
 
 - `PayloadManager` owns commands, collection state, telemetry, and events.
+- MissionApp decides whether captures may start. `PayloadManager` enforces it: while `captureControlIn` says DISABLED, `startCapture()` and `startPassthrough()` refuse with `INHIBITED`. A running operation finishes.
 - Current driver behavior is emulated on the Raspberry Pi.
 - Driver choice is a topology/build profile decision, not a runtime command.
 - Future real payload protocol goes in an driver, not this manager.

@@ -36,11 +36,16 @@ class MissionAppTester final : public MissionAppGTestBase {
     void testCaptureFinishingInSafeDoesNotLeaveSafe();
     void testOldCommandsRespectSafe();
     void testSafeEntryCancelsQueuedCollection();
+    void testSafeEntryWaitsForBothReports();
+    void testStaleCancelReportCannotConfirmSafe();
+    void testEnabledReportCannotConfirmSafe();
+    void testSafeEntryWarningCountsFromEachEntry();
+    void testSafeExitBlockedUntilEntryConfirmed();
+    void testCaptureControlFollowsSafeOnly();
+    void testFaultCausesRecordedHonestly();
     void testBootInSafeParameter();
     void testBootInBaseByDefault();
     void testSimulateSafeFaultOnlyInLocalBuild();
-    //! ScienceApp hears every accepted mode change, so it can refuse captures in SAFE.
-    void testModeSentOnEveryChange();
     // D5 demo modes: what each mode reports
     void testSubsystemPlanMatchesMopMatrix();
     void testOperationsModeTelemetryFollowsMode();
@@ -54,6 +59,8 @@ class MissionAppTester final : public MissionAppGTestBase {
   private:
     void connectPorts();
     void initComponents();
+    //! Both reports SAFE entry waits for, as PayloadManager and ScienceApp send them.
+    void finishSafeEntry();
     //! Sends REPORT_MODE and checks the answer is `expected`, with no side effects.
     void assertReportModeAnswers(U32 cmdSeq, Components::MissionMode expected);
     //! Reaches `mode` the way the real system does (commands and reports), then clears history.

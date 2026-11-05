@@ -17,9 +17,14 @@ module Components {
         @ Collection cancellation output to ScienceApp
         output port cancelRequestOut: Svc.Ping
 
-        @ The current mission mode, sent on every change and at start-up. ScienceApp refuses every
-        @ capture while it reads SAFE (SDD v4.0 Table 5: science inhibited in Safe).
-        output port modeOut: Components.MissionModeUpdate
+        @ ScienceApp's report that pending collections are cancelled
+        async input port cancelReportIn: Svc.Ping
+
+        @ Capture control to PayloadManager: MissionApp decides, PayloadManager enforces
+        output port captureControlOut: Components.OperationControl
+
+        @ PayloadManager's report that a capture control is applied
+        async input port captureControlReportIn: Components.OperationControlReport
 
         @ Mission mode update input from story managers
         async input port modeUpdateIn: [2] Components.MissionModeUpdate
@@ -143,6 +148,11 @@ module Components {
             adcs: Components.SubsystemRequest,
             payload: Components.SubsystemRequest
         ) severity activity high format "{} asks EPS={} OBC={} UHF-TX={} UHF-RX={} S-band={} GPS={} ADCS={} Payload={}"
+
+        @ A component has not reported its SAFE control. Raised once after SAFE_ENTRY_CONFIRM_TICKS seconds,
+        @ and whenever a ground command tries to leave SAFE before both reports are in.
+        @ waiting: bit 0 = PayloadManager capture inhibit, bit 1 = ScienceApp cancel.
+        event SafeEntryUnconfirmed(waiting: U8) severity warning high format "SAFE entry not confirmed yet, waiting mask={}"
 
         @ Port for requesting the current time
         time get port timeCaller

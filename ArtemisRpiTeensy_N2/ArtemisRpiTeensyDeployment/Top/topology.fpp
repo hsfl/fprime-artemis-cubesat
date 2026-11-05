@@ -172,8 +172,10 @@ module ArtemisRpiTeensyDeployment {
     connections MissionFlow {
       missionApp.collectionRequestOut -> scienceApp.requestIn
       missionApp.cancelRequestOut -> scienceApp.cancelRequestIn
-      # SAFE inhibits science: ScienceApp refuses every capture while MissionApp reports SAFE.
-      missionApp.modeOut -> scienceApp.missionModeIn
+      scienceApp.cancelReportOut -> missionApp.cancelReportIn
+      missionApp.captureControlOut -> payloadManager.captureControlIn
+      payloadManager.captureControlReportOut -> missionApp.captureControlReportIn
+      storageManager.productStoredOut -> scienceApp.productStoredIn
       scienceApp.payloadRequestOut -> payloadManager.requestIn
       payloadManager.operationNoticeOut -> scienceApp.operationNoticeIn
       scienceApp.scienceProductOut -> storageManager.requestIn

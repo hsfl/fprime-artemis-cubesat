@@ -50,6 +50,8 @@ module Components {
     USE_SCHEDULE_COLLECTION = 6
     @ A collection is queued or running.
     COLLECTION_ACTIVE = 7
+    @ A component has not yet reported that it applied its SAFE control.
+    SAFE_ENTRY_UNCONFIRMED = 8
   }
 
   @ State an operations mode asks a subsystem to be in (MOP v2.0 §8 hardware status).
@@ -195,6 +197,8 @@ module Components {
     DRIVER_UNAVAILABLE = 4
     FAILED = 5
     TIMED_OUT = 6
+    @ MissionApp's capture control is inhibiting new operations.
+    INHIBITED = 7
   }
 
   @ One-shot local simulator behavior; never a real payload protocol status.
@@ -242,6 +246,16 @@ module Components {
     sourceCrc: U32,
     errorCode: U32
   )
+
+  @ Runtime control from MissionApp: ENABLED lets an operation start, DISABLED inhibits it.
+  @ MissionApp decides. The receiving component enforces it where the operation starts.
+  port OperationControl(control: Fw.Enabled)
+
+  @ Report back to MissionApp that a control is applied. activeOperation = one was already running.
+  port OperationControlReport(control: Fw.Enabled, activeOperation: bool)
+
+  @ StorageManager's answer for one science product: stored = committed, false = rejected.
+  port ScienceProductStored(productId: U32, stored: bool)
 
   @ Correlated operation progress from PayloadManager to ScienceApp.
   port PayloadOperationNotice(
