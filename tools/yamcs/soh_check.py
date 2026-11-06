@@ -200,7 +200,7 @@ def main():
     if args.expect_periodic:
         time.sleep(2 * PERIOD_SECONDS + 4)
         count = len(events_after("SOH overall", "Snapshot", enabled_at))
-        ok = count >= 3  # the one at enable + two periodic
+        ok = 3 <= count <= 4  # the one at enable + two periodic, one more if a tick lands on the edge
         steps.append({"step": f"periodic reports every {PERIOD_SECONDS} s", "result": "PASS" if ok else "FAIL",
                       "snapshots_since_enable": count})
         print(f"{'PASS' if ok else 'FAIL':4}  periodic reports every {PERIOD_SECONDS} s ({count} reports in {2 * PERIOD_SECONDS + 4} s)")
@@ -213,7 +213,7 @@ def main():
         steps.append({"step": "no reports after DISABLED", "result": "PASS" if count == 0 else "FAIL",
                       "snapshots_after_disable": count})
         print(f"{'PASS' if count == 0 else 'FAIL':4}  no reports after DISABLED ({count} seen)")
-    step("SOH_PERIOD_SECONDS = 0 is reported and not used", SOH + ".SOH_PERIOD_SECONDS_PRM_SET", {"val": 0},
+    step("SOH_PERIOD_SECONDS = 0 is reported", SOH + ".SOH_PERIOD_SECONDS_PRM_SET", {"val": 0},
          [event_check("SohParameterRejected", "SOH parameter", value="0")])
     step("SOH_PERIOD_SECONDS back to 10", SOH + ".SOH_PERIOD_SECONDS_PRM_SET", {"val": PERIOD_SECONDS}, [])
 
