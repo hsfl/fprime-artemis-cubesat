@@ -224,11 +224,12 @@ class Scenario:
             print(f"        -> {record['failure']}")
         return record["result"] == "PASS"
 
-    def in_order(self, label):
-        """PASS when the last step's events reached the ground in the order the step lists them."""
+    def in_order(self, label, skip=0):
+        """PASS when the last step's events, after the first `skip`, reached the ground in the listed order."""
         last = self.steps[-1]
         numbers = last.get("event_sequence", [])
-        ok = len(numbers) > 1 and None not in numbers and numbers == sorted(numbers)
+        compared = numbers[skip:]
+        ok = len(compared) > 1 and None not in compared and compared == sorted(compared)
         record = {"step": label, "released": last.get("released"), "event_sequence": numbers,
                   "result": "PASS" if ok else "FAIL"}
         self.steps.append(record)
@@ -380,7 +381,9 @@ def main():
     s.step("SET_MODE SAFE: PayloadManager inhibits, then SAFE entry completes", M + ".SET_MODE", {"mode": "SAFE"},
            True, [mode_changed("SAFE"), payload("CaptureControlApplied", "capture control", control="DISABLED"),
                   Expect("SafeModeEntered", "SAFE mode entered")])
-    s.in_order("The inhibit came before SAFE entry completed")
+    # ModeChanged stays out of this check. MissionApp sends the inhibit first and PayloadManager runs on its
+    # own thread, so CaptureControlApplied can land either side of ModeChanged.
+    s.in_order("The inhibit came before SAFE entry completed", skip=1)
     safe_from = latest_release(s)
     s.step("payloadManager.SCIENCE_CAPTURE refused at the gate", PAYLOAD + ".SCIENCE_CAPTURE",
            {"durationSeconds": CAPTURE_SECONDS}, False, [refused_at_gate()])
