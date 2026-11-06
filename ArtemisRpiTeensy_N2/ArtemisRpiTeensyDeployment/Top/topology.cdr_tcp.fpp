@@ -206,7 +206,8 @@ module ArtemisRpiTeensyDeployment {
       gpsManager.sohStatusOut -> sohApp.statusIn[3]
       storageManager.sohStatusOut -> sohApp.statusIn[4]
       thermalManager.sohStatusOut -> sohApp.statusIn[5]
-      teensyTransportManager.sohStatusOut -> sohApp.statusIn[7]
+      # statusIn[7] stays open: no RFM23 driver feeds teensyTransportManager in this build, so its link
+      # state never leaves ACQUIRING. The active PDU path is watched through epsManager on statusIn[0].
     }
 
     connections ArtemisRpiTeensyDeployment {
