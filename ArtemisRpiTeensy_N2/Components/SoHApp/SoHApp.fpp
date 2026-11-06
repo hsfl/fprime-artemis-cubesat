@@ -11,8 +11,7 @@ module Components {
         output port pingOut: Svc.Ping
 
         @ Rate group scheduling input (1 Hz). Drives periodic SOH reports while reporting is on.
-        @ Still commented out in both topologies (RF budget, July 2026). With reporting off by
-        @ default it sends nothing, so connecting it is a one-line proposal for the topology owner.
+        @ Connected to rateGroup1 in both topologies. Silent until SET_SOH_REPORTING ENABLED.
         sync input port run: Svc.Sched
 
         @ Status inputs from subsystem and transport managers
