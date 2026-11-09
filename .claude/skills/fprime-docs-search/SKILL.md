@@ -7,9 +7,9 @@ description: "Search and retrieve F´ (F Prime) documentation. Use when you need
 
 ## Priority Order
 
-1. **Repo-local pinned docs** — `ArtemisRpiTeensy_N2/lib/fprime/docs` matches the exact F' version this project builds against. Always search here first.
+1. **Repo-local pinned docs.** Search the selected deployment's F′ checkout first when present. For the Pi deployment, use `ArtemisRpiTeensy_N2/lib/fprime/docs`.
 2. **FPP language docs** — separate site: `https://nasa.github.io/fpp/fpp-users-guide.html` (syntax, how-to) and `https://nasa.github.io/fpp/fpp-spec.html` (formal spec). FPP is NOT covered on the main F' docs site.
-3. **Official web docs** — `https://fprime.jpl.nasa.gov/latest/docs/...` only when local docs lack the topic.
+3. **Official web docs.** Use them when local docs are unavailable or lack the topic.
 
 **Version drift warning:** web URLs are `/latest/`; the submodule is pinned. Check the pinned version with `git -C ArtemisRpiTeensy_N2/lib/fprime describe --tags`. When web and local docs disagree, trust local — it matches what actually compiles here.
 
@@ -43,22 +43,7 @@ Key local entry points (all under `ArtemisRpiTeensy_N2/lib/fprime/docs/`):
 
 ## Web Fallback
 
-Base: `https://fprime.jpl.nasa.gov/latest/docs/`. The URL structure mirrors the local paths above (e.g. local `user-manual/design-patterns/rate-group.md` → web `user-manual/design-patterns/rate-group/`). Other roots:
-
-- Component docs: `.../docs/Svc/`, `.../docs/Drv/` (SDD example: `.../docs/Svc/Framer/docs/sdd.md`)
-- Subtopologies: `.../docs/Svc/Subtopologies/` (CdhCore, ComCcsds, ComFprime, DataProducts, FileHandling)
-- Tutorials: `.../docs/tutorials/` (cross-compilation, hello-world)
-- How-tos: `.../docs/how-to/`
-- API reference: `.../docs/reference/`
-
-Fetch with a specific extraction prompt:
-
-```
-WebFetch(
-  url: "https://fprime.jpl.nasa.gov/latest/docs/user-manual/design-patterns/rate-group/",
-  prompt: "What does this page say about <specific question>?"
-)
-```
+Use the host's available web search or fetch capability. Start at the [F′ documentation index](https://fprime.jpl.nasa.gov/latest/docs/) for the user manual, tutorials, component docs, and API reference. Open the relevant page and cite it. If a topic or component moved between releases, inspect the [NASA F′ source](https://github.com/nasa/fprime) at the selected deployment's pinned revision.
 
 ## Tips
 
