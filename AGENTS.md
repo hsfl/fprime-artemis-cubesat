@@ -42,9 +42,13 @@ Project skills are shared through `.agents/skills/` for Codex-style agents and `
 
 ## F' Agent Usage Guide
 
-Use this project with the `fprime-swe` skill and follow these steps exactly.
+For F' work, follow this checkout's instructions and use the shared `fprime-swe` skill when available.
 
 ## Current Project Quick Start (Read First)
+
+Hardware operation, RF, power switching, burn-wire activation, flashing, and deployment require task-specific user authorization and the applicable runbook. Evidence of a fault alone does not authorize flashing.
+
+For commands below, first change to the selected checkout root and set `REPO_ROOT="$(pwd -P)"`. Re-establish it on each host before using these examples.
 
 - Before making assumptions about the repo state, run:
   ```bash
@@ -133,14 +137,14 @@ fprime-util build
 Preferred launcher (repo-maintained defaults):
 macOS:
 ```bash
-cd ~/Developer/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+cd "$REPO_ROOT/ArtemisRpiTeensy_N2"
 PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
 ./tools/run_gds_uart.sh --port "$PORT"
 ```
 
 Windows WSL2:
 ```bash
-cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2
+cd "$REPO_ROOT/ArtemisRpiTeensy_N2"
 PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
 ./tools/run_gds_uart.sh --port "$PORT"
 ```
@@ -182,29 +186,30 @@ Use this section when working in the Teensy bridge workspace:
 Run from the baremetal project root:
 macOS:
 ```bash
-cd ~/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+cd "$REPO_ROOT/ArtemisTeensy_N2_Baremetal"
 ./tools/arduino-cli/build.sh
 ```
 
 Windows WSL2:
 ```bash
-cd ~/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
+cd "$REPO_ROOT/ArtemisTeensy_N2_Baremetal"
 ./tools/arduino-cli/build.sh
 ```
 
 ### Upload (Arduino CLI)
+After task-specific authorization, use `arduino-cli board list` and physical identification to set the confirmed target in the variable shown. Prefer its `usb:*` ID. A serial upload port is permitted only when a single board is attached and the applicable runbook supports it.
 macOS:
 ```bash
-cd ~/Developer/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
-PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
-./tools/arduino-cli/upload.sh "$PORT"
+cd "$REPO_ROOT/ArtemisTeensy_N2_Baremetal"
+arduino-cli board list
+./tools/arduino-cli/upload.sh "${SAT_UPLOAD_ID:?Set the confirmed satellite Teensy upload ID}"
 ```
 
 Windows WSL2:
 ```bash
-cd ~/fprime-artemis-cubesat/ArtemisTeensy_N2_Baremetal
-PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
-./tools/arduino-cli/upload.sh "$PORT"
+cd "$REPO_ROOT/ArtemisTeensy_N2_Baremetal"
+arduino-cli board list
+./tools/arduino-cli/upload.sh "${SAT_UPLOAD_ID:?Set the confirmed satellite Teensy upload ID}"
 ```
 
 ### Teensy Source of Truth
@@ -230,30 +235,31 @@ Use this section when working in the ground bridge workspace:
 Run from `GDS_Teensy`:
 macOS:
 ```bash
-cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
+cd "$REPO_ROOT/GDS_Teensy"
 ./tools/arduino-cli/build.sh
 ```
 
 Windows WSL2:
 ```bash
-cd ~/fprime-artemis-cubesat/GDS_Teensy
+cd "$REPO_ROOT/GDS_Teensy"
 ./tools/arduino-cli/build.sh
 ```
 
 ### Upload (Arduino CLI)
+After task-specific authorization, apply the same board identification rules as for the satellite upload above.
 Run from `GDS_Teensy`:
 macOS:
 ```bash
-cd ~/Developer/fprime-artemis-cubesat/GDS_Teensy
-PORT="$(ls /dev/cu.usbmodem* | head -n 1)"
-./tools/arduino-cli/upload.sh "$PORT"
+cd "$REPO_ROOT/GDS_Teensy"
+arduino-cli board list
+./tools/arduino-cli/upload.sh "${GROUND_UPLOAD_ID:?Set the confirmed ground Teensy upload ID}"
 ```
 
 Windows WSL2:
 ```bash
-cd ~/fprime-artemis-cubesat/GDS_Teensy
-PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
-./tools/arduino-cli/upload.sh "$PORT"
+cd "$REPO_ROOT/GDS_Teensy"
+arduino-cli board list
+./tools/arduino-cli/upload.sh "${GROUND_UPLOAD_ID:?Set the confirmed ground Teensy upload ID}"
 ```
 - `upload.sh` expects artifacts from `build.sh` in `build/arduino-cli`.
 
@@ -333,7 +339,7 @@ PORT="$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n 1)"
 - Binary:
   - `ArtemisRpiTeensy_N2/build-artifacts/Linux/bin/ArtemisRpiTeensyDeployment`
 - Run:
-  - `cd ~/fprime-artemis-cubesat/ArtemisRpiTeensy_N2 && ./build-artifacts/Linux/bin/ArtemisRpiTeensyDeployment -d /dev/serial0`
+  - `cd "$REPO_ROOT/ArtemisRpiTeensy_N2" && ./build-artifacts/Linux/bin/ArtemisRpiTeensyDeployment -d /dev/serial0`
 - Minimum pass criteria:
   - startup banner appears
   - no immediate init assertion
