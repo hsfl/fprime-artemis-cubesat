@@ -23,6 +23,9 @@ module Components {
         @ Driver request output
         output port driverRequestOut: Components.PayloadDriverCaptureRequest
 
+        @ Simulator-only capture options, queued before the matching driver request.
+        output port simulationCaptureOptionsOut: Components.PayloadSimulationCaptureOptions
+
         @ Opaque synthetic pass-through request output to the payload driver
         output port driverPassthroughOut: Components.PayloadDriverPassthroughRequest
 
@@ -41,8 +44,8 @@ module Components {
         @ Start a payload collection by collection ID
         async command START_PAYLOAD_COLLECTION(collectionId: U32)
 
-        @ Capture neutron samples for the requested duration in seconds
-        async command SCIENCE_CAPTURE(durationSeconds: U32)
+        @ Capture neutron samples for the requested duration in minutes
+        async command SCIENCE_CAPTURE(durationMinutes: U32)
 
         @ Forward an opaque printable ASCII literal to the board-free synthetic payload facade.
         @ Embedded NUL and non-ASCII input are outside this demo contract and are not validated here.
@@ -66,8 +69,8 @@ module Components {
         @ Last collection ID requested
         telemetry LastCollectionId: U32
 
-        @ Last requested capture duration in seconds
-        telemetry LastCaptureDurationSeconds: U32
+        @ Last requested capture duration in minutes
+        telemetry LastCaptureDurationMinutes: U32
 
         @ Configured sample count
         telemetry SampleCount: U32
@@ -97,7 +100,7 @@ module Components {
         event PayloadConfigured(sampleCount: U32, periodMs: U32) severity activity high format "Payload configured samples={} periodMs={}"
 
         @ Payload science capture event
-        event PayloadScienceCaptureRequested(durationSeconds: U32) severity activity high format "Payload science capture requested duration={}s"
+        event PayloadScienceCaptureRequested(durationMinutes: U32) severity activity high format "Payload science capture requested duration={} min"
 
         @ Literal pass-through accepted by the manager and sent to the synthetic driver.
         event SyntheticPassthroughForwarded(

@@ -31,6 +31,9 @@ output port configuredCaptureOut: Components.PayloadConfiguredCaptureRequest
 @ Science product handoff to StorageManager
 output port scienceProductOut: Components.ScienceProductDescriptor
 
+@ Terminal commit result for a submitted product.
+async input port productCommitIn: Components.ScienceProductCommitResult
+
 @ Opt-in request to deliver the just-stored product through CommsApp.
 output port deliveryRequestOut: Components.ScienceProductDeliveryRequest
 
@@ -41,22 +44,22 @@ output port missionModeOut: Components.MissionModeUpdate
 async command START_COLLECTION opcode 0
 
 @ Set the configured capture duration, through PayloadManager when connected.
-async command CONFIGURE_CAPTURE_DURATION(durationSeconds: U32) opcode 1
+async command CONFIGURE_CAPTURE_DURATION(durationMinutes: U32) opcode 1
 
 @ Capture one product and automatically request its downlink after StorageManager validates and stores it.
-async command COLLECT_AND_DOWNLINK(durationSeconds: U32) opcode 3
+async command COLLECT_AND_DOWNLINK(durationMinutes: U32) opcode 3
 
 @ Token-correlated capture and automatic downlink for Yamcs command-history verification.
-async command VERIFIED_COLLECT_AND_DOWNLINK(verificationToken: U32, durationSeconds: U32) opcode 4
+async command VERIFIED_COLLECT_AND_DOWNLINK(verificationToken: U32, durationMinutes: U32) opcode 4
 
-@ Local boot default for profiles that set duration in ScienceApp.
-param CAPTURE_DURATION_SECONDS: U32 default 30 set opcode 5 save opcode 6
+@ Local boot default in minutes. ID 0 formerly stored the duration in seconds.
+param CAPTURE_DURATION_MINUTES: U32 default Components.DEFAULT_CAPTURE_DURATION_MINUTES id 1 set opcode 5 save opcode 6
 
 @ Pending delay before collection
 telemetry PendingDelaySeconds: U32
 
-@ Local capture default or last confirmed payload duration in seconds.
-telemetry CaptureDurationSeconds: U32 update on change
+@ Local capture default or last confirmed payload duration in minutes.
+telemetry CaptureDurationMinutes: U32 update on change
 
 @ Number of completed collections
 telemetry CollectionCount: U32 update on change
@@ -68,7 +71,7 @@ event CollectionTriggered(delaySeconds: U32) severity activity high format "Scie
 event ScienceProductReady(productSize: U32) severity activity high format "Science product ready size={}"
 
 @ Capture duration configuration event
-event CaptureDurationConfigured(durationSeconds: U32) severity activity high format "Science capture duration configured {}s"
+event CaptureDurationConfigured(durationMinutes: U32) severity activity high format "Science capture duration configured {} min"
 
 @ Collection cancel event
 event CollectionCancelled(remainingSeconds: U32) severity activity high format "Science collection cancelled with {}s remaining"

@@ -89,11 +89,20 @@ module Components {
   @ Mission collection request from MissionApp to ScienceApp.
   port CollectionRequest(delaySeconds: U32)
 
-  @ Payload capture request with caller correlation, in seconds.
-  port PayloadCaptureRequest(requestId: U32, durationSeconds: U32)
+  @ Default capture duration in minutes for profiles with local duration configuration.
+  constant DEFAULT_CAPTURE_DURATION_MINUTES = 1
+
+  @ Longest supported finite hardware acquisition, in minutes.
+  constant MAX_CAPTURE_DURATION_MINUTES = 216
+
+  @ Keep simulated products within the existing bounded 120-second exposure.
+  constant MAX_SIMULATED_CAPTURE_DURATION_MINUTES = 2
+
+  @ Payload capture request with caller correlation, in minutes.
+  port PayloadCaptureRequest(requestId: U32, durationMinutes: U32)
 
   @ Configure the payload's duration independently of starting a capture.
-  port PayloadDurationConfigRequest(requestId: U32, durationSeconds: U32)
+  port PayloadDurationConfigRequest(requestId: U32, durationMinutes: U32)
 
   @ Start a capture using the configuration already applied to the payload.
   port PayloadConfiguredCaptureRequest(requestId: U32)
@@ -160,14 +169,19 @@ module Components {
     DRIVER_UNAVAILABLE = 6
   }
 
-  @ Request to the simulated driver to capture one science dataset.
+  @ Request to the payload driver to capture one science dataset.
   port PayloadDriverCaptureRequest(
     requestId: U32,
     generation: U32,
-    durationSeconds: U32,
-    faultMode: PayloadSimulationFault,
-    delayMs: U32,
+    durationMinutes: U32,
     timeoutMs: U32
+  )
+
+  @ One-shot fault injection for the matching simulator capture generation.
+  port PayloadSimulationCaptureOptions(
+    generation: U32,
+    faultMode: PayloadSimulationFault,
+    delayMs: U32
   )
 
   @ Request to the simulated driver to echo one opaque literal.
@@ -180,7 +194,7 @@ module Components {
     timeoutMs: U32
   )
 
-  @ Correlated response from the simulated driver for either operation kind.
+  @ Correlated response from the payload driver for either operation kind.
   port PayloadDriverOperationResult(
     requestId: U32,
     generation: U32,
@@ -209,7 +223,7 @@ module Components {
     scienceRequested: bool
   )
 
-  @ Whether the simulated driver's physical capture slot is idle and reusable.
+  @ Whether the payload driver is available for admission.
   port PayloadDriverAvailability(available: bool)
 
   @ Science product descriptor handoff. The source path is a driver-owned local file path.
@@ -220,6 +234,9 @@ module Components {
     sourcePath: string size 192,
     sourceCrc: U32
   )
+
+  @ Terminal outcome of a new product submission to durable storage.
+  port ScienceProductCommitResult(productId: U32, productBytes: U32, committed: bool)
 
   @ Storage-to-comms science availability notification.
   port ScienceDownlinkReady(

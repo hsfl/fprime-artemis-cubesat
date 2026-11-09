@@ -7,7 +7,6 @@
 namespace Components {
 
 namespace {
-constexpr U32 DEFAULT_CAPTURE_DURATION_SECONDS = 30U;
 constexpr U32 DEFAULT_OPERATION_TIMEOUT_MS = 5000U;
 constexpr U32 MIN_OPERATION_TIMEOUT_MS = 1000U;
 constexpr U32 MAX_OPERATION_TIMEOUT_MS = 8000U;
@@ -30,7 +29,7 @@ PayloadManager::PayloadManager(const char* const compName)
     : PayloadManagerComponentBase(compName),
       m_lastPayloadValue(0),
       m_lastCollectionId(0),
-      m_lastCaptureDurationSeconds(DEFAULT_CAPTURE_DURATION_SECONDS),
+      m_lastCaptureDurationMinutes(DEFAULT_CAPTURE_DURATION_MINUTES),
       m_sampleCount(1),
       m_samplePeriodMs(1000),
       m_managerHeartbeat(0),
@@ -77,18 +76,18 @@ void PayloadManager::run_handler(FwIndexType portNum, U32 context) {
     }
     this->tlmWrite_LastPayloadValue(this->m_lastPayloadValue);
     this->tlmWrite_LastCollectionId(this->m_lastCollectionId);
-    this->tlmWrite_LastCaptureDurationSeconds(this->m_lastCaptureDurationSeconds);
+    this->tlmWrite_LastCaptureDurationMinutes(this->m_lastCaptureDurationMinutes);
     this->tlmWrite_SampleCount(this->m_sampleCount);
     this->tlmWrite_SamplePeriodMs(this->m_samplePeriodMs);
     this->tlmWrite_ManagerHeartbeat(this->m_managerHeartbeat);
     this->writeStatusTelemetry();
 }
 
-void PayloadManager::requestIn_handler(FwIndexType portNum, U32 requestId, U32 durationSeconds) {
+void PayloadManager::requestIn_handler(FwIndexType portNum, U32 requestId, U32 durationMinutes) {
     static_cast<void>(portNum);
     const U32 callerId = (requestId == 0U) ? this->allocateRequestId() : requestId;
     this->m_lastCollectionId = callerId;
-    static_cast<void>(this->startCapture(callerId, durationSeconds, true));
+    static_cast<void>(this->startCapture(callerId, durationMinutes, true));
 }
 
 void PayloadManager::driverOperationResultIn_handler(
@@ -154,7 +153,7 @@ void PayloadManager::driverAvailabilityIn_handler(FwIndexType portNum, bool avai
 void PayloadManager::REQUEST_PAYLOAD_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     this->tlmWrite_LastPayloadValue(this->m_lastPayloadValue);
     this->tlmWrite_LastCollectionId(this->m_lastCollectionId);
-    this->tlmWrite_LastCaptureDurationSeconds(this->m_lastCaptureDurationSeconds);
+    this->tlmWrite_LastCaptureDurationMinutes(this->m_lastCaptureDurationMinutes);
     this->writeStatusTelemetry();
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
@@ -173,13 +172,13 @@ void PayloadManager::CONFIGURE_PAYLOAD_cmdHandler(
 
 void PayloadManager::START_PAYLOAD_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 collectionId) {
     this->m_lastCollectionId = collectionId;
-    const bool accepted = this->startCapture(collectionId, this->m_lastCaptureDurationSeconds);
+    const bool accepted = this->startCapture(collectionId, this->m_lastCaptureDurationMinutes);
     this->cmdResponse_out(opCode, cmdSeq, accepted ? Fw::CmdResponse::OK : Fw::CmdResponse::EXECUTION_ERROR);
 }
 
-void PayloadManager::SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) {
+void PayloadManager::SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationMinutes) {
     const U32 requestId = this->allocateRequestId();
-    const bool accepted = this->startCapture(requestId, durationSeconds);
+    const bool accepted = this->startCapture(requestId, durationMinutes);
     this->cmdResponse_out(opCode, cmdSeq, accepted ? Fw::CmdResponse::OK : Fw::CmdResponse::EXECUTION_ERROR);
 }
 
@@ -249,7 +248,7 @@ void PayloadManager::CONFIGURE_SIMULATION_cmdHandler(
 #endif
 }
 
-bool PayloadManager::startCapture(U32 requestId, U32 durationSeconds, bool scienceRequested) {
+bool PayloadManager::startCapture(U32 requestId, U32 durationMinutes, bool scienceRequested) {
     const Components::PayloadOperationKind kind = Components::PayloadOperationKind::CAPTURE;
     if (requestId == 0U) {
         this->rejectOperation(requestId, kind, Components::PayloadOperationState::INVALID, scienceRequested);
@@ -259,7 +258,7 @@ bool PayloadManager::startCapture(U32 requestId, U32 durationSeconds, bool scien
         this->rejectOperation(requestId, kind, Components::PayloadOperationState::BUSY, scienceRequested);
         return false;
     }
-    if (!this->isValidCaptureDuration(durationSeconds)) {
+    if (!this->isValidCaptureDuration(durationMinutes)) {
         this->rejectOperation(requestId, kind, Components::PayloadOperationState::INVALID, scienceRequested);
         return false;
     }
@@ -293,15 +292,18 @@ bool PayloadManager::startCapture(U32 requestId, U32 durationSeconds, bool scien
     };
     this->m_lastOperationGeneration = generation;
     this->m_lastCollectionId = requestId;
-    this->m_lastCaptureDurationSeconds = durationSeconds;
+    this->m_lastCaptureDurationMinutes = durationMinutes;
     this->m_driverAvailable = false;
     this->consumeSimulationFault();
     this->emitOperationStatus(requestId, generation, kind, Components::PayloadOperationState::ACCEPTED,
                               0U, 0U, Components::ScienceProductSource::UNKNOWN, nullptr, 0U,
                               scienceRequested);
     this->log_ACTIVITY_HI_PayloadCollectionForwarded(requestId);
-    this->log_ACTIVITY_HI_PayloadScienceCaptureRequested(durationSeconds);
-    this->driverRequestOut_out(0, requestId, generation, durationSeconds, faultMode, delayMs, timeoutMs);
+    this->log_ACTIVITY_HI_PayloadScienceCaptureRequested(durationMinutes);
+    if (this->isConnected_simulationCaptureOptionsOut_OutputPort(0)) {
+        this->simulationCaptureOptionsOut_out(0, generation, faultMode, delayMs);
+    }
+    this->driverRequestOut_out(0, requestId, generation, durationMinutes, timeoutMs);
     this->writeStatusTelemetry();
     return true;
 }
@@ -499,8 +501,8 @@ bool PayloadManager::isValidProduct(
     return readOk && (static_cast<U32>(crc) == sourceCrc);
 }
 
-bool PayloadManager::isValidCaptureDuration(U32 durationSeconds) const {
-    return (durationSeconds > 0U) && (durationSeconds <= 120U);
+bool PayloadManager::isValidCaptureDuration(U32 durationMinutes) const {
+    return (durationMinutes > 0U) && (durationMinutes <= MAX_SIMULATED_CAPTURE_DURATION_MINUTES);
 }
 
 void PayloadManager::consumeSimulationFault() {

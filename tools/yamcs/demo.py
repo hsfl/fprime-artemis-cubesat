@@ -74,14 +74,13 @@ def probe():
         result["initial_mode"] = fresh_parameter(f"{DEPLOYMENT}.missionApp.CurrentMode", started)
         if result["initial_mode"].get("engValue", {}).get("stringValue") != "BASE":
             raise RuntimeError("Start a fresh local stack in BASE before this single-collection probe")
-        result["configure"] = issue(f"{DEPLOYMENT}.scienceApp.CONFIGURE_CAPTURE_DURATION", {"durationSeconds": 1})
+        result["configure"] = issue(f"{DEPLOYMENT}.scienceApp.CONFIGURE_CAPTURE_DURATION", {"durationMinutes": 1})
         result["configured_event"] = returned_event(result["configure"], "scienceApp", "CaptureDurationConfigured",
-                                                    lambda e: e.get("extra", {}).get("durationSeconds") == "1")
-        configured = datetime.fromisoformat(result["configure"]["generationTime"].replace("Z", "+00:00"))
-        result["configured_duration"] = fresh_parameter(f"{DEPLOYMENT}.scienceApp.CaptureDurationSeconds", configured,
+                                                    lambda e: e.get("extra", {}).get("durationMinutes") == "1")
+        # The one-minute default may already be current when the command completes.
+        result["configured_duration"] = fresh_parameter(f"{DEPLOYMENT}.scienceApp.CaptureDurationMinutes", started,
                                                        predicate=lambda v: numeric(v) == 1)
-        # This channel is emitted on change; reconfiguring duration does not
-        # produce a newer zero count. Require telemetry from this app startup.
+        # Require the initial collection count from this app startup.
         result["initial_collection_count"] = fresh_parameter(f"{DEPLOYMENT}.scienceApp.CollectionCount", started)
         if numeric(result["initial_collection_count"]) != 0:
             raise RuntimeError("This probe requires a freshly started native app with no prior collections")
@@ -89,7 +88,7 @@ def probe():
         result["scheduled_event"] = returned_event(result["schedule"], "missionApp", "CollectionScheduled",
                                                   lambda e: e.get("extra", {}).get("delaySeconds") == "2")
         result["capture_event"] = returned_event(result["schedule"], "payloadDriverNeutronSim", "CaptureComplete",
-                                                lambda e: e.get("extra", {}).get("durationSeconds") == "1"
+                                                lambda e: e.get("extra", {}).get("durationMinutes") == "1"
                                                 and e.get("extra", {}).get("productId") == "1")
         reported_bytes = int(result["capture_event"]["extra"]["productBytes"])
         result["stored_event"] = returned_event(result["schedule"], "storageManager", "ScienceStored",

@@ -1,8 +1,8 @@
 #include "ScienceAppTester.hpp"
 
-TEST(Nominal, DefaultDurationIsThirty) {
+TEST(Nominal, DefaultDurationIsOneMinute) {
     Components::ScienceAppTester tester;
-    tester.testDefaultDurationIsThirty();
+    tester.testDefaultDurationIsOneMinute();
 }
 
 TEST(Nominal, ScheduledCountdownFiresExactlyOnce) {
@@ -57,9 +57,14 @@ TEST(Nominal, ParamSeedsDurationAtInit) {
     tester.testParamSeedsDurationAtInit();
 }
 
-TEST(Nominal, InvalidParamFallsBackToThirty) {
+TEST(Nominal, InvalidParamFallsBackToOneMinute) {
     Components::ScienceAppTester tester;
-    tester.testInvalidParamFallsBackToThirty();
+    tester.testInvalidParamFallsBackToOneMinute();
+}
+
+TEST(Nominal, ScienceReadyWaitsForMatchingCommit) {
+    Components::ScienceAppTester tester;
+    tester.testScienceReadyWaitsForMatchingCommit();
 }
 
 #ifndef NEUTRON2_CDR_TCP

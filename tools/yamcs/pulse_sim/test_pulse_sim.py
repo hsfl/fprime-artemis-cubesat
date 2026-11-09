@@ -118,7 +118,7 @@ class PulseProductTests(unittest.TestCase):
                 str(SCRIPT),
                 "capture",
                 "--duration-seconds",
-                "30",
+                "60",
                 "--dataset",
                 str(missing_dataset),
                 "--cursor",
@@ -141,11 +141,11 @@ class PulseProductTests(unittest.TestCase):
             self.assertEqual(first_bytes, second_path.read_bytes())
             self.assertTrue(first_path.name.startswith("neutron_capture_"))
             self.assertTrue(first_path.name.endswith(".json"))
-            self.assertEqual(int(summaries[0]["rows"]), 60)
-            self.assertEqual(int(summaries[0]["total_counts"]), 60)
+            self.assertEqual(int(summaries[0]["rows"]), 120)
+            self.assertEqual(int(summaries[0]["total_counts"]), 120)
             self.assertEqual(int(summaries[0]["saa_rows"]), 0)
             self.assertEqual(int(summaries[0]["output_bytes"]), len(first_bytes))
-            self.assertEqual(int(summaries[0]["exposure_window_seconds"]), 30)
+            self.assertEqual(int(summaries[0]["exposure_window_seconds"]), 60)
             self.assertFalse(cursor_path.exists())
             self.assertLess(len(first_bytes), 1_000_000)
 

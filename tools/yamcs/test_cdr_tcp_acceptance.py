@@ -299,11 +299,16 @@ def main():
                 return False
 
         wait_until(ready, 100, "Yamcs did not reach RUNNING")
+        # The F Prime event subscriber starts after the instance reports RUNNING.
+        # Wait for a real event from the periodic fake PDU traffic before pinging.
+        smoke.wait_for_event("PduRequestHandled",
+                             predicate=lambda event: event.get("type") ==
+                             DEPLOYMENT + ".epsDriverArtemis.PduRequestHandled")
         result["checks"]["ping"] = ping()
         rejections = []
         for command_name, arguments in [
-            ("COLLECT_AND_DOWNLINK", {"durationSeconds": 1}),
-            ("VERIFIED_COLLECT_AND_DOWNLINK", {"verificationToken": 42, "durationSeconds": 1}),
+            ("COLLECT_AND_DOWNLINK", {"durationMinutes": 1}),
+            ("VERIFIED_COLLECT_AND_DOWNLINK", {"verificationToken": 42, "durationMinutes": 1}),
         ]:
             command = smoke.issue(DEPLOYMENT + ".scienceApp." + command_name, arguments)
             released = datetime.fromisoformat(command["generationTime"].replace("Z", "+00:00"))
@@ -396,8 +401,15 @@ def main():
             if not records or (helper.returncode == 0) != should_succeed:
                 raise RuntimeError("Stock helper outcome wrong: " + label)
             helper_checks[label] = json.loads(records[-1].read_text())
-        capture = smoke.issue(DEPLOYMENT + ".scienceApp.SCIENCE_CAPTURE", {"durationSeconds": 1})
-        committed = smoke.wait_for_event("ScienceProductCommitted", after=datetime.fromisoformat(capture["generationTime"].replace("Z", "+00:00")))
+        capture = smoke.issue(DEPLOYMENT + ".scienceApp.SCIENCE_CAPTURE", {"durationMinutes": 1})
+        released = datetime.fromisoformat(capture["generationTime"].replace("Z", "+00:00"))
+        captured = smoke.wait_for_event("CaptureComplete", after=released, timeout=90,
+                                        predicate=lambda event: event.get("extra", {}).get("durationMinutes") == "1")
+        if int(captured["extra"]["rows"]) != 60:
+            raise RuntimeError("One-minute simulated capture did not produce 60 one-second rows")
+        committed = smoke.wait_for_event("ScienceProductCommitted", after=released, timeout=90,
+                                         predicate=lambda event: event.get("extra", {}).get("productId") ==
+                                         captured["extra"]["productId"])
         product_id = int(committed["extra"]["productId"])
         oracle = Path(committed["extra"]["sourcePath"])
         if not oracle.is_absolute():
@@ -410,7 +422,8 @@ def main():
         records = sorted(helper_run.glob("stock-downlink-*.json"))
         if helper.returncode or not records:
             raise RuntimeError("Stock helper product/catalog downlink failed")
-        helper_checks["retained_product"] = {"capture_command": capture, "committed_event": committed,
+        helper_checks["retained_product"] = {"capture_command": capture, "capture_event": captured,
+                                               "committed_event": committed,
                                                "stock_downlink": json.loads(records[-1].read_text())}
         result["checks"]["ground_helper"] = helper_checks
         if object_bytes(interrupted_name) is not None:

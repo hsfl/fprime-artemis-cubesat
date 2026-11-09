@@ -25,7 +25,7 @@ class PayloadManager final : public PayloadManagerComponentBase {
 
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void run_handler(FwIndexType portNum, U32 context) override;
-    void requestIn_handler(FwIndexType portNum, U32 requestId, U32 durationSeconds) override;
+    void requestIn_handler(FwIndexType portNum, U32 requestId, U32 durationMinutes) override;
     void driverOperationResultIn_handler(
         FwIndexType portNum,
         U32 requestId,
@@ -44,7 +44,7 @@ class PayloadManager final : public PayloadManagerComponentBase {
     void REQUEST_PAYLOAD_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void CONFIGURE_PAYLOAD_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 sampleCount, U32 periodMs) override;
     void START_PAYLOAD_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 collectionId) override;
-    void SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
+    void SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationMinutes) override;
     void SYNTHETIC_PASSTHROUGH_cmdHandler(
         FwOpcodeType opCode,
         U32 cmdSeq,
@@ -59,7 +59,7 @@ class PayloadManager final : public PayloadManagerComponentBase {
         U32 timeoutMs
     ) override;
 
-    bool startCapture(U32 requestId, U32 durationSeconds, bool scienceRequested = false);
+    bool startCapture(U32 requestId, U32 durationMinutes, bool scienceRequested = false);
     bool startPassthrough(U32 requestId, const Fw::StringBase& literalCommand);
     void emitOperationStatus(
         U32 requestId,
@@ -95,12 +95,12 @@ class PayloadManager final : public PayloadManagerComponentBase {
     bool isValidProduct(U32 productId, U32 productBytes,
                         const Components::ScienceProductSource& sourceKind,
                         const Fw::StringBase& sourcePath, U32 sourceCrc) const;
-    bool isValidCaptureDuration(U32 durationSeconds) const;
+    bool isValidCaptureDuration(U32 durationMinutes) const;
     void consumeSimulationFault();
 
     U32 m_lastPayloadValue;
     U32 m_lastCollectionId;
-    U32 m_lastCaptureDurationSeconds;
+    U32 m_lastCaptureDurationMinutes;
     U32 m_sampleCount;
     U32 m_samplePeriodMs;
     U32 m_managerHeartbeat;

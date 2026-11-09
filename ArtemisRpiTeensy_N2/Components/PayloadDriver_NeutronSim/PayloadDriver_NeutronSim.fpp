@@ -8,8 +8,11 @@ module Components {
         @ Health ping output
         output port pingOut: Svc.Ping
 
-        @ Correlated capture request including a one-shot simulator behavior
+        @ Correlated capture request
         async input port requestIn: Components.PayloadDriverCaptureRequest
+
+        @ Optional simulator-only behavior for the next matching capture generation.
+        async input port simulationCaptureOptionsIn: Components.PayloadSimulationCaptureOptions
 
         @ Opaque synthetic pass-through command input from PayloadManager.
         async input port passthroughIn: Components.PayloadDriverPassthroughRequest
@@ -23,8 +26,8 @@ module Components {
         @ Rate-group tick for nonblocking child-process and delayed-response polling.
         async input port run: Svc.Sched
 
-        @ Last requested capture duration in seconds
-        telemetry LastDurationSeconds: U32
+        @ Last requested capture duration in minutes
+        telemetry LastDurationMinutes: U32
 
         @ Rows captured by the simulator
         telemetry LastRowsCaptured: U32
@@ -51,10 +54,10 @@ module Components {
         telemetry CaptureSlotAvailable: bool
 
         @ Simulator capture completed
-        event CaptureComplete(durationSeconds: U32, rows: U32, productBytes: U32, productId: U32) severity activity high format "Neutron sim capture duration={}s rows={} bytes={} product={}"
+        event CaptureComplete(durationMinutes: U32, rows: U32, productBytes: U32, productId: U32) severity activity high format "Neutron sim capture duration={} min rows={} bytes={} product={}"
 
         @ Simulator capture failed
-        event CaptureFailed(durationSeconds: U32, status: U32) severity warning high format "Neutron sim capture failed duration={}s status={}"
+        event CaptureFailed(durationMinutes: U32, status: U32) severity warning high format "Neutron sim capture failed duration={} min status={}"
 
         @ Capture worker was terminated and reaped after its bounded deadline.
         event CaptureWorkerReaped(generation: U32, exitStatus: U32) severity warning high format "Capture worker generation={} reaped status={}"

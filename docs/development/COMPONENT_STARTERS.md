@@ -115,7 +115,7 @@ and the viewer parses the result.
 
 ## What Needs Work
 
-- Payload: use `PayloadManager.SCIENCE_CAPTURE(durationSeconds)` for the demo; products now move through a `ScienceProductDescriptor` with product ID, byte count, source kind, source path, and CRC. Replace RPi-emulated driver behavior after the board arrives.
+- Payload: use `PayloadManager.SCIENCE_CAPTURE(durationMinutes)` for the demo; products now move through a `ScienceProductDescriptor` with product ID, byte count, source kind, source path, and CRC. Replace RPi-emulated driver behavior after the board arrives.
 - Mission/Storage: encode the CONOPs flow: base mode, scheduled collect, science product, storage check, downlink.
 - Storage: use `StorageManager.REPORT_LATEST_DATASET`, `StorageManager.REPORT_STORAGE_HISTORY`, and `StorageManager.REMOVE_OLD_DATASETS(confirm=1)` for demo/debug visibility. Cleanup is for test/debug use until mission-ops rules are set with the system engineer.
 - Ground: use `fprime-gds` for commands/events/telemetry/progress, `tools/payload_receiver.py` for channel 1 reconstruction, and `ground-station/neutron2-payload-viewer/` for neutron-count CSV review.

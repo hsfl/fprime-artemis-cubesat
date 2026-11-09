@@ -26,13 +26,14 @@ def fingerprints():
             for name in SOURCES}
 
 
-def check_science(raw, displayed):
+def check_science(raw, displayed, duration_minutes):
     """Independent calculations; deliberately does not import ground analysis."""
     data = json.loads(raw)
     science = displayed["science"]
     assert data["schema"] == science["schema"] == "n2-pulses-v1"
     assert data["simulated"] is science["simulated"] is True
-    expected_count = data["durationSeconds"] * 2
+    assert data["durationSeconds"] == duration_minutes * 60
+    expected_count = duration_minutes * 60 * 2
     assert len(data["events"]) == science["eventCount"] == expected_count
     charges, ratios = [], []
     for event, actual, wave in zip(data["events"], science["events"], science["waveforms"], strict=True):
@@ -98,7 +99,7 @@ def probe():
                 configured = issue(f"{DEPLOYMENT}.payloadManager.CONFIGURE_SIMULATION",
                                    {"faultMode": fault, "delayMs": 0, "timeoutMs": 8000})
                 returned_event(configured, "payloadManager", "SimulationConfigured")
-            command = issue(f"{DEPLOYMENT}.scienceApp.COLLECT_AND_DOWNLINK", {"durationSeconds": duration})
+            command = issue(f"{DEPLOYMENT}.scienceApp.COLLECT_AND_DOWNLINK", {"durationMinutes": duration})
             rejected = returned_event(command, "scienceApp", expected)
             released = datetime.fromisoformat(command["generationTime"].replace("Z", "+00:00"))
             time.sleep(3)
@@ -108,15 +109,15 @@ def probe():
                          if datetime.fromisoformat(e["receptionTime"].replace("Z", "+00:00")) >= released]
             assert not forbidden and numeric(parameter(f"{DEPLOYMENT}.scienceApp.CollectionCount")) == initial
             result["negative_checks"].append({"command": command, "rejected": rejected, "result": "PASS"})
-        for index, duration in enumerate((30, 5)):
-            command = issue(f"{DEPLOYMENT}.scienceApp.COLLECT_AND_DOWNLINK", {"durationSeconds": duration})
+        for index, duration in enumerate((1, 2)):
+            command = issue(f"{DEPLOYMENT}.scienceApp.COLLECT_AND_DOWNLINK", {"durationMinutes": duration})
             released = datetime.fromisoformat(command["generationTime"].replace("Z", "+00:00"))
-            capture = {"command": command, "duration_seconds": duration}
+            capture = {"command": command, "duration_minutes": duration}
             result["captures"].append(capture)
             capture["admitted"] = returned_event(command, "payloadManager", "PayloadOperationStatus",
                 lambda e: e.get("extra", {}).get("state") == "ACCEPTED" and e["extra"].get("kind") == "CAPTURE")
             capture["capture_complete"] = returned_event(command, "payloadDriverNeutronSim", "CaptureComplete",
-                lambda e: e.get("extra", {}).get("durationSeconds") == str(duration))
+                lambda e: e.get("extra", {}).get("durationMinutes") == str(duration))
             product = int(capture["capture_complete"]["extra"]["productId"])
             size = int(capture["capture_complete"]["extra"]["productBytes"])
             capture["stored"] = returned_event(command, "storageManager", "ScienceStored",
@@ -147,7 +148,7 @@ def probe():
             assert displayed["readbackSha256"] == digest and displayed["scienceType"] == "pulses"
             capture.update({"receipt": receipt, "download": str(destination),
                             "source_oracle_after_receipt": str(source),
-                            "plot_verification": check_science(raw, displayed), "result": "PASS"})
+                            "plot_verification": check_science(raw, displayed, duration), "result": "PASS"})
             fresh_parameter(f"{DEPLOYMENT}.scienceApp.CollectionCount", released,
                             predicate=lambda value: numeric(value) == initial + index + 1)
         assert len({c["receipt"]["objectName"] for c in result["captures"]}) == 2

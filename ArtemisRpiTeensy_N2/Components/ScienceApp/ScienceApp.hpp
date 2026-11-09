@@ -32,28 +32,29 @@ class ScienceApp final : public ScienceAppComponentBase {
         U32 sourceCrc,
         bool scienceRequested
     ) override;
+    void productCommitIn_handler(FwIndexType portNum, U32 productId, U32 productBytes, bool committed) override;
     void START_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
-    void CONFIGURE_CAPTURE_DURATION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
+    void CONFIGURE_CAPTURE_DURATION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationMinutes) override;
 #ifdef NEUTRON2_CONFIGURED_CAPTURE
     void SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
 #else
-    void SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
+    void SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationMinutes) override;
 #endif
-    void COLLECT_AND_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
+    void COLLECT_AND_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationMinutes) override;
     void VERIFIED_COLLECT_AND_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
-                                                  U32 verificationToken, U32 durationSeconds) override;
+                                                  U32 verificationToken, U32 durationMinutes) override;
     void parameterUpdated(FwPrmIdType id) override;
     void seedCaptureDurationFromParam();
-    bool isValidCaptureDuration(U32 durationSeconds) const;
-    void applyCaptureDuration(U32 durationSeconds);
+    bool isValidCaptureDuration(U32 durationMinutes);
+    void applyCaptureDuration(U32 durationMinutes);
     void finishDurationConfig(const Components::PayloadOperationState& state);
     void cancelPendingCollection();
     U32 allocateRequestId();
     bool startConfiguredCapture();
-    bool startCapture(U32 durationSeconds, bool requestDownlink = false, U32* requestIdOut = nullptr);
+    bool startCapture(U32 durationMinutes, bool requestDownlink = false, U32* requestIdOut = nullptr);
     struct PendingDurationConfig {
         U32 requestId;
-        U32 durationSeconds;
+        U32 durationMinutes;
         FwOpcodeType opCode;
         U32 cmdSeq;
         U32 issuedTick;
@@ -72,7 +73,7 @@ class ScienceApp final : public ScienceAppComponentBase {
                                   U32 productBytes, U32 sourceCrc, U32 reasonCode);
     bool rememberDownlinkIntent(U32 requestId);
     void setDownlinkIntentGeneration(U32 requestId, U32 generation);
-    bool hasDownlinkIntent(U32 requestId, U32 generation) const;
+    void setDownlinkIntentProduct(U32 requestId, U32 generation, U32 productId);
     void clearDownlinkIntent(U32 requestId, U32 generation);
     void publishScienceProduct(U32 productId, U32 productBytes,
                                const Components::ScienceProductSource& sourceKind,
@@ -83,7 +84,7 @@ class ScienceApp final : public ScienceAppComponentBase {
     void writeTelemetry();
 
     U32 m_pendingDelaySeconds;
-    U32 m_captureDurationSeconds;
+    U32 m_captureDurationMinutes;
     U32 m_collectionCount;
     U32 m_runTicks;
     U32 m_lastTelemetryTick;
@@ -94,9 +95,14 @@ class ScienceApp final : public ScienceAppComponentBase {
     U32 m_activeCaptureRequestId;
     U32 m_activeCaptureGeneration;
     bool m_activeCaptureScienceRequested;
+    U32 m_pendingCommitProductId;
+    struct DownlinkIntent {
+        U32 requestId;
+        U32 generation;
+        U32 productId;
+    };
     static constexpr U32 DOWNLINK_INTENT_CAPACITY = 8U;
-    U32 m_downlinkRequestIds[DOWNLINK_INTENT_CAPACITY];
-    U32 m_downlinkRequestGenerations[DOWNLINK_INTENT_CAPACITY];
+    DownlinkIntent m_downlinkIntents[DOWNLINK_INTENT_CAPACITY];
 };
 
 }  // namespace Components

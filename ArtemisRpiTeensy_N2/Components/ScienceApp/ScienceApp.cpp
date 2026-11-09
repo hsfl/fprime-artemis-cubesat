@@ -1,4 +1,5 @@
 #include "Components/ScienceApp/ScienceApp.hpp"
+#include "Components/Types/FppConstantsAc.hpp"
 
 #include <cstdio>
 #include <sys/stat.h>
@@ -6,11 +7,9 @@
 namespace Components {
 
 namespace {
-constexpr U32 DEFAULT_CAPTURE_DURATION_SECONDS = 30U;
-constexpr U32 MAX_CAPTURE_DURATION_SECONDS = 120U;
 constexpr U32 DURATION_CONFIG_TIMEOUT_TICKS = 30U;
 constexpr U32 REJECT_INVALID_DELAY_SECONDS = 1U;
-constexpr U32 REJECT_INVALID_CAPTURE_DURATION_SECONDS = 2U;
+constexpr U32 REJECT_INVALID_CAPTURE_DURATION_MINUTES = 2U;
 constexpr U32 REJECT_CDR_AUTO_DOWNLINK_UNSUPPORTED = 3U;
 constexpr U32 REJECT_DURATION_CONFIG_BUSY = 4U;
 constexpr U32 REJECT_CONFIGURED_CAPTURE_PORT_MISSING = 5U;
@@ -26,7 +25,7 @@ constexpr U32 VERIFIED_REJECT_INVALID_PRODUCT = 6U;
 ScienceApp::ScienceApp(const char* const compName)
     : ScienceAppComponentBase(compName),
       m_pendingDelaySeconds(0),
-      m_captureDurationSeconds(DEFAULT_CAPTURE_DURATION_SECONDS),
+      m_captureDurationMinutes(DEFAULT_CAPTURE_DURATION_MINUTES),
       m_collectionCount(0),
       m_runTicks(0),
       m_lastTelemetryTick(0),
@@ -37,14 +36,14 @@ ScienceApp::ScienceApp(const char* const compName)
       m_activeCaptureRequestId(0),
       m_activeCaptureGeneration(0),
       m_activeCaptureScienceRequested(false),
-      m_downlinkRequestIds{},
-      m_downlinkRequestGenerations{} {}
+      m_pendingCommitProductId(0),
+      m_downlinkIntents{} {}
 
 ScienceApp::~ScienceApp() {}
 
 void ScienceApp::preamble() {
     if (this->isConnected_durationConfigOut_OutputPort(0)) {
-        this->m_captureDurationSeconds = 0U;
+        this->m_captureDurationMinutes = 0U;
     } else {
         this->seedCaptureDurationFromParam();
     }
@@ -52,22 +51,22 @@ void ScienceApp::preamble() {
 }
 
 void ScienceApp::parameterUpdated(FwPrmIdType id) {
-    if (id == PARAMID_CAPTURE_DURATION_SECONDS && !this->isConnected_durationConfigOut_OutputPort(0)) {
+    if (id == PARAMID_CAPTURE_DURATION_MINUTES && !this->isConnected_durationConfigOut_OutputPort(0)) {
         this->seedCaptureDurationFromParam();
     }
 }
 
 void ScienceApp::seedCaptureDurationFromParam() {
     Fw::ParamValid valid = Fw::ParamValid::INVALID;
-    const U32 durationSeconds = this->paramGet_CAPTURE_DURATION_SECONDS(valid);
+    const U32 durationMinutes = this->paramGet_CAPTURE_DURATION_MINUTES(valid);
     if (valid == Fw::ParamValid::UNINIT) {
         return;
     }
-    if (!this->isValidCaptureDuration(durationSeconds)) {
-        this->m_captureDurationSeconds = DEFAULT_CAPTURE_DURATION_SECONDS;
-        this->log_WARNING_LO_ScienceCommandRejected(REJECT_INVALID_CAPTURE_DURATION_SECONDS, durationSeconds);
+    if (!this->isValidCaptureDuration(durationMinutes)) {
+        this->m_captureDurationMinutes = DEFAULT_CAPTURE_DURATION_MINUTES;
+        this->log_WARNING_LO_ScienceCommandRejected(REJECT_INVALID_CAPTURE_DURATION_MINUTES, durationMinutes);
     } else {
-        this->m_captureDurationSeconds = durationSeconds;
+        this->m_captureDurationMinutes = durationMinutes;
     }
     this->writeTelemetry();
 }
@@ -92,7 +91,8 @@ void ScienceApp::run_handler(FwIndexType portNum, U32 context) {
         this->m_pendingDelaySeconds -= 1;
         countdownChanged = true;
         if (this->m_pendingDelaySeconds == 0 && !this->startConfiguredCapture() &&
-            this->m_activeCaptureRequestId == 0U && this->isConnected_missionModeOut_OutputPort(0)) {
+            this->m_activeCaptureRequestId == 0U && this->m_pendingCommitProductId == 0U &&
+            this->isConnected_missionModeOut_OutputPort(0)) {
             this->missionModeOut_out(0, Components::MissionMode::BASE, 0U);
         }
     }
@@ -171,6 +171,8 @@ void ScienceApp::operationNoticeIn_handler(
         this->m_activeCaptureRequestId = requestId;
         this->m_activeCaptureGeneration = generation;
         this->m_activeCaptureScienceRequested = scienceRequested;
+        // A result from the previous collection must not change this mode.
+        this->m_pendingCommitProductId = 0U;
         if ((verified != nullptr) && (verified->generation == 0U) && scienceRequested) {
             verified->generation = generation;
             this->logVerifiedCaptureStatus(verified->verificationToken, requestId, generation, state,
@@ -180,7 +182,7 @@ void ScienceApp::operationNoticeIn_handler(
             this->setDownlinkIntentGeneration(requestId, generation);
         }
         if (this->isConnected_missionModeOut_OutputPort(0)) {
-            this->missionModeOut_out(0, Components::MissionMode::COLLECTING, this->m_captureDurationSeconds);
+            this->missionModeOut_out(0, Components::MissionMode::COLLECTING, this->m_captureDurationMinutes);
         }
         return;
     }
@@ -200,7 +202,8 @@ void ScienceApp::operationNoticeIn_handler(
         if (scienceRequested) {
             this->clearDownlinkIntent(requestId, generation);
         }
-        if ((this->m_activeCaptureRequestId == 0U) && this->isConnected_missionModeOut_OutputPort(0)) {
+        if ((this->m_activeCaptureRequestId == 0U) && (this->m_pendingCommitProductId == 0U) &&
+            this->isConnected_missionModeOut_OutputPort(0)) {
             this->missionModeOut_out(0, Components::MissionMode::BASE, 0U);
         }
         return;
@@ -233,20 +236,26 @@ void ScienceApp::operationNoticeIn_handler(
             }
             return;
         }
-        this->publishScienceProduct(productId, productBytes, sourceKind, sourcePath, sourceCrc);
         if ((verified != nullptr) && !verified->terminal) {
             verified->terminal = true;
             this->logVerifiedCaptureStatus(verified->verificationToken, requestId, generation, state,
                                            productId, productBytes, sourceCrc, 0U);
         }
-        if (scienceRequested && this->hasDownlinkIntent(requestId, generation) &&
-            this->isConnected_deliveryRequestOut_OutputPort(0)) {
-            // The two outputs target the same StorageManager actor. F' queues
-            // these in call order, so Storage stores/validates before delivery.
-            this->deliveryRequestOut_out(0, productId);
-        }
-        if (scienceRequested) {
-            this->clearDownlinkIntent(requestId, generation);
+        if (this->isConnected_scienceProductOut_OutputPort(0)) {
+            // This actor initiates the storage write after correlating the
+            // capture result. Arm the commit match before submitting it.
+            this->m_pendingCommitProductId = productId;
+            if (scienceRequested) {
+                this->setDownlinkIntentProduct(requestId, generation, productId);
+            }
+            this->publishScienceProduct(productId, productBytes, sourceKind, sourcePath, sourceCrc);
+        } else {
+            if (scienceRequested) {
+                this->clearDownlinkIntent(requestId, generation);
+            }
+            if (this->isConnected_missionModeOut_OutputPort(0)) {
+                this->missionModeOut_out(0, Components::MissionMode::BASE, 0U);
+            }
         }
         this->m_activeCaptureRequestId = 0U;
         this->m_activeCaptureGeneration = 0U;
@@ -277,13 +286,37 @@ void ScienceApp::operationNoticeIn_handler(
     }
 }
 
+void ScienceApp::productCommitIn_handler(FwIndexType portNum, U32 productId, U32 productBytes, bool committed) {
+    static_cast<void>(portNum);
+    if (productId == 0U) {
+        return;
+    }
+    if (productId == this->m_pendingCommitProductId) {
+        this->m_pendingCommitProductId = 0U;
+        if (this->isConnected_missionModeOut_OutputPort(0)) {
+            const auto mode = committed ? Components::MissionMode::SCIENCE_READY : Components::MissionMode::BASE;
+            this->missionModeOut_out(0, mode, committed ? productBytes : 0U);
+        }
+    }
+    for (DownlinkIntent& intent : this->m_downlinkIntents) {
+        if (intent.productId == productId) {
+            intent = {};
+            if (committed && this->isConnected_deliveryRequestOut_OutputPort(0)) {
+                // Queue the mode update before allowing CommsApp to start delivery.
+                this->deliveryRequestOut_out(0, productId);
+            }
+            return;
+        }
+    }
+}
+
 void ScienceApp::START_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     this->m_pendingDelaySeconds = 0U;
     this->writeTelemetry();
     if (!this->isConnected_durationConfigOut_OutputPort(0) &&
-        !this->isValidCaptureDuration(this->m_captureDurationSeconds)) {
-        this->log_WARNING_LO_ScienceCommandRejected(REJECT_INVALID_CAPTURE_DURATION_SECONDS,
-                                                    this->m_captureDurationSeconds);
+        !this->isValidCaptureDuration(this->m_captureDurationMinutes)) {
+        this->log_WARNING_LO_ScienceCommandRejected(REJECT_INVALID_CAPTURE_DURATION_MINUTES,
+                                                    this->m_captureDurationMinutes);
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
         return;
     }
@@ -291,29 +324,29 @@ void ScienceApp::START_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     this->cmdResponse_out(opCode, cmdSeq, submitted ? Fw::CmdResponse::OK : Fw::CmdResponse::EXECUTION_ERROR);
 }
 
-void ScienceApp::CONFIGURE_CAPTURE_DURATION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) {
-    if (!this->isValidCaptureDuration(durationSeconds)) {
-        this->log_WARNING_LO_ScienceCommandRejected(REJECT_INVALID_CAPTURE_DURATION_SECONDS, durationSeconds);
+void ScienceApp::CONFIGURE_CAPTURE_DURATION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationMinutes) {
+    if (!this->isValidCaptureDuration(durationMinutes)) {
+        this->log_WARNING_LO_ScienceCommandRejected(REJECT_INVALID_CAPTURE_DURATION_MINUTES, durationMinutes);
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
         return;
     }
     if (this->isConnected_durationConfigOut_OutputPort(0)) {
         if (this->m_pendingDurationConfig.requestId != 0U) {
-            this->log_WARNING_LO_ScienceCommandRejected(REJECT_DURATION_CONFIG_BUSY, durationSeconds);
+            this->log_WARNING_LO_ScienceCommandRejected(REJECT_DURATION_CONFIG_BUSY, durationMinutes);
             this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
             return;
         }
         const U32 requestId = this->allocateRequestId();
-        this->m_pendingDurationConfig = {requestId, durationSeconds, opCode, cmdSeq, this->m_runTicks};
-        this->durationConfigOut_out(0, requestId, durationSeconds);
+        this->m_pendingDurationConfig = {requestId, durationMinutes, opCode, cmdSeq, this->m_runTicks};
+        this->durationConfigOut_out(0, requestId, durationMinutes);
         return;
     }
     if (this->isConnected_configuredCaptureOut_OutputPort(0)) {
-        this->log_WARNING_LO_ScienceCommandRejected(REJECT_CONFIGURED_CAPTURE_PORT_MISSING, durationSeconds);
+        this->log_WARNING_LO_ScienceCommandRejected(REJECT_CONFIGURED_CAPTURE_PORT_MISSING, durationMinutes);
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
         return;
     }
-    this->applyCaptureDuration(durationSeconds);
+    this->applyCaptureDuration(durationMinutes);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
@@ -322,38 +355,38 @@ void ScienceApp::SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     this->START_COLLECTION_cmdHandler(opCode, cmdSeq);
 }
 #else
-void ScienceApp::SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) {
-    if (!this->isValidCaptureDuration(durationSeconds)) {
-        this->log_WARNING_LO_ScienceCommandRejected(REJECT_INVALID_CAPTURE_DURATION_SECONDS, durationSeconds);
+void ScienceApp::SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationMinutes) {
+    if (!this->isValidCaptureDuration(durationMinutes)) {
+        this->log_WARNING_LO_ScienceCommandRejected(REJECT_INVALID_CAPTURE_DURATION_MINUTES, durationMinutes);
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
         return;
     }
     this->m_pendingDelaySeconds = 0U;
     this->writeTelemetry();
-    const bool submitted = this->startCapture(durationSeconds);
+    const bool submitted = this->startCapture(durationMinutes);
     this->cmdResponse_out(opCode, cmdSeq, submitted ? Fw::CmdResponse::OK : Fw::CmdResponse::EXECUTION_ERROR);
 }
 #endif
 
-void ScienceApp::COLLECT_AND_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) {
+void ScienceApp::COLLECT_AND_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationMinutes) {
 #ifdef NEUTRON2_CDR_TCP
     this->log_WARNING_LO_ScienceCommandRejected(REJECT_CDR_AUTO_DOWNLINK_UNSUPPORTED, opCode);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
     return;
 #endif
-    if (!this->isValidCaptureDuration(durationSeconds)) {
-        this->log_WARNING_LO_ScienceCommandRejected(REJECT_INVALID_CAPTURE_DURATION_SECONDS, durationSeconds);
+    if (!this->isValidCaptureDuration(durationMinutes)) {
+        this->log_WARNING_LO_ScienceCommandRejected(REJECT_INVALID_CAPTURE_DURATION_MINUTES, durationMinutes);
         this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
         return;
     }
     this->m_pendingDelaySeconds = 0U;
     this->writeTelemetry();
-    const bool submitted = this->startCapture(durationSeconds, true);
+    const bool submitted = this->startCapture(durationMinutes, true);
     this->cmdResponse_out(opCode, cmdSeq, submitted ? Fw::CmdResponse::OK : Fw::CmdResponse::EXECUTION_ERROR);
 }
 
 void ScienceApp::VERIFIED_COLLECT_AND_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
-                                                           U32 verificationToken, U32 durationSeconds) {
+                                                           U32 verificationToken, U32 durationMinutes) {
 #ifdef NEUTRON2_CDR_TCP
     this->log_WARNING_LO_ScienceCommandRejected(REJECT_CDR_AUTO_DOWNLINK_UNSUPPORTED, opCode);
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
@@ -383,8 +416,8 @@ void ScienceApp::VERIFIED_COLLECT_AND_DOWNLINK_cmdHandler(FwOpcodeType opCode, U
 
     VerifiedCaptureRecord& record = this->m_verifiedCaptures[this->m_verifiedCaptureCount++];
     record = VerifiedCaptureRecord{verificationToken, 0U, 0U, false};
-    if (!this->isValidCaptureDuration(durationSeconds)) {
-        this->log_WARNING_LO_ScienceCommandRejected(REJECT_INVALID_CAPTURE_DURATION_SECONDS, durationSeconds);
+    if (!this->isValidCaptureDuration(durationMinutes)) {
+        this->log_WARNING_LO_ScienceCommandRejected(REJECT_INVALID_CAPTURE_DURATION_MINUTES, durationMinutes);
         record.terminal = true;
         this->logVerifiedCaptureStatus(verificationToken, 0U, 0U,
                                        Components::PayloadOperationState::INVALID, 0U, 0U, 0U,
@@ -396,7 +429,7 @@ void ScienceApp::VERIFIED_COLLECT_AND_DOWNLINK_cmdHandler(FwOpcodeType opCode, U
     this->m_pendingDelaySeconds = 0U;
     this->writeTelemetry();
     U32 requestId = 0U;
-    const bool submitted = this->startCapture(durationSeconds, true, &requestId);
+    const bool submitted = this->startCapture(durationMinutes, true, &requestId);
     record.requestId = requestId;
     if (!submitted) {
         record.terminal = true;
@@ -407,14 +440,16 @@ void ScienceApp::VERIFIED_COLLECT_AND_DOWNLINK_cmdHandler(FwOpcodeType opCode, U
     this->cmdResponse_out(opCode, cmdSeq, submitted ? Fw::CmdResponse::OK : Fw::CmdResponse::EXECUTION_ERROR);
 }
 
-bool ScienceApp::isValidCaptureDuration(U32 durationSeconds) const {
-    return (durationSeconds > 0U) && (durationSeconds <= MAX_CAPTURE_DURATION_SECONDS);
+bool ScienceApp::isValidCaptureDuration(U32 durationMinutes) {
+    const U32 maximum = this->isConnected_durationConfigOut_OutputPort(0)
+        ? MAX_CAPTURE_DURATION_MINUTES : MAX_SIMULATED_CAPTURE_DURATION_MINUTES;
+    return (durationMinutes > 0U) && (durationMinutes <= maximum);
 }
 
-void ScienceApp::applyCaptureDuration(U32 durationSeconds) {
-    this->m_captureDurationSeconds = durationSeconds;
+void ScienceApp::applyCaptureDuration(U32 durationMinutes) {
+    this->m_captureDurationMinutes = durationMinutes;
     this->writeTelemetry();
-    this->log_ACTIVITY_HI_CaptureDurationConfigured(durationSeconds);
+    this->log_ACTIVITY_HI_CaptureDurationConfigured(durationMinutes);
 }
 
 void ScienceApp::finishDurationConfig(const Components::PayloadOperationState& state) {
@@ -422,10 +457,10 @@ void ScienceApp::finishDurationConfig(const Components::PayloadOperationState& s
     this->m_pendingDurationConfig = {};
     Fw::CmdResponse response = Fw::CmdResponse::EXECUTION_ERROR;
     if (state == Components::PayloadOperationState::COMPLETED) {
-        this->applyCaptureDuration(pending.durationSeconds);
+        this->applyCaptureDuration(pending.durationMinutes);
         response = Fw::CmdResponse::OK;
     } else {
-        this->m_captureDurationSeconds = 0U;
+        this->m_captureDurationMinutes = 0U;
         this->writeTelemetry();
         this->log_WARNING_HI_ScienceOperationRejected(pending.requestId, state);
         if (state == Components::PayloadOperationState::INVALID) {
@@ -454,7 +489,7 @@ bool ScienceApp::startConfiguredCapture() {
     const bool configConnected = this->isConnected_durationConfigOut_OutputPort(0);
     const bool captureConnected = this->isConnected_configuredCaptureOut_OutputPort(0);
     if (!configConnected && !captureConnected) {
-        return this->startCapture(this->m_captureDurationSeconds);
+        return this->startCapture(this->m_captureDurationMinutes);
     }
     if (!configConnected || !captureConnected) {
         this->log_WARNING_LO_ScienceCommandRejected(REJECT_CONFIGURED_CAPTURE_PORT_MISSING, 0U);
@@ -462,10 +497,10 @@ bool ScienceApp::startConfiguredCapture() {
     }
     if (this->m_pendingDurationConfig.requestId != 0U) {
         this->log_WARNING_LO_ScienceCommandRejected(REJECT_DURATION_CONFIG_BUSY,
-                                                    this->m_pendingDurationConfig.durationSeconds);
+                                                    this->m_pendingDurationConfig.durationMinutes);
         return false;
     }
-    if (!this->isValidCaptureDuration(this->m_captureDurationSeconds)) {
+    if (!this->isValidCaptureDuration(this->m_captureDurationMinutes)) {
         this->log_WARNING_LO_ScienceCommandRejected(REJECT_DURATION_CONFIG_REQUIRED, 0U);
         return false;
     }
@@ -473,7 +508,7 @@ bool ScienceApp::startConfiguredCapture() {
     return true;
 }
 
-bool ScienceApp::startCapture(U32 durationSeconds, bool requestDownlink, U32* requestIdOut) {
+bool ScienceApp::startCapture(U32 durationMinutes, bool requestDownlink, U32* requestIdOut) {
     const U32 requestId = this->allocateRequestId();
     if (requestIdOut != nullptr) {
         *requestIdOut = requestId;
@@ -486,7 +521,7 @@ bool ScienceApp::startCapture(U32 durationSeconds, bool requestDownlink, U32* re
         this->log_WARNING_HI_ScienceOperationRejected(requestId, Components::PayloadOperationState::BUSY);
         return false;
     }
-    this->payloadRequestOut_out(0, requestId, durationSeconds);
+    this->payloadRequestOut_out(0, requestId, durationMinutes);
     return true;
 }
 
@@ -516,10 +551,9 @@ void ScienceApp::logVerifiedCaptureStatus(U32 verificationToken, U32 requestId, 
 }
 
 bool ScienceApp::rememberDownlinkIntent(U32 requestId) {
-    for (U32 index = 0; index < DOWNLINK_INTENT_CAPACITY; ++index) {
-        if (this->m_downlinkRequestIds[index] == 0U) {
-            this->m_downlinkRequestIds[index] = requestId;
-            this->m_downlinkRequestGenerations[index] = 0U;
+    for (DownlinkIntent& intent : this->m_downlinkIntents) {
+        if (intent.requestId == 0U) {
+            intent = {requestId, 0U, 0U};
             return true;
         }
     }
@@ -527,30 +561,27 @@ bool ScienceApp::rememberDownlinkIntent(U32 requestId) {
 }
 
 void ScienceApp::setDownlinkIntentGeneration(U32 requestId, U32 generation) {
-    for (U32 index = 0; index < DOWNLINK_INTENT_CAPACITY; ++index) {
-        if (this->m_downlinkRequestIds[index] == requestId) {
-            this->m_downlinkRequestGenerations[index] = generation;
+    for (DownlinkIntent& intent : this->m_downlinkIntents) {
+        if ((intent.requestId == requestId) && (intent.generation == 0U)) {
+            intent.generation = generation;
             return;
         }
     }
 }
 
-bool ScienceApp::hasDownlinkIntent(U32 requestId, U32 generation) const {
-    for (U32 index = 0; index < DOWNLINK_INTENT_CAPACITY; ++index) {
-        if ((this->m_downlinkRequestIds[index] == requestId) &&
-            (this->m_downlinkRequestGenerations[index] == generation)) {
-            return true;
+void ScienceApp::setDownlinkIntentProduct(U32 requestId, U32 generation, U32 productId) {
+    for (DownlinkIntent& intent : this->m_downlinkIntents) {
+        if ((intent.requestId == requestId) && (intent.generation == generation)) {
+            intent.productId = productId;
+            return;
         }
     }
-    return false;
 }
 
 void ScienceApp::clearDownlinkIntent(U32 requestId, U32 generation) {
-    for (U32 index = 0; index < DOWNLINK_INTENT_CAPACITY; ++index) {
-        if ((this->m_downlinkRequestIds[index] == requestId) &&
-            (this->m_downlinkRequestGenerations[index] == generation)) {
-            this->m_downlinkRequestIds[index] = 0U;
-            this->m_downlinkRequestGenerations[index] = 0U;
+    for (DownlinkIntent& intent : this->m_downlinkIntents) {
+        if ((intent.requestId == requestId) && (intent.generation == generation)) {
+            intent = {};
             return;
         }
     }
@@ -566,12 +597,7 @@ void ScienceApp::publishScienceProduct(
     this->m_collectionCount += 1U;
     this->writeTelemetry();
     this->log_ACTIVITY_HI_ScienceProductReady(productBytes);
-    if (this->isConnected_scienceProductOut_OutputPort(0)) {
-        this->scienceProductOut_out(0, productId, productBytes, sourceKind, sourcePath, sourceCrc);
-    }
-    if (this->isConnected_missionModeOut_OutputPort(0)) {
-        this->missionModeOut_out(0, Components::MissionMode::SCIENCE_READY, productBytes);
-    }
+    this->scienceProductOut_out(0, productId, productBytes, sourceKind, sourcePath, sourceCrc);
 }
 
 bool ScienceApp::isValidProduct(
@@ -611,7 +637,7 @@ bool ScienceApp::isValidProduct(
 
 void ScienceApp::writeTelemetry() {
     this->tlmWrite_PendingDelaySeconds(this->m_pendingDelaySeconds);
-    this->tlmWrite_CaptureDurationSeconds(this->m_captureDurationSeconds);
+    this->tlmWrite_CaptureDurationMinutes(this->m_captureDurationMinutes);
     this->tlmWrite_CollectionCount(this->m_collectionCount);
 }
 

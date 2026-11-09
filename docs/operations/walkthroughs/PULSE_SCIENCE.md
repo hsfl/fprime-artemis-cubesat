@@ -19,9 +19,9 @@ The pulse profile selects the repository-owned `pulse_sim` source and sends 32 d
 
 ### 1. Send the collection command
 
-In **Commanding → Send a command**, choose `scienceApp.COLLECT_AND_DOWNLINK`, enter `durationSeconds=30`, and send once. No mode, scheduling, or EPS command is needed.
+In **Commanding → Send a command**, choose `scienceApp.COLLECT_AND_DOWNLINK`, enter `durationMinutes=1`, and send once. No mode, scheduling, or EPS command is needed.
 
-![Enter a 30-second synthetic exposure](images/n2-pulse-science-2026-10-08/01-command.jpg)
+![Archived command form for a 30-second synthetic exposure](images/n2-pulse-science-2026-10-08/01-command.jpg)
 
 Yamcs **Queued / Released / Sent OK** confirms dispatch. The command report does not itself confirm capture or ground receipt.
 
@@ -29,7 +29,7 @@ Yamcs **Queued / Released / Sent OK** confirms dispatch. The command report does
 
 ### 2. Confirm the returned capture and receipt
 
-In **Events**, search `CaptureComplete`. A 30-second synthetic exposure produces **60 events**, shown as `rows=60`. In this replay the capture is product `3`, size `22,432` bytes. Also confirm the matching `ScienceStored` and `PayloadDownlinkStarted` product/transfer/size.
+In **Events**, search `CaptureComplete`. A one-minute synthetic exposure produces **120 events**, shown as `rows=120`. Confirm the matching `ScienceStored` and `PayloadDownlinkStarted` product, transfer and size. The archived screenshot shows a 30-second capture.
 
 ![CaptureComplete with 60 events and product 3](images/n2-pulse-science-2026-10-08/03-capture-events.jpg)
 
@@ -55,7 +55,7 @@ The **Integrated charge spectrum** bins pulse area in ADC-sample units. **PSD de
 
 Click **Download raw Yamcs object**. The `.bin` contains `n2-pulses-v1` JSON. This replay's browser download independently matched its receipt SHA, CRC, and size. Retain it with the receipt. Start another collection only after sender completion and verified receipt. No automatic source deletion or positive ground ACK back to F′ is implemented.
 
-The fixed default seed is `12345`. Repeating the same duration and seed yields the same raw sample bytes, with a new product/transfer identity. To exercise another reproducible fixture, set `N2_LOCAL_PULSE_SEED` to an unsigned 32-bit integer when starting the pulse stack. Duration is synthetic exposure; the generator does not wait 30 wall-clock seconds to create the pulses.
+The fixed default seed is `12345`. Repeating the same duration and seed yields the same raw sample bytes, with a new product/transfer identity. To exercise another reproducible fixture, set `N2_LOCAL_PULSE_SEED` to an unsigned 32-bit integer when starting the pulse stack. The generator creates the full synthetic exposure immediately.
 
 ## Repeat acceptance
 
@@ -72,7 +72,7 @@ In a second terminal:
 ./tools/yamcs/pulse_cycle.sh
 ```
 
-The probe requests 30- and 5-second exposures (60 and 10 events), verifies packet recovery and invalid/failed capture suppression, independently downloads the raw objects from Yamcs, checks identity/size/CRC/SHA, and recalculates every waveform point, pulse charge/ratio, spectrum bin, and PSD bin. It reads a finalized source file only after ground receipt as an integrity oracle; the ground receiver and viewer never copy the source file. Probe fingerprints must match the stack-start manifest and remain unchanged through acceptance.
+The probe requests one- and two-minute exposures (120 and 240 events), verifies packet recovery and invalid/failed capture suppression, independently downloads the raw objects from Yamcs, checks identity, size, CRC and SHA, and recalculates every waveform point, pulse charge and ratio, spectrum bin, and PSD bin. After ground receipt, it checks the downloaded bytes against the finalized source file. Probe fingerprints must match the stack-start manifest and remain unchanged through acceptance.
 
 The [synthetic pulse plan](../../verification/SYNTHETIC_PULSE_ACCEPTANCE.md) records the versioned fixture and integration gates. The [earlier count-CSV walkthrough](RAW_CYCLE.md) remains the accepted B baseline. This software exercise does not establish Aris's physical interface, Pi Zero W runtime, SatNOGS SPI/SDR/RF, CDR/FSR acceptance, or flight science accuracy.
 

@@ -5,4 +5,5 @@ register_fprime_library(
         ${CMAKE_CURRENT_LIST_DIR}/PayloadDriver_NeutronSim.cpp
     DEPENDS
         Components_Types
+        Components_ProductId
 )

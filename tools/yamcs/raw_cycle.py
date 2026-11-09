@@ -55,7 +55,7 @@ def probe(durations):
                     {"faultMode": fault, "delayMs": 0, "timeoutMs": 8000})
                 returned_event(configured, "payloadManager", "SimulationConfigured",
                     lambda event: event.get("extra", {}).get("faultMode") == fault)
-            command = issue(f"{DEPLOYMENT}.scienceApp.COLLECT_AND_DOWNLINK", {"durationSeconds": duration})
+            command = issue(f"{DEPLOYMENT}.scienceApp.COLLECT_AND_DOWNLINK", {"durationMinutes": duration})
             rejected = returned_event(command, "scienceApp", expected)
             released = datetime.fromisoformat(command["generationTime"].replace("Z", "+00:00"))
             time.sleep(3)
@@ -66,17 +66,17 @@ def probe(durations):
                     if datetime.fromisoformat(event["receptionTime"].replace("Z", "+00:00")) >= released)
             if forbidden or numeric(parameter(f"{DEPLOYMENT}.scienceApp.CollectionCount")) != initial_count:
                 raise RuntimeError("Invalid/failed automatic capture published or downlinked a product")
-            result["negative_checks"].append({"duration_seconds": duration, "fault": fault,
+            result["negative_checks"].append({"duration_minutes": duration, "fault": fault,
                 "command": command, "rejected": rejected, "result": "PASS", "forbidden_events": forbidden})
         for index, duration in enumerate(durations):
-            capture = {"duration_seconds": duration}
+            capture = {"duration_minutes": duration}
             result["captures"].append(capture)
             if index == 0:
                 configured = issue(f"{DEPLOYMENT}.payloadManager.CONFIGURE_SIMULATION",
                     {"faultMode": "DELAYED_RESPONSE", "delayMs": 4000, "timeoutMs": 8000})
                 returned_event(configured, "payloadManager", "SimulationConfigured",
                     lambda event: event.get("extra", {}).get("faultMode") == "DELAYED_RESPONSE")
-            command = issue(f"{DEPLOYMENT}.scienceApp.COLLECT_AND_DOWNLINK", {"durationSeconds": duration})
+            command = issue(f"{DEPLOYMENT}.scienceApp.COLLECT_AND_DOWNLINK", {"durationMinutes": duration})
             capture["command"] = command
             released = datetime.fromisoformat(command["generationTime"].replace("Z", "+00:00"))
             capture["admitted"] = returned_event(command, "payloadManager", "PayloadOperationStatus",
@@ -91,7 +91,7 @@ def probe(durations):
                     and event.get("extra", {}).get("generation") == "0")
                 capture["same_id_busy_contender"] = {"command": contender, "rejected": busy}
             capture["capture_complete"] = returned_event(command, "payloadDriverNeutronSim", "CaptureComplete",
-                lambda event: event.get("extra", {}).get("durationSeconds") == str(duration))
+                lambda event: event.get("extra", {}).get("durationMinutes") == str(duration))
             product = int(capture["capture_complete"]["extra"]["productId"])
             size = int(capture["capture_complete"]["extra"]["productBytes"])
             capture["stored"] = returned_event(command, "storageManager", "ScienceStored",
@@ -126,7 +126,7 @@ def probe(durations):
             capture["source_oracle"] = {"path": str(source), "bytes": len(source_bytes),
                                          "sha256": hashlib.sha256(source_bytes).hexdigest()}
             rows = list(csv.DictReader(io.StringIO(received.decode("utf-8"))))
-            if len(rows) != duration or any(set(row) != {"t_s", "counts", "flag"} for row in rows):
+            if len(rows) != duration * 60 or any(set(row) != {"t_s", "counts", "flag"} for row in rows):
                 raise RuntimeError("Received simulator CSV does not match the requested windows")
             frequencies = {}
             for row in rows:
@@ -185,7 +185,8 @@ def probe(durations):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--durations", type=int, nargs="+", default=[30, 5])
+    parser.add_argument("--durations", type=int, choices=(1, 2), nargs="+", default=[1, 2],
+                        help="Simulated capture durations in minutes")
     args = parser.parse_args()
     with (ROOT / "yamcs/run/demo.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)

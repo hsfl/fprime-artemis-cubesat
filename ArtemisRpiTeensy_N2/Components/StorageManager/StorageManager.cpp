@@ -327,7 +327,6 @@ StorageManager::StorageManager(const char* const compName)
       m_storedProducts(0U),
       m_lastProductSize(0U),
       m_selectedProductId(0U),
-      m_lastInputProductId(0U),
       m_nextProductId(1U),
       m_removedDatasetFiles(0U),
       m_removeDatasetFailures(0U),
@@ -372,48 +371,48 @@ void StorageManager::requestIn_handler(FwIndexType portNum,
                                        const Fw::StringBase& sourcePath,
                                        U32 sourceCrc) {
     static_cast<void>(portNum);
-    this->m_lastInputProductId = 0U;
     if (!this->ensureCatalogLoaded()) {
-        this->rejectProduct(productId, REJECT_STORAGE_UNAVAILABLE, sourcePath);
+        this->rejectIncomingProduct(productId, REJECT_STORAGE_UNAVAILABLE, sourcePath);
         return;
     }
     if ((productId == 0U) || (productBytes == 0U) ||
         (sourceKind == Components::ScienceProductSource::UNKNOWN) || (sourcePath.length() == 0U) ||
         (sourceCrc > 0xFFFFU)) {
-        this->rejectProduct(productId, REJECT_INVALID_DESCRIPTOR, sourcePath);
+        this->rejectIncomingProduct(productId, REJECT_INVALID_DESCRIPTOR, sourcePath);
         return;
     }
     if (sourcePath.length() >= SOURCE_PATH_CAPACITY) {
-        this->rejectProduct(productId, REJECT_PATH_TOO_LONG, sourcePath);
+        this->rejectIncomingProduct(productId, REJECT_PATH_TOO_LONG, sourcePath);
         return;
     }
     if (this->m_storedProducts >= HISTORY_CAPACITY) {
-        this->rejectProduct(productId, REJECT_CATALOG_FULL, sourcePath);
+        this->rejectIncomingProduct(productId, REJECT_CATALOG_FULL, sourcePath);
         return;
     }
     if ((this->findProduct(productId) != nullptr) ||
         (::access(productDataPath(this->m_storageRoot, productId).c_str(), F_OK) == 0) ||
         (::access(productMetadataPath(this->m_storageRoot, productId).c_str(), F_OK) == 0)) {
-        this->rejectProduct(productId, REJECT_DUPLICATE_ID, sourcePath);
+        this->rejectIncomingProduct(productId, REJECT_DUPLICATE_ID, sourcePath);
         return;
     }
 
     const std::string dataPath = productDataPath(this->m_storageRoot, productId);
     const std::string metadataPath = productMetadataPath(this->m_storageRoot, productId);
     if (dataPath.size() >= SOURCE_PATH_CAPACITY) {
-        this->rejectProduct(productId, REJECT_PATH_TOO_LONG, sourcePath);
+        this->rejectIncomingProduct(productId, REJECT_PATH_TOO_LONG, sourcePath);
         return;
     }
     if (!this->persistNextProductId((productId == std::numeric_limits<U32>::max()) ? 0U : productId + 1U)) {
-        this->rejectProduct(productId, REJECT_ID_COUNTER, sourcePath);
+        this->rejectIncomingProduct(productId, REJECT_ID_COUNTER, sourcePath);
         return;
     }
     if (!this->copyProductAtomically(sourcePath, dataPath, productBytes, sourceCrc)) {
-        this->rejectProduct(productId, REJECT_COPY_OR_CRC, sourcePath);
+        this->rejectIncomingProduct(productId, REJECT_COPY_OR_CRC, sourcePath);
         return;
     }
     if (!this->writeMetadataAtomically(metadataPath, productId, productBytes, sourceKind, sourceCrc)) {
-        this->rejectProduct(productId, REJECT_METADATA_COMMIT, Fw::String(dataPath.c_str()));
+        (void)::unlink(dataPath.c_str());
+        this->rejectIncomingProduct(productId, REJECT_METADATA_COMMIT, Fw::String(dataPath.c_str()));
         return;
     }
 
@@ -421,7 +420,6 @@ void StorageManager::requestIn_handler(FwIndexType portNum,
     ProductRecord& record = this->m_history[this->m_storedProducts];
     record = ProductRecord{productId, productId, productBytes, sourceCrc, sourceKind, storedPath};
     this->m_storedProducts += 1U;
-    this->m_lastInputProductId = productId;
     this->m_lastProductSize = productBytes;
     this->m_selectedProductId = productId;
     this->log_ACTIVITY_HI_ScienceStored(this->m_storedProducts, productBytes);
@@ -432,6 +430,9 @@ void StorageManager::requestIn_handler(FwIndexType portNum,
     this->tlmWrite_StorageHistoryDepth(this->historyDepth());
     this->tlmWrite_SelectedProductId(this->m_selectedProductId);
     this->tlmWrite_StorageReady(true);
+    if (this->isConnected_productCommitOut_OutputPort(0)) {
+        this->productCommitOut_out(0, productId, productBytes, true);
+    }
 }
 
 void StorageManager::deliveryRequestIn_handler(FwIndexType portNum, U32 productId) {
@@ -440,12 +441,7 @@ void StorageManager::deliveryRequestIn_handler(FwIndexType portNum, U32 productI
         this->rejectProduct(productId, REJECT_STORAGE_UNAVAILABLE, Fw::String(""));
         return;
     }
-    if ((productId == 0U) || (productId != this->m_lastInputProductId) ||
-        (productId != this->m_selectedProductId)) {
-        this->rejectProduct(productId, REJECT_INVALID_DESCRIPTOR, Fw::String(""));
-        return;
-    }
-    ProductRecord* record = this->findProduct(this->m_selectedProductId);
+    const ProductRecord* const record = this->findProduct(productId);
     if ((record == nullptr) || !this->isValidStoredProduct(*record)) {
         this->rejectProduct(productId, REJECT_INVALID_STORED_FILE,
                             (record == nullptr) ? Fw::String("") : record->sourcePath);
@@ -613,7 +609,6 @@ bool StorageManager::loadCatalog() {
     this->m_storedProducts = 0U;
     this->m_lastProductSize = 0U;
     this->m_selectedProductId = 0U;
-    this->m_lastInputProductId = 0U;
     this->m_catalogOverflow = 0U;
     if (!ensureDirectory(this->m_storageRoot)) {
         return false;
@@ -943,6 +938,13 @@ void StorageManager::rejectProduct(U32 productId, U32 reason, const Fw::StringBa
     this->log_WARNING_HI_ScienceProductRejected(productId, reason);
     const Fw::String safePath(path.toChar());
     this->log_WARNING_LO_ScienceProductRejectedDetail(productId, reason, safePath);
+}
+
+void StorageManager::rejectIncomingProduct(U32 productId, U32 reason, const Fw::StringBase& path) {
+    this->rejectProduct(productId, reason, path);
+    if (this->isConnected_productCommitOut_OutputPort(0)) {
+        this->productCommitOut_out(0, productId, 0U, false);
+    }
 }
 
 void StorageManager::publishSelected(const ProductRecord& record, bool selectedByCommand) {

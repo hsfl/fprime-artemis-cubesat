@@ -6,6 +6,8 @@
 #ifndef ARTEMISRPITEENSYDEPLOYMENT_ARTEMISRPITEENSYDEPLOYMENTTOPOLOGYDEFS_HPP
 #define ARTEMISRPITEENSYDEPLOYMENT_ARTEMISRPITEENSYDEPLOYMENTTOPOLOGYDEFS_HPP
 
+#include <PayloadPingEntries.hpp>
+
 // Subtopology PingEntries includes
 #include "Svc/Subtopologies/CdhCore/PingEntries.hpp"
 #include "Svc/Subtopologies/ComCcsds/PingEntries.hpp"
@@ -62,7 +64,6 @@ namespace PingEntries {
     namespace ArtemisRpiTeensyDeployment_thermalManager {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_payloadDownlinkApp {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_epsDriverArtemis {enum { WARN = 3, FATAL = 5 };}
-    namespace ArtemisRpiTeensyDeployment_payloadDriverNeutronSim {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_adcsDriverD2S2 {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_gpsDriverArtemis {enum { WARN = 3, FATAL = 5 };}
     namespace ArtemisRpiTeensyDeployment_commsDriverTeensyRfm23 {enum { WARN = 3, FATAL = 5 };}

@@ -23,7 +23,7 @@ In Yamcs, open **Commanding → Send a command** and select `ArtemisRpiTeensyDep
 | Argument | Value |
 | --- | --- |
 | `verificationToken` | An unused decimal integer from `1` through `4294967295`, never reused across sessions. Example: `26101401` if it is unused. Keep a note of tokens already used. |
-| `durationSeconds` | `5` |
+| `durationMinutes` | `1` |
 
 Send one collection at a time. In that command's history/details, confirm `PayloadAccepted`, `PayloadTerminal`, `StorageCommitted`, `SenderComplete`, `GroundReceipt`, and `CommandComplete` each report `OK`. Count delivery as successful only when Yamcs shows **SUCCESS** and `CommandComplete_Status=OK`; a released command or successful sender stage alone does not confirm ground receipt.
 

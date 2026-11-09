@@ -26,7 +26,7 @@ With the bench idle, send `missionApp.ENTER_BASE_MODE`. Open **Events** and conf
 
    ![EMIT_SOH_SNAPSHOT in the sohApp folder, with no arguments](images/n2-fsr-mission-ops/03-soh-snapshot.jpg)
 
-2. Send `scienceApp.CONFIGURE_CAPTURE_DURATION` with `durationSeconds = 10`. This sets the amount of simulated science data.
+2. Send `scienceApp.CONFIGURE_CAPTURE_DURATION` with `durationMinutes = 1` on the minute-based build. The older bench dictionary in the screenshot used `durationSeconds = 10`. Use the argument shown by the dictionary paired with the running binary.
 
    ![CONFIGURE_CAPTURE_DURATION with durationSeconds set to 10](images/n2-fsr-mission-ops/03b-configure-duration.jpg)
 

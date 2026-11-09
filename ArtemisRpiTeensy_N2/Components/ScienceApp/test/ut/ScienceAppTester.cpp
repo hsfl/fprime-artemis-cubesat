@@ -1,12 +1,13 @@
 #include "ScienceAppTester.hpp"
 
 #include <cstdio>
+#include <string>
 #include <unistd.h>
 
 namespace Components {
 
 namespace {
-constexpr const char* AUTO_DOWNLINK_TEST_PATH = "/tmp/science_app_auto_downlink_ut.bin";
+const std::string TEST_PRODUCT_PATH = "./science_app_ut_" + std::to_string(::getpid()) + ".bin";
 
 U16 scienceProductCrc(const U8* data, FwSizeType size) {
     U16 crc = 0xFFFFU;
@@ -22,7 +23,7 @@ U16 scienceProductCrc(const U8* data, FwSizeType size) {
 }
 
 bool writeScienceProduct(const U8* data, FwSizeType size) {
-    std::FILE* file = std::fopen(AUTO_DOWNLINK_TEST_PATH, "wb");
+    std::FILE* file = std::fopen(TEST_PRODUCT_PATH.c_str(), "wb");
     if (file == nullptr) {
         return false;
     }
@@ -40,7 +41,7 @@ ScienceAppTester::ScienceAppTester()
 
 ScienceAppTester::~ScienceAppTester() {
     this->component.deinit();
-    (void)::unlink(AUTO_DOWNLINK_TEST_PATH);
+    (void)::unlink(TEST_PRODUCT_PATH.c_str());
 }
 
 void ScienceAppTester::initComponents() {
@@ -52,6 +53,7 @@ void ScienceAppTester::connectPorts() {
     this->connect_to_cmdIn(0, this->component.get_cmdIn_InputPort(0));
     this->connect_to_cancelRequestIn(0, this->component.get_cancelRequestIn_InputPort(0));
     this->connect_to_operationNoticeIn(0, this->component.get_operationNoticeIn_InputPort(0));
+    this->connect_to_productCommitIn(0, this->component.get_productCommitIn_InputPort(0));
     this->connect_to_pingIn(0, this->component.get_pingIn_InputPort(0));
     this->connect_to_requestIn(0, this->component.get_requestIn_InputPort(0));
     this->connect_to_run(0, this->component.get_run_InputPort(0));
@@ -80,7 +82,7 @@ void ScienceAppTester::connectConfiguredCapturePorts() {
     this->component.set_configuredCaptureOut_OutputPort(0, this->get_from_configuredCaptureOut(0));
 }
 
-void ScienceAppTester::testDefaultDurationIsThirty() {
+void ScienceAppTester::testDefaultDurationIsOneMinute() {
     this->clearHistory();
 
     this->sendCmd_START_COLLECTION(0, 0);
@@ -88,7 +90,7 @@ void ScienceAppTester::testDefaultDurationIsThirty() {
 
     ASSERT_CMD_RESPONSE_SIZE(1);
     ASSERT_from_payloadRequestOut_SIZE(1);
-    ASSERT_from_payloadRequestOut(0, 1, 30);
+    ASSERT_from_payloadRequestOut(0, 1, 1);
     ASSERT_from_missionModeOut_SIZE(0);
 
     Fw::String sourcePath("");
@@ -97,7 +99,7 @@ void ScienceAppTester::testDefaultDurationIsThirty() {
                                       Components::ScienceProductSource::UNKNOWN, sourcePath, 0, true);
     this->component.doDispatch();
     ASSERT_from_missionModeOut_SIZE(1);
-    ASSERT_from_missionModeOut(0, Components::MissionMode::COLLECTING, 30);
+    ASSERT_from_missionModeOut(0, Components::MissionMode::COLLECTING, 1);
 
     this->invoke_to_operationNoticeIn(0, 1, 1, Components::PayloadOperationKind::CAPTURE,
                                       Components::PayloadOperationState::FAILED, 0, 0,
@@ -105,7 +107,7 @@ void ScienceAppTester::testDefaultDurationIsThirty() {
     this->component.doDispatch();
     ASSERT_from_missionModeOut_SIZE(2);
     ASSERT_from_missionModeOut(1, Components::MissionMode::BASE, 0);
-    ASSERT_TLM_CaptureDurationSeconds(0, 30);
+    ASSERT_TLM_CaptureDurationMinutes(0, 1);
 }
 
 void ScienceAppTester::testScheduledCountdownFiresExactlyOnce() {
@@ -126,7 +128,7 @@ void ScienceAppTester::testScheduledCountdownFiresExactlyOnce() {
     this->invoke_to_run(0, 0);
     this->component.doDispatch();
     ASSERT_from_payloadRequestOut_SIZE(1);
-    ASSERT_from_payloadRequestOut(0, 1, 30);
+    ASSERT_from_payloadRequestOut(0, 1, 1);
     ASSERT_from_missionModeOut_SIZE(0);
     Fw::String sourcePath("");
     this->invoke_to_operationNoticeIn(0, 1, 1, Components::PayloadOperationKind::CAPTURE,
@@ -134,7 +136,7 @@ void ScienceAppTester::testScheduledCountdownFiresExactlyOnce() {
                                       Components::ScienceProductSource::UNKNOWN, sourcePath, 0, true);
     this->component.doDispatch();
     ASSERT_from_missionModeOut_SIZE(1);
-    ASSERT_from_missionModeOut(0, Components::MissionMode::COLLECTING, 30);
+    ASSERT_from_missionModeOut(0, Components::MissionMode::COLLECTING, 1);
     ASSERT_TLM_PendingDelaySeconds(2, 0);
 
     this->invoke_to_run(0, 0);
@@ -162,13 +164,13 @@ void ScienceAppTester::testRejectsZeroDelayAndBadDurations() {
     ASSERT_EVENTS_ScienceCommandRejected_SIZE(2);
     ASSERT_EVENTS_ScienceCommandRejected(1, 2, 0);
 
-    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 1, 121);
+    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 1, 3);
     this->component.doDispatch();
     ASSERT_CMD_RESPONSE_SIZE(2);
     ASSERT_CMD_RESPONSE(1, ScienceAppComponentBase::OPCODE_CONFIGURE_CAPTURE_DURATION, 1,
                         Fw::CmdResponse::VALIDATION_ERROR);
     ASSERT_EVENTS_ScienceCommandRejected_SIZE(3);
-    ASSERT_EVENTS_ScienceCommandRejected(2, 2, 121);
+    ASSERT_EVENTS_ScienceCommandRejected(2, 2, 3);
 
 #ifndef NEUTRON2_CONFIGURED_CAPTURE
     this->sendCmd_SCIENCE_CAPTURE(0, 2, 0);
@@ -182,13 +184,13 @@ void ScienceAppTester::testRejectsZeroDelayAndBadDurations() {
     ASSERT_from_payloadRequestOut_SIZE(0);
 
     this->clearHistory();
-    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 3, 120);
+    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 3, 2);
     this->component.doDispatch();
     ASSERT_CMD_RESPONSE_SIZE(1);
     ASSERT_CMD_RESPONSE(0, ScienceAppComponentBase::OPCODE_CONFIGURE_CAPTURE_DURATION, 3,
                         Fw::CmdResponse::OK);
     ASSERT_EVENTS_CaptureDurationConfigured_SIZE(1);
-    ASSERT_EVENTS_CaptureDurationConfigured(0, 120);
+    ASSERT_EVENTS_CaptureDurationConfigured(0, 2);
 }
 
 void ScienceAppTester::testCancelClearsCountdown() {
@@ -238,37 +240,37 @@ void ScienceAppTester::testQueuedCancelAtFinalTickBoundaryPreventsCollection() {
 void ScienceAppTester::testScienceCaptureDoesNotPersistDuration() {
     this->clearHistory();
 
-    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 0, 45);
+    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 0, 2);
     this->component.doDispatch();
     ASSERT_CMD_RESPONSE_SIZE(1);
-    ASSERT_TLM_CaptureDurationSeconds(0, 45);
+    ASSERT_TLM_CaptureDurationMinutes(0, 2);
 
     this->clearHistory();
-    this->sendCmd_SCIENCE_CAPTURE(0, 1, 5);
+    this->sendCmd_SCIENCE_CAPTURE(0, 1, 1);
     this->component.doDispatch();
     ASSERT_CMD_RESPONSE_SIZE(1);
     ASSERT_CMD_RESPONSE(0, ScienceAppComponentBase::OPCODE_SCIENCE_CAPTURE, 1,
                         Fw::CmdResponse::OK);
     ASSERT_from_payloadRequestOut_SIZE(1);
-    ASSERT_from_payloadRequestOut(0, 1, 5);
+    ASSERT_from_payloadRequestOut(0, 1, 1);
     ASSERT_from_missionModeOut_SIZE(0);
-    ASSERT_TLM_CaptureDurationSeconds_SIZE(0);
+    ASSERT_TLM_CaptureDurationMinutes_SIZE(0);
     ASSERT_EVENTS_CaptureDurationConfigured_SIZE(0);
 
     this->clearHistory();
     this->sendCmd_START_COLLECTION(0, 2);
     this->component.doDispatch();
     ASSERT_from_payloadRequestOut_SIZE(1);
-    ASSERT_from_payloadRequestOut(0, 2, 45);
+    ASSERT_from_payloadRequestOut(0, 2, 2);
     ASSERT_from_missionModeOut_SIZE(0);
-    ASSERT_TLM_CaptureDurationSeconds_SIZE(0);
+    ASSERT_TLM_CaptureDurationMinutes_SIZE(0);
 }
 #endif
 
 void ScienceAppTester::testConfiguredCaptureWaitsForMatchingDurationResult() {
     this->connectConfiguredCapturePorts();
     this->component.preamble();
-    ASSERT_TLM_CaptureDurationSeconds(0, 0U);
+    ASSERT_TLM_CaptureDurationMinutes(0, 0U);
 
     this->sendCmd_START_COLLECTION(0, 0);
     this->component.doDispatch();
@@ -279,10 +281,10 @@ void ScienceAppTester::testConfiguredCaptureWaitsForMatchingDurationResult() {
     ASSERT_from_payloadRequestOut_SIZE(0);
     this->clearHistory();
 
-    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 1, 60U);
+    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 1, 216U);
     this->component.doDispatch();
     ASSERT_from_durationConfigOut_SIZE(1);
-    ASSERT_from_durationConfigOut(0, 1U, 60U);
+    ASSERT_from_durationConfigOut(0, 1U, 216U);
     ASSERT_CMD_RESPONSE_SIZE(0);
 
     this->invoke_to_durationConfigResultIn(0, 2U, PayloadOperationState::COMPLETED);
@@ -306,7 +308,7 @@ void ScienceAppTester::testConfiguredCaptureWaitsForMatchingDurationResult() {
     ASSERT_from_configuredCaptureOut_SIZE(0);
     ASSERT_from_payloadRequestOut_SIZE(0);
     ASSERT_EVENTS_CaptureDurationConfigured_SIZE(0);
-    ASSERT_TLM_CaptureDurationSeconds_SIZE(0);
+    ASSERT_TLM_CaptureDurationMinutes_SIZE(0);
 
     this->clearHistory();
     this->invoke_to_durationConfigResultIn(0, 1U, PayloadOperationState::COMPLETED);
@@ -315,9 +317,9 @@ void ScienceAppTester::testConfiguredCaptureWaitsForMatchingDurationResult() {
     ASSERT_CMD_RESPONSE(0, ScienceAppComponentBase::OPCODE_CONFIGURE_CAPTURE_DURATION, 1,
                         Fw::CmdResponse::OK);
     ASSERT_EVENTS_CaptureDurationConfigured_SIZE(1);
-    ASSERT_EVENTS_CaptureDurationConfigured(0, 60U);
-    ASSERT_TLM_CaptureDurationSeconds_SIZE(1);
-    ASSERT_TLM_CaptureDurationSeconds(0, 60U);
+    ASSERT_EVENTS_CaptureDurationConfigured(0, 216U);
+    ASSERT_TLM_CaptureDurationMinutes_SIZE(1);
+    ASSERT_TLM_CaptureDurationMinutes(0, 216U);
 
     this->sendCmd_START_COLLECTION(0, 4);
     this->component.doDispatch();
@@ -341,14 +343,14 @@ void ScienceAppTester::testConfiguredDurationFailureAllowsRetry() {
     this->component.preamble();
     this->clearHistory();
 
-    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 0, 60U);
+    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 0, 1U);
     this->component.doDispatch();
     this->invoke_to_durationConfigResultIn(0, 1U, PayloadOperationState::COMPLETED);
     this->component.doDispatch();
-    ASSERT_TLM_CaptureDurationSeconds(0, 60U);
+    ASSERT_TLM_CaptureDurationMinutes(0, 1U);
     this->clearHistory();
 
-    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 1, 90U);
+    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 1, 2U);
     this->component.doDispatch();
     this->invoke_to_durationConfigResultIn(0, 2U, PayloadOperationState::FAILED);
     this->component.doDispatch();
@@ -358,13 +360,13 @@ void ScienceAppTester::testConfiguredDurationFailureAllowsRetry() {
     ASSERT_EVENTS_ScienceOperationRejected_SIZE(1);
     ASSERT_EVENTS_ScienceOperationRejected(0, 2U, PayloadOperationState::FAILED);
     ASSERT_EVENTS_CaptureDurationConfigured_SIZE(0);
-    ASSERT_TLM_CaptureDurationSeconds_SIZE(1);
-    ASSERT_TLM_CaptureDurationSeconds(0, 0U);
+    ASSERT_TLM_CaptureDurationMinutes_SIZE(1);
+    ASSERT_TLM_CaptureDurationMinutes(0, 0U);
 
-    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 2, 45U);
+    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 2, 2U);
     this->component.doDispatch();
     ASSERT_from_durationConfigOut_SIZE(2);
-    ASSERT_from_durationConfigOut(1, 3U, 45U);
+    ASSERT_from_durationConfigOut(1, 3U, 2U);
 
     this->invoke_to_durationConfigResultIn(0, 2U, PayloadOperationState::COMPLETED);
     this->component.doDispatch();
@@ -376,7 +378,7 @@ void ScienceAppTester::testConfiguredDurationFailureAllowsRetry() {
     ASSERT_CMD_RESPONSE(1, ScienceAppComponentBase::OPCODE_CONFIGURE_CAPTURE_DURATION, 2,
                         Fw::CmdResponse::OK);
     ASSERT_EVENTS_CaptureDurationConfigured_SIZE(1);
-    ASSERT_EVENTS_CaptureDurationConfigured(0, 45U);
+    ASSERT_EVENTS_CaptureDurationConfigured(0, 2U);
 }
 
 void ScienceAppTester::testConfiguredDurationTimesOut() {
@@ -384,14 +386,14 @@ void ScienceAppTester::testConfiguredDurationTimesOut() {
     this->component.preamble();
     this->clearHistory();
 
-    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 0, 60U);
+    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 0, 1U);
     this->component.doDispatch();
     this->invoke_to_durationConfigResultIn(0, 1U, PayloadOperationState::COMPLETED);
     this->component.doDispatch();
-    ASSERT_TLM_CaptureDurationSeconds(0, 60U);
+    ASSERT_TLM_CaptureDurationMinutes(0, 1U);
     this->clearHistory();
 
-    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 1, 45U);
+    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 1, 2U);
     this->component.doDispatch();
     for (U32 tick = 0; tick < 29U; ++tick) {
         this->invoke_to_run(0, 0);
@@ -411,8 +413,8 @@ void ScienceAppTester::testConfiguredDurationTimesOut() {
     this->component.doDispatch();
     ASSERT_CMD_RESPONSE_SIZE(1);
     ASSERT_EVENTS_CaptureDurationConfigured_SIZE(0);
-    ASSERT_TLM_CaptureDurationSeconds_SIZE(1);
-    ASSERT_TLM_CaptureDurationSeconds(0, 0U);
+    ASSERT_TLM_CaptureDurationMinutes_SIZE(1);
+    ASSERT_TLM_CaptureDurationMinutes(0, 0U);
 
     this->sendCmd_START_COLLECTION(0, 2);
     this->component.doDispatch();
@@ -437,14 +439,14 @@ void ScienceAppTester::testScheduledCaptureReturnsToBaseIfDurationMissingOrPendi
     ASSERT_from_configuredCaptureOut_SIZE(0);
     ASSERT_from_payloadRequestOut_SIZE(0);
 
-    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 0, 60U);
+    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 0, 1U);
     this->component.doDispatch();
     this->invoke_to_durationConfigResultIn(0, 1U, PayloadOperationState::COMPLETED);
     this->component.doDispatch();
-    ASSERT_TLM_CaptureDurationSeconds(0, 60U);
+    ASSERT_TLM_CaptureDurationMinutes(0, 1U);
     this->clearHistory();
 
-    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 1, 45U);
+    this->sendCmd_CONFIGURE_CAPTURE_DURATION(0, 1, 2U);
     this->component.doDispatch();
     this->invoke_to_requestIn(0, 1U);
     this->component.doDispatch();
@@ -458,12 +460,12 @@ void ScienceAppTester::testScheduledCaptureReturnsToBaseIfDurationMissingOrPendi
 }
 
 void ScienceAppTester::testParamSeedsDurationAtInit() {
-    this->paramSet_CAPTURE_DURATION_SECONDS(45, Fw::ParamValid::VALID);
+    this->paramSet_CAPTURE_DURATION_MINUTES(2, Fw::ParamValid::VALID);
     this->component.loadParameters();
     this->component.preamble();
 
     ASSERT_EVENTS_ScienceCommandRejected_SIZE(0);
-    ASSERT_TLM_CaptureDurationSeconds(0, 45);
+    ASSERT_TLM_CaptureDurationMinutes(0, 2);
 
     this->clearHistory();
     this->sendCmd_START_COLLECTION(0, 0);
@@ -473,18 +475,18 @@ void ScienceAppTester::testParamSeedsDurationAtInit() {
     ASSERT_CMD_RESPONSE(0, ScienceAppComponentBase::OPCODE_START_COLLECTION, 0,
                         Fw::CmdResponse::OK);
     ASSERT_from_payloadRequestOut_SIZE(1);
-    ASSERT_from_payloadRequestOut(0, 1, 45);
+    ASSERT_from_payloadRequestOut(0, 1, 2);
     ASSERT_from_missionModeOut_SIZE(0);
 }
 
-void ScienceAppTester::testInvalidParamFallsBackToThirty() {
-    this->paramSet_CAPTURE_DURATION_SECONDS(121, Fw::ParamValid::VALID);
+void ScienceAppTester::testInvalidParamFallsBackToOneMinute() {
+    this->paramSet_CAPTURE_DURATION_MINUTES(3, Fw::ParamValid::VALID);
     this->component.loadParameters();
     this->component.preamble();
 
     ASSERT_EVENTS_ScienceCommandRejected_SIZE(1);
-    ASSERT_EVENTS_ScienceCommandRejected(0, 2, 121);
-    ASSERT_TLM_CaptureDurationSeconds(0, 30);
+    ASSERT_EVENTS_ScienceCommandRejected(0, 2, 3);
+    ASSERT_TLM_CaptureDurationMinutes(0, 1);
 
     this->clearHistory();
     this->sendCmd_START_COLLECTION(0, 0);
@@ -494,7 +496,7 @@ void ScienceAppTester::testInvalidParamFallsBackToThirty() {
     ASSERT_CMD_RESPONSE(0, ScienceAppComponentBase::OPCODE_START_COLLECTION, 0,
                         Fw::CmdResponse::OK);
     ASSERT_from_payloadRequestOut_SIZE(1);
-    ASSERT_from_payloadRequestOut(0, 1, 30);
+    ASSERT_from_payloadRequestOut(0, 1, 1);
     ASSERT_from_missionModeOut_SIZE(0);
 }
 
@@ -503,15 +505,15 @@ void ScienceAppTester::testCollectAndDownlinkWaitsForValidatedCompletion() {
     ASSERT_TRUE(writeScienceProduct(product, sizeof(product)));
     this->clearHistory();
 
-    this->sendCmd_COLLECT_AND_DOWNLINK(0, 0, 4U);
+    this->sendCmd_COLLECT_AND_DOWNLINK(0, 0, 2U);
     this->component.doDispatch();
     ASSERT_CMD_RESPONSE_SIZE(1);
     ASSERT_CMD_RESPONSE(0, ScienceAppComponentBase::OPCODE_COLLECT_AND_DOWNLINK, 0, Fw::CmdResponse::OK);
     ASSERT_from_payloadRequestOut_SIZE(1);
-    ASSERT_from_payloadRequestOut(0, 1, 4U);
+    ASSERT_from_payloadRequestOut(0, 1, 2U);
     ASSERT_from_deliveryRequestOut_SIZE(0);
 
-    Fw::String sourcePath(AUTO_DOWNLINK_TEST_PATH);
+    Fw::String sourcePath(TEST_PRODUCT_PATH.c_str());
     // The direct manager request owns this ID first. Its accepted operation
     // must still publish the legacy C product, without consuming the pending
     // ScienceApp request's automatic-delivery intent.
@@ -520,7 +522,7 @@ void ScienceAppTester::testCollectAndDownlinkWaitsForValidatedCompletion() {
                                       Components::ScienceProductSource::UNKNOWN, sourcePath, 0U, false);
     this->component.doDispatch();
     ASSERT_from_missionModeOut_SIZE(1);
-    ASSERT_from_missionModeOut(0, Components::MissionMode::COLLECTING, 30U);
+    ASSERT_from_missionModeOut(0, Components::MissionMode::COLLECTING, 1U);
     ASSERT_from_deliveryRequestOut_SIZE(0);
 
     // ScienceApp's same-ID request is rejected BUSY. It must clear only its
@@ -540,29 +542,44 @@ void ScienceAppTester::testCollectAndDownlinkWaitsForValidatedCompletion() {
 
     // A later ScienceApp-owned operation still binds and completes its own
     // automatic-delivery intent.
-    this->sendCmd_COLLECT_AND_DOWNLINK(0, 1, 5U);
+    this->sendCmd_COLLECT_AND_DOWNLINK(0, 1, 2U);
     this->component.doDispatch();
     ASSERT_from_payloadRequestOut_SIZE(2);
-    ASSERT_from_payloadRequestOut(1, 2, 5U);
+    ASSERT_from_payloadRequestOut(1, 2, 2U);
     this->invoke_to_operationNoticeIn(0, 2, 42, Components::PayloadOperationKind::CAPTURE,
                                       Components::PayloadOperationState::ACCEPTED, 0U, 0U,
                                       Components::ScienceProductSource::UNKNOWN, sourcePath, 0U, true);
     this->component.doDispatch();
+    this->invoke_to_productCommitIn(0, 23U, sizeof(product), true);
+    this->component.doDispatch();
+    ASSERT_from_missionModeOut_SIZE(2);
+    ASSERT_from_deliveryRequestOut_SIZE(0);
+
     this->invoke_to_operationNoticeIn(0, 2, 42, Components::PayloadOperationKind::CAPTURE,
                                       Components::PayloadOperationState::COMPLETED, 24U, sizeof(product),
                                       Components::ScienceProductSource::NEUTRON_SIM, sourcePath,
                                       scienceProductCrc(product, sizeof(product)), true);
     this->component.doDispatch();
     ASSERT_from_scienceProductOut_SIZE(2);
+    ASSERT_from_deliveryRequestOut_SIZE(0);
+    ASSERT_from_missionModeOut_SIZE(2);
+
+    this->invoke_to_productCommitIn(0, 24U, sizeof(product), true);
+    this->component.doDispatch();
+    ASSERT_from_missionModeOut_SIZE(3);
+    ASSERT_from_missionModeOut(2, Components::MissionMode::SCIENCE_READY, sizeof(product));
     ASSERT_from_deliveryRequestOut_SIZE(1);
     ASSERT_from_deliveryRequestOut(0, 24U);
+    this->invoke_to_productCommitIn(0, 24U, sizeof(product), true);
+    this->component.doDispatch();
+    ASSERT_from_deliveryRequestOut_SIZE(1);
     ASSERT_TLM_CollectionCount_SIZE(3);
     ASSERT_TLM_CollectionCount(2, 2U);
 }
 
 void ScienceAppTester::testCollectAndDownlinkClearsIntentOnFailure() {
     this->clearHistory();
-    this->sendCmd_COLLECT_AND_DOWNLINK(0, 0, 4U);
+    this->sendCmd_COLLECT_AND_DOWNLINK(0, 0, 2U);
     this->component.doDispatch();
     ASSERT_from_payloadRequestOut_SIZE(1);
 
@@ -580,7 +597,7 @@ void ScienceAppTester::testCollectAndDownlinkClearsIntentOnFailure() {
     // A late terminal callback for the failed operation must not revive its intent.
     const U8 product[] = {0x4E, 0x32};
     ASSERT_TRUE(writeScienceProduct(product, sizeof(product)));
-    Fw::String validPath(AUTO_DOWNLINK_TEST_PATH);
+    Fw::String validPath(TEST_PRODUCT_PATH.c_str());
     this->invoke_to_operationNoticeIn(0, 1, 52, Components::PayloadOperationKind::CAPTURE,
                                       Components::PayloadOperationState::COMPLETED, 23U, sizeof(product),
                                       Components::ScienceProductSource::NEUTRON_SIM, validPath,
@@ -590,18 +607,67 @@ void ScienceAppTester::testCollectAndDownlinkClearsIntentOnFailure() {
     ASSERT_from_scienceProductOut_SIZE(0);
 }
 
+void ScienceAppTester::testScienceReadyWaitsForMatchingCommit() {
+    const U8 product[] = {0x00, 0xA5, 0xFF};
+    ASSERT_TRUE(writeScienceProduct(product, sizeof(product)));
+    const Fw::String sourcePath(TEST_PRODUCT_PATH.c_str());
+    const U16 crc = scienceProductCrc(product, sizeof(product));
+
+    // Storage cannot acknowledge this capture until ScienceApp has sent the
+    // descriptor. A result outside that window must have no effect.
+    this->invoke_to_operationNoticeIn(0, 1U, 1U, PayloadOperationKind::CAPTURE,
+                                      PayloadOperationState::ACCEPTED, 0U, 0U,
+                                      ScienceProductSource::UNKNOWN, sourcePath, 0U, true);
+    this->invoke_to_productCommitIn(0, 17U, sizeof(product), true);
+    this->component.doDispatch();
+    this->component.doDispatch();
+    ASSERT_from_missionModeOut_SIZE(1);
+    ASSERT_from_missionModeOut(0, MissionMode::COLLECTING, 1U);
+
+    this->invoke_to_operationNoticeIn(0, 1U, 1U, PayloadOperationKind::CAPTURE,
+                                      PayloadOperationState::COMPLETED, 17U, sizeof(product),
+                                      ScienceProductSource::TEST, sourcePath, crc, true);
+    this->invoke_to_productCommitIn(0, 16U, sizeof(product), true);
+    this->component.doDispatch();
+    this->component.doDispatch();
+    ASSERT_from_scienceProductOut_SIZE(1);
+    ASSERT_from_missionModeOut_SIZE(1);
+
+    this->invoke_to_productCommitIn(0, 17U, sizeof(product), true);
+    this->invoke_to_productCommitIn(0, 17U, sizeof(product), true);
+    this->component.doDispatch();
+    this->component.doDispatch();
+    ASSERT_from_missionModeOut_SIZE(2);
+    ASSERT_from_missionModeOut(1, MissionMode::SCIENCE_READY, sizeof(product));
+
+    this->invoke_to_operationNoticeIn(0, 2U, 2U, PayloadOperationKind::CAPTURE,
+                                      PayloadOperationState::ACCEPTED, 0U, 0U,
+                                      ScienceProductSource::UNKNOWN, sourcePath, 0U, true);
+    this->invoke_to_operationNoticeIn(0, 2U, 2U, PayloadOperationKind::CAPTURE,
+                                      PayloadOperationState::COMPLETED, 18U, sizeof(product),
+                                      ScienceProductSource::TEST, sourcePath, crc, true);
+    this->invoke_to_productCommitIn(0, 18U, 0U, false);
+    this->component.doDispatch();
+    this->component.doDispatch();
+    this->component.doDispatch();
+    ASSERT_from_missionModeOut_SIZE(4);
+    ASSERT_from_missionModeOut(2, MissionMode::COLLECTING, 1U);
+    ASSERT_from_missionModeOut(3, MissionMode::BASE, 0U);
+    ASSERT_from_deliveryRequestOut_SIZE(0);
+}
+
 void ScienceAppTester::testCdrRejectsAutomaticDownlinkBeforeCaptureOrTokenAllocation() {
 #ifdef NEUTRON2_CDR_TCP
     constexpr U32 REJECT_CDR_AUTO_DOWNLINK_UNSUPPORTED = 3U;
     this->clearHistory();
 
-    this->sendCmd_COLLECT_AND_DOWNLINK(0, 0, 5U);
+    this->sendCmd_COLLECT_AND_DOWNLINK(0, 0, 2U);
     this->component.doDispatch();
-    this->sendCmd_VERIFIED_COLLECT_AND_DOWNLINK(0, 1, 42U, 5U);
+    this->sendCmd_VERIFIED_COLLECT_AND_DOWNLINK(0, 1, 42U, 2U);
     this->component.doDispatch();
     // Reusing the token remains an unsupported-workflow rejection, proving the
     // earlier request did not consume a token-table entry.
-    this->sendCmd_VERIFIED_COLLECT_AND_DOWNLINK(0, 2, 42U, 5U);
+    this->sendCmd_VERIFIED_COLLECT_AND_DOWNLINK(0, 2, 42U, 2U);
     this->component.doDispatch();
 
     ASSERT_CMD_RESPONSE_SIZE(3);

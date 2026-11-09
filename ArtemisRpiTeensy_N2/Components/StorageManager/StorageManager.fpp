@@ -14,6 +14,9 @@ module Components {
         @ Science product input from ScienceApp
         async input port requestIn: Components.ScienceProductDescriptor
 
+        @ Terminal commit result for each incoming product descriptor.
+        output port productCommitOut: Components.ScienceProductCommitResult
+
         @ Explicit automatic-delivery request for a product already stored here.
         async input port deliveryRequestIn: Components.ScienceProductDeliveryRequest
 

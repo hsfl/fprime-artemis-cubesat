@@ -58,6 +58,7 @@ class StorageManager final : public StorageManagerComponentBase {
     bool readMetadata(U32 filenameProductId, ProductRecord& record) const;
     bool isValidStoredProduct(const ProductRecord& record) const;
     void rejectProduct(U32 productId, U32 reason, const Fw::StringBase& path) const;
+    void rejectIncomingProduct(U32 productId, U32 reason, const Fw::StringBase& path);
     void publishSelected(const ProductRecord& record, bool selectedByCommand);
     void reportLatest() const;
     void reportHistory() const;
@@ -71,7 +72,6 @@ class StorageManager final : public StorageManagerComponentBase {
     U32 m_storedProducts;
     U32 m_lastProductSize;
     U32 m_selectedProductId;
-    U32 m_lastInputProductId;
     U32 m_nextProductId;
     U32 m_removedDatasetFiles;
     U32 m_removeDatasetFailures;

@@ -190,6 +190,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     capture_parser = subparsers.add_parser("capture", help="Generate one bounded synthetic pulse exposure")
+    # The F Prime driver converts its minute command to an exposure in seconds.
+    # Keep seconds at this boundary to preserve the v1 product schema.
     capture_parser.add_argument("--duration-seconds", required=True, type=parse_duration)
     # These options preserve the simulator launch interface. Pulse generation
     # is intentionally independent of the old CSV dataset and cursor.

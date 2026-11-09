@@ -15,7 +15,7 @@ class ScienceAppTester final : public ScienceAppGTestBase {
     ScienceAppTester();
     ~ScienceAppTester();
 
-    void testDefaultDurationIsThirty();
+    void testDefaultDurationIsOneMinute();
     void testScheduledCountdownFiresExactlyOnce();
     void testRejectsZeroDelayAndBadDurations();
     void testCancelClearsCountdown();
@@ -28,9 +28,10 @@ class ScienceAppTester final : public ScienceAppGTestBase {
     void testConfiguredDurationTimesOut();
     void testScheduledCaptureReturnsToBaseIfDurationMissingOrPending();
     void testParamSeedsDurationAtInit();
-    void testInvalidParamFallsBackToThirty();
+    void testInvalidParamFallsBackToOneMinute();
     void testCollectAndDownlinkWaitsForValidatedCompletion();
     void testCollectAndDownlinkClearsIntentOnFailure();
+    void testScienceReadyWaitsForMatchingCommit();
     void testCdrRejectsAutomaticDownlinkBeforeCaptureOrTokenAllocation();
 
   private:

@@ -175,6 +175,7 @@ module ArtemisRpiTeensyDeployment {
       scienceApp.payloadRequestOut -> payloadManager.requestIn
       payloadManager.operationNoticeOut -> scienceApp.operationNoticeIn
       scienceApp.scienceProductOut -> storageManager.requestIn
+      storageManager.productCommitOut -> scienceApp.productCommitIn
       scienceApp.deliveryRequestOut -> storageManager.deliveryRequestIn
       storageManager.downlinkReadyOut -> commsApp.scienceReadyIn
       storageManager.deliveryDescriptorOut -> commsApp.deliveryDescriptorIn
@@ -193,6 +194,7 @@ module ArtemisRpiTeensyDeployment {
       uartChannelMux.localRecvOut -> epsDriverArtemis.teensyResponseIn
 
       payloadManager.driverRequestOut -> payloadDriverNeutronSim.requestIn
+      payloadManager.simulationCaptureOptionsOut -> payloadDriverNeutronSim.simulationCaptureOptionsIn
       payloadDriverNeutronSim.operationResponseOut -> payloadManager.driverOperationResultIn
       payloadDriverNeutronSim.availabilityOut -> payloadManager.driverAvailabilityIn
       payloadManager.driverPassthroughOut -> payloadDriverNeutronSim.passthroughIn

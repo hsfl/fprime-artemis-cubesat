@@ -9,6 +9,7 @@ module ArtemisRpiTeensyDeployment {
       rateGroup2.RateGroupMemberOut[3] -> payloadDriverNeutronSim.run
       scienceApp.payloadRequestOut -> payloadManager.requestIn
       payloadManager.driverRequestOut -> payloadDriverNeutronSim.requestIn
+      payloadManager.simulationCaptureOptionsOut -> payloadDriverNeutronSim.simulationCaptureOptionsIn
       payloadDriverNeutronSim.operationResponseOut -> payloadManager.driverOperationResultIn
       payloadDriverNeutronSim.availabilityOut -> payloadManager.driverAvailabilityIn
       payloadManager.driverPassthroughOut -> payloadDriverNeutronSim.passthroughIn
