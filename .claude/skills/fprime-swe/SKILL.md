@@ -1,41 +1,32 @@
 ---
 name: fprime-swe
-description: Use when developing F Prime (F') flight software - creating components, ports, topologies, building, testing, cross-compiling for embedded targets like Raspberry Pi, or using fprime-util CLI commands
+description: Use when developing or documenting F Prime (F') flight software in this checkout, including components, ports, topologies, builds, tests, and embedded targets.
 ---
 
 # F Prime (F') Flight Software Development
 
-## This Repo
+## This Checkout
 
-For all repo-specific workflow — venv path, `generate -f` policy, `Components/` cwd rule, topology wiring, demo-first decision rules — read `AGENTS.md` first. The generic guidance below applies everywhere; AGENTS.md overrides it for this project.
+Consult this checkout's `AGENTS.md` for the task-relevant architecture, workflow, and validation instructions. Follow the owning project's toolchain and runbooks for the selected deployment.
 
-Key repo-specific facts:
-- Venv: `. ArtemisRpiTeensy_N2/fprime-venv/bin/activate`
-- Always use `fprime-util generate -f` (not bare `generate`) to avoid stale cache failures
-- New components must be created from inside `ArtemisRpiTeensy_N2/Components/`, not the project root
-- Active F' project root: `ArtemisRpiTeensy_N2`
+For the Pi-hosted `ArtemisRpiTeensy_N2` deployment, the project root is `ArtemisRpiTeensy_N2/` and components are under its `Components/` directory. Its documented virtual environment is `ArtemisRpiTeensy_N2/fprime-venv/`; check that it is valid for this checkout before reuse. Consult the checkout's instructions for the right build profile and generator options.
 
 ## Overview
 
 F' is NASA JPL's open-source flight software framework for embedded systems (CubeSats, Mars Ingenuity). Component-based architecture with code generation tools.
 
-**Environment/bootstrapping rules:**
-- Always check if the project is already bootstrapped (look for `lib/fprime/`, `settings.ini`, and `fprime-venv/`).
-- If not bootstrapped, run **interactive** `fprime-bootstrap project` once (allow stdin prompts).
-- Always create/activate a `.venv` (or `fprime-venv/`) before installing or running tools.
-- Always use `python` and `pip` (not `python3`/`pip3`).
-- Do not downgrade Python.
-- Run `fprime-util generate` before `fprime-util new --component` if a build cache doesn't exist.
-- Create new components from inside the `Components/` folder (not project root).
-
-**Activate venv first:** `. .venv/bin/activate` or `. fprime-venv/bin/activate`
+**Project and environment:**
+- Locate the selected F′ project and deployment roots, then follow their instructions and existing toolchain. Projects can use different directory layouts and environment names.
+- For a read-only question, inspect the available source and documentation without bootstrapping or creating an environment. For build or test work, reuse the project's configured environment and invoke its chosen Python interpreter and tooling.
+- Bootstrap only when creating a new project is in scope. For an existing project, use its documented setup when the authorized work requires it.
+- If generating a component, follow the selected project's F′ version and component layout. Generate the build cache first when the applicable generator requires it.
 
 ## Quick Reference - CLI Commands
 
 | Command | Purpose |
 |---------|---------|
 | `fprime-bootstrap project` | Create new F' project (once, interactive input required) |
-| `fprime-util new --component` | Scaffold component (.fpp, C++, CMake) — run from `Components/` |
+| `fprime-util new --component` | Scaffold a component in the selected project's component directory |
 | `fprime-util new --port` | Create custom port type |
 | `fprime-util new --deployment` | Create deployment |
 | `fprime-util impl` | Generate C++ implementation stubs |
@@ -80,7 +71,7 @@ my-satellite/
 │   ├── Ports/
 │   └── Deployment/
 ├── lib/fprime/            # Framework submodule
-├── fprime-venv/           # Python venv (activate this!)
+├── fprime-venv/           # Example Python environment
 ├── settings.ini           # Build config (toolchain, paths)
 └── CMakeLists.txt
 ```
@@ -88,6 +79,7 @@ my-satellite/
 ## Development Workflow
 
 ### 1. Create Component
+For a project using this layout, create the component from its component directory:
 ```bash
 cd Components
 fprime-util new --component
@@ -116,46 +108,30 @@ paramGet_ParamName();                   // Get parameter
 ```
 
 ### 4. Build & Test
-```bash
-fprime-util generate && fprime-util build
-fprime-util generate --ut && fprime-util build --ut && fprime-util check --ut
-```
 
-**If `fprime-util generate` fails because the build cache already exists:**
-```bash
-fprime-util generate -f
-```
+Use the selected deployment's documented build profile and test commands. For the Pi-hosted deployment in this checkout, consult `AGENTS.md` and the relevant build or test runbook before regenerating a cache or building. Read-only work does not require these commands.
 
 ### 5. Run with GDS
 ```bash
 fprime-gds  # Opens web UI at http://127.0.0.1:5000
 ```
 
-**This repo / macOS note:** port 5000 is often taken by Control Center/AirPlay Receiver on macOS. Use the repo launcher `./tools/run_gds_uart.sh` (defaults to GUI port 5050) or pass `--gui-port 5050`.
+For a revision-matched GDS UART task, consult the selected checkout runbook and launcher. Port 5000 can conflict with macOS services; the documented UART launcher uses GUI port 5050.
 - **Commanding tab**: Send commands
 - **Events tab**: View logs
 - **Channels tab**: Monitor telemetry
 
 ## Cross-Compilation (Raspberry Pi)
 
-**THIS REPO'S TARGET IS A PI ZERO W (ARMv6).** Do NOT use `aarch64-linux` or standard `arm-hf-linux` for it — both target ARMv7+ and produce binaries that SIGILL on the Pi Zero W. Use the `fprime-cross-compilation` skill, which documents the ARMv6 toolchain and the repo's `tools/cross/cross_compile.sh` workflow.
-
-Generic F' cross-compilation (for ARMv7+/ARMv8 targets only):
+Choose the target toolchain for the device's CPU architecture, ABI, and operating system. `aarch64-linux` below is an example for a compatible 64-bit target. A 32-bit `arm-hf-linux` toolchain is not automatically compatible with every 32-bit ARM CPU. Pi Zero W requires an ARMv6-compatible hard-float toolchain; follow the selected project's documented toolchain and verify the binary's attributes. Consult the `fprime-cross-compilation` skill and project runbook for the applicable build and ground connection.
 
 ```bash
 export ARM_TOOLS_PATH=/opt/toolchains  # Point to ARM GCC
-fprime-util generate aarch64-linux     # 64-bit Pi 3/4/5
+fprime-util generate aarch64-linux     # 64-bit Pi
 fprime-util build aarch64-linux
 ```
 
-Platforms: `aarch64-linux` (64-bit), `arm-hf-linux` (32-bit ARMv7)
-
-**macOS users**: Use Docker container for ARM cross-compilation.
-
-Transfer binary to Pi, run deployment, connect GDS:
-```bash
-fprime-gds --ip <pi_address>
-```
+For the Pi Zero W deployment in this checkout, use the project-local `fprime-cross-compilation` skill and its linked runbook for the ARMv6 toolchain and current workflow. Other deployments may target a different processor and toolchain.
 
 ## Framework Components to Reuse
 
@@ -188,20 +164,20 @@ Don't reinvent - use built-in `Svc`/`Drv` components:
 
 | Mistake | Fix |
 |---------|-----|
-| Forgot to activate venv | `. fprime-venv/bin/activate` |
-| Running `fprime-util new --component` from project root | Run it inside `Components/` |
+| Project tooling is unavailable | Use the selected project's documented environment and deployment root |
+| Component generated in the wrong location | Follow the selected project's component layout |
 | Generator prompts fail due to EOF (piped input) | Answer all prompts including the final "add to CMake" and "generate impl" questions, or run interactively in a tty | 
 | Build cache error before generator | Run `fprime-util generate` first |
-| Build cache already exists and `generate` fails | Use `fprime-util generate -f` |
-| Partial component folder left after a failed run | Remove the directory and rerun the generator |
+| Build cache already exists and `generate` fails | Follow the selected project's instructions for inspecting or regenerating the cache |
+| Partial component folder left after a failed run | Inspect it, preserve pre-existing work, and follow the project's recovery guidance |
 | CMake doesn't see new files | Run `fprime-util generate` again |
 | Port type mismatch | Only same-type ports can connect |
 | Missing port connection | Check topology for unconnected required ports |
-| Cross-compile fails on macOS | Use Docker container |
+| Cross-compile fails on macOS | Check the selected project's documented container or cross-toolchain setup |
 
 ## References
 
 - [F' Documentation](https://fprime.jpl.nasa.gov/)
 - [Hello World Tutorial](https://fprime.jpl.nasa.gov/latest/tutorials-hello-world/)
 - [Cross-Compilation Setup](https://fprime.jpl.nasa.gov/latest/docs/tutorials/cross-compilation/)
-- Use the "fprime-docs-search" skill if you need to figure out how to live search web fetch query the F' Documentation.
+- For framework lookup, use the project-local `fprime-docs-search` skill when available or search the official documentation for the project's F′ revision.
