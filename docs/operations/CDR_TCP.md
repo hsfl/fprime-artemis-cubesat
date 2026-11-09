@@ -43,6 +43,23 @@ The default simulator dictionary exposes collection-only `scienceApp.SCIENCE_CAP
 
 Existing `COLLECT_AND_DOWNLINK`/`VERIFIED_COLLECT_AND_DOWNLINK` workflows belong to the separate custom channel-1 baseline. CDR rejects those commands before capture or token allocation.
 
+## Reuse in another CDR deployment
+
+Add the public F′ project root to the consuming project's F′ library
+locations. Its `library.cmake` registers the shared components. Register
+the selected payload manager and driver in the consuming project.
+
+- Include `Top/instances.shared.fppi` inside the
+  `ArtemisRpiTeensyDeployment` module and register `Top/instances.cdr_tcp.fpp`
+  for the TCP instance and rate-group indices.
+- Include `Top/topology.cdr_tcp.shared.fppi` inside the topology and add the
+  payload instance membership and bindings. The shared wiring expects
+  `payloadManager.run`, `payloadManager.operationNoticeOut`, and
+  `payloadManager.sohStatusOut`.
+- Register `CdrTcpConfig` and retain the CDR topology dependencies on it,
+  `Fw_Logger`, and `Drv_TcpServer`. The public
+  `Top/topology.cdr_tcp.fpp` is the simulator entry point.
+
 ## Local acceptance
 
 ```sh
