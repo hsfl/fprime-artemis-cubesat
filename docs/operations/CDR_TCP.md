@@ -39,7 +39,9 @@ The source path is passed unchanged to F′; a relative source is relative to th
 
 The helper independently downloads the reconstructed `fprimeFilesIn` object through Yamcs, saves it and writes PASS/FAIL evidence. A reported receive SHA is source-verified only when an independent expected SHA/oracle was supplied. `FileSent` or command OK alone is not delivery proof. Missing files, missing/partial receipt or mismatched integrity fail; stock transfer has no selective retry/resume guarantee. After interruption, reconnect and issue a fresh transfer with a new destination.
 
-Use collection-only `scienceApp.SCIENCE_CAPTURE(durationSeconds)` followed by the stock helper for a stored product. Existing `COLLECT_AND_DOWNLINK`/`VERIFIED_COLLECT_AND_DOWNLINK` workflows belong to the separate custom channel-1 baseline; CDR explicitly rejects those commands before capture or token allocation.
+The default simulator dictionary exposes collection-only `scienceApp.SCIENCE_CAPTURE(durationSeconds)`. A build with `NEUTRON2_CONFIGURED_CAPTURE=ON` exposes `scienceApp.CONFIGURE_CAPTURE_DURATION(durationSeconds)` followed by `scienceApp.SCIENCE_CAPTURE()`. When the duration configuration ports are wired to a backend, wait for the configuration command to complete before issuing capture. Use the dictionary from the selected build and wait for the matching `ScienceProductCommitted` event before running the stock helper.
+
+Existing `COLLECT_AND_DOWNLINK`/`VERIFIED_COLLECT_AND_DOWNLINK` workflows belong to the separate custom channel-1 baseline. CDR rejects those commands before capture or token allocation.
 
 ## Local acceptance
 

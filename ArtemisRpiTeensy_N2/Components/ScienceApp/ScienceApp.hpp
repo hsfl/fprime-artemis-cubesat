@@ -16,6 +16,9 @@ class ScienceApp final : public ScienceAppComponentBase {
     void run_handler(FwIndexType portNum, U32 context) override;
     void requestIn_handler(FwIndexType portNum, U32 delaySeconds) override;
     void cancelRequestIn_handler(FwIndexType portNum, U32 key) override;
+    void durationConfigResultIn_handler(
+        FwIndexType portNum, U32 requestId, const Components::PayloadOperationState& state
+    ) override;
     void operationNoticeIn_handler(
         FwIndexType portNum,
         U32 requestId,
@@ -31,15 +34,30 @@ class ScienceApp final : public ScienceAppComponentBase {
     ) override;
     void START_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void CONFIGURE_CAPTURE_DURATION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
+#ifdef NEUTRON2_CONFIGURED_CAPTURE
+    void SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
+#else
     void SCIENCE_CAPTURE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
+#endif
     void COLLECT_AND_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
     void VERIFIED_COLLECT_AND_DOWNLINK_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
                                                   U32 verificationToken, U32 durationSeconds) override;
     void parameterUpdated(FwPrmIdType id) override;
     void seedCaptureDurationFromParam();
     bool isValidCaptureDuration(U32 durationSeconds) const;
+    void applyCaptureDuration(U32 durationSeconds);
+    void finishDurationConfig(const Components::PayloadOperationState& state);
     void cancelPendingCollection();
+    U32 allocateRequestId();
+    bool startConfiguredCapture();
     bool startCapture(U32 durationSeconds, bool requestDownlink = false, U32* requestIdOut = nullptr);
+    struct PendingDurationConfig {
+        U32 requestId;
+        U32 durationSeconds;
+        FwOpcodeType opCode;
+        U32 cmdSeq;
+        U32 issuedTick;
+    };
     struct VerifiedCaptureRecord {
         U32 verificationToken;
         U32 requestId;
@@ -70,6 +88,7 @@ class ScienceApp final : public ScienceAppComponentBase {
     U32 m_runTicks;
     U32 m_lastTelemetryTick;
     U32 m_nextRequestId;
+    PendingDurationConfig m_pendingDurationConfig;
     U32 m_verifiedCaptureCount;
     VerifiedCaptureRecord m_verifiedCaptures[VERIFIED_CAPTURE_CAPACITY];
     U32 m_activeCaptureRequestId;

@@ -112,6 +112,10 @@ int main(int argc, char* argv[]) {
     // Setup program shutdown via Ctrl-C
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
+#if defined(NEUTRON2_CDR_TCP) && defined(SIGPIPE)
+    // Let the TCP driver handle a closed peer through its send error path.
+    signal(SIGPIPE, SIG_IGN);
+#endif
     (void)printf("Hit Ctrl-C to quit\n");
 
     // Setup, cycle, and teardown topology
