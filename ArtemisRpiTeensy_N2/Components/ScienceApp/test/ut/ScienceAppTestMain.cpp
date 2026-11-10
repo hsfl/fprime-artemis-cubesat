@@ -25,9 +25,31 @@ TEST(Nominal, QueuedCancelAtFinalTickBoundaryPreventsCollection) {
     tester.testQueuedCancelAtFinalTickBoundaryPreventsCollection();
 }
 
+#ifndef NEUTRON2_CONFIGURED_CAPTURE
 TEST(Nominal, ScienceCaptureDoesNotPersistDuration) {
     Components::ScienceAppTester tester;
     tester.testScienceCaptureDoesNotPersistDuration();
+}
+#endif
+
+TEST(ConfiguredCapture, WaitsForMatchingDurationResult) {
+    Components::ScienceAppTester tester;
+    tester.testConfiguredCaptureWaitsForMatchingDurationResult();
+}
+
+TEST(ConfiguredCapture, DurationFailureAllowsRetry) {
+    Components::ScienceAppTester tester;
+    tester.testConfiguredDurationFailureAllowsRetry();
+}
+
+TEST(ConfiguredCapture, DurationTimesOut) {
+    Components::ScienceAppTester tester;
+    tester.testConfiguredDurationTimesOut();
+}
+
+TEST(ConfiguredCapture, ScheduledCaptureReturnsToBaseIfDurationMissingOrPending) {
+    Components::ScienceAppTester tester;
+    tester.testScheduledCaptureReturnsToBaseIfDurationMissingOrPending();
 }
 
 TEST(Nominal, ParamSeedsDurationAtInit) {

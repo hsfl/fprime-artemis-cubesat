@@ -20,7 +20,13 @@ class ScienceAppTester final : public ScienceAppGTestBase {
     void testRejectsZeroDelayAndBadDurations();
     void testCancelClearsCountdown();
     void testQueuedCancelAtFinalTickBoundaryPreventsCollection();
+#ifndef NEUTRON2_CONFIGURED_CAPTURE
     void testScienceCaptureDoesNotPersistDuration();
+#endif
+    void testConfiguredCaptureWaitsForMatchingDurationResult();
+    void testConfiguredDurationFailureAllowsRetry();
+    void testConfiguredDurationTimesOut();
+    void testScheduledCaptureReturnsToBaseIfDurationMissingOrPending();
     void testParamSeedsDurationAtInit();
     void testInvalidParamFallsBackToThirty();
     void testCollectAndDownlinkWaitsForValidatedCompletion();
@@ -34,6 +40,7 @@ class ScienceAppTester final : public ScienceAppGTestBase {
 
   private:
     void connectPorts();
+    void connectConfiguredCapturePorts();
     void initComponents();
     void captureToStorage(U32 requestId, U32 productId, U32 generation);
 

@@ -6,6 +6,7 @@ Start with the guide for your task. Final local native CDR profile and legacy Ya
 | --- | --- |
 | Mission ops: first-time local setup | [Local setup](operations/LOCAL_SETUP.md) |
 | Mission ops: run a prepared laptop | [Daily quickstart](operations/QUICKSTART.md) |
+| Mission ops: rehearse on the deployed Yamcs station | [FlatSat FSR walkthrough](operations/walkthroughs/FSR_MISSION_OPS.md) |
 | Mission ops: a command or display failed | [Operator troubleshooting](operations/TROUBLESHOOTING.md) |
 | PDU named rail commands and readbacks | [PDU Yamcs operator guide](operations/PDU_READABILITY.md) |
 | Develop or test N2 FSW | [Build and test](development/BUILD_AND_TEST.md) |

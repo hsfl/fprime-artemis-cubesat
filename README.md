@@ -17,6 +17,12 @@ Updated October 27, 2026; incorporates the CDR TCP selection and bounded live PD
 
 **Transport selected October 20:** use the stock F′ TCP server on the Zero W and the Pi 5 Yamcs tcp-fast-client, with direct ComCcsds and stock FileDownlink. Do not add a network mux or move the accepted custom channel-1 workflow into CDR. Final native local checks passed both supplied files with independent Yamcs GET byte/hash checks, disconnect recovery, fake channel-2 PDU RPC, legacy Yamcs regressions, guard tests, and startup cancellation. This is not hardware acceptance. See [development intent](docs/planning/DEVELOPMENT_INTENT.md), the [CDR TCP/Yamcs implementation plan](docs/planning/CDR_TCP_YAMCS_IMPLEMENTATION_PLAN.md), [CDR TCP runbook](docs/operations/CDR_TCP.md), and [portable evidence pack](docs/verification/evidence/n2-cdr-tcp-2026-10-20/README.md). ADCS, geo-based commanding and D2S2 HIL remain below the core demo priorities.
 
+### FlatSat FSR end-to-end demo plan
+
+The plan shows the operator sequence from Base and state of health on the first pass through scheduled collection and science downlink on the next pass. The deployed Yamcs walkthrough adapts that sequence for the LAN bench with simulated payload data. [Yamcs operator walkthrough](docs/operations/walkthroughs/FSR_MISSION_OPS.md)
+
+![FlatSat FSR end-to-end demo plan showing Base mode, the first ground pass, scheduled collection, and science downlink on the next pass](docs/archive/legacy-gds-rfm23bp/diagrams/flatsat-fsr-end-to-end-demo-plan.png)
+
 ## Target hardware and data flow
 
 CDR uses the stock F′ TCP server on the Pi Zero W and the Yamcs tcp-fast-client on Pi 5. ComCcsds carries command, telemetry, and stock FileDownlink directly over TCP; there is no network mux. The Pi 5 ground bridge composes stock TCP/UDP adapters, the TM frame aggregator, and PacketBridge with a small 5 ms TM pacing wrapper. The independent physical UART mux channel 2 remains connected to the satellite Teensy for PDU v2 RPC. Final local native loopback and file checks passed; the [October 27 Pi/PDU bench check](docs/verification/evidence/n2-pdu-deployment-2026-10-27/README.md) covers version and named rail readback, not the full payload sequence. The diagram below is the **full FSR target**; its SatNOGS/SDR/RF path is deferred from CDR.
