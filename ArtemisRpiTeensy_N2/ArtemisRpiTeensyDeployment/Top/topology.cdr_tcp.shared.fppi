@@ -118,7 +118,8 @@
       rateGroup1.RateGroupMemberOut[6] -> missionApp.run
       # RF MVP: tick the scheduled science path; keep higher-volume demo status loops off.
       rateGroup1.RateGroupMemberOut[8] -> scienceApp.run
-      # rateGroup1.RateGroupMemberOut[9] -> sohApp.run
+      # SOH timer: silent at start-up; SET_SOH_REPORTING ENABLED sends one report every SOH_PERIOD_SECONDS.
+      rateGroup1.RateGroupMemberOut[9] -> sohApp.run
 
       # Rate group 2
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup2] -> rateGroup2.CycleIn
@@ -183,7 +184,8 @@
       gpsManager.sohStatusOut -> sohApp.statusIn[3]
       storageManager.sohStatusOut -> sohApp.statusIn[4]
       thermalManager.sohStatusOut -> sohApp.statusIn[5]
-      teensyTransportManager.sohStatusOut -> sohApp.statusIn[7]
+      # statusIn[7] stays open: no RFM23 driver feeds teensyTransportManager in this build, so its link
+      # state never leaves ACQUIRING. The active PDU path is watched through epsManager on statusIn[0].
     }
 
     connections ArtemisRpiTeensyDeployment {
