@@ -4,6 +4,8 @@ Run the current **software-only synthetic pulse demo** on one computer. This doe
 
 For first-time setup, use [Local setup](LOCAL_SETUP.md). For errors, see [Troubleshooting](TROUBLESHOOTING.md).
 
+For the two-pass FlatSat rehearsal on the deployed station, follow the [FSR Yamcs walkthrough](walkthroughs/FSR_MISSION_OPS.md).
+
 ## Start a session
 
 From the `neutron_2` repository root, start one stack and leave its terminal open:

@@ -5,10 +5,11 @@ description: "Use when guiding live or rehearsal hardware-in-the-loop testing fo
 
 # F Prime HIL Testing
 
-> Current N2 routing: use `docs/operations/QUICKSTART.md` and `docs/development/YAMCS_LOCAL_TESTING.md` for the local Yamcs baseline. The GDS/RFM23BP procedures below are the older comparison workflow and do not establish PLD/SatNOGS/SDR integration. Windows/WSL local Yamcs remains unvalidated.
-
+For current N2 work, start with `docs/operations/QUICKSTART.md` or `docs/development/YAMCS_LOCAL_TESTING.md` for the applicable Yamcs workflow. Windows/WSL local Yamcs remains unvalidated. Use the stages below only for revision-matched legacy GDS/RFM23BP bench work. Treat its results as evidence for that setup.
 
 ## Operating Style
+
+Check existing logs and software evidence for a diagnosis. Live hardware and RF steps require task-specific user authorization and the applicable runbook. A flash authorization applies only to the board or boards it covers.
 
 Keep it KISS: one physical step, one confirmation, then move on. Do not assume
 old ports, old IPs, old SSH aliases, or old running processes. The goal is to
@@ -25,22 +26,9 @@ walk the operator through live HIL safely:
 If hardware is absent, do not fail the task. Say what could be checked locally
 and what remains blocked by hardware.
 
-## First Read
+## Sources for the legacy workflow
 
-From the repo root, read these before acting:
-
-```bash
-git status --short --branch
-git submodule status --recursive
-sed -n '1,220p' AGENTS.md
-sed -n '1,220p' README.md
-sed -n '1,260p' docs/architecture/SYSTEM_ARCHITECTURE.md
-sed -n '400,490p' docs/archive/AGENT_NOTES.md
-sed -n '1,140p' docs/archive/legacy-gds-rfm23bp/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md
-```
-
-Use `docs/archive/legacy-gds-rfm23bp/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md` as the current HIL proof source. Older
-`HIL_TEST_HANDOFF_*` files may be stale or branch-specific.
+Verify the selected checkout and submodule revisions using `AGENTS.md`. For this legacy workflow, consult `docs/archive/legacy-gds-rfm23bp/NEUTRON2_RF_MVP_DEMO_RUNBOOK.md` and the current instructions relevant to the task. Match any older handoff to its checkout and board revision.
 
 ## Platform Detection
 
@@ -106,6 +94,8 @@ command `gtimeout`); otherwise run `cat <port>` and Ctrl-C after a few seconds.
 
 ## Teensy Upload Targeting: Mandatory
 
+Flashing requires task-specific user authorization and the applicable runbook. Evidence of wrong firmware supports a diagnosis but does not authorize an upload.
+
 Never upload to a Teensy by `/dev/cu.usbmodem*`, `/dev/tty.usbmodem*`,
 `/dev/ttyACM*`, or `/dev/ttyUSB*` when more than one Teensy is connected.
 Arduino/Teensy CLI can report success while using auto-search against the wrong
@@ -118,23 +108,22 @@ Before any Teensy upload, list physical Teensy upload IDs:
 arduino-cli board list
 ```
 
-Current HIL bench mapping:
+For each authorized board, use `arduino-cli board list` and physical identification to set its variable to the confirmed current `usb:*` ID. Run only that board's block from the selected checkout root. The build must succeed before the upload runs.
 
-```text
-ground Teensy upload ID    = usb:100000
-satellite Teensy upload ID = usb:2100000
-```
-
-Use those `usb:*` IDs for uploads:
+Ground Teensy:
 
 ```bash
-cd GDS_Teensy
-./tools/arduino-cli/build.sh
-./tools/arduino-cli/upload.sh usb:100000
+cd GDS_Teensy &&
+  ./tools/arduino-cli/build.sh &&
+  ./tools/arduino-cli/upload.sh "${GROUND_UPLOAD_ID:?Set the confirmed ground Teensy upload ID}"
+```
 
-cd ../ArtemisTeensy_N2_Baremetal
-./tools/arduino-cli/build.sh
-./tools/arduino-cli/upload.sh usb:2100000
+Satellite Teensy:
+
+```bash
+cd ArtemisTeensy_N2_Baremetal &&
+  ./tools/arduino-cli/build.sh &&
+  ./tools/arduino-cli/upload.sh "${SAT_UPLOAD_ID:?Set the confirmed satellite Teensy upload ID}"
 ```
 
 If an upload wrapper refuses a serial-device upload while multiple Teensys are
@@ -197,14 +186,7 @@ configured for triple serial:
 rg -n "usb=serial3|SerialUSB1|SerialUSB2" GDS_Teensy
 ```
 
-Only reflash when the user asks for it or evidence says the firmware is wrong:
-
-```bash
-cd GDS_Teensy
-arduino-cli board list
-./tools/arduino-cli/build.sh
-./tools/arduino-cli/upload.sh usb:100000
-```
+If a reflash is needed and the user has authorized the ground board, follow the ground procedure in [Teensy Upload Targeting](#teensy-upload-targeting-mandatory).
 
 After flashing, re-enumerate serial ports and sample the debug stream. Do not
 continue until the ground port roles are clear and the ground debug stream is
@@ -216,14 +198,7 @@ Tell the user to plug in the satellite Teensy. Re-enumerate serial devices and
 identify the newly added single serial port that is not part of the ground
 triple-serial group.
 
-Build and upload only to the satellite board:
-
-```bash
-cd ArtemisTeensy_N2_Baremetal
-arduino-cli board list
-./tools/arduino-cli/build.sh
-./tools/arduino-cli/upload.sh usb:2100000
-```
+If a flash is needed and the user has authorized the satellite board, follow the satellite procedure in [Teensy Upload Targeting](#teensy-upload-targeting-mandatory).
 
 Stop before repeated upload retries if Teensy needs a physical PROGRAM press.
 Ask the user to press PROGRAM, then retry once.
@@ -353,13 +328,7 @@ timeout 5 cat "$GDS_DATA_PORT"
 
 If the ground triple serial ports enumerate but all ground streams are silent
 while the satellite debug stream shows increasing `rf_tx_pkt`, suspect a wrong
-or stale ground upload first. Reflash the ground board by physical upload ID:
-
-```bash
-cd GDS_Teensy
-./tools/arduino-cli/build.sh
-./tools/arduino-cli/upload.sh usb:100000
-```
+or stale ground upload first. If a reflash is needed and the user has authorized the ground board, follow the ground procedure in [Teensy Upload Targeting](#teensy-upload-targeting-mandatory).
 
 Known false-positive failure mode:
 
@@ -479,7 +448,7 @@ themselves mean the link is dead.
 Stop and ask before:
 
 - repeated Teensy upload attempts that need manual PROGRAM
-- reflashing when evidence does not point to stale or wrong firmware
+- flashing without task-specific authorization or a confirmed physical target
 - uploading by serial device path while multiple Teensys are connected
 - killing an existing GDS process the user asked to keep open
 - switching from `n2pi` to `artemis-pi` when the user named a specific target

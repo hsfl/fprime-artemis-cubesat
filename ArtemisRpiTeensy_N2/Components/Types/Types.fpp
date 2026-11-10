@@ -92,6 +92,12 @@ module Components {
   @ Payload capture request with caller correlation, in seconds.
   port PayloadCaptureRequest(requestId: U32, durationSeconds: U32)
 
+  @ Configure the payload's duration independently of starting a capture.
+  port PayloadDurationConfigRequest(requestId: U32, durationSeconds: U32)
+
+  @ Start a capture using the configuration already applied to the payload.
+  port PayloadConfiguredCaptureRequest(requestId: U32)
+
   @ Maximum printable ASCII literal size in bytes for the board-free synthetic pass-through contract.
   @ Embedded NUL and non-ASCII input are outside this demo contract and are not validated here.
   constant PAYLOAD_PASSTHROUGH_LITERAL_MAX = 128
@@ -139,6 +145,9 @@ module Components {
     FAILED = 5
     TIMED_OUT = 6
   }
+
+  @ Terminal configuration outcome correlated to a PayloadDurationConfigRequest.
+  port PayloadDurationConfigResult(requestId: U32, $state: PayloadOperationState)
 
   @ One-shot local simulator behavior; never a real payload protocol status.
   enum PayloadSimulationFault : U8 {

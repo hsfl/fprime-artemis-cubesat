@@ -101,6 +101,10 @@ This is the target behavior. Existing demo mode/scheduling code is a starting po
 
 Keep mission policy above device protocols. F′'s [Application-Manager-Driver pattern](../../ArtemisRpiTeensy_N2/lib/fprime/docs/user-manual/design-patterns/app-man-drv.md) provides the design guide. The actual [topology](../../ArtemisRpiTeensy_N2/ArtemisRpiTeensyDeployment/Top/topology.fpp) and [shared types/ports](../../ArtemisRpiTeensy_N2/Components/Types/Types.fpp) own current connections.
 
+![F′ Application–Manager–Driver pattern showing how Neutron 2 separates mission logic from hardware and simulators](diagrams/FPRIME_ARCHITECTURE_PATTERN.png)
+
+The figure illustrates the layering with simulator and earlier RFM23BP components. The current responsibilities are listed below.
+
 | Owner | Current responsibility | Hardware integration boundary |
 | --- | --- | --- |
 | `MissionApp` | Mode ownership/transition guard; mission commands | Extend nominal FSR coordination without moving mission authority to the ground or Teensy |

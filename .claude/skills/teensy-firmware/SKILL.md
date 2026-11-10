@@ -12,7 +12,6 @@ description: "Use when building, uploading, or modifying Teensy 4.1 bridge firmw
 | Workspace | `ArtemisTeensy_N2_Baremetal/` | `GDS_Teensy/` |
 | Sketch | `firmware/satellite_teensy/satellite_teensy.ino` | `firmware/gds_teensy/gds_teensy.ino` |
 | FQBN | `teensy:avr:teensy41` (single serial) | `teensy:avr:teensy41:usb=serial3` (**triple serial**) |
-| HIL bench upload ID | `usb:2100000` | `usb:100000` |
 | Debug marker | `[ArtemisTeensy]` counters | `[GDS_Teensy]` counters |
 
 Shared Arduino libraries live in `ArtemisTeensy_N2_Baremetal/firmware/libs/`
@@ -43,14 +42,15 @@ debug counters, third = payload channel 1 receiver.
 
 ## Build and Upload
 
-Always run from the workspace root (scripts set `ARDUINO_CONFIG_FILE` to the
-workspace-local `tools/arduino-cli/arduino-cli.yaml`; running elsewhere picks
-up the wrong config):
+Flashing requires task-specific user authorization for the target board and the applicable runbook. Identify that board in this session before uploading.
+
+Start in the selected checkout root and enter the project directory for the authorized board. The scripts use that project's Arduino CLI config. Set `UPLOAD_ID` from the current board listing before the upload.
 
 ```bash
 cd GDS_Teensy                      # or ArtemisTeensy_N2_Baremetal
 ./tools/arduino-cli/build.sh
-./tools/arduino-cli/upload.sh usb:100000    # usb:2100000 for satellite
+arduino-cli board list
+./tools/arduino-cli/upload.sh "${UPLOAD_ID:?Set the confirmed physical Teensy upload ID}"
 ```
 
 ### Upload targeting — mandatory rule

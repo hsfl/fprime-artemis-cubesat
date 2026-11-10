@@ -19,9 +19,9 @@ with `docs/development/TROUBLESHOOTING.md`.
 
 ## Platforms
 
-- **macOS** (primary): runs natively; typical repo root `~/Developer/fprime-artemis-cubesat`.
-- **Windows**: run everything inside **WSL2** (typical repo root
-  `~/fprime-artemis-cubesat`); the browser for GDS (`:5050`) and the viewer
+- **macOS** (primary): runs natively from the selected repository checkout.
+- **Windows**: run the development workflow inside **WSL2** from the selected
+  repository checkout; the browser for GDS (`:5050`) and the viewer
   (`:8062`) can be native Windows. Setup: `docs/development/WINDOWS_WSL.md`.
 - **Linux**: runs natively.
 - No serial hardware is involved, so no `sudo` is needed on any platform — a

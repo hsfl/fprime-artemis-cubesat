@@ -1,6 +1,6 @@
 ---
 name: fprime-cross-compilation
-description: "Cross-compile F' (F Prime) deployments for ARM/Linux targets, especially on macOS using the F' ARM Docker container. Use for any F' cross-compilation tasks: installing the ARM toolchain, building a deployment for aarch64-linux or arm-hf-linux, or running the ARM GDS workflow (scp + fprime-gds --ip-client)."
+description: "Use for this Neutron 2 checkout's Raspberry Pi Zero W ARMv6 F Prime cross-compilation, its Docker build script, sysroot, and verified handoff. For other targets, select a toolchain for the actual CPU and use the general F Prime cross-compilation guidance."
 ---
 
 # F' Cross-Compilation (Tutorial 3)
@@ -42,7 +42,11 @@ Python venv, and force-regenerates the F Prime build cache. Do not use it for
 every small C++/FPP iteration; the slow part is usually Python dependency setup,
 and forced regeneration also throws away incremental compile state.
 
-## Quick start (macOS on Apple Silicon)
+## Alternate ARM targets (not the Pi Zero W)
+
+The following generic aarch64 example is for a compatible target selected for the task. Use the Pi Zero W workflow above for ARMv6.
+
+### Quick start (macOS on Apple Silicon)
 
 1) Ensure Docker or Rancher Desktop is running.
 2) Pull the ARM container:
@@ -68,7 +72,7 @@ fprime-util generate aarch64-linux
 fprime-util build aarch64-linux
 ```
 
-## Linux toolchain install (if not using the container)
+### Linux toolchain install (if not using the container)
 
 Use a Linux VM or host, then:
 
@@ -85,7 +89,7 @@ Verify:
 /opt/toolchains/bin/aarch64-none-linux-gnu-gcc -v
 ```
 
-## ARM runtime workflow (optional)
+### ARM runtime workflow (optional)
 
 1) Copy the binary to the device:
 
@@ -109,7 +113,7 @@ ssh <user>@<device-address>
 
 ## Notes
 
-- macOS users must run cross-compilation commands inside the Docker container.
+- The documented macOS workflows use a Docker container.
 - Windows users run the same Docker flow inside WSL2 (Docker Desktop with the
   WSL2 backend); native PowerShell/CMD is not a supported F Prime path.
 - For repo-specific context and prior attempts, read `references/context.md`.
