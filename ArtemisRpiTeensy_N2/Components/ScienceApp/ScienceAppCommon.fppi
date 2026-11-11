@@ -28,8 +28,14 @@ async input port durationConfigResultIn: Components.PayloadDurationConfigResult
 @ Optional trigger for a capture using the payload's configured duration.
 output port configuredCaptureOut: Components.PayloadConfiguredCaptureRequest
 
+@ Report back to MissionApp that pending collections are cancelled
+output port cancelReportOut: Svc.Ping
+
 @ Science product handoff to StorageManager
 output port scienceProductOut: Components.ScienceProductDescriptor
+
+@ StorageManager's answer for a product handed over on scienceProductOut
+async input port productStoredIn: Components.ScienceProductStored
 
 @ Opt-in request to deliver the just-stored product through CommsApp.
 output port deliveryRequestOut: Components.ScienceProductDeliveryRequest
@@ -90,6 +96,9 @@ event VerifiedCaptureStatus(
     sourceCrc: U32,
     reasonCode: U32
 ) severity activity high format "Verified capture token={} request={} generation={} state={} product={} bytes={} crc={} reason={}"
+
+@ StorageManager rejected a product, so it is not SCIENCE_READY.
+event ScienceProductNotStored(productId: U32) severity warning high format "Science product {} was not stored"
 
 @ Port for requesting the current time
 time get port timeCaller

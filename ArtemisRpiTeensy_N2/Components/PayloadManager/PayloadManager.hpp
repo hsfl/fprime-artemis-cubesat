@@ -41,6 +41,8 @@ class PayloadManager final : public PayloadManagerComponentBase {
         U32 errorCode
     ) override;
     void driverAvailabilityIn_handler(FwIndexType portNum, bool available) override;
+    //! MissionApp's capture control. Applied here, then reported back.
+    void captureControlIn_handler(FwIndexType portNum, const Fw::Enabled& control) override;
     void REQUEST_PAYLOAD_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void CONFIGURE_PAYLOAD_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 sampleCount, U32 periodMs) override;
     void START_PAYLOAD_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 collectionId) override;
@@ -110,6 +112,7 @@ class PayloadManager final : public PayloadManagerComponentBase {
     U32 m_lastCompletedGeneration;
     bool m_driverAvailable;
     Operation m_operation;
+    bool m_captureInhibited;  //!< set by MissionApp's capture control, checked where operations start
     Components::PayloadSimulationFault m_nextFaultMode;
     U32 m_nextDelayMs;
     U32 m_nextTimeoutMs;

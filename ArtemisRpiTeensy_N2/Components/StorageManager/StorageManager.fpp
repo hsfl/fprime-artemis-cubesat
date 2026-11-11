@@ -23,6 +23,9 @@ module Components {
         @ Science availability output to CommsApp
         output port downlinkReadyOut: Components.ScienceDownlinkReady
 
+        @ Answer to requestIn: the product was committed, or rejected
+        output port productStoredOut: Components.ScienceProductStored
+
         @ Exact validated descriptor for an automatic delivery request.
         output port deliveryDescriptorOut: Components.ScienceProductDeliveryDescriptor
 

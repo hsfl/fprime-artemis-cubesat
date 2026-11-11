@@ -62,6 +62,27 @@ The script waits for the Yamcs instance, resolves the current `missionApp.PING` 
 
 To stop this checkout's recorded stack, press Ctrl+C in its foreground terminal or run `./tools/yamcs/stop.sh` from another terminal. The helper checks the recorded PID's command path before signaling it. A deliberate restart creates fresh native application state while retaining the local Yamcs archive; the probe checks fresh reception/acquisition times so archived successes do not satisfy a new run.
 
+## Mode report check through Yamcs
+
+With the foreground runner still active and no other operator commands in flight, from a second terminal at the repository root:
+
+```sh
+tools/yamcs/.venv/bin/python tools/yamcs/report_mode.py
+tools/yamcs/.venv/bin/python tools/yamcs/report_mode.py --expect-mode BASE
+```
+
+The script sends the read-only `missionApp.REPORT_MODE` command through the Yamcs HTTP API. It then checks the Yamcs event archive for exactly one `missionApp.ModeReport` answer, plus the stock `CdhCore.cmdDisp` `OpCodeDispatched` and `OpCodeCompleted` events for its opcode. It prints the reported mode and saves a JSON record under the active `yamcs/run/<timestamp>/` directory. `--expect-mode` also requires a specific mode; a freshly started stack is in `BASE`. For the CDR TCP stack ([CDR_TCP.md](../operations/CDR_TCP.md)), whose launcher does not write `yamcs/run/current.json`, add `--dictionary <matching dictionary>`; the record then goes to `yamcs/run/report-mode-<time>/` unless `--run-dir` is given. Operators can send the same command from the Yamcs web UI Commanding page; the answer appears under Events as `Mission mode is BASE`. This is local software evidence only.
+
+## Demo mode cycle through Yamcs
+
+On a freshly started stack, with no other operator commands in flight:
+
+```sh
+tools/yamcs/.venv/bin/python tools/yamcs/mode_cycle.py
+```
+
+The script walks the demo modes ([MISSION_MODES.md](../architecture/MISSION_MODES.md)) through the Yamcs HTTP API. Part A runs one scheduled collection through Science Collection and Science Processing, opens and closes a downlink window with `missionApp.SET_MODE`, and checks the refusals for `SET_MODE SCIENCE_PROCESSING`, `SET_MODE SCIENCE_COLLECTION` and a downlink while a collection is queued. Part B enters SAFE from the ground, checks that commands are refused there, and leaves it. On this local build it also sends `missionApp.SIMULATE_SAFE_FAULT` (low power, latched), checks that the exit is blocked until `CLEAR_SAFE_LATCH` and the stability interval (default 10 s), then leaves SAFE. Part C sets `AUTO_RETURN_TO_BASE` to 1 for one collection, checks that MissionApp returns to `BASE` by itself after the stored product, and sets it back to 0. Part D checks the SAFE capture control: MissionApp's inhibit reaches PayloadManager before SAFE entry completes, `payloadManager.SCIENCE_CAPTURE`, `START_PAYLOAD_COLLECTION` and `SYNTHETIC_PASSTHROUGH` are refused at the one gate, a ScienceApp capture is refused there too, a queued collection never fires, and after SAFE a capture gives a stored product. Every step checks the `CdhCore.cmdDisp` result (`OpCodeCompleted` or `OpCodeError`) and the MissionApp, ScienceApp or PayloadManager events it must produce. It sets a 3 s capture with `scienceApp.CONFIGURE_CAPTURE_DURATION` (volatile) and takes about two minutes. It saves one JSON record under the active `yamcs/run/<timestamp>/` directory. For the CDR TCP stack add `--dictionary <matching dictionary>`: that build refuses `SIMULATE_SAFE_FAULT`, and the script checks the refusal instead. This is local software evidence only.
+
 ## Existing collection/file compatibility probe
 
 On a freshly started, otherwise idle local stack, run:

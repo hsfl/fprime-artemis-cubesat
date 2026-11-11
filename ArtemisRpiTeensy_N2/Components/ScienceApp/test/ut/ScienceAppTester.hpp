@@ -32,11 +32,17 @@ class ScienceAppTester final : public ScienceAppGTestBase {
     void testCollectAndDownlinkWaitsForValidatedCompletion();
     void testCollectAndDownlinkClearsIntentOnFailure();
     void testCdrRejectsAutomaticDownlinkBeforeCaptureOrTokenAllocation();
+    void testScienceReadyWaitsForStorageCommit();
+    void testStorageFailureReturnsToBaseNotReady();
+    void testStorageFailureSendsNoDelivery();
+    void testInhibitedCaptureIsReportedAndChangesNoMode();
+    void testCancelReportsBackToMissionApp();
 
   private:
     void connectPorts();
     void connectConfiguredCapturePorts();
     void initComponents();
+    void captureToStorage(U32 requestId, U32 productId, U32 generation);
 
     ScienceApp component;
 };

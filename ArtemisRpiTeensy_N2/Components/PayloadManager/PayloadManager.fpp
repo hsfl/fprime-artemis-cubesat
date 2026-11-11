@@ -20,6 +20,12 @@ module Components {
         @ Current simulated-driver capture capacity
         async input port driverAvailabilityIn: Components.PayloadDriverAvailability
 
+        @ MissionApp's capture control. While inhibited, no new capture or pass-through starts.
+        async input port captureControlIn: Components.OperationControl
+
+        @ Report back to MissionApp that a capture control is applied
+        output port captureControlReportOut: Components.OperationControlReport
+
         @ Driver request output
         output port driverRequestOut: Components.PayloadDriverCaptureRequest
 
@@ -87,6 +93,9 @@ module Components {
         @ Latest manager-owned operation generation token
         telemetry LastOperationGeneration: U32
 
+        @ Whether MissionApp's capture control is inhibiting new operations
+        telemetry CaptureInhibited: bool
+
         @ Payload request forwarded to driver
         event PayloadCollectionForwarded(requestKey: U32) severity activity high format "Payload request forwarded key={}"
 
@@ -135,6 +144,9 @@ module Components {
 
         @ Simulator configuration rejected because it is unsupported or unsafe at this time.
         event SimulationConfigRejected(reason: U32) severity warning low format "Payload simulator configuration rejected reason={}"
+
+        @ A capture control from MissionApp was applied. A running operation is left to finish.
+        event CaptureControlApplied(control: Fw.Enabled, activeOperation: bool) severity activity high format "Payload capture control {} applied, operation running={}"
 
         @ Port for requesting the current time
         time get port timeCaller

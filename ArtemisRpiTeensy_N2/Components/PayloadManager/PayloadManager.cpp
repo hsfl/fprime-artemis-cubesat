@@ -41,6 +41,7 @@ PayloadManager::PayloadManager(const char* const compName)
       m_driverAvailable(true),
       m_operation{false, 0, 0, Components::PayloadOperationKind::CAPTURE, false,
                   std::chrono::steady_clock::time_point{}},
+      m_captureInhibited(false),
       m_nextFaultMode(Components::PayloadSimulationFault::NORMAL),
       m_nextDelayMs(1000),
       m_nextTimeoutMs(DEFAULT_OPERATION_TIMEOUT_MS),
@@ -151,6 +152,18 @@ void PayloadManager::driverAvailabilityIn_handler(FwIndexType portNum, bool avai
     this->writeStatusTelemetry();
 }
 
+// MissionApp owns what each mode allows. This is only the enforcement: a running operation finishes,
+// and startCapture() and startPassthrough() refuse new ones while inhibited.
+void PayloadManager::captureControlIn_handler(FwIndexType portNum, const Fw::Enabled& control) {
+    static_cast<void>(portNum);
+    this->m_captureInhibited = (control == Fw::Enabled::DISABLED);
+    this->writeStatusTelemetry();
+    this->log_ACTIVITY_HI_CaptureControlApplied(control, this->m_operation.active);
+    if (this->isConnected_captureControlReportOut_OutputPort(0)) {
+        this->captureControlReportOut_out(0, control, this->m_operation.active);
+    }
+}
+
 void PayloadManager::REQUEST_PAYLOAD_STATUS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {
     this->tlmWrite_LastPayloadValue(this->m_lastPayloadValue);
     this->tlmWrite_LastCollectionId(this->m_lastCollectionId);
@@ -251,6 +264,11 @@ void PayloadManager::CONFIGURE_SIMULATION_cmdHandler(
 
 bool PayloadManager::startCapture(U32 requestId, U32 durationSeconds, bool scienceRequested) {
     const Components::PayloadOperationKind kind = Components::PayloadOperationKind::CAPTURE;
+    // The one admission check for every capture: direct commands and ScienceApp requests both start here.
+    if (this->m_captureInhibited) {
+        this->rejectOperation(requestId, kind, Components::PayloadOperationState::INHIBITED, scienceRequested);
+        return false;
+    }
     if (requestId == 0U) {
         this->rejectOperation(requestId, kind, Components::PayloadOperationState::INVALID, scienceRequested);
         return false;
@@ -308,6 +326,10 @@ bool PayloadManager::startCapture(U32 requestId, U32 durationSeconds, bool scien
 
 bool PayloadManager::startPassthrough(U32 requestId, const Fw::StringBase& literalCommand) {
     const Components::PayloadOperationKind kind = Components::PayloadOperationKind::PASSTHROUGH;
+    if (this->m_captureInhibited) {
+        this->rejectOperation(requestId, kind, Components::PayloadOperationState::INHIBITED);
+        return false;
+    }
     if ((requestId == 0U) || (literalCommand.length() == 0U)) {
         this->log_WARNING_HI_SyntheticPassthroughRejected(requestId, 3U);
         this->rejectOperation(requestId, kind, Components::PayloadOperationState::INVALID);
@@ -440,6 +462,7 @@ void PayloadManager::writeStatusTelemetry() {
     this->tlmWrite_PayloadDriverAvailable(this->m_driverAvailable);
     this->tlmWrite_PayloadOperationInFlight(this->m_operation.active);
     this->tlmWrite_LastOperationGeneration(this->m_lastOperationGeneration);
+    this->tlmWrite_CaptureInhibited(this->m_captureInhibited);
 }
 
 U32 PayloadManager::allocateGeneration() {

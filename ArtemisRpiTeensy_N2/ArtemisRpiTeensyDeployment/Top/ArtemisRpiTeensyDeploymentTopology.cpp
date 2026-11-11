@@ -95,7 +95,8 @@ void setupTopology(const TopologyState& state) {
 #endif
     // Project-specific component configuration. Function provided above. May be inlined, if desired.
     configureTopology();
-    // Autocoded parameter loading. Function provided by autocoder.
+    // Autocoded parameter file read, then parameter loading. Functions provided by autocoder.
+    readParameters();
     loadParameters();
     // Autocoded task kick-off (active components). Function provided by autocoder.
     startTasks(state);

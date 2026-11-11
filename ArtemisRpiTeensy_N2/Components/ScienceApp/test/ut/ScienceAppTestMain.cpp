@@ -72,12 +72,37 @@ TEST(Nominal, CollectAndDownlinkClearsIntentOnFailure) {
     Components::ScienceAppTester tester;
     tester.testCollectAndDownlinkClearsIntentOnFailure();
 }
+
+TEST(Safe, StorageFailureSendsNoDelivery) {
+    Components::ScienceAppTester tester;
+    tester.testStorageFailureSendsNoDelivery();
+}
 #else
 TEST(Nominal, CdrRejectsAutomaticDownlinkBeforeCaptureOrTokenAllocation) {
     Components::ScienceAppTester tester;
     tester.testCdrRejectsAutomaticDownlinkBeforeCaptureOrTokenAllocation();
 }
 #endif
+
+TEST(Safe, ScienceReadyWaitsForStorageCommit) {
+    Components::ScienceAppTester tester;
+    tester.testScienceReadyWaitsForStorageCommit();
+}
+
+TEST(Safe, StorageFailureReturnsToBaseNotReady) {
+    Components::ScienceAppTester tester;
+    tester.testStorageFailureReturnsToBaseNotReady();
+}
+
+TEST(Safe, InhibitedCaptureIsReportedAndChangesNoMode) {
+    Components::ScienceAppTester tester;
+    tester.testInhibitedCaptureIsReportedAndChangesNoMode();
+}
+
+TEST(Safe, CancelReportsBackToMissionApp) {
+    Components::ScienceAppTester tester;
+    tester.testCancelReportsBackToMissionApp();
+}
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

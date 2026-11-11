@@ -37,6 +37,9 @@ ScienceApp::ScienceApp(const char* const compName)
       m_activeCaptureRequestId(0),
       m_activeCaptureGeneration(0),
       m_activeCaptureScienceRequested(false),
+      m_productAwaitingStorage(0),
+      m_productAwaitingStorageBytes(0),
+      m_deliverAfterStorage(false),
       m_downlinkRequestIds{},
       m_downlinkRequestGenerations{} {}
 
@@ -117,8 +120,10 @@ void ScienceApp::requestIn_handler(FwIndexType portNum, U32 delaySeconds) {
 
 void ScienceApp::cancelRequestIn_handler(FwIndexType portNum, U32 key) {
     static_cast<void>(portNum);
-    static_cast<void>(key);
     this->cancelPendingCollection();
+    if (this->isConnected_cancelReportOut_OutputPort(0)) {
+        this->cancelReportOut_out(0, key);
+    }
 }
 
 void ScienceApp::durationConfigResultIn_handler(
@@ -187,6 +192,7 @@ void ScienceApp::operationNoticeIn_handler(
 
     if ((generation == 0U) &&
         ((state == Components::PayloadOperationState::BUSY) ||
+         (state == Components::PayloadOperationState::INHIBITED) ||
          (state == Components::PayloadOperationState::INVALID) ||
          (state == Components::PayloadOperationState::DRIVER_UNAVAILABLE) ||
          (state == Components::PayloadOperationState::FAILED) ||
@@ -200,7 +206,9 @@ void ScienceApp::operationNoticeIn_handler(
         if (scienceRequested) {
             this->clearDownlinkIntent(requestId, generation);
         }
-        if ((this->m_activeCaptureRequestId == 0U) && this->isConnected_missionModeOut_OutputPort(0)) {
+        // An inhibited request never started, and MissionApp is the one inhibiting: nothing to report.
+        if ((this->m_activeCaptureRequestId == 0U) && (state != Components::PayloadOperationState::INHIBITED) &&
+            this->isConnected_missionModeOut_OutputPort(0)) {
             this->missionModeOut_out(0, Components::MissionMode::BASE, 0U);
         }
         return;
@@ -239,12 +247,7 @@ void ScienceApp::operationNoticeIn_handler(
             this->logVerifiedCaptureStatus(verified->verificationToken, requestId, generation, state,
                                            productId, productBytes, sourceCrc, 0U);
         }
-        if (scienceRequested && this->hasDownlinkIntent(requestId, generation) &&
-            this->isConnected_deliveryRequestOut_OutputPort(0)) {
-            // The two outputs target the same StorageManager actor. F' queues
-            // these in call order, so Storage stores/validates before delivery.
-            this->deliveryRequestOut_out(0, productId);
-        }
+        this->m_deliverAfterStorage = scienceRequested && this->hasDownlinkIntent(requestId, generation);
         if (scienceRequested) {
             this->clearDownlinkIntent(requestId, generation);
         }
@@ -567,10 +570,35 @@ void ScienceApp::publishScienceProduct(
     this->writeTelemetry();
     this->log_ACTIVITY_HI_ScienceProductReady(productBytes);
     if (this->isConnected_scienceProductOut_OutputPort(0)) {
+        // SCIENCE_READY waits for StorageManager's answer on productStoredIn.
+        this->m_productAwaitingStorage = productId;
+        this->m_productAwaitingStorageBytes = productBytes;
         this->scienceProductOut_out(0, productId, productBytes, sourceKind, sourcePath, sourceCrc);
+    } else if (this->isConnected_missionModeOut_OutputPort(0)) {
+        this->missionModeOut_out(0, Components::MissionMode::SCIENCE_READY, productBytes);
+    }
+}
+
+void ScienceApp::productStoredIn_handler(FwIndexType portNum, U32 productId, bool stored) {
+    static_cast<void>(portNum);
+    if ((productId == 0U) || (productId != this->m_productAwaitingStorage)) {
+        return;
+    }
+    const U32 productBytes = this->m_productAwaitingStorageBytes;
+    const bool deliver = this->m_deliverAfterStorage;
+    this->m_productAwaitingStorage = 0U;
+    this->m_productAwaitingStorageBytes = 0U;
+    this->m_deliverAfterStorage = false;
+    if (!stored) {
+        this->log_WARNING_HI_ScienceProductNotStored(productId);
     }
     if (this->isConnected_missionModeOut_OutputPort(0)) {
-        this->missionModeOut_out(0, Components::MissionMode::SCIENCE_READY, productBytes);
+        this->missionModeOut_out(0, stored ? Components::MissionMode::SCIENCE_READY : Components::MissionMode::BASE,
+                                 stored ? productBytes : 0U);
+    }
+    // After the report above, so SCIENCE_READY reaches MissionApp ahead of CommsApp's DOWNLINKING.
+    if (stored && deliver && this->isConnected_deliveryRequestOut_OutputPort(0)) {
+        this->deliveryRequestOut_out(0, productId);
     }
 }
 

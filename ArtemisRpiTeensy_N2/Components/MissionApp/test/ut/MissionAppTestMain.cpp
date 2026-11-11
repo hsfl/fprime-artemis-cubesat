@@ -35,6 +35,146 @@ TEST(Nominal, CancelCollectionReturnsBaseAndCancels) {
     tester.testCancelCollectionReturnsBaseAndCancels();
 }
 
+TEST(Nominal, ReportModeAnswersOnceAndChangesNothing) {
+    Components::MissionAppTester tester;
+    tester.testReportModeAnswersOnceAndChangesNothing();
+}
+
+TEST(Nominal, ReportModeTracksEveryDemoStoryMode) {
+    Components::MissionAppTester tester;
+    tester.testReportModeTracksEveryDemoStoryMode();
+}
+
+TEST(TransitionTable, SubsystemReports) {
+    Components::MissionAppTester tester;
+    tester.testTransitionTableSubsystemReports();
+}
+
+TEST(TransitionTable, GroundSetMode) {
+    Components::MissionAppTester tester;
+    tester.testTransitionTableGroundSetMode();
+}
+
+TEST(TransitionTable, Faults) {
+    Components::MissionAppTester tester;
+    tester.testTransitionTableFaults();
+}
+
+TEST(SafeMode, ExitBlockedByLatchUntilCleared) {
+    Components::MissionAppTester tester;
+    tester.testSafeExitBlockedByLatchUntilCleared();
+}
+
+TEST(SafeMode, ExitWaitsForStabilityInterval) {
+    Components::MissionAppTester tester;
+    tester.testSafeExitWaitsForStabilityInterval();
+}
+
+TEST(SafeMode, ExitIntervalUsesParameter) {
+    Components::MissionAppTester tester;
+    tester.testSafeExitIntervalUsesParameter();
+}
+
+TEST(SafeMode, CaptureFinishingInSafeDoesNotLeaveSafe) {
+    Components::MissionAppTester tester;
+    tester.testCaptureFinishingInSafeDoesNotLeaveSafe();
+}
+
+TEST(SafeMode, OldCommandsRespectSafe) {
+    Components::MissionAppTester tester;
+    tester.testOldCommandsRespectSafe();
+}
+
+TEST(SafeMode, EntryCancelsQueuedCollection) {
+    Components::MissionAppTester tester;
+    tester.testSafeEntryCancelsQueuedCollection();
+}
+
+TEST(SafeMode, BootInSafeParameter) {
+    Components::MissionAppTester tester;
+    tester.testBootInSafeParameter();
+}
+
+TEST(SafeMode, BootInBaseByDefault) {
+    Components::MissionAppTester tester;
+    tester.testBootInBaseByDefault();
+}
+
+TEST(SafeMode, SimulateSafeFaultOnlyInLocalBuild) {
+    Components::MissionAppTester tester;
+    tester.testSimulateSafeFaultOnlyInLocalBuild();
+}
+
+TEST(DemoModes, SubsystemPlanMatchesMopMatrix) {
+    Components::MissionAppTester tester;
+    tester.testSubsystemPlanMatchesMopMatrix();
+}
+
+TEST(DemoModes, OperationsModeTelemetryFollowsMode) {
+    Components::MissionAppTester tester;
+    tester.testOperationsModeTelemetryFollowsMode();
+}
+
+TEST(DemoModes, FullDemoCycleWithModes) {
+    Components::MissionAppTester tester;
+    tester.testFullDemoCycleWithModes();
+}
+
+TEST(DemoModes, ReportModeAnswersSafe) {
+    Components::MissionAppTester tester;
+    tester.testReportModeAnswersSafe();
+}
+
+TEST(DemoModes, ExistingIdsUnchanged) {
+    Components::MissionAppTester tester;
+    tester.testExistingIdsUnchanged();
+}
+
+TEST(AutoReturn, OffHoldsScienceReady) {
+    Components::MissionAppTester tester;
+    tester.testAutoReturnOffHoldsScienceReady();
+}
+
+TEST(AutoReturn, OnGoesBackToBase) {
+    Components::MissionAppTester tester;
+    tester.testAutoReturnOnGoesBackToBase();
+}
+
+TEST(Safe, SafeEntryWaitsForBothReports) {
+    Components::MissionAppTester tester;
+    tester.testSafeEntryWaitsForBothReports();
+}
+
+TEST(Safe, SafeExitBlockedUntilEntryConfirmed) {
+    Components::MissionAppTester tester;
+    tester.testSafeExitBlockedUntilEntryConfirmed();
+}
+
+TEST(Safe, CaptureControlFollowsSafeOnly) {
+    Components::MissionAppTester tester;
+    tester.testCaptureControlFollowsSafeOnly();
+}
+
+TEST(Safe, FaultCausesRecordedHonestly) {
+    Components::MissionAppTester tester;
+    tester.testFaultCausesRecordedHonestly();
+}
+
+TEST(Safe, StaleCancelReportCannotConfirmSafe) {
+    Components::MissionAppTester tester;
+    tester.testStaleCancelReportCannotConfirmSafe();
+}
+
+TEST(Safe, EnabledReportCannotConfirmSafe) {
+    Components::MissionAppTester tester;
+    tester.testEnabledReportCannotConfirmSafe();
+}
+
+TEST(Safe, SafeEntryWarningCountsFromEachEntry) {
+    Components::MissionAppTester tester;
+    tester.testSafeEntryWarningCountsFromEachEntry();
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

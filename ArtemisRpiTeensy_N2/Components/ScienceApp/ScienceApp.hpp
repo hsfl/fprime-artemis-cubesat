@@ -32,6 +32,8 @@ class ScienceApp final : public ScienceAppComponentBase {
         U32 sourceCrc,
         bool scienceRequested
     ) override;
+    //! StorageManager's answer. SCIENCE_READY goes out only for a committed product.
+    void productStoredIn_handler(FwIndexType portNum, U32 productId, bool stored) override;
     void START_COLLECTION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void CONFIGURE_CAPTURE_DURATION_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 durationSeconds) override;
 #ifdef NEUTRON2_CONFIGURED_CAPTURE
@@ -94,6 +96,9 @@ class ScienceApp final : public ScienceAppComponentBase {
     U32 m_activeCaptureRequestId;
     U32 m_activeCaptureGeneration;
     bool m_activeCaptureScienceRequested;
+    U32 m_productAwaitingStorage;       //!< product handed to StorageManager, 0 when none
+    U32 m_productAwaitingStorageBytes;
+    bool m_deliverAfterStorage;         //!< ask for delivery once StorageManager commits the product
     static constexpr U32 DOWNLINK_INTENT_CAPACITY = 8U;
     U32 m_downlinkRequestIds[DOWNLINK_INTENT_CAPACITY];
     U32 m_downlinkRequestGenerations[DOWNLINK_INTENT_CAPACITY];

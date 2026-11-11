@@ -53,6 +53,7 @@ void ScienceAppTester::connectPorts() {
     this->connect_to_cancelRequestIn(0, this->component.get_cancelRequestIn_InputPort(0));
     this->connect_to_operationNoticeIn(0, this->component.get_operationNoticeIn_InputPort(0));
     this->connect_to_pingIn(0, this->component.get_pingIn_InputPort(0));
+    this->connect_to_productStoredIn(0, this->component.get_productStoredIn_InputPort(0));
     this->connect_to_requestIn(0, this->component.get_requestIn_InputPort(0));
     this->connect_to_run(0, this->component.get_run_InputPort(0));
 
@@ -67,6 +68,7 @@ void ScienceAppTester::connectPorts() {
     this->component.set_timeCaller_OutputPort(0, this->get_from_timeCaller(0));
     this->component.set_tlmOut_OutputPort(0, this->get_from_tlmOut(0));
 
+    this->component.set_cancelReportOut_OutputPort(0, this->get_from_cancelReportOut(0));
     this->component.set_deliveryRequestOut_OutputPort(0, this->get_from_deliveryRequestOut(0));
     this->component.set_missionModeOut_OutputPort(0, this->get_from_missionModeOut(0));
     this->component.set_payloadRequestOut_OutputPort(0, this->get_from_payloadRequestOut(0));
@@ -554,10 +556,127 @@ void ScienceAppTester::testCollectAndDownlinkWaitsForValidatedCompletion() {
                                       scienceProductCrc(product, sizeof(product)), true);
     this->component.doDispatch();
     ASSERT_from_scienceProductOut_SIZE(2);
+    ASSERT_from_deliveryRequestOut_SIZE(0);  // delivery waits for the storage answer
+
+    this->invoke_to_productStoredIn(0, 24U, true);
+    this->component.doDispatch();
     ASSERT_from_deliveryRequestOut_SIZE(1);
     ASSERT_from_deliveryRequestOut(0, 24U);
     ASSERT_TLM_CollectionCount_SIZE(3);
     ASSERT_TLM_CollectionCount(2, 2U);
+}
+
+// Run one capture to the point where the product is handed to StorageManager.
+void ScienceAppTester::captureToStorage(U32 requestId, U32 productId, U32 generation) {
+    static const U8 product[] = {1U, 2U, 3U, 4U};
+    ASSERT_TRUE(writeScienceProduct(product, sizeof(product)));
+    const Fw::String sourcePath(AUTO_DOWNLINK_TEST_PATH);
+#ifdef NEUTRON2_CONFIGURED_CAPTURE
+    this->sendCmd_SCIENCE_CAPTURE(0, 1);
+#else
+    this->sendCmd_SCIENCE_CAPTURE(0, 1, 5U);
+#endif
+    this->component.doDispatch();
+    this->invoke_to_operationNoticeIn(0, requestId, generation, Components::PayloadOperationKind::CAPTURE,
+                                      Components::PayloadOperationState::ACCEPTED, 0U, 0U,
+                                      Components::ScienceProductSource::UNKNOWN, sourcePath, 0U, true);
+    this->component.doDispatch();
+    this->invoke_to_operationNoticeIn(0, requestId, generation, Components::PayloadOperationKind::CAPTURE,
+                                      Components::PayloadOperationState::COMPLETED, productId, sizeof(product),
+                                      Components::ScienceProductSource::NEUTRON_SIM, sourcePath,
+                                      scienceProductCrc(product, sizeof(product)), true);
+    this->component.doDispatch();
+}
+
+// SCIENCE_READY means stored, so it waits for StorageManager's answer.
+void ScienceAppTester::testScienceReadyWaitsForStorageCommit() {
+    this->clearHistory();
+    ASSERT_NO_FATAL_FAILURE(this->captureToStorage(1U, 30U, 50U));
+    ASSERT_from_scienceProductOut_SIZE(1);
+    ASSERT_from_missionModeOut_SIZE(1);
+    ASSERT_from_missionModeOut(0, Components::MissionMode::COLLECTING, 30U);
+
+    this->invoke_to_productStoredIn(0, 99U, true);  // not the product we handed over
+    this->component.doDispatch();
+    ASSERT_from_missionModeOut_SIZE(1);
+
+    this->invoke_to_productStoredIn(0, 30U, true);
+    this->component.doDispatch();
+    ASSERT_from_missionModeOut_SIZE(2);
+    ASSERT_from_missionModeOut(1, Components::MissionMode::SCIENCE_READY, 4U);
+
+    this->invoke_to_productStoredIn(0, 30U, true);  // a repeated answer changes nothing
+    this->component.doDispatch();
+    ASSERT_from_missionModeOut_SIZE(2);
+}
+
+void ScienceAppTester::testStorageFailureReturnsToBaseNotReady() {
+    this->clearHistory();
+    ASSERT_NO_FATAL_FAILURE(this->captureToStorage(1U, 31U, 51U));
+    this->invoke_to_productStoredIn(0, 31U, false);
+    this->component.doDispatch();
+    ASSERT_EVENTS_ScienceProductNotStored_SIZE(1);
+    ASSERT_EVENTS_ScienceProductNotStored(0, 31U);
+    ASSERT_from_missionModeOut_SIZE(2);
+    ASSERT_from_missionModeOut(1, Components::MissionMode::BASE, 0U);
+}
+
+// A capture PayloadManager inhibits is reported as refused. ScienceApp decides nothing itself.
+// A product storage refused is never offered for delivery.
+void ScienceAppTester::testStorageFailureSendsNoDelivery() {
+    static const U8 product[] = {1U, 2U, 3U, 4U};
+    ASSERT_TRUE(writeScienceProduct(product, sizeof(product)));
+    const Fw::String sourcePath(AUTO_DOWNLINK_TEST_PATH);
+    this->clearHistory();
+    this->sendCmd_COLLECT_AND_DOWNLINK(0, 1, 5U);
+    this->component.doDispatch();
+    this->invoke_to_operationNoticeIn(0, 1, 52, Components::PayloadOperationKind::CAPTURE,
+                                      Components::PayloadOperationState::ACCEPTED, 0U, 0U,
+                                      Components::ScienceProductSource::UNKNOWN, sourcePath, 0U, true);
+    this->component.doDispatch();
+    this->invoke_to_operationNoticeIn(0, 1, 52, Components::PayloadOperationKind::CAPTURE,
+                                      Components::PayloadOperationState::COMPLETED, 32U, sizeof(product),
+                                      Components::ScienceProductSource::NEUTRON_SIM, sourcePath,
+                                      scienceProductCrc(product, sizeof(product)), true);
+    this->component.doDispatch();
+    this->invoke_to_productStoredIn(0, 32U, false);
+    this->component.doDispatch();
+    ASSERT_EVENTS_ScienceProductNotStored_SIZE(1);
+    ASSERT_from_deliveryRequestOut_SIZE(0);
+}
+
+void ScienceAppTester::testInhibitedCaptureIsReportedAndChangesNoMode() {
+    this->clearHistory();
+    const Fw::String empty("");
+#ifdef NEUTRON2_CONFIGURED_CAPTURE
+    this->sendCmd_SCIENCE_CAPTURE(0, 1);
+#else
+    this->sendCmd_SCIENCE_CAPTURE(0, 1, 5U);
+#endif
+    this->component.doDispatch();
+    ASSERT_from_payloadRequestOut_SIZE(1);
+    this->invoke_to_operationNoticeIn(0, 1U, 0U, Components::PayloadOperationKind::CAPTURE,
+                                      Components::PayloadOperationState::INHIBITED, 0U, 0U,
+                                      Components::ScienceProductSource::UNKNOWN, empty, 0U, true);
+    this->component.doDispatch();
+    ASSERT_EVENTS_ScienceOperationRejected_SIZE(1);
+    ASSERT_EVENTS_ScienceOperationRejected(0, 1U, Components::PayloadOperationState::INHIBITED);
+    ASSERT_from_missionModeOut_SIZE(0);
+}
+
+void ScienceAppTester::testCancelReportsBackToMissionApp() {
+    this->clearHistory();
+    this->invoke_to_requestIn(0, 20U);
+    this->component.doDispatch();
+    this->invoke_to_cancelRequestIn(0, 7U);
+    this->component.doDispatch();
+    ASSERT_from_cancelReportOut_SIZE(1);
+    ASSERT_from_cancelReportOut(0, 7U);  // MissionApp matches this key to its SAFE cancel
+    for (U32 tick = 0U; tick < 25U; ++tick) {
+        this->invoke_to_run(0, 0U);
+        this->component.doDispatch();
+    }
+    ASSERT_from_payloadRequestOut_SIZE(0);
 }
 
 void ScienceAppTester::testCollectAndDownlinkClearsIntentOnFailure() {

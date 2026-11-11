@@ -151,6 +151,8 @@
     connections MissionFlow {
       missionApp.collectionRequestOut -> scienceApp.requestIn
       missionApp.cancelRequestOut -> scienceApp.cancelRequestIn
+      scienceApp.cancelReportOut -> missionApp.cancelReportIn
+      storageManager.productStoredOut -> scienceApp.productStoredIn
       payloadManager.operationNoticeOut -> scienceApp.operationNoticeIn
       scienceApp.scienceProductOut -> storageManager.requestIn
       scienceApp.deliveryRequestOut -> storageManager.deliveryRequestIn

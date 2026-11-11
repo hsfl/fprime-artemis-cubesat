@@ -17,6 +17,13 @@ Base case: coordinate RFM23BP downlink and RPi-emulated payload collection.
 - `ENTER_BASE_MODE`
 - `PING(token)`
 - `SCHEDULE_COLLECTION(delaySeconds)`
+- `CANCEL_COLLECTION`
+- `REPORT_MODE` (read-only: emits one `ModeReport` event with the current mode)
+- `SET_MODE(mode)` (switch operations mode: `BASE`, `SAFE` or `SCIENCE_DOWNLINK`; the transition table refuses the rest with a reason)
+- `CLEAR_SAFE_LATCH` (clears a latched SAFE fault; leaving SAFE still needs `SET_MODE BASE`)
+- `SIMULATE_SAFE_FAULT(cause, latch)` (local Yamcs builds only: acts like a fault indication)
+
+MissionApp decides what each mode allows and tells the other components through ports: `captureControlOut` inhibits or enables captures in PayloadManager, `cancelRequestOut` cancels pending collections in ScienceApp. Both report back, and SAFE entry is complete only then.
 
 ## Abstraction Rule
 
