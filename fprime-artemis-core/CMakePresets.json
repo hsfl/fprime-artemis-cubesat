@@ -1,21 +1,86 @@
 {
-    "version": 4,
-    "configurePresets": [
+  "version": 4,
+  "configurePresets": [
     {
       "name": "fprime-zephyr-teensy41",
-      "displayName": "F´ Zephyr (teensy41)",
-      "description": "F´ release build using local fprime-venv",
+      "displayName": "F\u00b4 Zephyr (teensy41)",
+      "description": "F\u00b4 release build using local fprime-venv",
       "binaryDir": "${sourceDir}/build-fprime-automatic-zephyr",
       "environment": {
         "VIRTUAL_ENV": "${fileDir}/fprime-venv",
         "PATH": "$env{VIRTUAL_ENV}/bin:$penv{PATH}"
       },
       "cacheVariables": {
-          "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-          "CMAKE_BUILD_TYPE": "Release",
-          "BOARD": "teensy41"
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_BUILD_TYPE": "Release",
+        "BOARD": "teensy41"
       },
       "toolchainFile": "${fileDir}/lib/fprime-zephyr/cmake/toolchain/zephyr.cmake",
       "generator": "Ninja"
-    }]
+    },
+    {
+      "name": "yamcs-twin",
+      "displayName": "yamcs-twin",
+      "description": "FC configure profile; full split build and runtime via tools/deployments.py",
+      "binaryDir": "${sourceDir}/../.profiles/yamcs-twin/build/fc",
+      "generator": "Ninja",
+      "toolchainFile": "${sourceDir}/lib/fprime-zephyr/cmake/toolchain/zephyr.cmake",
+      "cacheVariables": {
+        "FPRIME_PROJECT_ROOT": "${sourceDir}",
+        "FPRIME_FRAMEWORK_PATH": "${sourceDir}/lib/fprime",
+        "FPRIME_LIBRARY_LOCATIONS": "${sourceDir}/lib/fprime-zephyr;${sourceDir}/../tools/cross",
+        "FPRIME_ENABLE_FRAMEWORK_UTS": "OFF",
+        "FPRIME_ENABLE_AUTOCODER_UTS": "OFF",
+        "BOARD": "native_sim/native/64",
+        "ARTEMIS_TWIN": "ON",
+        "ARTEMIS_GROUND_LINK": "RFM23",
+        "USER_CACHE_DIR": "${sourceDir}/../.profiles/yamcs-twin/build/fc/.cache",
+        "FPRIME_INSTALL_DEST": "${sourceDir}/../.profiles/yamcs-twin/artifacts/fc",
+        "ZEPHYR_TOOLCHAIN_VARIANT": "host",
+        "CONF_FILE": "prj_native.conf",
+        "DTC_OVERLAY_FILE": "boards/native_sim.overlay"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "yamcs-rfm23-hil",
+      "displayName": "yamcs-rfm23-hil",
+      "description": "FC configure profile; full split build and runtime via tools/deployments.py",
+      "binaryDir": "${sourceDir}/../.profiles/yamcs-rfm23-hil/build/fc",
+      "generator": "Ninja",
+      "toolchainFile": "${sourceDir}/lib/fprime-zephyr/cmake/toolchain/zephyr.cmake",
+      "cacheVariables": {
+        "FPRIME_PROJECT_ROOT": "${sourceDir}",
+        "FPRIME_FRAMEWORK_PATH": "${sourceDir}/lib/fprime",
+        "FPRIME_LIBRARY_LOCATIONS": "${sourceDir}/lib/fprime-zephyr;${sourceDir}/../tools/cross",
+        "FPRIME_ENABLE_FRAMEWORK_UTS": "OFF",
+        "FPRIME_ENABLE_AUTOCODER_UTS": "OFF",
+        "BOARD": "teensy41",
+        "ARTEMIS_TWIN": "OFF",
+        "ARTEMIS_GROUND_LINK": "RFM23",
+        "USER_CACHE_DIR": "${sourceDir}/../.profiles/yamcs-rfm23-hil/build/fc/.cache",
+        "FPRIME_INSTALL_DEST": "${sourceDir}/../.profiles/yamcs-rfm23-hil/artifacts/fc"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "yamcs-twin",
+      "configurePreset": "yamcs-twin",
+      "targets": [
+        "FprimeArtemisCore_Deployments_FlightControllerDeployment"
+      ]
+    },
+    {
+      "name": "yamcs-rfm23-hil",
+      "configurePreset": "yamcs-rfm23-hil",
+      "targets": [
+        "FprimeArtemisCore_Deployments_FlightControllerDeployment"
+      ]
+    }
+  ]
 }

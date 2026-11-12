@@ -31,6 +31,11 @@ class ArtifactPairTests(unittest.TestCase):
             ignored.parent.mkdir()
             ignored.write_text("generated cache")
             self.assertEqual(before, working_source_digest(root))
+            for name in ("venv/lib/site-packages/metadata.json", "sysroot/usr/include/generated.h", "verify/run.json"):
+                ignored = root / "tools/cross" / name
+                ignored.parent.mkdir(parents=True, exist_ok=True)
+                ignored.write_text("local generated state")
+                self.assertEqual(before, working_source_digest(root), name)
 
     def test_modified_dictionary_cannot_start_with_old_manifest(self):
         with tempfile.TemporaryDirectory() as temporary:

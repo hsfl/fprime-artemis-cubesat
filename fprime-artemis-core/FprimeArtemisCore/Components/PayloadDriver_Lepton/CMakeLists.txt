@@ -15,6 +15,7 @@ register_fprime_module(
 )
 
 set(LEPTON_UVC_ENABLED OFF)
+option(ARTEMIS_REQUIRE_UVC "Reject payload builds without the physical Lepton UVC backend" OFF)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # CMake's default multiarch search does not always descend into an ARM
     # sysroot's arm-linux-gnueabihf directory. Keep native Linux discovery,
@@ -49,6 +50,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 else()
     message(STATUS "PayloadDriver_Lepton: libuvc disabled for non-Linux host ${CMAKE_SYSTEM_NAME}")
+endif()
+if(ARTEMIS_REQUIRE_UVC AND NOT LEPTON_UVC_ENABLED)
+    message(FATAL_ERROR "ARTEMIS_REQUIRE_UVC requires target libuvc headers/library and libusb-1.0")
 endif()
 
 register_fprime_ut(

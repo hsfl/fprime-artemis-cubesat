@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "profiles": {
+    "yamcs-twin": {
+      "description": "Local Zephyr/Linux applications, virtual devices/RF and Yamcs",
+      "flight_controller": {"board": "native_sim/native/64", "twin": true, "ground_link": "RFM23"},
+      "payload_computer": {"target": "native-linux", "camera_backend": "sample"},
+      "ground": {"transport": "virtual", "yamcs_port": 8090}
+    },
+    "yamcs-rfm23-hil": {
+      "description": "Teensy41 RFM23BP, Pi Zero W ARMv6/UVC and explicit Ground Teensy serial streams",
+      "flight_controller": {"board": "teensy41", "twin": false, "ground_link": "RFM23"},
+      "payload_computer": {"target": "pi-zero-w-armv6hf", "camera_backend": "uvc", "require_uvc": true},
+      "ground": {"transport": "serial", "baud": 115200, "yamcs_port": 8090, "ccsds_interface": 0, "science_interface": 2}
+    }
+  }
+}

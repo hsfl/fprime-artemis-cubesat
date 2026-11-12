@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import shutil
 import subprocess
@@ -43,7 +44,7 @@ def working_source_digest(root: Path = ROOT) -> str:
     paths = set()
     for tree in (root / "fprime-artemis-core", root / "tools/cross", root / "config"):
         for directory, names, files in os.walk(tree):
-            names[:] = sorted(name for name in names if name not in ("lib", "fprime-venv", ".venv", "__pycache__", ".git")
+            names[:] = sorted(name for name in names if name not in ("lib", "fprime-venv", ".venv", "venv", "sysroot", "verify", "__pycache__", ".git")
                               and not name.startswith("build"))
             for name in files:
                 path = Path(directory) / name
@@ -121,7 +122,9 @@ def build(role: str, jobs: int) -> None:
         shutil.copy2(source, temporary)
         temporary.replace(destination)
     project_state = git_state(ROOT)
-    manifest = {"role": role, "source_sha": project_state["sha"], "source_dirty": project_state["dirty"],
+    manifest = {"role": role, "deployment_profile": "yamcs-twin",
+                "target": "native_sim/native/64" if role == "fc" else platform.machine() + "-linux",
+                "source_sha": project_state["sha"], "source_dirty": project_state["dirty"],
                 "source_dirty_paths": project_state["dirty_paths"], "working_source_sha256": working_source_digest(),
                 "framework_sha": source_sha(PROJECT / "lib/fprime"),
                 "zephyr_sha": source_sha(PROJECT / "lib/zephyr-workspace/zephyr"),

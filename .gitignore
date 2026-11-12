@@ -53,3 +53,6 @@ ArtemisTeensy_N2_Baremetal/build/
 /tools/cross/venv/
 .cross-venv-linux/
 /.twin-runs/
+
+# Named profile generated builds, release artifacts and local run data
+/.profiles/

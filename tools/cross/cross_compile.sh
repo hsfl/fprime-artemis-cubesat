@@ -26,6 +26,7 @@ CLEAN="false"
 LOCAL_ONLY="false"
 COPY_ONLY="false"
 SKIP_SMOKE="false"
+REQUIRE_UVC="false"
 
 usage() {
   cat <<'EOF'
@@ -78,6 +79,7 @@ Options:
                         sysroot alone.
   --resync-sysroot      Re-copy the sysroot from the Pi. The sysroot is shared
                         by every project, so this affects all of them.
+  --require-uvc         Require the real Lepton UVC driver/libraries at configure time
   --skip-sync           Reuse an existing sysroot without rsync
   --skip-image-build    Reuse the existing Docker image tag
   --local-only          Build + verify locally only (skip SSH deploy/smoke)
@@ -114,6 +116,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --clean)
       CLEAN="true"
+      shift
+      ;;
+    --require-uvc)
+      REQUIRE_UVC="true"
       shift
       ;;
     --skip-sync)
@@ -154,6 +160,11 @@ done
 
 if [[ "$COPY_ONLY" == "true" && "$LOCAL_ONLY" == "true" ]]; then
   echo "--copy-only and --local-only are mutually exclusive" >&2
+  exit 2
+fi
+
+if [[ "$LOCAL_ONLY" == "true" && "$SYNC_SYSROOT" == "true" ]]; then
+  echo "--local-only cannot be combined with --resync-sysroot (SSH is disabled)." >&2
   exit 2
 fi
 
@@ -306,12 +317,13 @@ if [[ "$BUILD_IMAGE" == "true" ]]; then
 fi
 
 CONTAINER_SCRIPT="$(mktemp)"
+trap 'rm -f "$CONTAINER_SCRIPT"' EXIT
 cat > "$CONTAINER_SCRIPT" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
 PROJECT_DIR="/repo/$PROJECT"
-SYSROOT_DIR="/repo/tools/cross/sysroot"
+SYSROOT_DIR="/sysroot"
 VERIFY_DIR="/repo/tools/cross/verify/$PROJECT/$DEPLOYMENT"
 BUILD_DIR="$PROJECT_DIR/build-fprime-automatic-$TOOLCHAIN"
 
@@ -375,19 +387,40 @@ if [[ -f "$BUILD_DIR/CMakeCache.txt" ]]; then
   fi
 fi
 
+# In the split core, Linux must not import the Zephyr-only OS/driver library.
+# Keep the override explicit rather than relying on a copied settings.ini/cache.
+LINUX_CORE="false"
+if [[ "$PROJECT" == "fprime-artemis-core" ]]; then LINUX_CORE="true"; fi
+CONFIG_KEY="$(printf '%s\n' 'linux-cmake-v2' "$REQ_KEY" "$LINUX_CORE" "${REQUIRE_UVC:-false}" "$SYSROOT_ID" | sha256sum | cut -c1-24)"
+OLD_KEY="$(cat "$BUILD_DIR/.artemis-cross-config" 2>/dev/null || true)"
 cd "$PROJECT_DIR"
-if [[ "${CLEAN_BUILD:-false}" == "true" || ! -d "$BUILD_DIR" ]]; then
-  GENERATE_ARGS=("$TOOLCHAIN")
-  if [[ "${CLEAN_BUILD:-false}" == "true" ]]; then
-    GENERATE_ARGS+=("-f")
-  fi
-  GENERATE_ARGS+=(
+if [[ "${CLEAN_BUILD:-false}" == "true" || ! -d "$BUILD_DIR" || "$OLD_KEY" != "$CONFIG_KEY" ]]; then
+  GENERATE_ARGS=(
     "-DCMAKE_BUILD_TYPE=Release"
     "-DCMAKE_SYSROOT=$SYSROOT_DIR"
     "-DARTEMIS_ARM_HELPERS_DIR=$PROJECT_DIR/lib/fprime/cmake/toolchain/helpers"
     "-DCMAKE_VERBOSE_MAKEFILE=ON"
   )
-  fprime-util generate "${GENERATE_ARGS[@]}"
+  if [[ "$LINUX_CORE" == "true" ]]; then
+    GENERATE_ARGS+=("-DFPRIME_LIBRARY_LOCATIONS=/repo/tools/cross" "-DARTEMIS_TWIN=OFF"
+                   "-DFPRIME_PROJECT_ROOT=$PROJECT_DIR" "-DFPRIME_FRAMEWORK_PATH=$PROJECT_DIR/lib/fprime"
+                   "-DFPRIME_ENABLE_FRAMEWORK_UTS=OFF" "-DFPRIME_ENABLE_AUTOCODER_UTS=OFF"
+                   "-DCMAKE_TOOLCHAIN_FILE=/repo/tools/cross/cmake/toolchain/$TOOLCHAIN.cmake")
+    if [[ "${REQUIRE_UVC:-false}" != "true" ]]; then GENERATE_ARGS+=("-DARTEMIS_REQUIRE_UVC=OFF"); fi
+  fi
+  if [[ "${REQUIRE_UVC:-false}" == "true" ]]; then GENERATE_ARGS+=("-DARTEMIS_REQUIRE_UVC=ON"); fi
+  if [[ "$LINUX_CORE" == "true" ]]; then
+    # fprime-util merges settings.ini library_locations into CLI -D options.
+    # Direct CMake honors the Linux-only library list without editing the
+    # shared Zephyr settings.ini or importing unused Zephyr implementation targets.
+    if [[ "${CLEAN_BUILD:-false}" == "true" ]]; then rm -rf "$BUILD_DIR"; fi
+    cmake -S "$PROJECT_DIR" -B "$BUILD_DIR" -G Ninja "${GENERATE_ARGS[@]}"
+  else
+    FORCE_ARGS=()
+    if [[ -d "$BUILD_DIR" ]]; then FORCE_ARGS+=("-f"); fi
+    fprime-util generate "$TOOLCHAIN" "${FORCE_ARGS[@]}" "${GENERATE_ARGS[@]}"
+  fi
+  printf '%s\n' "$CONFIG_KEY" > "$BUILD_DIR/.artemis-cross-config"
 else
   echo "Reusing existing F Prime build cache: $BUILD_DIR"
 fi
@@ -395,7 +428,11 @@ fi
 # Build from inside the deployment directory so only the selected deployment
 # and its dependencies are built, whatever the project layout is.
 cd "$PROJECT_DIR/$DEPLOYMENT_REL"
-fprime-util build "$TOOLCHAIN"
+if [[ "$LINUX_CORE" == "true" ]]; then
+  cmake --build "$BUILD_DIR" --target "${DEPLOYMENT_REL//\//_}" --parallel 8
+else
+  fprime-util build "$TOOLCHAIN"
+fi
 
 # Artifact directories are named after the deployment, but nested projects
 # prefix them with the module path (FprimeArtemisCore_Deployments_<name>).
@@ -429,10 +466,17 @@ fi
 
 printf '%s\n' "$BIN_PATH" > "$VERIFY_DIR/binary-path.txt"
 printf '%s\n' "$DICT_PATH" > "$VERIFY_DIR/dictionary-path.txt"
+VERIFY_ARGS=(--binary "$BIN_PATH" --dictionary "$DICT_PATH" --sysroot "$SYSROOT_DIR"
+             --project "$PROJECT_DIR" --build-dir "$BUILD_DIR" --deployment "$DEPLOYMENT" --output "$VERIFY_DIR/manifest.json")
+if [[ "${REQUIRE_UVC:-false}" == "true" ]]; then VERIFY_ARGS+=(--require-uvc); fi
+python /repo/tools/cross/verify_artifact.py "${VERIFY_ARGS[@]}"
 EOF
 chmod +x "$CONTAINER_SCRIPT"
 
+SYSROOT_ID="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$SYSROOT_DIR")"
 docker run --rm \
+  -e SYSROOT_ID="$SYSROOT_ID" \
+  -e REQUIRE_UVC="$REQUIRE_UVC" \
   -e CLEAN_BUILD="$CLEAN" \
   -e CLEAN_VENV="$CLEAN" \
   -e PROJECT="$PROJECT" \
@@ -440,6 +484,7 @@ docker run --rm \
   -e DEPLOYMENT_REL="$DEPLOYMENT_REL" \
   -e TOOLCHAIN="$TOOLCHAIN" \
   -v "$REPO_ROOT:/repo" \
+  -v "$SYSROOT_DIR:/sysroot:ro" \
   -v "$CONTAINER_SCRIPT:/tmp/run-build.sh:ro" \
   -w "/repo/$PROJECT" \
   "$IMAGE_TAG" \

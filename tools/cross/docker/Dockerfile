@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ninja-build \
     pkg-config \
+    qemu-user \
     rsync \
     && rm -rf /var/lib/apt/lists/*
 
