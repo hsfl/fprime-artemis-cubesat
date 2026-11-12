@@ -10,6 +10,9 @@ Read its verified unchanged-C3M-app compatibility result and producing-dictionar
 
 Architecture and documentation map: [current twin design](../../docs/architecture/ARTEMIS_LOCAL_TWIN.md).
 
+Physical kit deployment: [target commands and readiness gaps](../../docs/development/ARTEMIS_HARDWARE_HANDOFF.md).
+The verified local twin is not yet a turnkey physical deployment.
+
 ## Start on macOS
 
 From the repository root:

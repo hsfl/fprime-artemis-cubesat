@@ -136,6 +136,7 @@ it does not make the app a second live receiver for the twin's radio.
 
 | Need | Document |
 |---|---|
+| Physical-target commands and remaining deployment gates | [Hardware handoff status](../development/ARTEMIS_HARDWARE_HANDOFF.md) |
 | Start/build/stop and fault controls | [Runtime runbook](../../tools/twin/README.md) |
 | Power → capture → cache → downlink → download → existing app | [Operator walkthrough](../operations/walkthroughs/C3M_YAMCS_LOCAL_TWIN.md) |
 | Decisions, milestones and detailed test provenance | [Milestone record](../development/ARTEMIS_LOCAL_TWIN.md) |
