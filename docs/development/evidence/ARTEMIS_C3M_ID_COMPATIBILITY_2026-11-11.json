@@ -1,0 +1,129 @@
+{
+  "result": "PASS",
+  "run_id": "20261112T055046Z-d8611b",
+  "date_hst": "2026-11-11",
+  "branch": "codex/artemis-local-twin",
+  "producer_changes": {
+    "lepton_base_container_and_record": "0x10027000",
+    "pi_link_buffer_manager_base": "0x10034000"
+  },
+  "working_source_sha256": "5fa3d4d3239ce5ed4df9e9af4cd499e8e4b6f47b9b3ec333f8e0d5b410ad8c47",
+  "builds": {
+    "fc": {
+      "framework_sha": "f22ce8f2f2943e641d454e9daa7f129e6c878d32",
+      "binary_sha256": "7cad3ef25f156c2692f867b19af55a25f8e46cdc41147387c9de88beed6f1095",
+      "dictionary_sha256": "651cd25f38e563c50d0c3fdd392fb96764ab7b02a22bdf6458d683dcd490b3af"
+    },
+    "pi": {
+      "framework_sha": "f22ce8f2f2943e641d454e9daa7f129e6c878d32",
+      "binary_sha256": "d1daafac5eedf11047765861f2b9a1cf642e4381d19bf3d633a2991546a7b740",
+      "dictionary_sha256": "e1654e92e4d9e9952ee5242976119416787f71a9dd53b349f2fa16fbfbe3998a"
+    }
+  },
+  "unchanged_app": {
+    "app_source_sha256": {
+      "ArtemisRpiTeensy_N2/tools/payload_receiver.py": "b1383568d2e4756ec02227f38efc95e820527e4fab11d0520626978ca308776a",
+      "ground-station/boson-viewer/boson_viewer.py": "e56bbbc32142c8ef7aef94ab163365317307f64ea9878ddb3443028e4bfa9ba6",
+      "ground-station/c3m-payload-receiver-ui/c3m_payload_receiver_ui.py": "096d03928406366a1a538f22b20c94c0162e9df19614e33d74bfa77d904ea43d",
+      "ground-station/c3m-payload-receiver-ui/static/app.js": "945141cb52d4a43a451df8aa02eb31e0b79e804030f0207701cd754fe3e0078e",
+      "ground-station/c3m-payload-receiver-ui/static/index.html": "76298b739d027c2f5c827c8ee8c8681be4588d09ebfa13378c43baee270bf8f5",
+      "ground-station/c3m-payload-receiver-ui/static/styles.css": "1bb185f1e4cde358c1cb07951e668b450c441becd51ffb6b54cf431278b08944",
+      "ground-station/lepton-dp-viewer/lepton_dp_viewer.py": "2cecacc28e2d3d1450202796694586ed113f9f7e3fbe3007d375ec1251591699"
+    },
+    "app_sources_unchanged": true,
+    "fprime_gds_version": "4.2.1",
+    "python_executable": "/Users/sozodennis/Developer/Artemis-Cubesat-Kit/fprime-artemis-cubesat/ArtemisRpiTeensy_N2/fprime-venv/bin/python",
+    "fprime_dp_executable": "/Users/sozodennis/Developer/Artemis-Cubesat-Kit/epscorc3m/ArtemisRpiTeensy_N2/fprime-venv/bin/fprime-dp",
+    "fprime_dp_launcher_sha256": "a2fdb4caa474e308bd2e2fa263efb0db6fee9b1f3af8920317bbdd04ab7a9c85"
+  },
+  "checks": {
+    "fresh_yamcs_cycles": 3,
+    "pi_off_loss_repair": true,
+    "actual_unchanged_app_replays": 4,
+    "runtime_tests": 15,
+    "app_source_edits": false,
+    "runtime_automatic_analysis": false
+  },
+  "products": [
+    {
+      "product_id": 16,
+      "bytes": 38486,
+      "object": "lepton-20261112T055046Z-d8611b-00000010-01-18f060926c00.fdp",
+      "sha256": "18f060926c0058cc6b96351288e63256e31a651587fa37cade0efcf8c6310ac9",
+      "crc16": 59851,
+      "repair_rounds": 0,
+      "yamcs_file_and_source_equal": true,
+      "unchanged_c3m_history": "complete",
+      "samples": 19200,
+      "csv_shape": [
+        120,
+        160
+      ],
+      "fixture_temperatures_equal": true,
+      "png_created": true,
+      "app_verification_file": "unchanged-c3m-app-pass/compatibility.json"
+    },
+    {
+      "product_id": 17,
+      "bytes": 38486,
+      "object": "lepton-20261112T055046Z-d8611b-00000011-02-42d9b045938c.fdp",
+      "sha256": "42d9b045938cbcb32c44bf9b45c3c808b79dd7981fc7af13663db0579f156cf9",
+      "crc16": 21521,
+      "repair_rounds": 0,
+      "yamcs_file_and_source_equal": true,
+      "unchanged_c3m_history": "complete",
+      "samples": 19200,
+      "csv_shape": [
+        120,
+        160
+      ],
+      "fixture_temperatures_equal": true,
+      "png_created": true,
+      "app_verification_file": "unchanged-c3m-product-17/compatibility.json"
+    },
+    {
+      "product_id": 18,
+      "bytes": 38486,
+      "object": "lepton-20261112T055046Z-d8611b-00000012-03-cac5a82296ea.fdp",
+      "sha256": "cac5a82296ea44af022849c39e22fce5bf4b52358e3792bdf3e04abbaf723e71",
+      "crc16": 45769,
+      "repair_rounds": 0,
+      "yamcs_file_and_source_equal": true,
+      "unchanged_c3m_history": "complete",
+      "samples": 19200,
+      "csv_shape": [
+        120,
+        160
+      ],
+      "fixture_temperatures_equal": true,
+      "png_created": true,
+      "app_verification_file": "unchanged-c3m-product-18/compatibility.json"
+    },
+    {
+      "product_id": 19,
+      "bytes": 38486,
+      "object": "lepton-20261112T055046Z-d8611b-00000013-04-af6acc97bee0.fdp",
+      "sha256": "af6acc97bee0d0cb67642d352e3f93022768d8377f755cfda464d8377f137027",
+      "crc16": 60387,
+      "repair_rounds": 1,
+      "yamcs_file_and_source_equal": true,
+      "unchanged_c3m_history": "complete",
+      "samples": 19200,
+      "csv_shape": [
+        120,
+        160
+      ],
+      "fixture_temperatures_equal": true,
+      "png_created": true,
+      "app_verification_file": "unchanged-c3m-pi-off-final/compatibility.json"
+    }
+  ],
+  "report_hashes": {
+    "acceptance.json": "01747ef5e11ca0643c006a351cf8a65c89fdf5c8ae863413cebc2eb1d2920cbe",
+    "acceptance-pi-off-repair.json": "c623ed8348e643b0d8b19c767a3324f0ac9fb60f2d3a0d27925b37077b4de3d7",
+    "unchanged-c3m-app-pass/compatibility.json": "6d25c3368692b7b8842a7dcbe2cf90aa44a6a6deb6ddbac4979743a175aa96d7",
+    "unchanged-c3m-product-17/compatibility.json": "928564e16c4328fd00972e8d7ce3ea1e1f38551a5d283001f4bfde2a1b18bb79",
+    "unchanged-c3m-product-18/compatibility.json": "a5e1e7d33afe1cd736cd2c7be270f93b49f62d03dac4775d05adaa8014938da7",
+    "unchanged-c3m-pi-off-final/compatibility.json": "0fd6fc0d5aa80c8f65809d3c2db3b7345e62795bb91be917bd3e889b88bd20f7"
+  }
+}

@@ -1,0 +1,184 @@
+{
+  "scope": "Local split FC/Pi twin; raw FDP delivery through Yamcs; analysis in existing mission ops software",
+  "run_id": "20261112T052132Z-f1628f",
+  "branch": "codex/artemis-local-twin",
+  "base": "d35be8174be8e5300f939dd5667c5b4c19060f7c",
+  "source_working_sha256": "5f112123856d311de8837bf456677ab5461697cadcd665a50ea376f15139ce7f",
+  "pins": {
+    "framework_sha": "f22ce8f2f2943e641d454e9daa7f129e6c878d32",
+    "zephyr_sha": "3568e1b6d5cdd51a6b964a2a1d6d29200fea2056"
+  },
+  "artifacts": {
+    "fc": {
+      "binary_sha256": "7cad3ef25f156c2692f867b19af55a25f8e46cdc41147387c9de88beed6f1095",
+      "dictionary_sha256": "651cd25f38e563c50d0c3fdd392fb96764ab7b02a22bdf6458d683dcd490b3af"
+    },
+    "pi": {
+      "binary_sha256": "72a585c8298cb4d48a89ad1764e1cb5775ba1790ce47916a152843c1a144d050",
+      "dictionary_sha256": "56023d15eab21445366717207d3085725f8401c7689d509040612b553f002af7"
+    }
+  },
+  "native_acceptance": {
+    "three_capture_cycles": "PASS",
+    "product_ids": [
+      7,
+      8,
+      9
+    ],
+    "pi_off_repair": "PASS",
+    "pi_off_product_id": 10,
+    "pi_off_repair_rounds": 1,
+    "faults": [
+      {
+        "case": "invalid_command_argument_rejected",
+        "result": "PASS"
+      },
+      {
+        "case": "active_capture_cancel_recovery",
+        "result": "PASS"
+      },
+      {
+        "case": "pc_link_mid_stage",
+        "result": "PASS"
+      },
+      {
+        "case": "radio_off_retains_cache",
+        "result": "PASS"
+      },
+      {
+        "case": "yamcs_unavailable_outbox_recovery",
+        "result": "PASS"
+      }
+    ]
+  },
+  "parent_verification": {
+    "all_archived_raw_get_crc_sha_equal": true,
+    "raw_file_count": 8,
+    "latest_pi_source_hash_equal": true,
+    "normal_yamcs_storage_browser_download": true,
+    "custom_viewer_or_automatic_analysis": false
+  },
+  "products": [
+    {
+      "product_id": 7,
+      "transfer_id": 1,
+      "bytes": 38486,
+      "crc16": 4880,
+      "sha256": "63686af6889c5ee6f51851c4f24f21a3a438548e25f7d66a5bf226be4196ec77",
+      "retry_rounds": 0,
+      "object": "lepton-20261112T052132Z-f1628f-00000007-01-63686af6889c.fdp"
+    },
+    {
+      "product_id": 8,
+      "transfer_id": 2,
+      "bytes": 38486,
+      "crc16": 29144,
+      "sha256": "5ca656900c0dab600b14f7b321538042439ed8537e99e8545f301e1944af2e2c",
+      "retry_rounds": 0,
+      "object": "lepton-20261112T052132Z-f1628f-00000008-02-5ca656900c0d.fdp"
+    },
+    {
+      "product_id": 9,
+      "transfer_id": 3,
+      "bytes": 38486,
+      "crc16": 18792,
+      "sha256": "1300e33b060f4bd02769fe1e7054bc44032f515b1ca7342f0c8157946038f546",
+      "retry_rounds": 0,
+      "object": "lepton-20261112T052132Z-f1628f-00000009-03-1300e33b060f.fdp"
+    },
+    {
+      "product_id": 10,
+      "transfer_id": 4,
+      "bytes": 38486,
+      "crc16": 54695,
+      "sha256": "9ba68b44af5c319fe88df71f4229c2712bdd8b2579ea407ca0f9011ae2cdd8e8",
+      "retry_rounds": 1,
+      "object": "lepton-20261112T052132Z-f1628f-0000000a-04-9ba68b44af5c.fdp"
+    },
+    {
+      "product_id": 11,
+      "transfer_id": 5,
+      "bytes": 38486,
+      "crc16": 10824,
+      "sha256": "09324940e39019ba5231d35349bc7aa339314241f3c5bc350b7ccd6bfc8b1644",
+      "retry_rounds": 0,
+      "object": "lepton-20261112T052132Z-f1628f-0000000b-05-09324940e390.fdp"
+    },
+    {
+      "product_id": 13,
+      "transfer_id": 6,
+      "bytes": 38486,
+      "crc16": 2633,
+      "sha256": "81a2beedcfa33f093397546f6a0e795a5410af54af53b9f04d11b98c803cf72e",
+      "retry_rounds": 0,
+      "object": "lepton-20261112T052132Z-f1628f-0000000d-06-81a2beedcfa3.fdp"
+    },
+    {
+      "product_id": 14,
+      "transfer_id": 8,
+      "bytes": 38486,
+      "crc16": 36499,
+      "sha256": "d4b0d460d33b718048d36e3f51852e3d1ff215c336922c907df796d5e08110b1",
+      "retry_rounds": 0,
+      "object": "lepton-20261112T052132Z-f1628f-0000000e-08-d4b0d460d33b.fdp"
+    },
+    {
+      "product_id": 15,
+      "transfer_id": 9,
+      "bytes": 38486,
+      "crc16": 64938,
+      "sha256": "e567225dbd972b842a4ebc58eba2b2ef82352786c2458b1d5b29aff58f768096",
+      "retry_rounds": 0,
+      "object": "lepton-20261112T052132Z-f1628f-0000000f-09-e567225dbd97.fdp"
+    }
+  ],
+  "component_checks": {
+    "runtime_python_tests": 15,
+    "science_coordinator_fprime": 11,
+    "pi_service_fprime": 7,
+    "lepton_driver_fprime": 4,
+    "eps_manager_fprime": 3,
+    "cache_receiver_host": 2,
+    "radio_link_host": 2,
+    "pdu_host_interoperability": 2,
+    "pi_helpers": 1
+  },
+  "teensy_targets": {
+    "rfm23": {
+      "elf_sha256": "03b86a3e5660453ca20f57e54c48f8c23dfe218c19db6b24535e933951791937",
+      "main_ram_static_high_water_bytes": 268432,
+      "main_ram_capacity_bytes": 524288,
+      "main_ram_static_percent": 51.1993,
+      "main_malloc_address_space_remaining_bytes": 255856,
+      "cache_address": "0x20280000",
+      "cache_noload_bytes": 196608,
+      "cache_bank_bytes": 262144,
+      "cache_bank_percent": 75.0,
+      "combined_static_reservations_bytes": 465040,
+      "physical_ram_bytes": 1048576,
+      "combined_static_percent_of_physical": 44.3497,
+      "runtime_heap_stack_peaks": "not measured; physical bench gate"
+    },
+    "usb": {
+      "elf_sha256": "6a134bc720140801d3924f8fdfbb03aba2822f674058d2c0031e46a0e19ccb7c",
+      "main_ram_static_high_water_bytes": 272720,
+      "main_ram_capacity_bytes": 524288,
+      "main_ram_static_percent": 52.0172,
+      "main_malloc_address_space_remaining_bytes": 251568,
+      "cache_address": "0x20280000",
+      "cache_noload_bytes": 196608,
+      "cache_bank_bytes": 262144,
+      "cache_bank_percent": 75.0,
+      "combined_static_reservations_bytes": 469328,
+      "physical_ram_bytes": 1048576,
+      "combined_static_percent_of_physical": 44.7586,
+      "runtime_heap_stack_peaks": "not measured; physical bench gate"
+    }
+  },
+  "evidence_files": {
+    "acceptance.json": "5990929b4adf9ca9c06dd2c59defff50f2089b704a1f5eb3ee03bd38c10e71c6",
+    "acceptance-pi-off-repair.json": "f01f702eb32106badbcd1c0e9669b0c0685da0bc5b8d057ce99467a5a3b106bf",
+    "acceptance-faults.json": "5b03cb900baa048dcc880f1bd6678fe9117d625d8871fa4018642887f4b5f05d"
+  },
+  "physical_hardware_runtime": "Not exercised; peak target heap/stack, physical buses and timing remain bench gates"
+}

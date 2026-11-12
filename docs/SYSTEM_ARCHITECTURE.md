@@ -1,5 +1,35 @@
 # System Architecture
 
+## Local Artemis twin branch
+
+The dedicated `codex/artemis-local-twin` branch implements a separate
+Teensy-primary Artemis architecture in `fprime-artemis-core`: the FC owns mission
+policy, scheduling, sensors, EPS, cache and radio; the Pi owns Lepton capture,
+processing and persistent files. Yamcs commands the FC and archives verified
+ground-received science. The full product stages into one 192 KiB FC RAM buffer
+before transmission; repairs read that retained buffer with the Pi off.
+
+```mermaid
+flowchart LR
+    Y[Yamcs operations] <-->|CCSDS via virtual RF| F[Zephyr flight controller]
+    F <-->|Correlated capture and 200-byte staging| P[Linux Pi payload]
+    P --> D[Persistent DpWriter products]
+    F --> C[192 KiB internal OCRAM cache]
+    C --> R[Channel 1 downlink and repair]
+    R --> G[Ground CRC verification]
+    G --> A[Yamcs raw file archive and download]
+    A --> M[Existing mission ops software for analysis]
+```
+
+Docker Desktop supplies one Linux VM with separate Compose roles, virtual UARTs,
+packet airtime and device models. See the
+[current twin architecture](architecture/ARTEMIS_LOCAL_TWIN.md),
+[runbook](../tools/twin/README.md) and
+[milestone/evidence record](development/ARTEMIS_LOCAL_TWIN.md). The remainder of
+this crosswalk describes the preserved legacy Pi-primary demo. Physical
+electrical, heap/stack and timing acceptance remains a later bench gate.
+
+
 ## Purpose
 
 This document is the working system-architecture crosswalk for the Neutron 2 FlatSat demo, written so future student developers can understand **the architecture, the decisions behind it, the tradeoffs, and the data-flow patterns** — not just the box diagram.

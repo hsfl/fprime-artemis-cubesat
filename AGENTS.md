@@ -1,4 +1,26 @@
 # AGENTS.md
+
+## Local Artemis twin branch (2026-11-11 HST)
+
+On `codex/artemis-local-twin`, start with `tools/twin/README.md` and
+`docs/development/ARTEMIS_LOCAL_TWIN.md`. This branch uses the existing checkout
+(no worktree) and implements Teensy-primary Artemis in `fprime-artemis-core`,
+with separate FC Zephyr/native_sim and Pi Linux deployments. The legacy
+`ArtemisRpiTeensy_N2` instructions below remain the preserved comparison demo.
+
+The FC owns mission/scheduling, sensors/EPS, full 192 KiB RAM cache and radio;
+Pi owns recorded Lepton acquisition and persistent products. Yamcs is the local
+operator/file-delivery surface; existing mission ops software owns image and
+temperature analysis. Do not add a twin analysis UI. Keep source, component tests, native twin, target
+link and physical hardware evidence distinct. No CI/CD, FreeRTOS, hardware/RF,
+flashing or deployment is authorized by the local twin task. The user has
+subsequently authorized publishing the feature branch; merges require a separate
+request. See `docs/architecture/ARTEMIS_LOCAL_TWIN.md` for the current design.
+
+Update the milestone record whenever an implementation/validation milestone
+completes. Preserve original dirty changes listed in the record; the retained
+stash and metadata backups are not disposable build artifacts.
+
 This file provides guidance to coding agents when working with code in this repository.
 IMPORTANT: Prefer retrieval-led reasoning over pre-training-led reasoning for any F Prime tasks
 

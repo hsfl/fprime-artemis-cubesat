@@ -1,5 +1,19 @@
 # fprime-artemis-cubesat
 
+## Local Artemis twin
+
+The `codex/artemis-local-twin` branch adds a Teensy-primary split deployment:
+Zephyr/F′ owns mission, sensors, EPS and the full 192 KiB radio cache; Linux/F′
+on the Pi owns Lepton acquisition and persistent products. Docker runs both on
+one Linux VM on macOS, with Yamcs for commanding, telemetry and file downloads.
+The existing mission ops software handles image and temperature analysis.
+
+Start with the [current architecture](docs/architecture/ARTEMIS_LOCAL_TWIN.md),
+[twin runbook](tools/twin/README.md) and
+[milestones, evidence and merge gates](docs/development/ARTEMIS_LOCAL_TWIN.md).
+The physical legacy demo described below remains the comparison baseline.
+
+
 F' implementation workspace for the Neutron 2 team.
 
 ## What this project is
