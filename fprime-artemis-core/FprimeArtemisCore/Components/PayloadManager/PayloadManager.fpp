@@ -14,6 +14,12 @@ module Components {
         @ Collection request input from ScienceApp
         sync input port requestIn: Components.PayloadCaptureRequest
 
+        @ Cancel on this manager's task, outside the requesting service's lock.
+        async input port cancelIn: Fw.Signal
+
+        @ Driver acknowledgment after cancellation has drained and readiness is reported.
+        sync input port driverCancelDoneIn: Fw.Signal
+
         @ Payload readiness from the active driver
         sync input port driverStateIn: Components.PayloadStateReport
 
@@ -22,6 +28,12 @@ module Components {
 
         @ Driver request output
         output port driverRequestOut: Components.PayloadCaptureRequest
+
+        @ Cancel the active collection on the selected driver's task.
+        output port driverCancelOut: Fw.Signal
+
+        @ Explicit cancellation acknowledgment, separate from ordinary product status.
+        output port cancelDoneOut: Fw.Signal
 
         @ Payload status output to ScienceApp
         output port statusOut: Components.ScienceProductDescriptor

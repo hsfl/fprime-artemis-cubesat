@@ -1,0 +1,15 @@
+{
+  "elf_sha256": "6a134bc720140801d3924f8fdfbb03aba2822f674058d2c0031e46a0e19ccb7c",
+  "main_ram_static_high_water_bytes": 272720,
+  "main_ram_capacity_bytes": 524288,
+  "main_ram_static_percent": 52.0172,
+  "main_malloc_address_space_remaining_bytes": 251568,
+  "cache_address": "0x20280000",
+  "cache_noload_bytes": 196608,
+  "cache_bank_bytes": 262144,
+  "cache_bank_percent": 75.0,
+  "combined_static_reservations_bytes": 469328,
+  "physical_ram_bytes": 1048576,
+  "combined_static_percent_of_physical": 44.7586,
+  "runtime_heap_stack_peaks": "not measured; physical bench gate"
+}

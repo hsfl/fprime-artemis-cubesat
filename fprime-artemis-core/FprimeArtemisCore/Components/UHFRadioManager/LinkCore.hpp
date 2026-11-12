@@ -15,6 +15,10 @@ class Transport {
     virtual bool send(const Packet&) = 0;
     virtual bool receive(Packet&) = 0;
     virtual void frame(const uint8_t*, uint16_t) = 0;
+    // Legacy users receive CCSDS only. Payload must have its own consumer.
+    virtual void frame(uint8_t channel, const uint8_t* bytes, uint16_t length) {
+        if (channel == link_protocol::CHANNEL_CCSDS) frame(bytes, length);
+    }
 };
 struct Counters {
     uint32_t tx = 0, rx = 0, retries = 0, timeouts = 0, drops = 0, duplicates = 0, reassemblyTimeouts = 0;
@@ -24,9 +28,7 @@ class LinkCore {
     explicit LinkCore(Transport& transport) : io(transport) {}
     Counters counters;
     void reset() {
-        active = false;
-        seen = false;
-        length = 0;
+        for (auto& state : channels) state = {};
     }
     void poll() {
         expire();
@@ -36,16 +38,25 @@ class LinkCore {
             process(p);
     }
     bool transmit(const uint8_t* data, uint16_t size, bool ackRequired = link_protocol::RF_TX_ACK_REQUIRED_CCSDS) {
+        return transmitOn(link_protocol::CHANNEL_CCSDS, data, size, ackRequired);
+    }
+    bool transmitChannel(uint8_t channel, const uint8_t* data, uint16_t size) {
+        if (!link_protocol::isRfChannel(channel)) return false;
+        return transmitOn(channel, data, size, link_protocol::txAckRequiredForChannel(channel));
+    }
+
+   private:
+    bool transmitOn(uint8_t channel, const uint8_t* data, uint16_t size, bool ackRequired) {
         if (!data || !size || size > link_protocol::FRAME_MAX_PAYLOAD)
             return false;
-        const uint8_t msg = nextMessage++, count = (size + 43) / 44;
+        const uint8_t msg = nextMessage[channel]++, count = (size + 43) / 44;
         for (uint8_t segment = 0; segment < count; ++segment) {
             Packet p;
             address(p);
             const uint16_t offset = segment * 44;
             const uint8_t n = size - offset > 44 ? 44 : size - offset;
             p.length = n + 5;
-            p.bytes[0] = 0xA5;
+            p.bytes[0] = link_protocol::magicForChannel(channel);
             p.bytes[1] = msg;
             p.bytes[2] = segment;
             p.bytes[3] = count;
@@ -64,7 +75,7 @@ class LinkCore {
                 while (uint32_t(io.now() - start) < link_protocol::RF_ACK_TIMEOUT_MS) {
                     Packet rx;
                     if (io.receive(rx)) {
-                        if (validHeader(rx) && rx.length == 5 && rx.bytes[0] == 0xA5 && rx.bytes[1] == msg &&
+                        if (validHeader(rx) && rx.length == 5 && rx.bytes[0] == link_protocol::magicForChannel(channel) && rx.bytes[1] == msg &&
                             rx.bytes[2] == 0xFF && rx.bytes[3] == segment && rx.bytes[4] == 0) {
                             success = true;
                             break;
@@ -92,13 +103,16 @@ class LinkCore {
         return true;
     }
 
-   private:
     Transport& io;
-    uint8_t nextMessage = 0, message = 0, expected = 0, total = 0, lastMessage = 0;
-    uint16_t length = 0;
-    uint32_t lastTime = 0;
-    bool active = false, seen = false;
-    uint8_t buffer[link_protocol::FRAME_MAX_PAYLOAD] = {};
+    struct Channel {
+        uint8_t message = 0, expected = 0, total = 0, lastMessage = 0;
+        uint16_t length = 0;
+        uint32_t lastTime = 0;
+        bool active = false, seen = false;
+        uint8_t buffer[link_protocol::FRAME_MAX_PAYLOAD] = {};
+    };
+    uint8_t nextMessage[link_protocol::CHANNEL_RF_COUNT] = {};
+    Channel channels[link_protocol::CHANNEL_RF_COUNT];
     static void address(Packet& p) {
         p.to = link_protocol::RF_REMOTE_ADDRESS;
         p.from = link_protocol::RF_LOCAL_ADDRESS;
@@ -110,19 +124,21 @@ class LinkCore {
                link_protocol::RfHeaderStatus::ACCEPT;
     }
     void expire() {
-        if (active && uint32_t(io.now() - lastTime) > link_protocol::RF_REASSEMBLY_TIMEOUT_MS) {
-            active = false;
-            length = 0;
-            ++counters.reassemblyTimeouts;
+        for (auto& state : channels) {
+            if (state.active && uint32_t(io.now() - state.lastTime) > link_protocol::RF_REASSEMBLY_TIMEOUT_MS) {
+                state.active = false;
+                state.length = 0;
+                ++counters.reassemblyTimeouts;
+            }
         }
     }
-    void ack(uint8_t msg, uint8_t segment) {
-        if (!link_protocol::RF_RX_ACK_REQUIRED_CCSDS)
+    void ack(uint8_t channel, uint8_t msg, uint8_t segment) {
+        if (!link_protocol::rxAckRequiredForChannel(channel))
             return;
         Packet p;
         address(p);
         p.length = 5;
-        p.bytes[0] = 0xA5;
+        p.bytes[0] = link_protocol::magicForChannel(channel);
         p.bytes[1] = msg;
         p.bytes[2] = 0xFF;
         p.bytes[3] = segment;
@@ -132,10 +148,13 @@ class LinkCore {
     }
     void process(const Packet& p) {
         expire();
-        if (!validHeader(p) || p.length < 5 || p.length > 49 || p.bytes[0] != 0xA5) {
+        uint8_t channel = 0;
+        if (!validHeader(p) || p.length < 5 || p.length > 49 ||
+            !link_protocol::channelForMagic(p.bytes[0], channel)) {
             ++counters.drops;
             return;
         }
+        Channel& state = channels[channel];
         ++counters.rx;
         const uint8_t msg = p.bytes[1], seg = p.bytes[2], count = p.bytes[3], n = p.bytes[4];
         if (seg == 0xFF)
@@ -144,43 +163,43 @@ class LinkCore {
             ++counters.drops;
             return;
         }
-        if (!active && seen && msg == lastMessage) {
+        if (!state.active && state.seen && msg == state.lastMessage) {
             ++counters.duplicates;
-            ack(msg, seg);
+            ack(channel, msg, seg);
             return;
         }
-        if (active && msg == message && count == total && seg < expected) {
+        if (state.active && msg == state.message && count == state.total && seg < state.expected) {
             ++counters.duplicates;
-            ack(msg, seg);
+            ack(channel, msg, seg);
             return;
         }
-        if (!active || message != msg || total != count || expected != seg) {
-            active = false;
-            length = 0;
+        if (!state.active || state.message != msg || state.total != count || state.expected != seg) {
+            state.active = false;
+            state.length = 0;
             if (seg != 0) {
                 ++counters.drops;
                 return;
             }
-            active = true;
-            message = msg;
-            total = count;
-            expected = 0;
+            state.active = true;
+            state.message = msg;
+            state.total = count;
+            state.expected = 0;
         }
-        if (length + n > sizeof(buffer)) {
-            active = false;
+        if (state.length + n > sizeof(state.buffer)) {
+            state.active = false;
             ++counters.drops;
             return;
         }
-        std::memcpy(buffer + length, p.bytes + 5, n);
-        length += n;
-        ++expected;
-        lastTime = io.now();
-        ack(msg, seg);
-        if (expected == total) {
-            active = false;
-            seen = true;
-            lastMessage = msg;
-            io.frame(buffer, length);
+        std::memcpy(state.buffer + state.length, p.bytes + 5, n);
+        state.length += n;
+        ++state.expected;
+        state.lastTime = io.now();
+        ack(channel, msg, seg);
+        if (state.expected == state.total) {
+            state.active = false;
+            state.seen = true;
+            state.lastMessage = msg;
+            io.frame(channel, state.buffer, state.length);
         }
     }
 };

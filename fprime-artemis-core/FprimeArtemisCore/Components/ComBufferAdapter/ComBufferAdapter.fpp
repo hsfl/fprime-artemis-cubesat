@@ -32,7 +32,10 @@ module Components {
     # ----------------------------------------------------------------------
 
     @ Provides bufferIn, bufferInReturn, bufferOut, bufferOutReturn
-    import Drv.PassiveBufferDriver
+    guarded input port bufferIn: Fw.BufferSend
+    output port bufferInReturn: Fw.BufferSend
+    output port bufferOut: Fw.BufferSend
+    sync input port bufferOutReturn: Fw.BufferSend
 
     # ----------------------------------------------------------------------
     # Framing-pipeline-facing side

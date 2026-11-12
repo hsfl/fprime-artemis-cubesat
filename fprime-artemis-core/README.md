@@ -1,4 +1,16 @@
 # fprime-artemis-core project
+
+## Local split-platform twin
+
+See the [runbook](../tools/twin/README.md) for the Docker Zephyr `native_sim`
+flight controller and Linux payload computer, and the
+[milestone record](../docs/development/ARTEMIS_LOCAL_TWIN.md) for tests, exact
+dependency pins and target memory evidence. FlightControllerDeployment owns
+mission/sensors/EPS/radio; PayloadComputerDeployment owns Lepton and storage.
+Both use F′ v4.4.2; Zephyr is v4.3.0. The full 192 KiB cache occupies a separate
+internal OCRAM bank. Software twin and target links do not establish board/HIL
+acceptance.
+
 This project is an implementation of F` on Zephyr RTOS. 
 
 <!-- Not sure if this will be true in the future -->

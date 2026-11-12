@@ -23,13 +23,13 @@ Fw::MallocAllocator mallocator;
 Fw::MallocAllocator fcLinkAllocator;
 
 // Rate group timing: base clock interval and divisors are coupled to rate group names
-const Fw::TimeInterval rateGroupInterval(1, 0);  // 1Hz base clock
-Svc::RateGroupDriver::DividerSet rateGroupDivisorsSet{{{1, 0}, {2, 0}, {4, 0}}};
-// Divisors: 1Hz, 0.5Hz, 0.25Hz
+const Fw::TimeInterval rateGroupInterval(0, 10000);  // 100 Hz base clock
+Svc::RateGroupDriver::DividerSet rateGroupDivisorsSet{{{100, 0}, {1, 0}, {400, 0}}};
+// Divisors: 1 Hz, 100 Hz, 0.25 Hz
 
 // Context tokens for rate group members (unused, set to zero)
 Svc::ActiveRateGroup::ContextArray rateGroup_1HzContext(0);
-Svc::ActiveRateGroup::ContextArray rateGroup_0_5HzContext(0);
+Svc::ActiveRateGroup::ContextArray rateGroup_100HzContext(0);
 Svc::ActiveRateGroup::ContextArray rateGroup_0_25HzContext(0);
 
 enum TopologyConstants {
@@ -49,7 +49,7 @@ void configureTopology() {
 
     // Rate groups require context arrays.
     rateGroup_1Hz.configure(rateGroup_1HzContext);
-    rateGroup_0_5Hz.configure(rateGroup_0_5HzContext);
+    rateGroup_100Hz.configure(rateGroup_100HzContext);
     rateGroup_0_25Hz.configure(rateGroup_0_25HzContext);
 
     // Command sequencer needs to allocate memory to hold contents of command sequences

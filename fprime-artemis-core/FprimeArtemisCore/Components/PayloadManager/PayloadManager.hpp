@@ -14,6 +14,8 @@ class PayloadManager final : public PayloadManagerComponentBase {
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void run_handler(FwIndexType portNum, U32 context) override;
     void requestIn_handler(FwIndexType portNum, U32 durationSeconds) override;
+    void cancelIn_handler(FwIndexType portNum) override;
+    void driverCancelDoneIn_handler(FwIndexType portNum) override;
     void driverStateIn_handler(FwIndexType portNum, const Components::PayloadState& payloadState) override;
     void driverStatusIn_handler(FwIndexType portNum,
                                  U32 productId,

@@ -21,8 +21,8 @@ class ThermalManager final : public ThermalManagerComponentBase {
     static constexpr F32 COLD_LIMIT_C = -10.0f;
     static constexpr F32 HOT_LIMIT_C = 60.0f;
 
-    //! run ticks per read. run is on the 10Hz group, so 5 reads every 0.5 s.
-    static constexpr U32 RUN_TICKS_PER_READ = 5;
+    //! run ticks per read. run is on the 100Hz group, so 50 ticks every 0.5 s.
+    static constexpr U32 RUN_TICKS_PER_READ = 50;
 
   private:
     // ----------------------------------------------------------------------

@@ -23,7 +23,7 @@
 //! Sizing for the GenericHub link to the PayloadComputer over lpuart4.
 //! Buffers must hold a whole pcLinkHub message plus its F Prime frame.
 namespace PcLink {
-static constexpr FwSizeType bufferSize = 512;       //!< >= ZephyrUartDriver SERIAL_BUFFER_SIZE (64); the Pi side needs 2048 for its driver
+static constexpr FwSizeType bufferSize = 512;       //!< >= ZephyrUartDriver RX_CHUNK_SIZE (256); the Pi side needs 2048 for its driver
 static constexpr FwSizeType bufferCount = 6;        //!< pcLinkHub transport buffers in the pool
 static constexpr FwSizeType accumulatorSize = 1024; //!< frame reassembly ring capacity
 static constexpr FwEnumStoreType bufferManagerId = 400;
@@ -33,8 +33,8 @@ static constexpr FwEnumStoreType bufferManagerId = 400;
 //! The GPS only ever receives: buffers hold at most one ZephyrUartDriver read,
 //! and the driver reassembles sentences itself, so they can be small.
 namespace Gps {
-static constexpr FwSizeType bufferSize = 64;  //!< == ZephyrUartDriver SERIAL_BUFFER_SIZE
-static constexpr FwSizeType bufferCount = 4;  //!< reads in flight at 10Hz
+static constexpr FwSizeType bufferSize = 256;  //!< == ZephyrUartDriver RX_CHUNK_SIZE
+static constexpr FwSizeType bufferCount = 4;  //!< bounded reads serviced at 100 Hz
 static constexpr FwEnumStoreType bufferManagerId = 500;
 }  // namespace Gps
 
@@ -62,7 +62,6 @@ static constexpr FwEnumStoreType bufferManagerId = 500;
  *
  * ```c++
  * namespace PingEntries {
-    namespace RadioComms_manager {enum { WARN = 3, FATAL = 5 };}
  * namespace cmdDisp {
  *     enum { WARN = 3, FATAL = 5 };
  * }
@@ -70,8 +69,9 @@ static constexpr FwEnumStoreType bufferManagerId = 500;
  * ```
  */
 namespace PingEntries {
+    namespace FprimeArtemisCore_epsManager {enum { WARN = 3, FATAL = 5 };}
     namespace RadioComms_manager {enum { WARN = 3, FATAL = 5 };}
-    namespace FprimeArtemisCore_rateGroup_10Hz {enum { WARN = 3, FATAL = 5 };}
+    namespace FprimeArtemisCore_rateGroup_100Hz {enum { WARN = 3, FATAL = 5 };}
     namespace FprimeArtemisCore_rateGroup_1Hz {enum { WARN = 3, FATAL = 5 };}
     namespace FprimeArtemisCore_rateGroup_0_25Hz {enum { WARN = 3, FATAL = 5 };}
     namespace FprimeArtemisCore_missionApp {enum { WARN = 3, FATAL = 5 };}
@@ -100,6 +100,7 @@ struct TopologyState {
 
 //! Allocator backing the pcLinkHub buffer manager and frame accumulator
 extern Fw::MallocAllocator pcLinkAllocator;
+extern Fw::MallocAllocator pduAllocator;
 
 //! Allocator backing the GPS buffer manager
 extern Fw::MallocAllocator gpsAllocator;

@@ -9,10 +9,10 @@ namespace Components {
 
 namespace {
 
-//! run is driven at 10 Hz and the payload computer reports at 1 Hz, so 30
+//! run is driven at 100 Hz and the payload computer reports at 1 Hz, so 300
 //! ticks tolerates two lost reports before the state is declared stale.
-constexpr U32 PAYLOAD_STATE_TIMEOUT_TICKS = 30U;
-constexpr U32 RUN_PERIOD_MS = 100U;
+constexpr U32 PAYLOAD_STATE_TIMEOUT_TICKS = 300U;
+constexpr U32 RUN_PERIOD_MS = 10U;
 
 }  // namespace
 

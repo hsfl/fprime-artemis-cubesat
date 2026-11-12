@@ -39,6 +39,7 @@ module ComCcsdsConfig {
 
     # Aggregator configuration constants
     module Aggregator {
+        constant aggregationSize = Svc.Ccsds.TmDataFieldSize
         @ Controls whether to span packets across transfer frames (see Svc.ComAggregator)
         constant enablePacketSpanning = false
     }

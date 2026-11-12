@@ -135,6 +135,20 @@ void UHFRadioManager::frame(const uint8_t* bytes, uint16_t size) {
     ComCfg::FrameContext context;
     dataOut_out(0, buffer, context);
 }
+void UHFRadioManager::frame(uint8_t channel, const uint8_t* bytes, uint16_t size) {
+    if (channel == link_protocol::CHANNEL_CCSDS) {
+        frame(bytes, size);
+        return;
+    }
+    if (channel != link_protocol::CHANNEL_PAYLOAD || size > 44 ||
+        !isConnected_scienceRetry_OutputPort(0)) {
+        ++link.counters.drops;
+        return;
+    }
+    ScienceBytes packet;
+    for (U32 i = 0; i < size; ++i) packet[i] = bytes[i];
+    scienceRetry_out(0, packet, static_cast<U8>(size));
+}
 void UHFRadioManager::notify(Fw::Success status) {
     comStatusOut_out(0, status);
 }
@@ -254,6 +268,36 @@ void UHFRadioManager::work() {
             // Never feed test completion into ComQueue's normal backpressure chain.
             const bool success = enabled && link.transmit(RadioLink::TEST_PACKET, sizeof(RadioLink::TEST_PACKET));
             finishTest(testOp, testSeq, success);
+        }
+        // Keep one hardware owner. Recheck control/health/power between bounded
+        // science packets so a backlog cannot monopolize the radio worker.
+        if (enabled && !recoverAt && isConnected_scienceNext_OutputPort(0) &&
+            isConnected_scienceSent_OutputPort(0)) {
+            for (unsigned i = 0; i < 4; ++i) {
+                k_mutex_lock(&mutex, K_FOREVER);
+                const bool urgent = pending || pingPending || powerPending || resetPending || testPending || stopping;
+                k_mutex_unlock(&mutex);
+                if (urgent) break;
+                ScienceBytes bytes;
+                U8 length = 0;
+                if (!scienceNext_out(0, bytes, length)) break;
+                if (length == 0 || length > 44) {
+                    ++link.counters.drops;
+                    scienceSent_out(0, false);
+                    break;
+                }
+                uint8_t payload[44];
+                for (unsigned n = 0; n < length; ++n) payload[n] = bytes[n];
+                const bool ok = link.transmitChannel(link_protocol::CHANNEL_PAYLOAD, payload, length);
+                scienceSent_out(0, ok);
+                if (!ok) {
+                    readySignalled = false;
+                    recoverAt = now() + 100;
+                    break;
+                }
+                link.poll();
+                if (i + 1 < 4) pause(link_protocol::PAYLOAD_CACHE_RF_GAP_MS);
+            }
         }
         if (uint32_t(now() - lastTlm) >= 1000) {
             lastTlm = now();

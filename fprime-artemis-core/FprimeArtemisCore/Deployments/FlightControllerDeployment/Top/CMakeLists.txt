@@ -1,6 +1,7 @@
 set(ARTEMIS_GROUND_LINK "USB" CACHE STRING "Flight controller ground transport: USB or RFM23")
 set_property(CACHE ARTEMIS_GROUND_LINK PROPERTY STRINGS USB RFM23)
 if (ARTEMIS_GROUND_LINK STREQUAL "RFM23")
+    set(GROUND_LINK_UART_OMIT "")
     set(GROUND_LINK_SCHED "")
     set(GROUND_LINK_INSTANCE "")
     set(GROUND_LINK_CONNECTIONS "connections RadioGroundLink {
@@ -12,7 +13,11 @@ if (ARTEMIS_GROUND_LINK STREQUAL "RFM23")
     }")
     add_compile_definitions(ARTEMIS_RADIO_GROUND_LINK=1)
 elseif (ARTEMIS_GROUND_LINK STREQUAL "USB")
-    set(GROUND_LINK_SCHED "rateGroup_10Hz.RateGroupMemberOut[0] -> comDriver.schedIn")
+    set(GROUND_LINK_UART_OMIT "")
+    foreach(channel RxBytes RxOverrunCount RxBackpressureCount RxAllocFailCount TxBytes TxDropCount)
+        string(APPEND GROUND_LINK_UART_OMIT "  FprimeArtemisCore.comDriver.${channel}\n")
+    endforeach()
+    set(GROUND_LINK_SCHED "rateGroup_100Hz.RateGroupMemberOut[0] -> comDriver.schedIn")
     set(GROUND_LINK_INSTANCE "instance ComCcsds.comStub\n    instance comDriver")
     set(GROUND_LINK_CONNECTIONS "connections UsbGroundLink {
       ComCcsds.FramingSubtopology.dataOut -> ComCcsds.comStub.dataIn
@@ -30,6 +35,7 @@ elseif (ARTEMIS_GROUND_LINK STREQUAL "USB")
 else()
     message(FATAL_ERROR "ARTEMIS_GROUND_LINK must be USB or RFM23")
 endif()
+configure_file(FlightControllerDeploymentPackets.fppi.in ${CMAKE_CURRENT_BINARY_DIR}/FlightControllerDeploymentPackets.fppi @ONLY)
 configure_file(topology.fpp.in ${CMAKE_CURRENT_BINARY_DIR}/topology.fpp @ONLY)
 ####
 # F Prime CMakeLists.txt:

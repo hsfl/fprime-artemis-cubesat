@@ -45,6 +45,17 @@ module Components {
     async command ENTER_BASE_MODE
 
     @ Power the payload computer off and return to STANDBY
+    async command PING
+    async command EMIT_SOH_SNAPSHOT
+    async command SCHEDULE_COLLECTION(delaySeconds: U32)
+    async command CANCEL_COLLECTION
+    async command REQUEST_SCIENCE_DOWNLINK
+    output port scienceScheduleOut: TwinScience.Schedule
+    output port scienceCancelOut: TwinScience.Cancel
+    output port scienceDownlinkOut: TwinScience.Downlink
+    output port scienceAdmissionOut: TwinScience.Admission
+    event PingReceived(sequence: U32) severity activity high format "Mission ping sequence={}"
+    event SohSnapshot(mode: MissionMode) severity activity high format "SOH snapshot mode={}"
     async command ENTER_STANDBY_MODE
 
     # ----------------------------------------------------------------------

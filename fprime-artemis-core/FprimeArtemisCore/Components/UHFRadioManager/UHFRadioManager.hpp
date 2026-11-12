@@ -29,6 +29,7 @@ class UHFRadioManager : public UHFRadioManagerComponentBase, private RadioLink::
     bool send(const RadioLink::Packet&) override;
     bool receive(RadioLink::Packet&) override;
     void frame(const uint8_t*, uint16_t) override;
+    void frame(uint8_t channel, const uint8_t*, uint16_t) override;
     k_thread thread;
     k_mutex mutex;
     std::atomic<bool> stopping{false};

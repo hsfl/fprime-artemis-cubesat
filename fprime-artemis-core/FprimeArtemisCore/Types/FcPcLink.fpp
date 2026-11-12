@@ -46,4 +46,7 @@ module FcPcLink {
   @ 1 Hz with the heartbeat so a missed message heals itself
   constant PAYLOAD_STATUS = 5
 
+  @ Bidirectional correlated capture/result and full-product cache staging.
+  constant SCIENCE = 6
+
 }

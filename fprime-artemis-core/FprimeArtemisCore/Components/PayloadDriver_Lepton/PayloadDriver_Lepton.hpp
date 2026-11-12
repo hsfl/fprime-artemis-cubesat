@@ -2,6 +2,7 @@
 #define Components_PayloadDriver_Lepton_HPP
 
 #include "FprimeArtemisCore/Components/PayloadDriver_Lepton/LeptonCamera.hpp"
+#include "FprimeArtemisCore/Components/PayloadDriver_Lepton/CaptureWindow.hpp"
 #include "FprimeArtemisCore/Components/PayloadDriver_Lepton/PayloadDriver_LeptonComponentAc.hpp"
 
 #include <string>
@@ -9,6 +10,7 @@
 namespace Components {
 
 class PayloadDriver_Lepton final : public PayloadDriver_LeptonComponentBase {
+    friend class PayloadDriver_LeptonTester;
   public:
     PayloadDriver_Lepton(const char* const compName);
     ~PayloadDriver_Lepton();
@@ -24,10 +26,13 @@ class PayloadDriver_Lepton final : public PayloadDriver_LeptonComponentBase {
         CAPTURE_WRITE_MISMATCH = 6,
         CAPTURE_CRC_ERROR = 7,
         CAPTURE_WRITE_TIMEOUT = 8,
+        CAPTURE_BAD_DURATION = 9,
+        CAPTURE_CANCELLED = 10,
     };
 
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void requestIn_handler(FwIndexType portNum, U32 durationSeconds) override;
+    void cancelIn_handler(FwIndexType portNum) override;
     void run_handler(FwIndexType portNum, U32 context) override;
     void deactivateIn_handler(FwIndexType portNum) override;
     void previewRequestIn_handler(FwIndexType portNum) override;
@@ -41,6 +46,8 @@ class PayloadDriver_Lepton final : public PayloadDriver_LeptonComponentBase {
     void downsampleLatestPreview();
     bool ensureCameraOpen(char* reason, U32 reasonSize);
     void publishFailure(CaptureStatus status, const char* reason);
+    void finishCancelledWrite();
+    bool assignWriteTime(Fw::Time& time);
     void writeTelemetry();
     //! Report the current readiness on stateOut, emitting events on change
     void reportState(Components::PayloadState state);
@@ -50,6 +57,7 @@ class PayloadDriver_Lepton final : public PayloadDriver_LeptonComponentBase {
     static bool computeFileCrc16(const std::string& outputPath, U32& crcOut);
 
     LeptonCamera m_camera;
+    CaptureWindow m_captureWindow;
     // Preview streaming owns one stable latest source and one stable preview
     // buffer. previewOut is synchronous, so the buffer remains valid through
     // a complete response-paced upload without a ring or queued copies.
@@ -63,6 +71,9 @@ class PayloadDriver_Lepton final : public PayloadDriver_LeptonComponentBase {
     U32 m_pendingWrites;
     U32 m_pendingProductId;
     U32 m_pendingWriteTicks;
+    bool m_pendingCancelled;
+    bool m_haveWriteTimestamp;
+    U64 m_lastWriteTimestampUs;
     std::string m_pendingPath;
     Components::PayloadState m_state;
 };

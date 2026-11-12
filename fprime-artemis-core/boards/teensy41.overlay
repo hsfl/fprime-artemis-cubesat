@@ -1,3 +1,5 @@
+#include <zephyr/dt-bindings/memory-controller/nxp,flexram.h>
+#include <zephyr/dt-bindings/memory-attr/memory-attr-arm.h>
 &zephyr_udc0 {
     cdc_acm_uart0: cdc_acm_uart0 {
         compatible = "zephyr,cdc-acm-uart";
@@ -182,6 +184,11 @@
     };
 
     aliases {
+        ground-uart = &cdc_acm_uart0;
+        pc-uart = &lpuart4;
+        gps-uart = &lpuart7;
+        pdu-uart = &lpuart6;
+        imu-bus = &lpi2c1;
         led0 = &led0;
     };
 
@@ -190,3 +197,13 @@
         io-channels = <&adc1 7>, <&adc1 8>, <&adc1 10>, <&adc1 15>, <&adc1 0>, <&adc1 13>, <&adc1 14>;
     };
 };
+
+/* Explicit 16 x 32 KiB FlexRAM map: OCRAM256 + DTCM128 + ITCM128. */
+&flexram {
+    flexram,bank-spec = <FLEXRAM_OCRAM>, <FLEXRAM_OCRAM>, <FLEXRAM_OCRAM>, <FLEXRAM_OCRAM>,
+                       <FLEXRAM_OCRAM>, <FLEXRAM_OCRAM>, <FLEXRAM_OCRAM>, <FLEXRAM_OCRAM>,
+                       <FLEXRAM_DTCM>, <FLEXRAM_DTCM>, <FLEXRAM_DTCM>, <FLEXRAM_DTCM>,
+                       <FLEXRAM_ITCM>, <FLEXRAM_ITCM>, <FLEXRAM_ITCM>, <FLEXRAM_ITCM>;
+};
+
+&ocram { zephyr,memory-attr = <DT_MEM_ARM_MPU_RAM>; };

@@ -26,6 +26,9 @@ module Components {
     @ rate group thread so frames on the UART cannot interleave.
     output port payloadStateOut: Components.PayloadStateReport
 
+    @ Fresh driver readiness for local science admission. Does not send to UART.
+    output port localPayloadStateOut: Components.PayloadStateReport
+
     # ----------------------------------------------------------------------
     # Local producers
     # ----------------------------------------------------------------------

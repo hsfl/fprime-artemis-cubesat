@@ -22,6 +22,9 @@ void FlightControllerLinkManager::run_handler(FwIndexType portNum, U32 context) 
 void FlightControllerLinkManager::payloadStateIn_handler(FwIndexType portNum,
                                                          const Components::PayloadState& payloadState) {
     this->m_payloadState = payloadState;
+    if (this->isConnected_localPayloadStateOut_OutputPort(0)) {
+        this->localPayloadStateOut_out(0, payloadState);
+    }
 }
 
 void FlightControllerLinkManager::SEND_HEARTBEAT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) {

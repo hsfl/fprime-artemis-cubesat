@@ -1,5 +1,5 @@
 module RadioComms {
-  instance driver: Components.UHFRadioDriver_RFM23BP base id 0x10301000
+  instance driver: Components.@ARTEMIS_RADIO_DRIVER@ base id 0x10301000
   instance manager: Components.UHFRadioManager base id 0x10302000
   topology Subtopology {
     instance driver
@@ -18,5 +18,8 @@ module RadioComms {
     port allocate = manager.allocate
     port deallocate = manager.deallocate
     port powerRequestIn = manager.powerRequestIn
+    port scienceNext = manager.scienceNext
+    port scienceSent = manager.scienceSent
+    port scienceRetry = manager.scienceRetry
   }
 }

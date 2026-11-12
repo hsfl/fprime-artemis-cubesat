@@ -9,6 +9,10 @@ module Components {
     output port driverSend: RadioSend
     output port driverReceive: RadioReceive
     output port driverStatus: RadioStatusGet
+    @ Science owner supplies/acknowledges packets; no full-product radio copy.
+    output port scienceNext: RadioScienceNext
+    output port scienceSent: RadioScienceSent
+    output port scienceRetry: RadioScienceRetry
     @ Enqueue a power request for the radio worker.
     sync input port powerRequestIn: RadioPower
     @ Command acceptance reports a queued request; RadioState reports its outcome.

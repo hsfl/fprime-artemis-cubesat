@@ -17,6 +17,8 @@
 ####
 register_fprime_module(
     AUTOCODER_INPUTS
+        "${CMAKE_CURRENT_LIST_DIR}/Eps.fpp"
+        "${CMAKE_CURRENT_LIST_DIR}/TwinScience.fpp"
         "${CMAKE_CURRENT_LIST_DIR}/Radio.fpp"
         "${CMAKE_CURRENT_LIST_DIR}/FcPcLink.fpp"
         "${CMAKE_CURRENT_LIST_DIR}/Imu.fpp"

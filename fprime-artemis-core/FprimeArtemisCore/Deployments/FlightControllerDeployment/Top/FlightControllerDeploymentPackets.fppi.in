@@ -16,7 +16,7 @@ telemetry packets FlightControllerDeploymentPackets {
   }
 
   packet RateTiming id 12 group 1 {
-    FprimeArtemisCore.rateGroup_10Hz.RgMaxTime
+    FprimeArtemisCore.rateGroup_100Hz.RgMaxTime
     FprimeArtemisCore.rateGroup_1Hz.RgMaxTime
     FprimeArtemisCore.rateGroup_0_25Hz.RgMaxTime
   }
@@ -33,7 +33,7 @@ telemetry packets FlightControllerDeploymentPackets {
     ComCcsds.commsBufferManager.NoBuffs
     ComCcsds.commsBufferManager.EmptyBuffs
 
-    FprimeArtemisCore.rateGroup_10Hz.RgCycleSlips
+    FprimeArtemisCore.rateGroup_100Hz.RgCycleSlips
     FprimeArtemisCore.rateGroup_1Hz.RgCycleSlips
     FprimeArtemisCore.rateGroup_0_25Hz.RgCycleSlips
   }
@@ -170,47 +170,77 @@ telemetry packets FlightControllerDeploymentPackets {
     CdhCore.version.LibraryVersion10
   }
 
-  packet Version_Custom1 id 28 group 2 {
-    CdhCore.version.CustomVersion01
-  }
 
-  packet Version_Custom2 id 29 group 2 {
-    CdhCore.version.CustomVersion02
-  }
 
-  packet Version_Custom3 id 30 group 2 {
-    CdhCore.version.CustomVersion03
-  }
 
-  packet Version_Custom4 id 31 group 2 {
-    CdhCore.version.CustomVersion04
-  }
 
-  packet Version_Custom5 id 32 group 2 {
-    CdhCore.version.CustomVersion05
-  }
 
-  packet Version_Custom6 id 33 group 2 {
-    CdhCore.version.CustomVersion06
-  }
 
-  packet Version_Custom7 id 34 group 2 {
-    CdhCore.version.CustomVersion07
-  }
 
-  packet Version_Custom8 id 35 group 2 {
-    CdhCore.version.CustomVersion08
-  }
 
-  packet Version_Custom9 id 36 group 2 {
-    CdhCore.version.CustomVersion09
-  }
 
-  packet Version_Custom10 id 37 group 2 {
-    CdhCore.version.CustomVersion10
-  }
 
+  packet Science id 44 group 1 {
+    FprimeArtemisCore.scienceCoordinator.JobState
+    FprimeArtemisCore.scienceCoordinator.ProductId
+    FprimeArtemisCore.scienceCoordinator.ProductBytes
+    FprimeArtemisCore.scienceCoordinator.CacheReceivedBytes
+    FprimeArtemisCore.scienceCoordinator.CacheValid
+    FprimeArtemisCore.scienceCoordinator.CachedProductId
+    FprimeArtemisCore.scienceCoordinator.CachedProductBytes
+    FprimeArtemisCore.scienceCoordinator.TransferId
+    FprimeArtemisCore.scienceCoordinator.TxPackets
+  }
+  packet Eps id 45 group 1 {
+    FprimeArtemisCore.epsManager.LinkState
+    FprimeArtemisCore.epsManager.KnownOutputs
+    FprimeArtemisCore.epsManager.OutputBitmap
+    FprimeArtemisCore.epsManager.ResetCause
+    FprimeArtemisCore.epsManager.FaultBitmap
+    FprimeArtemisCore.epsManager.UptimeSeconds
+    FprimeArtemisCore.epsManager.Capabilities
+    FprimeArtemisCore.epsManager.Busy
+    FprimeArtemisCore.epsManager.CrcErrors
+    FprimeArtemisCore.epsManager.FramingErrors
+    FprimeArtemisCore.epsManager.Timeouts
+    FprimeArtemisCore.epsManager.LastProtocolStatus
+  }
 } omit {
+  # Fprime4.4 CustomVersionDb is 93B; unused engineering records exceed89B RFpacketdata.
+  CdhCore.version.CustomVersion01
+  CdhCore.version.CustomVersion02
+  CdhCore.version.CustomVersion03
+  CdhCore.version.CustomVersion04
+  CdhCore.version.CustomVersion05
+  CdhCore.version.CustomVersion06
+  CdhCore.version.CustomVersion07
+  CdhCore.version.CustomVersion08
+  CdhCore.version.CustomVersion09
+  CdhCore.version.CustomVersion10
+  FprimeArtemisCore.pduUartDriver.RxBytes
+  FprimeArtemisCore.pduUartDriver.RxOverrunCount
+  FprimeArtemisCore.pduUartDriver.RxBackpressureCount
+  FprimeArtemisCore.pduUartDriver.RxAllocFailCount
+  FprimeArtemisCore.pduUartDriver.TxBytes
+  FprimeArtemisCore.pduUartDriver.TxDropCount
+  FprimeArtemisCore.pduBufferManager.TotalBuffs
+  FprimeArtemisCore.pduBufferManager.CurrBuffs
+  FprimeArtemisCore.pduBufferManager.HiBuffs
+  FprimeArtemisCore.pduBufferManager.NoBuffs
+  FprimeArtemisCore.pduBufferManager.EmptyBuffs
+  FprimeArtemisCore.pcLinkDriver.RxBytes
+  FprimeArtemisCore.pcLinkDriver.RxOverrunCount
+  FprimeArtemisCore.pcLinkDriver.RxBackpressureCount
+  FprimeArtemisCore.pcLinkDriver.RxAllocFailCount
+  FprimeArtemisCore.pcLinkDriver.TxBytes
+  FprimeArtemisCore.pcLinkDriver.TxDropCount
+  FprimeArtemisCore.gpsUartDriver.RxBytes
+  FprimeArtemisCore.gpsUartDriver.RxOverrunCount
+  FprimeArtemisCore.gpsUartDriver.RxBackpressureCount
+  FprimeArtemisCore.gpsUartDriver.RxAllocFailCount
+  FprimeArtemisCore.gpsUartDriver.TxBytes
+  FprimeArtemisCore.gpsUartDriver.TxDropCount
+@GROUND_LINK_UART_OMIT@
   CdhCore.cmdDisp.CommandErrors
   # FC↔PC link buffer pool health: not downlinked during MVP bring-up
   FprimeArtemisCore.pcLinkBufferManager.TotalBuffs

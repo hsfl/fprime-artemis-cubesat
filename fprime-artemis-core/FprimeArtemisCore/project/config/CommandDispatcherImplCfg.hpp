@@ -9,6 +9,7 @@
 #define CMDDISPATCHER_COMMANDDISPATCHERIMPLCFG_HPP_
 
 #include <Fw/FPrimeBasicTypes.hpp>
+#include <limits>
 
 // Define configuration values for dispatcher
 
@@ -23,6 +24,7 @@ namespace CmdDispatcherCfg {
 //! Include command opcodes in events when true.
 //! When false, opcode fields are set to the maximum FwOpcodeType value.
 constexpr bool IncludeCommandOpcodesInEvents = true;
+constexpr bool EXECUTE_WHEN_SEQUENCE_TABLE_FULL_DEFAULT = false;
 
 constexpr FwOpcodeType getEventOpcode(const FwOpcodeType opcode) {
     return IncludeCommandOpcodesInEvents ? opcode : std::numeric_limits<FwOpcodeType>::max();

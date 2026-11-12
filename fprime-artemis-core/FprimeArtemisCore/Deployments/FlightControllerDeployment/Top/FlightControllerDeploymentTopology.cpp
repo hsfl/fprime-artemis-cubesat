@@ -11,6 +11,11 @@
 // Necessary project-specified types
 #include <Fw/Types/MallocAllocator.hpp>
 #include <zephyr/drivers/adc.h>
+#include <zephyr/random/random.h>
+#ifdef ARTEMIS_TWIN
+extern "C" void artemis_native_init(void);
+extern "C" void artemis_native_poll_power(void);
+#endif
 
 // Public functions for use in main program are namespaced with deployment module FprimeArtemisCore
 // This is also the namespace where the topology components are instantiated by FPP.
@@ -18,15 +23,16 @@ namespace FprimeArtemisCore {
 
 // Allocator for the pcLinkHub link buffer manager and frame accumulator
 Fw::MallocAllocator pcLinkAllocator;
+Fw::MallocAllocator pduAllocator;
 Fw::MallocAllocator gpsAllocator;
 
 // Rate group timing: base clock interval and divisors are coupled to rate group names
-constexpr U32 BASE_RATEGROUP_PERIOD_MS = 100;  // 10Hz base clock
-Svc::RateGroupDriver::DividerSet rateGroupDivisorsSet{{{1, 0}, {10, 0}, {40, 0}}};
+constexpr U32 BASE_RATEGROUP_PERIOD_MS = 10;  // 10Hz base clock
+Svc::RateGroupDriver::DividerSet rateGroupDivisorsSet{{{1, 0}, {100, 0}, {400, 0}}};
 // Divisors: 10Hz, 1Hz, 0.25Hz
 
 // Context tokens for rate group members (unused, set to zero)
-Svc::ActiveRateGroup::ContextArray rateGroup_10HzContext(0);
+Svc::ActiveRateGroup::ContextArray rateGroup_100HzContext(0);
 Svc::ActiveRateGroup::ContextArray rateGroup_1HzContext(0);
 Svc::ActiveRateGroup::ContextArray rateGroup_0_25HzContext(0);
 
@@ -42,7 +48,7 @@ void configureTopology() {
     rateGroupDriver.configure(rateGroupDivisorsSet);
 
     // Rate groups require context arrays.
-    rateGroup_10Hz.configure(rateGroup_10HzContext);
+    rateGroup_100Hz.configure(rateGroup_100HzContext);
     rateGroup_1Hz.configure(rateGroup_1HzContext);
     rateGroup_0_25Hz.configure(rateGroup_0_25HzContext);
 
@@ -60,6 +66,7 @@ void setupTopology(const TopologyState& state) {
     // Autocoded configuration. Function provided by autocoder.
     configComponents(state);
     RadioComms::driver.configure();
+    scienceCoordinator.configure(sys_rand32_get());
     // Project-specific component configuration. Function provided above. May be inlined, if desired.
     configureTopology();
     // Autocoded parameter read from file. Function provided by autocoder.
@@ -80,6 +87,8 @@ void setupTopology(const TopologyState& state) {
     pcLinkDriver.configure(state.pcLinkDevice, state.pcLinkBaud);
     // GPS on lpuart7: NMEA in, PMTK standby/wake out
     gpsUartDriver.configure(state.gpsDevice, state.gpsBaud);
+    pduUartDriver.configure(DEVICE_DT_GET(DT_ALIAS(pdu_uart)), 9600);
+    epsManager.configure(10, 2000);
 
     // TMP36 ADC channels, in temp_sensors io-channels order (= Components::ThermalSensor).
     // ZephyrADCDriver keeps the pointer, so the specs must outlive this function.
@@ -105,6 +114,9 @@ void setupTopology(const TopologyState& state) {
     // Payload computer power-enable pin (rpi_power node, Teensy pin 36)
     static const struct gpio_dt_spec rpiPowerPin = GPIO_DT_SPEC_GET(DT_NODELABEL(rpi_power), rpi_enable_gpios);
     (void)rpiPowerDriver.open(rpiPowerPin, Zephyr::ZephyrGpioDriver::GpioConfiguration::OUT);
+#ifdef ARTEMIS_TWIN
+    artemis_native_init();
+#endif
 }
 
 void startRateGroups() {
@@ -112,6 +124,9 @@ void startRateGroups() {
     timer.start();
     // Blocks forever: the Zephyr rate driver is cycled from this main loop
     while (1) {
+#ifdef ARTEMIS_TWIN
+        artemis_native_poll_power();
+#endif
         timer.cycle();
     }
 }

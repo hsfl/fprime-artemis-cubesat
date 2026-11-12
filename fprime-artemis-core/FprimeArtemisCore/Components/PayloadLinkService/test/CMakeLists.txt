@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.18)
+project(ArtemisPayloadLinkTests LANGUAGES CXX)
+enable_testing()
+add_executable(payload_link_helpers helpers.cpp)
+target_compile_features(payload_link_helpers PRIVATE cxx_std_14)
+target_compile_options(payload_link_helpers PRIVATE -Wall -Wextra -Werror)
+add_test(NAME payload_link_helpers COMMAND payload_link_helpers)

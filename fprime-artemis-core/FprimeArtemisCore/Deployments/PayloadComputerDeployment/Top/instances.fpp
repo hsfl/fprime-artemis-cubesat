@@ -26,19 +26,19 @@ module PayloadComputerDeployment {
   # Active component instances
   # ----------------------------------------------------------------------
 
-  # 1Hz rate group (divisor 1 of 1Hz base clock)
+  # 1 Hz rate group (divisor 100 of 100 Hz base clock)
   instance rateGroup_1Hz: Svc.ActiveRateGroup base id 0x10001000 \
     queue size Default.QUEUE_SIZE \
     stack size Default.STACK_SIZE \
     priority 43
 
-  # 0.5Hz rate group (divisor 2 of 1Hz base clock)
-  instance rateGroup_0_5Hz: Svc.ActiveRateGroup base id 0x10002000 \
+  # 100 Hz science-service group (divisor 1 of 100 Hz base clock)
+  instance rateGroup_100Hz: Svc.ActiveRateGroup base id 0x10002000 \
     queue size Default.QUEUE_SIZE \
     stack size Default.STACK_SIZE \
     priority 42
 
-  # 0.25Hz rate group (divisor 4 of 1Hz base clock)
+  # 0.25 Hz rate group (divisor 400 of 100 Hz base clock)
   instance rateGroup_0_25Hz: Svc.ActiveRateGroup base id 0x10003000 \
     queue size Default.QUEUE_SIZE \
     stack size Default.STACK_SIZE \
@@ -56,7 +56,8 @@ module PayloadComputerDeployment {
 
   # A capture blocks this task for up to 5 s while it waits for a frame, so it
   # runs below the manager and the rate groups.
-  instance payloadDriverLepton: Components.PayloadDriver_Lepton base id 0x10031000 \
+  # Preserve the public C3M FDP container/record identity consumed by mission ops.
+  instance payloadDriverLepton: Components.PayloadDriver_Lepton base id 0x10027000 \
     queue size Default.QUEUE_SIZE \
     stack size Default.STACK_SIZE \
     priority 29
@@ -79,6 +80,8 @@ module PayloadComputerDeployment {
   instance timer: Svc.LinuxTimer base id 0x10013000
 
   instance dpWrittenRouter: Components.DpWrittenRouter base id 0x10032000
+
+  instance payloadLinkService: Components.PayloadLinkService base id 0x10033000
 
   # ----------------------------------------------------------------------
   # FC<->PC link to the FlightController (Teensy 4.1) over /dev/serial0
@@ -120,7 +123,7 @@ module PayloadComputerDeployment {
       """
     }
 
-  instance fcLinkBufferManager: Svc.BufferManager base id 0x10027000 \
+  instance fcLinkBufferManager: Svc.BufferManager base id 0x10034000 \
     {
       phase Fpp.ToCpp.Phases.configObjects """
       Svc::BufferManager::BufferBins bins;

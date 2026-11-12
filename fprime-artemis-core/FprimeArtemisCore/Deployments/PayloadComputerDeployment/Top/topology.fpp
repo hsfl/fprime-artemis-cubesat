@@ -6,7 +6,7 @@ module PayloadComputerDeployment {
 
   enum Ports_RateGroups {
     rateGroup_1Hz
-    rateGroup_0_5Hz
+    rateGroup_100Hz
     rateGroup_0_25Hz
   }
 
@@ -25,7 +25,7 @@ module PayloadComputerDeployment {
   # ----------------------------------------------------------------------
     instance chronoTime
     instance rateGroup_1Hz
-    instance rateGroup_0_5Hz
+    instance rateGroup_100Hz
     instance rateGroup_0_25Hz
     instance rateGroupDriver
     instance systemResources
@@ -43,6 +43,7 @@ module PayloadComputerDeployment {
     instance payloadManager
     instance payloadDriverLepton
     instance dpWrittenRouter
+    instance payloadLinkService
 
   # ----------------------------------------------------------------------
   # Pattern graph specifiers
@@ -102,6 +103,8 @@ module PayloadComputerDeployment {
       # --- Heartbeat into the hub ---
       fcLinkManager.peerAliveOut        -> fcLinkHub.serialIn[FcPcLink.HEARTBEAT]
       fcLinkManager.payloadStateOut     -> fcLinkHub.serialIn[FcPcLink.PAYLOAD_STATUS]
+      payloadLinkService.messageOut      -> fcLinkHub.serialIn[FcPcLink.SCIENCE]
+      fcLinkHub.serialOut[FcPcLink.SCIENCE] -> payloadLinkService.messageIn
 
       # --- Downlink: hub -> framer -> ComStub -> UART ---
       fcLinkHub.allocate                -> fcLinkBufferManager.bufferGetCallee
@@ -163,9 +166,10 @@ module PayloadComputerDeployment {
       rateGroup_1Hz.RateGroupMemberOut[7] -> payloadDriverLepton.run
       rateGroup_1Hz.RateGroupMemberOut[8] -> payloadManager.run
 
-      # 0.5Hz rate group
-      rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_0_5Hz] -> rateGroup_0_5Hz.CycleIn
-      rateGroup_0_5Hz.RateGroupMemberOut[0] -> cmdSeq.schedIn
+      # 100 Hz science sender. All sends originate from this bounded service.
+      rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_100Hz] -> rateGroup_100Hz.CycleIn
+      rateGroup_100Hz.RateGroupMemberOut[0] -> payloadLinkService.run
+      rateGroup_1Hz.RateGroupMemberOut[9] -> cmdSeq.schedIn
 
       # 0.25Hz rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_0_25Hz] -> rateGroup_0_25Hz.CycleIn
@@ -186,12 +190,19 @@ module PayloadComputerDeployment {
     connections Payload {
       # Capture requests down, product status and readiness back up
       payloadManager.driverRequestOut   -> payloadDriverLepton.requestIn
+      payloadManager.driverCancelOut    -> payloadDriverLepton.cancelIn
+      payloadDriverLepton.cancelDoneOut -> payloadManager.driverCancelDoneIn
       payloadDriverLepton.statusOut     -> payloadManager.driverStatusIn
       payloadDriverLepton.stateOut      -> payloadManager.driverStateIn
 
       # Readiness to the flight controller. fcLinkManager caches it and sends
       # it from its rate group tick.
       payloadManager.stateOut           -> fcLinkManager.payloadStateIn
+      fcLinkManager.localPayloadStateOut -> payloadLinkService.stateIn
+      payloadManager.statusOut          -> payloadLinkService.productIn
+      payloadLinkService.captureOut     -> payloadManager.requestIn
+      payloadLinkService.cancelOut      -> payloadManager.cancelIn
+      payloadManager.cancelDoneOut      -> payloadLinkService.cancelDoneIn
 
       # Lepton frames are stored as data products
       payloadDriverLepton.productGetOut  -> ArtemisDataProducts.dpMgr.productGetIn

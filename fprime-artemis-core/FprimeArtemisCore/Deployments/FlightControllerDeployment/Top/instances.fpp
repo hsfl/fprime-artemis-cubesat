@@ -35,7 +35,7 @@ module FprimeArtemisCore {
   # 10Hz rate group (divisor 1). UART reads: ZephyrUartDriver reads at most
   # 64 bytes per schedIn, so 10Hz gives each link a 640 B/s read ceiling.
   # thermalManager also runs here and reads every 5th tick (2Hz).
-  instance rateGroup_10Hz: Svc.ActiveRateGroup base id 0x10001000 \
+  instance rateGroup_100Hz: Svc.ActiveRateGroup base id 0x10001000 \
     queue size Default.QUEUE_SIZE \
     stack size Default.STACK_SIZE \
     priority 1
@@ -68,6 +68,25 @@ module FprimeArtemisCore {
   # ----------------------------------------------------------------------
   # Passive component instances
   # ----------------------------------------------------------------------
+
+  instance epsManager: Components.EpsManager base id 0x1003B000
+  instance pduUartDriver: Zephyr.ZephyrUartDriver base id 0x1003C000
+  instance pduBufferManager: Svc.BufferManager base id 0x1003D000 \
+    {
+      phase Fpp.ToCpp.Phases.configObjects """
+      Svc::BufferManager::BufferBins bins;
+      """
+      phase Fpp.ToCpp.Phases.configComponents """
+      memset(&ConfigObjects::FprimeArtemisCore_pduBufferManager::bins, 0, sizeof(ConfigObjects::FprimeArtemisCore_pduBufferManager::bins));
+      ConfigObjects::FprimeArtemisCore_pduBufferManager::bins.bins[0].bufferSize = 256;
+      ConfigObjects::FprimeArtemisCore_pduBufferManager::bins.bins[0].numBuffers = 4;
+      FprimeArtemisCore::pduBufferManager.setup(600, 0, FprimeArtemisCore::pduAllocator, ConfigObjects::FprimeArtemisCore_pduBufferManager::bins);
+      """
+      phase Fpp.ToCpp.Phases.tearDownComponents """
+      FprimeArtemisCore::pduBufferManager.cleanup();
+      """
+    }
+  instance scienceCoordinator: Components.ScienceCoordinator base id 0x1003A000
 
   instance chronoTime: Zephyr.ZephyrTime base id 0x10010000
 
@@ -117,7 +136,7 @@ module FprimeArtemisCore {
   instance imuI2cBus: Zephyr.ZephyrI2cDriver base id 0x1002A000 \
     {
       phase Fpp.ToCpp.Phases.configComponents """
-      if (FprimeArtemisCore::imuI2cBus.open(DEVICE_DT_GET(DT_NODELABEL(lpi2c1))) != Drv::I2cStatus::I2C_OK) {
+      if (FprimeArtemisCore::imuI2cBus.open(DEVICE_DT_GET(DT_ALIAS(imu_bus))) != Drv::I2cStatus::I2C_OK) {
           Fw::Logger::log("[ERROR] IMU I2C bus (lpi2c1) not ready\\n");
       }
       """

@@ -12,13 +12,13 @@
 #include <zephyr/sys/printk.h>
 
 // UART used for the ground link. Exposed over USB CDC ACM on the Teensy 4.1.
-const struct device* serial = DEVICE_DT_GET(DT_NODELABEL(cdc_acm_uart0));
+const struct device* serial = DEVICE_DT_GET(DT_ALIAS(ground_uart));
 
 // UART to the PayloadComputer (Raspberry Pi). Teensy TX=8 / RX=7.
-const struct device* pcLinkSerial = DEVICE_DT_GET(DT_NODELABEL(lpuart4));
+const struct device* pcLinkSerial = DEVICE_DT_GET(DT_ALIAS(pc_uart));
 
 // UART from the Adafruit Mini GPS PA1010D. Teensy RX=28 / TX=29.
-const struct device* gpsSerial = DEVICE_DT_GET(DT_NODELABEL(lpuart7));
+const struct device* gpsSerial = DEVICE_DT_GET(DT_ALIAS(gps_uart));
 
 int main(int argc, char* argv[]) {
     // ** DO NOT REMOVE **//

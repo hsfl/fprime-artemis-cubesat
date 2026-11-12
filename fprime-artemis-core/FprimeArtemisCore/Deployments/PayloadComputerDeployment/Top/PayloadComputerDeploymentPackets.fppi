@@ -27,7 +27,7 @@ telemetry packets PayloadComputerDeploymentPackets {
     ComCcsds.commsBufferManager.HiBuffs
 
     rateGroup_1Hz.RgMaxTime
-    rateGroup_0_5Hz.RgMaxTime
+    rateGroup_100Hz.RgMaxTime
     rateGroup_0_25Hz.RgMaxTime
   }
 
@@ -43,7 +43,7 @@ telemetry packets PayloadComputerDeploymentPackets {
     ComCcsds.commsBufferManager.EmptyBuffs
 
     rateGroup_1Hz.RgCycleSlips
-    rateGroup_0_5Hz.RgCycleSlips
+    rateGroup_100Hz.RgCycleSlips
     rateGroup_0_25Hz.RgCycleSlips
   }
 
@@ -191,6 +191,13 @@ telemetry packets PayloadComputerDeploymentPackets {
     fcLinkBufferManager.HiBuffs
     fcLinkBufferManager.NoBuffs
     fcLinkBufferManager.EmptyBuffs
+  }
+
+  packet ScienceLink id 38 group 1 {
+    payloadLinkService.CaptureRequests
+    payloadLinkService.CommittedProducts
+    payloadLinkService.StagedBytes
+    payloadLinkService.ProtocolErrors
   }
 
 } omit {

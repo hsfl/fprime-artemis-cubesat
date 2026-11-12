@@ -51,6 +51,12 @@ else()
     message(STATUS "PayloadDriver_Lepton: libuvc disabled for non-Linux host ${CMAKE_SYSTEM_NAME}")
 endif()
 
+register_fprime_ut(
+    AUTOCODER_INPUTS "${CMAKE_CURRENT_LIST_DIR}/PayloadDriver_Lepton.fpp"
+    SOURCES "${CMAKE_CURRENT_LIST_DIR}/test/ut/PayloadDriver_LeptonTester.cpp"
+            "${CMAKE_CURRENT_LIST_DIR}/test/ut/PayloadDriver_LeptonTestMain.cpp"
+    UT_AUTO_HELPERS)
+
 if(LEPTON_UVC_ENABLED)
     add_executable(PayloadDriver_Lepton_testLeptonCamera
         "${CMAKE_CURRENT_LIST_DIR}/testLeptonCamera/testLeptonCamera.cpp"

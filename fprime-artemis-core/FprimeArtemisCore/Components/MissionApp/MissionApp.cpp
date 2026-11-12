@@ -64,6 +64,7 @@ void MissionApp::run_handler(FwIndexType portNum, U32 context) {
     }
 
     this->tlmWrite_CurrentMode(this->m_mode);
+    if (isConnected_scienceAdmissionOut_OutputPort(0)) scienceAdmissionOut_out(0, m_mode == MissionMode::BASE);
 }
 
 void MissionApp::pingIn_handler(FwIndexType portNum, U32 key) {
@@ -125,6 +126,7 @@ void MissionApp::setMode(MissionMode mode) {
         this->m_mode = mode;
         this->log_ACTIVITY_HI_ModeChanged(mode);
         this->tlmWrite_CurrentMode(mode);
+        if (isConnected_scienceAdmissionOut_OutputPort(0)) scienceAdmissionOut_out(0, mode == MissionMode::BASE);
     }
 }
 
@@ -142,3 +144,11 @@ void MissionApp::failBaseEntry(BaseModeFailure reason) {
 }
 
 }  // namespace Components
+
+namespace Components {
+void MissionApp::PING_cmdHandler(FwOpcodeType op, U32 seq) { log_ACTIVITY_HI_PingReceived(seq); cmdResponse_out(op, seq, Fw::CmdResponse::OK); }
+void MissionApp::EMIT_SOH_SNAPSHOT_cmdHandler(FwOpcodeType op, U32 seq) { tlmWrite_CurrentMode(m_mode); log_ACTIVITY_HI_SohSnapshot(m_mode); cmdResponse_out(op, seq, Fw::CmdResponse::OK); }
+void MissionApp::SCHEDULE_COLLECTION_cmdHandler(FwOpcodeType op, U32 seq, U32 delay) { cmdResponse_out(op, seq, scienceScheduleOut_out(0, delay)); }
+void MissionApp::CANCEL_COLLECTION_cmdHandler(FwOpcodeType op, U32 seq) { cmdResponse_out(op, seq, scienceCancelOut_out(0)); }
+void MissionApp::REQUEST_SCIENCE_DOWNLINK_cmdHandler(FwOpcodeType op, U32 seq) { cmdResponse_out(op, seq, scienceDownlinkOut_out(0)); }
+}

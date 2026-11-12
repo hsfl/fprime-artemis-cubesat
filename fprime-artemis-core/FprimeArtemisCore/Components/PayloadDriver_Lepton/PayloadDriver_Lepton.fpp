@@ -18,6 +18,14 @@ module Components {
         @ Scheduled collection request from PayloadManager.
         async input port requestIn: Components.PayloadCaptureRequest
 
+        @ Cancel a collection on this driver's serialized task. An outstanding
+        @ DpWriter request is drained before cancellation reports READY.
+        async input port cancelIn: Fw.Signal
+
+        @ Explicit cancellation acknowledgment after failure and readiness reports.
+        @ Ordinary capture completion/failure does not produce this acknowledgment.
+        output port cancelDoneOut: Fw.Signal
+
         @ Readiness probe. Opens the camera if it is not streaming, then
         @ reports the payload state. Dropped rather than queued while a capture
         @ holds the driver task, so a slow capture cannot overflow the queue.

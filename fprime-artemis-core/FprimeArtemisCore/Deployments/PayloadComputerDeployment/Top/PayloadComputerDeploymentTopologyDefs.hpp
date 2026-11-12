@@ -60,7 +60,7 @@ static constexpr FwEnumStoreType bufferManagerId = 400;
  */
 namespace PingEntries {
     namespace PayloadComputerDeployment_rateGroup_1Hz {enum { WARN = 3, FATAL = 5 };}
-    namespace PayloadComputerDeployment_rateGroup_0_5Hz {enum { WARN = 3, FATAL = 5 };}
+    namespace PayloadComputerDeployment_rateGroup_100Hz {enum { WARN = 3, FATAL = 5 };}
     namespace PayloadComputerDeployment_rateGroup_0_25Hz {enum { WARN = 3, FATAL = 5 };}
     namespace PayloadComputerDeployment_cmdSeq {enum { WARN = 3, FATAL = 5 };}
     namespace PayloadComputerDeployment_payloadManager {enum { WARN = 3, FATAL = 5 };}

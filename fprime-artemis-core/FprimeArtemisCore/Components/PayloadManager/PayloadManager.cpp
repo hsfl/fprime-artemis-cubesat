@@ -46,6 +46,20 @@ void PayloadManager::requestIn_handler(FwIndexType portNum, U32 durationSeconds)
     }
 }
 
+void PayloadManager::cancelIn_handler(FwIndexType portNum) {
+    static_cast<void>(portNum);
+    if (this->isConnected_driverCancelOut_OutputPort(0)) {
+        this->driverCancelOut_out(0);
+    }
+}
+
+void PayloadManager::driverCancelDoneIn_handler(FwIndexType portNum) {
+    static_cast<void>(portNum);
+    if (this->isConnected_cancelDoneOut_OutputPort(0)) {
+        this->cancelDoneOut_out(0);
+    }
+}
+
 void PayloadManager::driverStateIn_handler(FwIndexType portNum, const Components::PayloadState& payloadState) {
     static_cast<void>(portNum);
     if (payloadState != this->m_payloadState) {
@@ -100,7 +114,7 @@ void PayloadManager::START_PAYLOAD_COLLECTION_cmdHandler(FwOpcodeType opCode, U3
     this->m_lastCollectionId = collectionId;
     this->log_ACTIVITY_HI_PayloadCollectionForwarded(collectionId);
     if (this->isConnected_driverRequestOut_OutputPort(0)) {
-        this->driverRequestOut_out(0, collectionId);
+        this->driverRequestOut_out(0, this->m_lastCaptureDurationSeconds);
     }
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }

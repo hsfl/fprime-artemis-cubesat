@@ -5,7 +5,7 @@ module FprimeArtemisCore {
   # ----------------------------------------------------------------------
 
   enum Ports_RateGroups {
-    rateGroup_10Hz
+    rateGroup_100Hz
     rateGroup_1Hz
     rateGroup_0_25Hz
   }
@@ -24,9 +24,13 @@ module FprimeArtemisCore {
   # Instances used in the topology
   # ----------------------------------------------------------------------
     instance chronoTime
-    instance rateGroup_10Hz
+    instance rateGroup_100Hz
     instance rateGroup_1Hz
     instance rateGroup_0_25Hz
+    instance epsManager
+    instance pduUartDriver
+    instance pduBufferManager
+    instance scienceCoordinator
     instance missionApp
     instance rateGroupDriver
     instance systemResources
@@ -76,7 +80,7 @@ module FprimeArtemisCore {
   # Telemetry packets (only used when TlmPacketizer is used)
   # ----------------------------------------------------------------------
 
-    include "@CMAKE_CURRENT_LIST_DIR@/FlightControllerDeploymentPackets.fppi"
+    include "@CMAKE_CURRENT_BINARY_DIR@/FlightControllerDeploymentPackets.fppi"
 
   # ----------------------------------------------------------------------
   # Direct graph specifiers
@@ -106,14 +110,17 @@ module FprimeArtemisCore {
       timer.CycleOut -> rateGroupDriver.CycleIn
 
       # 10Hz rate group: UART reads, plus thermal
-      rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_10Hz] -> rateGroup_10Hz.CycleIn
+      rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_100Hz] -> rateGroup_100Hz.CycleIn
       @GROUND_LINK_SCHED@
-      rateGroup_10Hz.RateGroupMemberOut[1] -> pcLinkDriver.schedIn
-      rateGroup_10Hz.RateGroupMemberOut[2] -> gpsUartDriver.schedIn
+      rateGroup_100Hz.RateGroupMemberOut[1] -> pcLinkDriver.schedIn
+      rateGroup_100Hz.RateGroupMemberOut[2] -> gpsUartDriver.schedIn
       # No 2Hz group exists; thermalManager reads on every 5th tick (0.5 s).
-      rateGroup_10Hz.RateGroupMemberOut[3] -> thermalManager.run
+      rateGroup_100Hz.RateGroupMemberOut[3] -> thermalManager.run
       # Same thread as pcLinkDriver.schedIn, which delivers payloadStateIn
-      rateGroup_10Hz.RateGroupMemberOut[4] -> pcLinkManager.run
+      rateGroup_100Hz.RateGroupMemberOut[4] -> pcLinkManager.run
+      rateGroup_100Hz.RateGroupMemberOut[5] -> scienceCoordinator.run
+      rateGroup_100Hz.RateGroupMemberOut[6] -> pduUartDriver.schedIn
+      rateGroup_100Hz.RateGroupMemberOut[7] -> epsManager.run
 
       # 1Hz rate group
       rateGroupDriver.CycleOut[Ports_RateGroups.rateGroup_1Hz] -> rateGroup_1Hz.CycleIn
@@ -138,6 +145,26 @@ module FprimeArtemisCore {
       rateGroup_0_25Hz.RateGroupMemberOut[3] -> gpsBufferManager.schedIn
     }
 
+    connections Eps {
+      pduUartDriver.allocate -> pduBufferManager.bufferGetCallee
+      pduUartDriver.deallocate -> pduBufferManager.bufferSendIn
+      pduUartDriver.$recv -> epsManager.drvReceiveIn
+      epsManager.drvReceiveReturnOut -> pduUartDriver.recvReturnIn
+      epsManager.drvSendOut -> pduUartDriver.$send
+      pduUartDriver.ready -> epsManager.drvConnected
+    }
+    connections Science {
+      missionApp.scienceScheduleOut -> scienceCoordinator.scheduleIn
+      missionApp.scienceCancelOut -> scienceCoordinator.cancelIn
+      missionApp.scienceDownlinkOut -> scienceCoordinator.downlinkIn
+      missionApp.scienceAdmissionOut -> scienceCoordinator.admissionIn
+      pcLinkManager.payloadStateOut -> scienceCoordinator.payloadStateIn
+      pcLinkHub.serialOut[FcPcLink.SCIENCE] -> scienceCoordinator.messageIn
+      scienceCoordinator.messageOut -> pcLinkHub.serialIn[FcPcLink.SCIENCE]
+      RadioComms.manager.scienceNext -> scienceCoordinator.radioNext
+      RadioComms.manager.scienceSent -> scienceCoordinator.radioSent
+      RadioComms.manager.scienceRetry -> scienceCoordinator.radioRetry
+    }
     connections Mission {
       # Application tier drives managers through their port contracts.
       missionApp.rpiPowerRequestOut -> rpiPowerManager.powerRequestIn

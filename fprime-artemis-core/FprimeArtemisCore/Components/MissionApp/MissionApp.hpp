@@ -38,6 +38,11 @@ class MissionApp final : public MissionAppComponentBase {
     // Handler implementations for commands
     // ----------------------------------------------------------------------
 
+    void PING_cmdHandler(FwOpcodeType, U32) override;
+    void EMIT_SOH_SNAPSHOT_cmdHandler(FwOpcodeType, U32) override;
+    void SCHEDULE_COLLECTION_cmdHandler(FwOpcodeType, U32, U32) override;
+    void CANCEL_COLLECTION_cmdHandler(FwOpcodeType, U32) override;
+    void REQUEST_SCIENCE_DOWNLINK_cmdHandler(FwOpcodeType, U32) override;
     void ENTER_BASE_MODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
 
     void ENTER_STANDBY_MODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;

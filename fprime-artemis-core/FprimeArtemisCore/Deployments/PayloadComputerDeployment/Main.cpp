@@ -13,6 +13,8 @@
 #include <getopt.h>
 // Used for atoi
 #include <cstdlib>
+#include <cstring>
+#include <fstream>
 // Used for logging to the console
 #include <Fw/Logger/Logger.hpp>
 
@@ -52,7 +54,18 @@ static void signalHandler(int signum) {
 int main(int argc, char* argv[]) {
     I32 option = 0;
     CHAR* uart_device = nullptr;
-    U32 baud_rate = 0;
+    U32 baud_rate = 115200;
+
+    const bool twin = std::getenv("ARTEMIS_TWIN") != nullptr;
+    if (twin) {
+        const char* backend = std::getenv("LEPTON_CAMERA_BACKEND");
+        const char* sample = std::getenv("C3M_LEPTON_SAMPLE_CSV");
+        if (!backend || std::strcmp(backend, "sample") != 0 || !sample ||
+            !std::ifstream(sample).good()) {
+            Fw::Logger::log("Twin requires LEPTON_CAMERA_BACKEND=sample and a readable C3M_LEPTON_SAMPLE_CSV\n");
+            return 2;
+        }
+    }
 
     Os::init();
 
@@ -78,7 +91,11 @@ int main(int argc, char* argv[]) {
         }
     }
     // Object for communicating state to the topology
-    PayloadComputerDeployment::TopologyState inputs;
+    if (twin && uart_device == nullptr) {
+        Fw::Logger::log("Twin requires an explicit FC UART endpoint (-d)\n");
+        return 2;
+    }
+    PayloadComputerDeployment::TopologyState inputs{};
     inputs.uartDevice = uart_device;
     inputs.baudRate = baud_rate;
 

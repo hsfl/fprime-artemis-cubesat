@@ -7,12 +7,17 @@
 #include <cstdio>
 #include <cstring>
 #include <limits>
+#include <chrono>
 
 namespace Components {
 
 namespace {
 
 constexpr U32 CAPTURE_TIMEOUT_MS = 5000U;
+U64 monotonicMilliseconds() {
+    return static_cast<U64>(std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count());
+}
 // DpWriter only notifies on a successful write. If no notification arrives
 // within this many run ticks (1 Hz), the write is treated as failed so the
 // driver does not report BUSY forever.
@@ -39,6 +44,9 @@ PayloadDriver_Lepton::PayloadDriver_Lepton(const char* const compName)
       m_pendingWrites(0),
       m_pendingProductId(0),
       m_pendingWriteTicks(0),
+      m_pendingCancelled(false),
+      m_haveWriteTimestamp(false),
+      m_lastWriteTimestampUs(0),
       m_pendingPath(),
       m_state(Components::PayloadState::UNKNOWN) {}
 
@@ -51,25 +59,72 @@ void PayloadDriver_Lepton::pingIn_handler(FwIndexType portNum, U32 key) {
 
 void PayloadDriver_Lepton::requestIn_handler(FwIndexType portNum, U32 durationSeconds) {
     static_cast<void>(portNum);
-    this->m_lastDurationSeconds = durationSeconds;
-    // Capture blocks this task for up to CAPTURE_TIMEOUT_MS; report BUSY first
-    // so the flight controller does not see READY while a frame is grabbed.
-    this->reportState(Components::PayloadState::BUSY);
-    if (!this->captureThermalImage(durationSeconds)) {
-        this->writeTelemetry();
+    if (m_captureWindow.active() || m_pendingWrites != 0) {
+        this->log_WARNING_HI_ImageCaptureFailed(Fw::LogStringArg("collection already active"));
+        return;
     }
+    this->m_lastDurationSeconds = durationSeconds;
+    if (!m_captureWindow.start(monotonicMilliseconds(), durationSeconds)) {
+        this->publishFailure(CAPTURE_BAD_DURATION, "capture duration must be 1..3600 seconds");
+        this->writeTelemetry();
+        return;
+    }
+    this->reportState(Components::PayloadState::BUSY);
+    this->writeTelemetry();
+}
+
+void PayloadDriver_Lepton::cancelIn_handler(FwIndexType portNum) {
+    static_cast<void>(portNum);
+    if (m_captureWindow.active()) {
+        m_captureWindow.finish();
+        this->publishFailure(CAPTURE_CANCELLED, "collection cancelled");
+        this->writeTelemetry();
+        this->reportState(this->currentState());
+        if (this->isConnected_cancelDoneOut_OutputPort(0)) this->cancelDoneOut_out(0);
+    } else if (m_pendingWrites != 0U) {
+        // DpWriter owns its buffer now. Retain the path and BUSY state until
+        // that write acknowledges or times out; never publish its success.
+        m_pendingCancelled = true;
+    } else {
+        // Completion can race with an already queued cancellation. Acknowledge
+        // that cancellation too, so its owner can leave the cancelling state.
+        this->publishFailure(CAPTURE_CANCELLED, "collection cancellation acknowledged");
+        this->writeTelemetry();
+        this->reportState(this->currentState());
+        if (this->isConnected_cancelDoneOut_OutputPort(0)) this->cancelDoneOut_out(0);
+    }
+}
+
+void PayloadDriver_Lepton::finishCancelledWrite() {
+    m_pendingWrites = 0U;
+    m_pendingPath.clear();
+    m_pendingProductId = 0U;
+    m_pendingWriteTicks = 0U;
+    m_pendingCancelled = false;
+    this->publishFailure(CAPTURE_CANCELLED, "collection cancelled; data-product write drained");
+    this->writeTelemetry();
     this->reportState(this->currentState());
+    if (this->isConnected_cancelDoneOut_OutputPort(0)) this->cancelDoneOut_out(0);
 }
 
 void PayloadDriver_Lepton::run_handler(FwIndexType portNum, U32 context) {
     static_cast<void>(portNum);
     static_cast<void>(context);
-    if ((this->m_pendingWrites != 0U) && (++this->m_pendingWriteTicks >= PENDING_WRITE_TIMEOUT_TICKS)) {
-        this->m_pendingWrites = 0U;
-        this->m_pendingPath.clear();
-        this->m_pendingProductId = 0U;
-        this->publishFailure(CAPTURE_WRITE_TIMEOUT, "no data-product write notification; write presumed failed");
+    if (m_captureWindow.elapsed(monotonicMilliseconds())) {
+        m_captureWindow.finish();
+        (void)this->captureThermalImage(m_lastDurationSeconds);
         this->writeTelemetry();
+    }
+    if ((this->m_pendingWrites != 0U) && (++this->m_pendingWriteTicks >= PENDING_WRITE_TIMEOUT_TICKS)) {
+        if (m_pendingCancelled) {
+            this->finishCancelledWrite();
+        } else {
+            this->m_pendingWrites = 0U;
+            this->m_pendingPath.clear();
+            this->m_pendingProductId = 0U;
+            this->publishFailure(CAPTURE_WRITE_TIMEOUT, "no data-product write notification; write presumed failed");
+            this->writeTelemetry();
+        }
     }
     if (!this->m_camera.isStreaming()) {
         char reason[96] = {};
@@ -84,6 +139,10 @@ void PayloadDriver_Lepton::run_handler(FwIndexType portNum, U32 context) {
 
 void PayloadDriver_Lepton::deactivateIn_handler(FwIndexType portNum) {
     static_cast<void>(portNum);
+    if (m_captureWindow.active()) {
+        m_captureWindow.finish();
+        this->publishFailure(CAPTURE_CAMERA_ERROR, "collection cancelled by camera deactivation");
+    }
     this->m_camera.close();
     this->reportState(this->currentState());
 }
@@ -104,8 +163,13 @@ void PayloadDriver_Lepton::dpWrittenIn_handler(FwIndexType portNum,
     }
 
     if (this->m_pendingPath != fileName.toChar()) {
-        this->m_lastCaptureStatus = CAPTURE_WRITE_MISMATCH;
-        this->writeTelemetry();
+        // A late notification from an earlier timed-out/cancelled capture
+        // must not change the current capture's result or correlation.
+        return;
+    }
+
+    if (m_pendingCancelled) {
+        this->finishCancelledWrite();
         return;
     }
 
@@ -158,7 +222,11 @@ bool PayloadDriver_Lepton::captureThermalImage(U32 durationSeconds) {
     this->log_ACTIVITY_LO_ImageCaptureStart();
 
     ThermalImageRecordType record;
-    const Fw::Time now = this->getTime();
+    Fw::Time now = this->getTime();
+    if (!this->assignWriteTime(now)) {
+        this->publishFailure(CAPTURE_SERIALIZE_ERROR, "data-product timestamp identity exhausted");
+        return false;
+    }
     record.set_timeTag(Fw::TimeValue(now.getTimeBase(), now.getContext(), now.getSeconds(), now.getUSeconds()));
 
     U16(&pixels)[LeptonCamera::NUM_PIXELS] = record.get_value();
@@ -200,6 +268,7 @@ bool PayloadDriver_Lepton::captureThermalImage(U32 durationSeconds) {
     this->m_pendingPath = expectedPath.toChar();
     this->m_pendingWrites = 1U;
     this->m_pendingWriteTicks = 0U;
+    this->m_pendingCancelled = false;
     this->m_lastDataBytes = clampSize(dpSize);
     this->m_lastFileBytes = 0U;
     this->m_lastCaptureStatus = CAPTURE_OK;
@@ -207,6 +276,20 @@ bool PayloadDriver_Lepton::captureThermalImage(U32 durationSeconds) {
     this->dpSend(container, now);
     this->log_ACTIVITY_HI_ImageCaptureQueued(dpSize);
     this->writeTelemetry();
+    return true;
+}
+
+bool PayloadDriver_Lepton::assignWriteTime(Fw::Time& time) {
+    // DpWritten carries only a filename. Make that identity unique for this
+    // driver's lifetime even when the clock is fixed or steps backward, so
+    // an old callback can never be accepted for a new capture after timeout.
+    U64 stamp = static_cast<U64>(time.getSeconds()) * 1000000U + time.getUSeconds();
+    if (m_haveWriteTimestamp && stamp <= m_lastWriteTimestampUs) stamp = m_lastWriteTimestampUs + 1U;
+    if (stamp / 1000000U > std::numeric_limits<U32>::max()) return false;
+    time.set(time.getTimeBase(), time.getContext(), static_cast<U32>(stamp / 1000000U),
+             static_cast<U32>(stamp % 1000000U));
+    m_lastWriteTimestampUs = stamp;
+    m_haveWriteTimestamp = true;
     return true;
 }
 
@@ -286,11 +369,11 @@ void PayloadDriver_Lepton::publishFailure(CaptureStatus status, const char* reas
 }
 
 Components::PayloadState PayloadDriver_Lepton::currentState() const {
+    if (this->m_captureWindow.active() || this->m_pendingWrites != 0U) {
+        return Components::PayloadState::BUSY;
+    }
     if (!this->m_camera.isStreaming()) {
         return Components::PayloadState::NOT_READY;
-    }
-    if (this->m_pendingWrites != 0U) {
-        return Components::PayloadState::BUSY;
     }
     return Components::PayloadState::READY;
 }
