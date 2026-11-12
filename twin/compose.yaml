@@ -1,0 +1,67 @@
+name: artemis-local-twin
+
+x-runtime: &runtime
+  image: artemis-local-twin:local
+  working_dir: /workspace
+  init: true
+  environment:
+    TWIN_RUN_ID: ${TWIN_RUN_ID:-local}
+    TWIN_DEVICES_HOST: devices
+    PYTHONUNBUFFERED: "1"
+  networks: [twin]
+
+services:
+  flight-controller:
+    <<: *runtime
+    build:
+      context: ..
+      dockerfile: twin/Dockerfile
+    command: [python, tools/twin/supervisor.py, fc]
+    volumes:
+      - ..:/workspace:ro
+      - fc-build:/build/fc
+      - fc-artifacts:/artifacts/fc
+      - pdu-build:/build/pdu
+      - ${TWIN_RUN_DIR:-../.twin-runs/current}/flight-controller:/data
+    depends_on: [devices]
+  payload-computer:
+    <<: *runtime
+    command: [python, tools/twin/supervisor.py, pi]
+    volumes:
+      - ..:/workspace:ro
+      - pi-build:/build/pi
+      - pi-artifacts:/artifacts/pi
+      - pi-data:/payload
+      - ${TWIN_RUN_DIR:-../.twin-runs/current}/payload-computer:/data
+    depends_on: [devices]
+  devices:
+    <<: *runtime
+    command: [python, tools/twin/devices.py]
+    volumes:
+      - ..:/workspace:ro
+      - pdu-build:/build/pdu
+      - ${TWIN_RUN_DIR:-../.twin-runs/current}/devices:/data
+    ports: ["127.0.0.1:${TWIN_DEVICES_PORT:-8092}:6200"]
+  ground:
+    <<: *runtime
+    command: [python, tools/twin/ground.py]
+    volumes:
+      - ..:/workspace:ro
+      - fc-artifacts:/artifacts/fc:ro
+      - pi-artifacts:/artifacts/pi:ro
+      - yamcs-data:/yamcs-data
+      - ${TWIN_RUN_DIR:-../.twin-runs/current}/ground:/data
+    ports:
+      - "127.0.0.1:${TWIN_YAMCS_PORT:-8090}:8090"
+    depends_on: [devices]
+
+networks:
+  twin: {}
+volumes:
+  fc-build: {}
+  pi-build: {}
+  pdu-build: {}
+  fc-artifacts: {}
+  pi-artifacts: {}
+  pi-data: {}
+  yamcs-data: {}

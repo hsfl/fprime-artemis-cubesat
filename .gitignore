@@ -52,3 +52,4 @@ ArtemisTeensy_N2_Baremetal/build/
 /tools/cross/verify/
 /tools/cross/venv/
 .cross-venv-linux/
+/.twin-runs/

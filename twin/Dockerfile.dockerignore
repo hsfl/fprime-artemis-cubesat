@@ -1,0 +1,11 @@
+**
+!twin/
+!twin/requirements.lock
+!fprime-artemis-core/
+!fprime-artemis-core/lib/
+!fprime-artemis-core/lib/fprime/
+!fprime-artemis-core/lib/fprime/requirements.txt
+!fprime-artemis-core/lib/zephyr-workspace/
+!fprime-artemis-core/lib/zephyr-workspace/zephyr/
+!fprime-artemis-core/lib/zephyr-workspace/zephyr/scripts/
+!fprime-artemis-core/lib/zephyr-workspace/zephyr/scripts/requirements-base.txt
