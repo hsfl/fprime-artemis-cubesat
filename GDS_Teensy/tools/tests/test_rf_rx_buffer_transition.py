@@ -133,8 +133,14 @@ int main() {
 
     def test_production_wrapper_cleans_tx_to_rx_transition(self) -> None:
         helper_bytes = [path.read_bytes() for path in HELPER_COPIES]
-        self.assertEqual(helper_bytes[0], helper_bytes[1])
-        self.assertEqual(helper_bytes[0], helper_bytes[2])
+        # 7c6de54 deliberately isolated both demo peers at 424 MHz;
+        # the reusable helper keeps its 433 MHz default. All other bytes
+        # must still match, including the bounded recovery/turnaround code.
+        shared_default = b"float frequency_mhz = 433.0f;"
+        self.assertEqual(helper_bytes[0].count(shared_default), 1)
+        demo_helper = helper_bytes[0].replace(shared_default, b"float frequency_mhz = 424.0f;")
+        self.assertEqual(demo_helper, helper_bytes[1])
+        self.assertEqual(demo_helper, helper_bytes[2])
         helper = helper_bytes[0].decode()
 
         clean_start = helper.index("void restartReceiveClean()")
