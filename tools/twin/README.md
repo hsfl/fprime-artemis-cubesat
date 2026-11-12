@@ -1,8 +1,7 @@
 # Local Artemis twin runtime and ground
 
-This tooling runs the real Zephyr/F′ flight controller and Linux/F′ payload
-computer in separate containers. It never opens a physical serial port or RF
-device. Docker Desktop supplies one Linux VM; Compose gives each role its own
+The `yamcs-twin` profile runs the real Zephyr/F′ flight controller and Linux/F′
+payload computer in separate containers using virtual devices. Docker Desktop supplies one Linux VM; Compose gives each role its own
 processes, UART endpoints, build artifacts, and data.
 
 Operator walkthrough: [C3M power → capture → cache → downlink → download](../../docs/operations/walkthroughs/C3M_YAMCS_LOCAL_TWIN.md).
@@ -10,8 +9,13 @@ Read its verified unchanged-C3M-app compatibility result and producing-dictionar
 
 Architecture and documentation map: [current twin design](../../docs/architecture/ARTEMIS_LOCAL_TWIN.md).
 
-Physical kit deployment: [target commands and readiness gaps](../../docs/development/ARTEMIS_HARDWARE_HANDOFF.md).
-The verified local twin is not yet a turnkey physical deployment.
+Named profiles: [build and run commands](../../docs/development/YAMCS_DEPLOYMENT_PROFILES.md).
+`python3 tools/deployments.py yamcs-twin <action>` is the named entry point for
+the standard actions in the initial command block below. Advanced image-only,
+PDU-only and shell commands remain available through `tools/twin/twin.py`. `yamcs-rfm23-hil` builds Teensy41 RFM23 and Pi Zero W/UVC
+artifacts and starts the native serial ground adapter with explicit CDC0/CDC2
+ports. That opt-in ground mode opens the supplied devices; the twin never does.
+Physical acceptance: [hardware handoff](../../docs/development/ARTEMIS_HARDWARE_HANDOFF.md).
 
 ## Start on macOS
 

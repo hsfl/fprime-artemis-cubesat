@@ -1,0 +1,294 @@
+{
+  "result": "PASS",
+  "recorded_at": "2026-11-12T19:18:58.895435+00:00",
+  "scope": "Named-profile builds and local runtime acceptance only; no physical hardware, RF, flash, SSH deployment or real UVC capture",
+  "implementation_commit": "d99111f238ce0ff19aa7426193a339bf9a6ec328",
+  "artifact_provenance": "Built before the feature commit from recorded source_sha with dirty source. Binary/dictionary hashes and working_source_sha256 identify artifacts; unrelated original dirty work was preserved outside commits.",
+  "hil_artifacts": {
+    "fc": {
+      "target": "teensy41",
+      "deployment_profile": "yamcs-rfm23-hil",
+      "binary_sha256": "9b243d5ca2d677174dd5dc78b04650fed08c82f7fce647bc80f4d6770d39bc83",
+      "dictionary_sha256": "c523773937290bc04e98c9a1c9a48e692c33df457051934338819ab0e2b10eb4",
+      "hex_sha256": "40c5a638519f6157a1dbb1359a968cf18e003034edf962b1ba13645e76d80a3a",
+      "framework_sha": "f22ce8f2f2943e641d454e9daa7f129e6c878d32",
+      "zephyr_sha": "3568e1b6d5cdd51a6b964a2a1d6d29200fea2056",
+      "source_sha": "31dccf69a7d4dc109995c5c5af682cd8f688fd16",
+      "source_dirty": true,
+      "working_source_sha256": "0b40d39e00f6903c105c553e53412e8e3f128c2a1d948cda011a61becfa73c8e"
+    },
+    "pi": {
+      "target": "pi-zero-w-armv6hf",
+      "deployment_profile": "yamcs-rfm23-hil",
+      "binary_sha256": "cf4462147632808c77c8508b1e255aac13ad6fa52758530593b41b3e7d1de09d",
+      "dictionary_sha256": "d495c484e8299af97f5d49eb3d576542812dbc9773147881f6faa5927bb23f11",
+      "framework_sha": "f22ce8f2f2943e641d454e9daa7f129e6c878d32",
+      "zephyr_sha": "3568e1b6d5cdd51a6b964a2a1d6d29200fea2056",
+      "source_sha": "31dccf69a7d4dc109995c5c5af682cd8f688fd16",
+      "source_dirty": true,
+      "working_source_sha256": "0b40d39e00f6903c105c553e53412e8e3f128c2a1d948cda011a61becfa73c8e"
+    }
+  },
+  "pi_cross_validation": {
+    "target": "armv6-linux-gnueabihf",
+    "toolchain": "pi-zero-w-armv6hf",
+    "binary_path": "/repo/fprime-artemis-core/build-artifacts/pi-zero-w-armv6hf/FprimeArtemisCore_Deployments_PayloadComputerDeployment/bin/FprimeArtemisCore_Deployments_PayloadComputerDeployment",
+    "dictionary_path": "/repo/fprime-artemis-core/build-artifacts/pi-zero-w-armv6hf/FprimeArtemisCore_Deployments_PayloadComputerDeployment/dict/PayloadComputerDeploymentTopologyDictionary.json",
+    "binary_sha256": "cf4462147632808c77c8508b1e255aac13ad6fa52758530593b41b3e7d1de09d",
+    "dictionary_sha256": "d495c484e8299af97f5d49eb3d576542812dbc9773147881f6faa5927bb23f11",
+    "require_uvc": true,
+    "uvc_enabled": true,
+    "cmake_library_locations": [
+      "/repo/tools/cross"
+    ],
+    "twin_build": false,
+    "source_sha": "31dccf69a7d4dc109995c5c5af682cd8f688fd16",
+    "source_dirty": true,
+    "framework_sha": "f22ce8f2f2943e641d454e9daa7f129e6c878d32",
+    "interpreter": "/lib/ld-linux-armhf.so.3",
+    "needed": [
+      "libuvc.so.0",
+      "libstdc++.so.6",
+      "libgcc_s.so.1",
+      "libc.so.6",
+      "ld-linux-armhf.so.3"
+    ],
+    "resolved_dependencies": {
+      "ld-linux-armhf.so.3": {
+        "sysroot_path": "usr/lib/arm-linux-gnueabihf/ld-linux-armhf.so.3",
+        "sha256": "dd023c7b2b8dc00c8d940414c2d25849e35a70ee5312e2808f1f982a10a17684",
+        "cpu_arch": "v6"
+      },
+      "libc.so.6": {
+        "sysroot_path": "usr/lib/arm-linux-gnueabihf/libc.so.6",
+        "sha256": "c1bef1d8d853ebd0a5a24c48d72490a17f1609eeb66ed5e5d22f103644241eda",
+        "cpu_arch": "v6"
+      },
+      "libgcc_s.so.1": {
+        "sysroot_path": "usr/lib/arm-linux-gnueabihf/libgcc_s.so.1",
+        "sha256": "65edcd9b06ceb97b1889fa494f96cfee43a38f9d3e67f3ffd8a777c278824b90",
+        "cpu_arch": "v6"
+      },
+      "libstdc++.so.6": {
+        "sysroot_path": "usr/lib/arm-linux-gnueabihf/libstdc++.so.6.0.30",
+        "sha256": "ddca9925765afbbbdc106ae4378b4855ec7d853484570afd0a3f1b59b37f5ae5",
+        "cpu_arch": "v6"
+      },
+      "libm.so.6": {
+        "sysroot_path": "usr/lib/arm-linux-gnueabihf/libm.so.6",
+        "sha256": "4dafc3b0942d0ee569270623e809bd66c63f40e53ed13e14548788a7d48eda7c",
+        "cpu_arch": "v6"
+      },
+      "libuvc.so.0": {
+        "sysroot_path": "usr/local/lib/libuvc.so.0.0.7",
+        "sha256": "a1875df80540ddfecd41d8899ea69622e30753461122f8e9dc01da44c501840b",
+        "cpu_arch": "v6"
+      },
+      "libusb-1.0.so.0": {
+        "sysroot_path": "usr/lib/arm-linux-gnueabihf/libusb-1.0.so.0.3.0",
+        "sha256": "3d8f27a2e7fcf3ea3ada5ddc18b89912490d704a43eb89b3ae2691a22a1059ba",
+        "cpu_arch": "v6"
+      },
+      "libpthread.so.0": {
+        "sysroot_path": "usr/lib/arm-linux-gnueabihf/libpthread.so.0",
+        "sha256": "f768540fa394a483922fe984bc0434968c88200b57dda6e7e38c2785c76e396e",
+        "cpu_arch": "v6"
+      },
+      "libudev.so.1": {
+        "sysroot_path": "usr/lib/arm-linux-gnueabihf/libudev.so.1.7.5",
+        "sha256": "3542308211d406bb4b8a3b93556328240201918f62ef7f7ce9003a25ec48dfe5",
+        "cpu_arch": "v6"
+      }
+    },
+    "library_search_paths": [
+      "/usr/local/lib",
+      "/lib/arm-linux-gnueabihf",
+      "/usr/lib/arm-linux-gnueabihf",
+      "/lib",
+      "/usr/lib"
+    ],
+    "dependency_resolution": "explicit search paths; confirm the same installed libraries on the physical Pi",
+    "file": "/repo/fprime-artemis-core/build-artifacts/pi-zero-w-armv6hf/FprimeArtemisCore_Deployments_PayloadComputerDeployment/bin/FprimeArtemisCore_Deployments_PayloadComputerDeployment: ELF 32-bit LSB pie executable, ARM, EABI5 version 1 (GNU/Linux), dynamically linked, interpreter /lib/ld-linux-armhf.so.3, BuildID[sha1]=677f09dde9492cf688b5225927bb66f05c223920, for GNU/Linux 3.2.0, not stripped",
+    "arm_attributes": "Attribute Section: aeabi\nFile Attributes\n  Tag_CPU_name: \"6KZ\"\n  Tag_CPU_arch: v6KZ\n  Tag_ARM_ISA_use: Yes\n  Tag_THUMB_ISA_use: Thumb-1\n  Tag_FP_arch: VFPv2\n  Tag_ABI_PCS_wchar_t: 4\n  Tag_ABI_FP_rounding: Needed\n  Tag_ABI_FP_denormal: Needed\n  Tag_ABI_FP_exceptions: Needed\n  Tag_ABI_FP_number_model: IEEE 754\n  Tag_ABI_align_needed: 8-byte\n  Tag_ABI_align_preserved: 8-byte, except leaf SP\n  Tag_ABI_enum_size: int\n  Tag_ABI_VFP_args: VFP registers\n  Tag_CPU_unaligned_access: v6\n  Tag_Virtualization_use: TrustZone\n",
+    "runtime_execution": "not performed; ELF inspection only",
+    "sysroot_metadata": "uname -a:\nLinux raspberrypi-c3m 6.12.62+rpt-rpi-v6 #1 Raspbian 1:6.12.62-1+rpt1~bookworm (2026-01-19) armv6l GNU/Linux\n\ndpkg --print-architecture:\narmhf\n\nld-linux:\n/usr/lib/arm-linux-gnueabihf/ld-linux-armhf.so.3\n\nglibc:\nldd (Debian GLIBC 2.36-9+rpt2+deb12u13) 2.36\n"
+  },
+  "pi_qemu": {
+    "result": "PASS",
+    "binary_sha256": "cf4462147632808c77c8508b1e255aac13ad6fa52758530593b41b3e7d1de09d",
+    "cpu": "arm1176",
+    "emulator": "qemu-arm version 7.2.22 (Debian 1:7.2+dfsg-7+deb12u18+b3)",
+    "duration_seconds": 5,
+    "returncode": 0,
+    "virtual_uart": true,
+    "camera_backend": "sample",
+    "payload_ready": true,
+    "fixture_sha256": "04eaee89f6d41d53ab74df94123eaac01f9a53d46383ffdd823111256c07b1a1",
+    "library_path": "/sysroot/usr/local/lib:/sysroot/lib/arm-linux-gnueabihf:/sysroot/usr/lib/arm-linux-gnueabihf:/sysroot/lib:/sysroot/usr/lib",
+    "log_sha256": "9bd54d30e055621ff86826c4a99730a41fde5ef2c3f44fbd42d2015c6bcb2de2",
+    "physical_hardware": false
+  },
+  "named_builds": {
+    "yamcs-twin": "PASS: FC native_sim, Pi Linux and PDU host",
+    "yamcs-rfm23-hil": "PASS: full --role all with explicit SDK/tools/sysroot; normalized FC ELF+HEX, Pi ELF, dictionaries and Pi startup bundle"
+  },
+  "ground_firmware": {
+    "result": "PASS",
+    "command": "cd GDS_Teensy && ./tools/arduino-cli/build.sh",
+    "target": "teensy:avr:teensy41:usb=serial3",
+    "hex_sha256": "5fce1cac92cd43d83ae456de6cbeb403b1729f2193184bbb1192dd4510f4d021",
+    "flashed": false
+  },
+  "tests": {
+    "runtime_profile_serial": 28,
+    "cross_contract": 4,
+    "ground_firmware_host": 13,
+    "total": 45,
+    "result": "PASS",
+    "independent_review": "Reconnect queue race fixed and independently reviewed; full-queue TCP regression passes. Named profiles, serial framing, manifest/UVC guards and docs checked."
+  },
+  "ground_host_test_repair": "Two preexisting byte-snapshot assertions failed because 7c6de54 intentionally set demo copies to 424 MHz while shared helper remains 433 MHz. Tests now allow only that exact one-line difference; product/radio settings unchanged.",
+  "hil_serial_pty": {
+    "result": "PASS",
+    "scope": "Real Yamcs and serial adapter; local PTY peer; no flight execution/hardware/RF",
+    "run_id": "serial-pty-1794510627917178000",
+    "raw_ccsds_bytes": 19,
+    "command_wire_hex": "20440412001000c00000050000100040018200",
+    "flight_command_completion": "Not asserted: PTY peer is not flight software",
+    "science_retry_hex": "4e32042900000101",
+    "raw_file_bytes": 38486,
+    "yamcs_exact_get": true,
+    "sha256": "af6acc97bee0d0cb67642d352e3f93022768d8377f755cfda464d8377f137027",
+    "retry_rounds": 1,
+    "dictionary_sha256": "d495c484e8299af97f5d49eb3d576542812dbc9773147881f6faa5927bb23f11",
+    "ground_exit_code": 0,
+    "acceptance_sha256": "576259f5c6f2fba73ae9cd1d92200820d0db01132dbf35c61e5ad1e95670c75b"
+  },
+  "twin_flow": {
+    "result": "PASS",
+    "run_id": "20261112T191012Z-99de17",
+    "completed_at": "2026-11-12T19:12:56.927148+00:00",
+    "cycles": [
+      {
+        "product_id": 20,
+        "result": "PASS",
+        "bytes": 38486,
+        "sha256": "5d58fe0fc7c991827604ebc12c65ca88c242a4db908d3e9a3d308fc15fc0dbb2",
+        "retry_rounds": 1,
+        "pi_off": true,
+        "pi_source_sha256": "5d58fe0fc7c991827604ebc12c65ca88c242a4db908d3e9a3d308fc15fc0dbb2"
+      },
+      {
+        "product_id": 21,
+        "result": "PASS",
+        "bytes": 38486,
+        "sha256": "bde49be775dce0dab6bd875f187926bf4236f7f6f5e51b6f81e8d16e5775e9c9",
+        "retry_rounds": 0,
+        "pi_off": false,
+        "pi_source_sha256": "bde49be775dce0dab6bd875f187926bf4236f7f6f5e51b6f81e8d16e5775e9c9"
+      },
+      {
+        "product_id": 22,
+        "result": "PASS",
+        "bytes": 38486,
+        "sha256": "abb474c566ecfb1c023798b681ea37e3a0861984a2f22b7bc580ebd4d43bc3c8",
+        "retry_rounds": 0,
+        "pi_off": false,
+        "pi_source_sha256": "abb474c566ecfb1c023798b681ea37e3a0861984a2f22b7bc580ebd4d43bc3c8"
+      }
+    ],
+    "acceptance_sha256": "827e0923bc66050ec22cf93cd5239100252c0d5f5d91ecc88229269208644d5a"
+  },
+  "faults": {
+    "result": "PASS",
+    "cases": [
+      {
+        "case": "invalid_command_argument_rejected",
+        "result": "PASS"
+      },
+      {
+        "case": "active_capture_cancel_recovery",
+        "result": "PASS"
+      },
+      {
+        "case": "pc_link_mid_stage",
+        "result": "PASS"
+      },
+      {
+        "case": "radio_off_retains_cache",
+        "result": "PASS"
+      },
+      {
+        "case": "yamcs_unavailable_outbox_recovery",
+        "result": "PASS"
+      }
+    ],
+    "acceptance_sha256": "fff37fdb80422f5103cd2ed31b68b971402a93fbeb0648f5668f1ede9208e817"
+  },
+  "unchanged_c3m_import": {
+    "result": "PASS",
+    "sha256": "5d58fe0fc7c991827604ebc12c65ca88c242a4db908d3e9a3d308fc15fc0dbb2",
+    "container_id": "0x10027000",
+    "record_id": "0x10027000",
+    "dictionary_sha256": "e1654e92e4d9e9952ee5242976119416787f71a9dd53b349f2fa16fbfbe3998a",
+    "app_sources_unchanged": true,
+    "fprime_gds_version": "4.2.1",
+    "history_result": "complete",
+    "product_kind": "lepton",
+    "width": 160,
+    "height": 120,
+    "samples": 19200,
+    "fixture_temperatures_equal": true,
+    "app_source_sha256": {
+      "ArtemisRpiTeensy_N2/tools/payload_receiver.py": "b1383568d2e4756ec02227f38efc95e820527e4fab11d0520626978ca308776a",
+      "ground-station/boson-viewer/boson_viewer.py": "e56bbbc32142c8ef7aef94ab163365317307f64ea9878ddb3443028e4bfa9ba6",
+      "ground-station/c3m-payload-receiver-ui/c3m_payload_receiver_ui.py": "096d03928406366a1a538f22b20c94c0162e9df19614e33d74bfa77d904ea43d",
+      "ground-station/c3m-payload-receiver-ui/static/app.js": "945141cb52d4a43a451df8aa02eb31e0b79e804030f0207701cd754fe3e0078e",
+      "ground-station/c3m-payload-receiver-ui/static/index.html": "76298b739d027c2f5c827c8ee8c8681be4588d09ebfa13378c43baee270bf8f5",
+      "ground-station/c3m-payload-receiver-ui/static/styles.css": "1bb185f1e4cde358c1cb07951e668b450c441becd51ffb6b54cf431278b08944",
+      "ground-station/lepton-dp-viewer/lepton_dp_viewer.py": "2cecacc28e2d3d1450202796694586ed113f9f7e3fbe3007d375ec1251591699"
+    }
+  },
+  "target_memory": {
+    "fc_main_ram_reserved_bytes": 268432,
+    "fc_main_ram_bank_bytes": 524288,
+    "fc_main_ram_reserved_percent": 51.2,
+    "fc_cache_bytes": 196608,
+    "fc_cache_bank_bytes": 262144,
+    "fc_cache_bank_percent": 75,
+    "combined_static_reserved_percent_of_1mib": 44.34967041015625,
+    "runtime_heap_stack_peaks": "not measured on hardware"
+  },
+  "checks": [
+    "CMake preset parse/list",
+    "shell syntax",
+    "Python byte compilation",
+    "git diff --check",
+    "HIL manifest cohort, target ISA and required UVC",
+    "read-only sysroot/no SSH contract"
+  ],
+  "logs": {
+    "artemis-named-hil-final-build.log": "20397d5c5aa851c27130968ad566227bd2b62f16f50b2a428af9333538ed4634",
+    "artemis-named-twin-final-build.log": "810fc3cb9a48a4722695a6395d63096cd51572dff5eb54f1d98a130f483ab415",
+    "artemis-named-twin-final-demo.log": "501cce99eba8132ba0805b10058ca60b88114a6d15c8499a654ece2983e25c9f",
+    "artemis-named-profile-faults.log": "e2eef0feef8a6903c2165edade8b06c32a144599d7e9b287ba55bf2c558adec7",
+    "artemis-profile-tests.log": "e8c06cf9bdc2d82ca07cb8fe0563ea595a8b8e9e4647ce376bb124dabf70bb00",
+    "artemis-ground-host-tests-final.log": "eea4fecfbfd2a48eb764e72a458513128a9f1bf1e14947cf14520bfbac994b99",
+    "artemis-ground-profile-build.log": "6789915f4b0b1cf62b194cf3bf9c2c547af8df39e971f5d8ad3036ce4dac997f",
+    "artemis-profile-c3m-check.log": "3fd7a1e23cf7850129b63900c32f9094f07e02b9c8d28640f83a47c5c3cc817e"
+  },
+  "remaining_bench_acceptance": [
+    "Physical target installation/boot and rollback",
+    "Matching Pi runtime libraries and USB camera permissions",
+    "Real Lepton capture",
+    "FC/Pi UART and Ground Teensy USB",
+    "Real RFM23BP RF",
+    "PDU/EPS power and populated sensors",
+    "Loaded timing and target heap/stack peaks"
+  ],
+  "retained_local_evidence": {
+    "twin_run": ".twin-runs/20261112T191012Z-99de17",
+    "hil_serial_pty": ".profiles/yamcs-rfm23-hil/pty-probe-final",
+    "pi_cross": "tools/cross/verify/fprime-artemis-core/PayloadComputerDeployment"
+  }
+}

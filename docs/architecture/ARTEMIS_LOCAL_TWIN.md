@@ -1,11 +1,19 @@
 # Artemis local twin architecture
 
-Current branch design and verified behavior, 2026-11-11 HST.
+Current branch design and verified behavior, updated 2026-11-12 HST.
 
 The Teensy flight controller owns spacecraft operations; the Pi owns payload
 acquisition and persistent products. Yamcs provides commanding, telemetry and
 raw-file delivery. The existing C3M application opens the downloaded file and
 performs image/temperature analysis.
+
+Two named profiles now select the execution and ground transports:
+`yamcs-twin` uses the Docker services below; `yamcs-rfm23-hil` builds Teensy41
+RFM23 and Pi Zero W/UVC applications, generates Pi startup inputs and connects
+Yamcs to Ground Teensy CDC0/CDC2. It uses the same mission/cache/file components.
+The serial adapter bypasses virtual RF framing because the Ground Teensy already
+owns it. Build/ELF/QEMU and real Yamcs PTY tests passed; physical bench behavior
+remains untested. See the [profile runbook](../development/YAMCS_DEPLOYMENT_PROFILES.md).
 
 ## Processes and ownership
 
@@ -136,6 +144,7 @@ it does not make the app a second live receiver for the twin's radio.
 
 | Need | Document |
 |---|---|
+| Named twin/HIL build and runtime profiles | [Profile runbook](../development/YAMCS_DEPLOYMENT_PROFILES.md) |
 | Physical-target commands and remaining deployment gates | [Hardware handoff status](../development/ARTEMIS_HARDWARE_HANDOFF.md) |
 | Start/build/stop and fault controls | [Runtime runbook](../../tools/twin/README.md) |
 | Power → capture → cache → downlink → download → existing app | [Operator walkthrough](../operations/walkthroughs/C3M_YAMCS_LOCAL_TWIN.md) |

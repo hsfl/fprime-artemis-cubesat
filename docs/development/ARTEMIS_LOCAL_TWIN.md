@@ -438,3 +438,58 @@ branch. Final committed contents will be preserved while grouping local history
 into flight/payload core, Docker/Yamcs runtime, and documentation/evidence commits.
 Original dirty files stay outside these commits. Dependency pins are verified
 on their upstream refs; final remote ref verification follows publication.
+
+### Named profiles — implementation and first build milestones, 2026-11-12 HST
+
+Added `yamcs-twin` and `yamcs-rfm23-hil` definitions, FC CMake presets and the
+`tools/deployments.py` command entry point. HIL build forces local-only cross
+compilation, emits matched hardware artifacts and Pi startup/service inputs,
+and never flashes/SSH-deploys. Real camera support is required for the HIL Pi.
+
+The Teensy RFM23 target linked with its full 192 KiB cache and the Pi Zero W
+ARMv6 target linked with libuvc enabled. Cross validation resolved the ARMv6
+interpreter and all nine shared dependencies from the prepared read-only sysroot.
+The physical ground serial adapter follows CDC0 CCSDS / CDC2 science and avoids
+double RF framing. Targeted PTY tests and an actual native Yamcs PTY probe
+passed, including real command bytes, recorded FDP packet loss/RETRY and exact
+Yamcs GET. The final Linux-only Pi binary also passed QEMU ARM1176 startup with
+recorded input, virtual UART, camera READY and clean SIGTERM exit.
+See [named-profile commands](YAMCS_DEPLOYMENT_PROFILES.md).
+
+
+### Named-profile acceptance and publication — 2026-11-12 HST
+
+- Both complete named build commands passed. `yamcs-rfm23-hil` generated the
+  Teensy41 RFM23 ELF/HEX, required-UVC Pi Zero W ARMv6 ELF, producing dictionaries,
+  matched manifests and Pi startup/service bundle. The final Pi binary excludes
+  the Zephyr library, passed ELF/dependency inspection, and ran on QEMU ARM1176
+  with explicit recorded input, READY and clean shutdown.
+- Final native Yamcs + two-PTY test passed against those exact HIL artifacts:
+  actual PING bytes reached the command port; missing science DATA0 generated
+  RETRY; the 38,486-byte Yamcs GET matched the replay source and receipt. This
+  exercised the host adapter, not flight code or physical RF.
+- Fresh twin run `20261112T191012Z-99de17` passed three full cycles, products
+  20/21/22. Product 20 downlinked and repaired one lost packet with Pi OFF;
+  all three independent Yamcs GETs matched the persisted Pi source oracle.
+- A fresh Yamcs download of product 20 passed the unchanged canonical C3M app
+  with its existing F′ 4.2.1 tools: complete History, CRC/SHA match, 160×120 image,
+  CSV/PNG and all 19,200 recorded temperatures equal. No analysis software changed.
+- All five full fault cases passed: invalid argument, active cancellation,
+  PC-link interruption during staging, radio OFF/cache retention and Yamcs
+  unavailable/outbox recovery. Cleanup restored device faults and resumed Yamcs.
+- **45/45 local tests passed**: 28 runtime/profile/serial, four cross-wrapper,
+  and 13 Ground Teensy host tests. The actual TripleSerial ground firmware also
+  compiled. Two old snapshot assertions were corrected to allow the intentional
+  `7c6de54` demo-only 424 MHz default while preserving every other byte check;
+  product/radio settings were not changed. Independent review passed, including
+  the saturated uplink/reconnect race regression and those snapshot corrections.
+- RFM23 static reservations remain 268,432 bytes in main RAM (51.20% of its
+  512 KiB bank) plus the full 192 KiB cache (75% of its 256 KiB bank), together
+  44.35% of the Teensy's 1 MiB physical RAM. Runtime peaks remain unmeasured.
+- [Compact final evidence](evidence/YAMCS_DEPLOYMENT_PROFILES_2026-11-12.json)
+  records exact artifact/source/library hashes, emulator/PTY scope, product and
+  app checks. [Profile commands](YAMCS_DEPLOYMENT_PROFILES.md) and
+  [hardware handoff](ARTEMIS_HARDWARE_HANDOFF.md) replace the prior missing-build/
+  missing-adapter status. Builds and tests performed no physical operation,
+  flashing, Pi deployment or real camera capture. Original unrelated dirty work
+  stays outside the feature commits. The local twin remains running for review.
