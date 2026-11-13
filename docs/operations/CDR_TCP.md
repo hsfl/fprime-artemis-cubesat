@@ -22,13 +22,37 @@ Run this against an already running CDR spacecraft process, using its matching J
 ./tools/yamcs/run_cdr_tcp.sh --dictionary <matching-dictionary.json> --address 127.0.0.1 --port 50000
 ```
 
-This starts Yamcs and a separate ground bridge using the packaged stock F′ TCP client, CCSDS framing and PacketBridge. A small UDP adapter wrapper spaces outgoing TM frames by 5 ms (configurable with `--frame-interval-ms`) because unpaced large-file bursts overran the local Yamcs UDP receiver during testing. FileDownlink and the TCP wire format stay stock. It does not launch a simulated spacecraft, science viewer, or custom channel-1 receiver. Open `http://127.0.0.1:8090` and select `fprime-project` / `realtime`. Each run gets its own config, database, received-file mirror and manifest under ignored `yamcs/run/`. Ctrl-C stops both owned process groups.
+This starts Yamcs and a separate ground bridge using the packaged stock F′ TCP client, CCSDS framing and PacketBridge. A small UDP adapter wrapper spaces outgoing TM frames by at least 20 ms (configurable with `--frame-interval-ms`) without catch-up bursts. The persistent ground Pi also uses at least 4 MiB UDP receive buffers; see [ground installation and rollback](../../deploy/ground/README.md). FileDownlink and the TCP wire format stay stock. It does not launch a simulated spacecraft, science viewer, or custom channel-1 receiver. Open `http://127.0.0.1:8090` and select `fprime-project` / `realtime`. Each run gets its own config, database, received-file mirror and manifest under ignored `yamcs/run/`. Ctrl-C stops both owned process groups.
 
 For eventual Pi 5 LAN use, select the Zero W's reachable IPv4 address and the appropriate Yamcs `--http-bind`. Host deployment and access configuration remain separate work. The pinned Yamcs UDP receive links bind wildcard sockets; the bridge destinations stay on loopback. The launcher records this dependency limitation rather than claiming an unsupported bind setting.
 
 ## File transfer
 
-First issue `FileHandling.fileDownlink.SendFile` through Yamcs using a spacecraft-side source filename and a unique destination name. Alternatively, use the ground helper:
+### Yamcs operator sequence
+
+Use the matching flight dictionary and select the retained **CSV** product ID from the capture completion event. For the private hardware command/capture sequence, use the consuming deployment's operator runbook; this public profile owns storage and downlink only.
+
+1. In **Commanding**, issue `storageManager.SELECT_PRODUCT` with `productId = <CSV_ID>`.
+2. Copy `sourcePath` from the matching `storageManager.ProductSelected` event. This is the spacecraft-side path, not a path on the ground Pi.
+3. Issue `FileHandling.fileDownlink.SendFile` with `sourceFileName = <exact sourcePath>` and `destFileName = <fresh name>.csv`. Do not include quotes in the Yamcs argument fields. Use a different destination for every attempt.
+4. Wait for **File Transfer → COMPLETED**. Retrieve the file at **Storage → Buckets → fprimeFilesIn → <destination>**. On the persistent ground station it is also mirrored at `/home/n2-fprime-yamcs/yamcs-station/received-files/<destination>`.
+
+The verified legacy CSV product 6 uses these exact arguments (change `attempt1` if already used):
+
+```text
+storageManager.SELECT_PRODUCT
+  productId: 6
+
+FileHandling.fileDownlink.SendFile
+  sourceFileName: /home/n2-obc/artemis/data/science-products/product_6.bin
+  destFileName: science-product-6-cdr-attempt1.csv
+```
+
+Expected legacy product 6 size is 605,968 bytes. The source's `.bin` extension is historical; its bytes are CSV. Future CSV commits use `.csv` after deploying the filename update. Do not rename old catalog files manually. A manual COMPLETED status is the stock receiver result; use the helper below for independent size/CRC verification and an optional expected SHA-256.
+
+### Verified helper
+
+Instead of issuing `SendFile` manually, request one transfer with the ground helper:
 
 ```sh
 ./tools/yamcs/downlink_stock.sh --source-file source/sample.csv --expected-file <local-integrity-oracle.csv>
@@ -37,7 +61,7 @@ First issue `FileHandling.fileDownlink.SendFile` through Yamcs using a spacecraf
 
 The source path is passed unchanged to F′; a relative source is relative to the spacecraft process's working directory. Stock source/destination names are limited to 100 UTF-8 bytes in this dictionary. The local oracle is used only for comparison and is never uploaded into Yamcs. Source-path mode requires a local oracle or explicit expected size plus SHA-256/CRC; product mode obtains size/CRC from a fresh `StorageManager.ProductSelected` event. `--expected-file` can also supply a separate SHA/byte oracle in product mode.
 
-The helper independently downloads the reconstructed `fprimeFilesIn` object through Yamcs, saves it and writes PASS/FAIL evidence. A reported receive SHA is source-verified only when an independent expected SHA/oracle was supplied. `FileSent` or command OK alone is not delivery proof. Missing files, missing/partial receipt or mismatched integrity fail; stock transfer has no selective retry/resume guarantee. After interruption, reconnect and issue a fresh transfer with a new destination.
+The helper requests one download through Yamcs's stock File Transfer API, waits for its transfer ID to complete, independently downloads the reconstructed `fprimeFilesIn` object, and saves it with PASS/FAIL evidence. On the persistent station, pass `--station ~/yamcs-station` to use saved local authentication. Product mode defaults to a unique destination preserving the selected source's recognized `.csv` or `.bin` extension (otherwise `.bin`). New StorageManager commits retain CSV as `product_<ID>.csv` and binary/opaque data as `product_<ID>.bin`. Existing legacy CSVs such as product 6 retain their `.bin` source names; supply an explicit `.csv` `--destination` for those. Always copy `ProductSelected.sourcePath` exactly. A reported receive SHA is source-verified only when an independent expected SHA/oracle was supplied. `FileSent` or command OK alone is not delivery proof. Only one helper runs per station/service, and an existing nonterminal download prevents a new request. Missing files, missing/partial receipt or mismatched integrity fail; stock transfer has no selective retry/resume guarantee. Timeouts do not cancel the stock receiver or resend automatically. Before a manual retry, stop the old sender and clear/drain its transport state as described in the [ground recovery procedure](../../deploy/ground/README.md), then use a fresh destination.
 
 The default simulator dictionary exposes collection-only `scienceApp.SCIENCE_CAPTURE(durationMinutes)` and accepts 1 or 2 minutes. The simulator generates the corresponding 60 or 120 seconds of exposure data. A build with `NEUTRON2_CONFIGURED_CAPTURE=ON` exposes `scienceApp.CONFIGURE_CAPTURE_DURATION(durationMinutes)` followed by `scienceApp.SCIENCE_CAPTURE()`. The private hardware backend accepts finite durations of 1–216 minutes. Wait for the configuration command to complete before issuing capture. Use the dictionary from the selected build and wait for the matching `ScienceProductCommitted` event before running the stock helper.
 
