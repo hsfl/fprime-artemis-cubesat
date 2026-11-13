@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -21,6 +22,7 @@ constexpr const char* DEFAULT_STORAGE_ROOT = "/home/pi/artemis/data/science-prod
 constexpr const char* ID_HIGH_WATER_FILE = "product-id-high-water";
 constexpr const char* PRODUCT_PREFIX = "product_";
 constexpr const char* PRODUCT_DATA_SUFFIX = ".bin";
+constexpr const char* PRODUCT_CSV_SUFFIX = ".csv";
 constexpr const char* PRODUCT_METADATA_SUFFIX = ".meta";
 constexpr const char* TRANSIENT_CAPTURE_DIR = "/tmp/neutron_payload_captures";
 constexpr const char* TRANSIENT_CAPTURE_PREFIX = "neutron_capture_";
@@ -47,8 +49,9 @@ std::string getStorageRoot() {
     return std::string(DEFAULT_STORAGE_ROOT);
 }
 
-std::string productDataPath(const std::string& root, U32 productId) {
-    return root + "/" + PRODUCT_PREFIX + std::to_string(productId) + PRODUCT_DATA_SUFFIX;
+std::string productDataPath(const std::string& root, U32 productId,
+                            const char* suffix = PRODUCT_DATA_SUFFIX) {
+    return root + "/" + PRODUCT_PREFIX + std::to_string(productId) + suffix;
 }
 
 std::string productMetadataPath(const std::string& root, U32 productId) {
@@ -64,6 +67,22 @@ bool hasSuffix(const char* value, const char* suffix) {
     const std::size_t suffixLength = std::strlen(suffix);
     return (valueLength >= suffixLength) &&
            (std::strcmp(value + valueLength - suffixLength, suffix) == 0);
+}
+
+const char* productDataSuffix(const char* sourcePath) {
+    // Only carry a known format suffix into the generated storage name. Do not
+    // preserve arbitrary source basenames or interpret CSV content heuristically.
+    const std::size_t length = std::strlen(sourcePath);
+    if (length >= 4U) {
+        const char* suffix = sourcePath + length - 4U;
+        if ((suffix[0] == '.') &&
+            (std::tolower(static_cast<unsigned char>(suffix[1])) == 'c') &&
+            (std::tolower(static_cast<unsigned char>(suffix[2])) == 's') &&
+            (std::tolower(static_cast<unsigned char>(suffix[3])) == 'v')) {
+            return PRODUCT_CSV_SUFFIX;
+        }
+    }
+    return PRODUCT_DATA_SUFFIX;
 }
 
 bool ensureDirectory(const std::string& path) {
@@ -116,13 +135,14 @@ bool ensureDirectory(const std::string& path) {
 bool parseProductFileId(const char* name, U32& productId) {
     const std::size_t prefixLength = std::strlen(PRODUCT_PREFIX);
     if ((std::strncmp(name, PRODUCT_PREFIX, prefixLength) != 0) ||
-        (!hasSuffix(name, PRODUCT_DATA_SUFFIX) && !hasSuffix(name, PRODUCT_METADATA_SUFFIX))) {
+        (!hasSuffix(name, PRODUCT_DATA_SUFFIX) && !hasSuffix(name, PRODUCT_CSV_SUFFIX) &&
+         !hasSuffix(name, PRODUCT_METADATA_SUFFIX))) {
         return false;
     }
     const std::size_t nameLength = std::strlen(name);
-    const std::size_t suffixLength = hasSuffix(name, PRODUCT_DATA_SUFFIX)
-        ? std::strlen(PRODUCT_DATA_SUFFIX)
-        : std::strlen(PRODUCT_METADATA_SUFFIX);
+    const std::size_t suffixLength = hasSuffix(name, PRODUCT_METADATA_SUFFIX)
+        ? std::strlen(PRODUCT_METADATA_SUFFIX)
+        : std::strlen(PRODUCT_DATA_SUFFIX);  // .bin and .csv are both four bytes
     if (nameLength <= prefixLength + suffixLength) {
         return false;
     }
@@ -391,12 +411,14 @@ void StorageManager::requestIn_handler(FwIndexType portNum,
     }
     if ((this->findProduct(productId) != nullptr) ||
         (::access(productDataPath(this->m_storageRoot, productId).c_str(), F_OK) == 0) ||
+        (::access(productDataPath(this->m_storageRoot, productId, PRODUCT_CSV_SUFFIX).c_str(), F_OK) == 0) ||
         (::access(productMetadataPath(this->m_storageRoot, productId).c_str(), F_OK) == 0)) {
         this->rejectIncomingProduct(productId, REJECT_DUPLICATE_ID, sourcePath);
         return;
     }
 
-    const std::string dataPath = productDataPath(this->m_storageRoot, productId);
+    const std::string dataPath = productDataPath(this->m_storageRoot, productId,
+                                                  productDataSuffix(sourcePath.toChar()));
     const std::string metadataPath = productMetadataPath(this->m_storageRoot, productId);
     if (dataPath.size() >= SOURCE_PATH_CAPACITY) {
         this->rejectIncomingProduct(productId, REJECT_PATH_TOO_LONG, sourcePath);
@@ -692,7 +714,9 @@ bool StorageManager::loadCatalog() {
         }
         ProductRecord record{};
         if (!this->readMetadata(productId, record) || !this->isValidStoredProduct(record)) {
-            const std::string expectedPath = productDataPath(this->m_storageRoot, productId);
+            const std::string expectedPath = (record.sourcePath.length() > 0U)
+                ? std::string(record.sourcePath.toChar())
+                : productMetadataPath(this->m_storageRoot, productId);
             this->rejectProduct(productId, REJECT_INVALID_STORED_FILE, Fw::String(expectedPath.c_str()));
             continue;
         }
@@ -908,7 +932,17 @@ bool StorageManager::readMetadata(U32 filenameProductId, ProductRecord& record) 
         (sourceCrc > 0xFFFFU)) {
         return false;
     }
-    const std::string dataPath = productDataPath(this->m_storageRoot, filenameProductId);
+    const std::string binPath = productDataPath(this->m_storageRoot, filenameProductId);
+    const std::string csvPath = productDataPath(this->m_storageRoot, filenameProductId, PRODUCT_CSV_SUFFIX);
+    const bool binExists = (::access(binPath.c_str(), F_OK) == 0);
+    const bool csvExists = (::access(csvPath.c_str(), F_OK) == 0);
+    // N2P1 metadata predates typed filenames. Recover its actual immutable file,
+    // including legacy CSV products stored as .bin, without renaming anything.
+    // Two possible files for one ID are ambiguous and must not be selected.
+    if (binExists == csvExists) {
+        return false;
+    }
+    const std::string& dataPath = csvExists ? csvPath : binPath;
     if (dataPath.size() >= SOURCE_PATH_CAPACITY) {
         return false;
     }

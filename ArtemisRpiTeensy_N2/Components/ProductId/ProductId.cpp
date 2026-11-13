@@ -82,6 +82,9 @@ bool parseProductIdFile(const char* name, U32& productId) {
     if (nameLength > prefixLength + 4U &&
         std::strcmp(name + nameLength - 4U, ".bin") == 0) {
         suffix = ".bin";
+    } else if (nameLength > prefixLength + 4U &&
+               std::strcmp(name + nameLength - 4U, ".csv") == 0) {
+        suffix = ".csv";
     } else if (nameLength > prefixLength + 5U &&
                std::strcmp(name + nameLength - 5U, ".meta") == 0) {
         suffix = ".meta";
