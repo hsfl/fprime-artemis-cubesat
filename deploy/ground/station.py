@@ -169,6 +169,14 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Starting Yamcs instance {instance}; OBC TCP peer {args.address} is handled by n2-ground-bridge.service",
           flush=True)
+    watchdog = repo / "tools" / "yamcs" / "transfer_watchdog.py"
+    access_file = station / "Yamcs-access.txt"
+    if watchdog.is_file() and access_file.is_file():
+        subprocess.Popen([str(venv / "bin" / "python"), "-u", str(watchdog), "--station", str(station),
+                          "--instance", instance, "--parent-pid", str(os.getpid())], env=env)
+        print("Starting stock-transfer watchdog: timeout alerts only; no cancel, retry, or payload commands", flush=True)
+    else:
+        print("Transfer timeout alerts unavailable: install transfer_watchdog.py and station access file", flush=True)
     os.chdir(repo)
     os.execvpe(command[0], command, env)
     return 0

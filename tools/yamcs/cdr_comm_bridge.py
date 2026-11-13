@@ -22,6 +22,7 @@ from fprime_gds.common.communication.ccsds.tm_frame_aggregator import (
 
 UDP_SEND_PORT = 50000
 UDP_RECV_PORT = 50001
+MIN_FRAME_INTERVAL_MS = 20.0
 
 
 def positive_interval(value: str) -> float:
@@ -54,7 +55,7 @@ def dictionary_constants(dictionary: Path) -> tuple[int, int]:
 class PacedUdpFastAdapter(UdpFastAdapter):
     """Stock UDP adapter with minimum spacing between outgoing TM datagrams."""
 
-    def __init__(self, *args, frame_interval_ms: float = 5.0,
+    def __init__(self, *args, frame_interval_ms: float = MIN_FRAME_INTERVAL_MS,
                  clock=time.monotonic, sleeper=time.sleep, **kwargs):
         if not math.isfinite(frame_interval_ms) or frame_interval_ms <= 0:
             raise ValueError("frame interval must be finite and greater than zero")
@@ -97,8 +98,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="matching F' CDR TCP topology JSON dictionary")
     parser.add_argument("--address", required=True, help="connectable Zero W TCP server address")
     parser.add_argument("--port", required=True, type=int, help="Zero W Drv.TcpServer port")
-    parser.add_argument("--frame-interval-ms", type=positive_interval, default=5.0,
-                        help="minimum gap between outgoing TM UDP frames (default: 5 ms)")
+    parser.add_argument("--frame-interval-ms", type=positive_interval, default=MIN_FRAME_INTERVAL_MS,
+                        help="minimum gap between outgoing TM UDP frames (default/minimum: 20 ms)")
     return parser
 
 
@@ -116,6 +117,10 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(str(exc))
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    if args.frame_interval_ms < MIN_FRAME_INTERVAL_MS:
+        logging.warning("Requested TM pacing %.3f ms is below the ground minimum; using %.3f ms (50 frames/s)",
+                        args.frame_interval_ms, MIN_FRAME_INTERVAL_MS)
+        args.frame_interval_ms = MIN_FRAME_INTERVAL_MS
     stop_requested = threading.Event()
     bridge = PacketBridge(
         TcpFastClientAdapter(args.address, args.port),

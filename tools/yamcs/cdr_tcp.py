@@ -292,8 +292,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--http-port", type=int, default=HTTP_PORT_DEFAULT, help=f"Yamcs HTTP port (default {HTTP_PORT_DEFAULT})")
     parser.add_argument("--heap", type=validate_heap, default=DEFAULT_HEAP,
                         help=f"Yamcs JVM max heap; replaces fprime-yamcs's fixed 4g (default {DEFAULT_HEAP})")
-    parser.add_argument("--frame-interval-ms", type=validate_frame_interval, default=5.0,
-                        help="minimum gap between outgoing TM UDP frames (default: 5 ms)")
+    parser.add_argument("--frame-interval-ms", type=validate_frame_interval, default=20.0,
+                        help="minimum gap between outgoing TM UDP frames (default/minimum: 20 ms)")
     parser.add_argument("--run-dir", help="new or existing empty-of-reserved-paths run directory; default is ignored yamcs/run/cdr-tcp-*")
     parser.add_argument("--startup-timeout", type=float, default=90.0, help="seconds to wait for Yamcs HTTP readiness")
     return parser
@@ -342,7 +342,7 @@ def main(argv: list[str] | None = None) -> int:
         "dictionary": str(dictionary),
         "dictionary_sha256": dictionary_hash,
         "transport": "Pi Zero W Drv.TcpServer <-> stock F' TCP/UDP adapters with local paced TM egress <-> Yamcs; direct ComCcsds and stock FileDownlink",
-        "paced_tm_egress": {"frame_interval_ms": args.frame_interval_ms, "default": 5.0,
+        "paced_tm_egress": {"frame_interval_ms": max(args.frame_interval_ms, 20.0), "default": 20.0,
                              "catch_up_bursts": False},
         "network_mux": False,
         "physical_uart_mux": {"channel": 2, "purpose": "Teensy/PDU RPC", "independent_of_tcp": True},

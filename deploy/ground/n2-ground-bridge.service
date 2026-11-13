@@ -12,7 +12,7 @@ Group=n2-fprime-yamcs
 Environment=HOME=/home/n2-fprime-yamcs
 Environment=PYTHONUNBUFFERED=1
 WorkingDirectory=/home/n2-fprime-yamcs/fprime-artemis-cubesat
-ExecStart=/home/n2-fprime-yamcs/fprime-artemis-cubesat/tools/yamcs/.venv/bin/python -u /home/n2-fprime-yamcs/fprime-artemis-cubesat/tools/yamcs/cdr_comm_bridge.py --dictionary /home/n2-fprime-yamcs/yamcs-station/dictionary.json --address n2-obc.local --port 50000 --frame-interval-ms 5
+ExecStart=/home/n2-fprime-yamcs/fprime-artemis-cubesat/tools/yamcs/.venv/bin/python -u /home/n2-fprime-yamcs/fprime-artemis-cubesat/tools/yamcs/cdr_comm_bridge.py --dictionary /home/n2-fprime-yamcs/yamcs-station/dictionary.json --address n2-obc.local --port 50000 --frame-interval-ms 20
 Restart=always
 RestartSec=5
 StandardOutput=journal

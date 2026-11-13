@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import argparse
 import binascii
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import secrets
 import time
@@ -17,6 +19,7 @@ from urllib import error, parse, request
 DEFAULT_URL = "http://127.0.0.1:8090"
 DEFAULT_INSTANCE = "fprime-project"
 DEFAULT_PROCESSOR = "realtime"
+DEFAULT_SERVICE = "FprimeFilePacketService"
 DEPLOYMENT = "ArtemisRpiTeensyDeployment"
 BUCKET = "fprimeFilesIn"
 FILE_ERRORS = (
@@ -24,9 +27,12 @@ FILE_ERRORS = (
     "DownlinkCanceled", "DownlinkPartialFail", "FilenameSourceOverflow",
     "FilenameDestinationOverflow",
 )
+_authenticated_client = None
 
 
 def api(url: str, path: str, body: dict | None = None, timeout: float = 10.0):
+    if _authenticated_client is not None:
+        return _authenticated_client.api(path, body, timeout=timeout)
     headers = {} if body is None else {"Content-Type": "application/json"}
     data = None if body is None else json.dumps(body).encode("utf-8")
     req = request.Request(url.rstrip("/") + path, data=data, headers=headers,
@@ -39,6 +45,8 @@ def api(url: str, path: str, body: dict | None = None, timeout: float = 10.0):
 
 
 def api_bytes(url: str, path: str, timeout: float = 10.0) -> bytes:
+    if _authenticated_client is not None:
+        return _authenticated_client.api_bytes(path, timeout=timeout)
     req = request.Request(url.rstrip("/") + path, method="GET")
     with request.urlopen(req, timeout=timeout) as response:
         return response.read()
@@ -245,12 +253,115 @@ def await_object(url: str, instance: str, source: str, destination: str,
     raise TimeoutError(f"Yamcs did not expose {destination!r} in {BUCKET} within {timeout:g}s")
 
 
-def default_destination(source: str) -> str:
+def default_destination(source: str, product_id: int | None = None) -> str:
+    if product_id is not None:
+        suffix = Path(source).suffix.lower()
+        if suffix not in (".csv", ".bin"):
+            suffix = ".bin"
+        return (f"grns-product-{product_id}-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}"
+                f"-{secrets.token_hex(4)}{suffix}")
     basename = source.replace("\\", "/").rsplit("/", 1)[-1] or "science.bin"
     basename = basename[-64:]
     result = f"cdr-{secrets.token_hex(4)}-{basename}"
     source_bytes_limit(result, "destination file name")
     return result
+
+
+def transfer_endpoint(instance: str, service: str, transfer_id: str | None = None) -> str:
+    base = (f"/api/filetransfer/{parse.quote(instance, safe='')}/"
+            f"{parse.quote(service, safe='')}/transfers")
+    return base if transfer_id is None else base + "/" + parse.quote(str(transfer_id), safe="")
+
+
+def require_idle(url: str, instance: str, service: str) -> None:
+    """Fail closed before any command if another download may still be active."""
+    endpoint = transfer_endpoint(instance, service)
+    query = {"direction": "DOWNLOAD", "limit": 1,
+             "state": ["RUNNING", "QUEUED", "PAUSED", "CANCELLING"]}
+    listing = api(url, endpoint + "?" + parse.urlencode(query, doseq=True))
+    for transfer in listing.get("transfers", []):
+        if (transfer.get("direction") == "DOWNLOAD" and
+                transfer.get("state") not in ("COMPLETED", "FAILED")):
+            raise RuntimeError(
+                f"download {transfer.get('id', '?')} is {transfer.get('state', 'unknown')}; "
+                "finish or recover the old sender/ground transfer before starting another")
+
+
+@contextmanager
+def helper_lock(station: Path, url: str, instance: str, service: str):
+    """Portable exclusive lock, deliberately never reclaimed automatically."""
+    identity = "\n".join((url.rstrip("/"), instance, service)).encode()
+    lock_dir = station / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / ("stock-downlink-" + hashlib.sha256(identity).hexdigest()[:20] + ".lock")
+    try:
+        fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        raise RuntimeError(
+            f"another helper owns {lock_path}; if it exited, recover the old sender/ground "
+            "transfer before manually removing this lock") from None
+    try:
+        with os.fdopen(fd, "w") as output:
+            json.dump({"pid": os.getpid(), "started_at": datetime.now(timezone.utc).isoformat()}, output)
+        yield
+    finally:
+        lock_path.unlink(missing_ok=True)
+
+
+def create_download(url: str, instance: str, service: str, source: str, destination: str) -> dict:
+    """Submit exactly once; an uncertain response must never trigger an automatic resend."""
+    try:
+        transfer = api(url, transfer_endpoint(instance, service), {
+            "direction": "DOWNLOAD", "bucket": BUCKET, "objectName": destination,
+            "remotePath": source, "source": "spacecraft", "destination": "ground",
+        })
+    except Exception as exc:
+        code = f" (HTTP {exc.code})" if isinstance(exc, error.HTTPError) else ""
+        raise RuntimeError(
+            f"download request did not return a confirmed transfer{code}; its outcome may be "
+            "unknown. Inspect Yamcs File Transfer and recover before retrying; no resend was attempted") from exc
+    if not isinstance(transfer, dict) or transfer.get("id") is None:
+        raise RuntimeError("download response omitted its transfer ID; inspect Yamcs before retrying")
+    return transfer
+
+
+def transfer_receipt(transfer: dict) -> dict:
+    fields = ("id", "state", "bucket", "objectName", "remotePath", "direction",
+              "startTime", "creationTime", "totalSize", "sizeTransferred", "failureReason")
+    return {key: transfer[key] for key in fields if key in transfer}
+
+
+def await_transfer(url: str, instance: str, service: str, transfer_id: str,
+                   timeout: float, idle_timeout: float, started: float, result: dict) -> dict:
+    """Observe stock state; timeout fails only this helper, never cancels or retries."""
+    last_progress = started
+    previous_size = 0
+    endpoint = transfer_endpoint(instance, service, transfer_id)
+    while True:
+        now = time.monotonic()
+        if now - started >= timeout:
+            raise TimeoutError(
+                f"download {transfer_id} exceeded {timeout:g}s overall; stock transfer may "
+                "remain RUNNING. No automatic cancel or retry")
+        transfer = api(url, endpoint, timeout=min(10.0, timeout - (now - started)))
+        result["transfer"] = transfer_receipt(transfer)
+        state = transfer.get("state")
+        if state == "FAILED":
+            raise RuntimeError(f"stock transfer {transfer_id} FAILED: {transfer.get('failureReason', 'unspecified')}")
+        if state == "COMPLETED":
+            return transfer
+        if state not in ("RUNNING", "QUEUED", "PAUSED", "CANCELLING"):
+            raise RuntimeError(f"stock transfer {transfer_id} has unexpected state {state!r}")
+        size = int(transfer.get("sizeTransferred", 0))
+        now = time.monotonic()
+        if size > previous_size:
+            last_progress = now
+            previous_size = size
+        if now - last_progress >= idle_timeout:
+            raise TimeoutError(
+                f"download {transfer_id} made no byte progress for {idle_timeout:g}s; stock "
+                "transfer may remain RUNNING. No automatic cancel or retry")
+        time.sleep(min(0.5, max(0.0, timeout - (now - started))))
 
 
 def write_evidence(run_dir: Path, record: dict) -> Path:
@@ -262,7 +373,7 @@ def write_evidence(run_dir: Path, record: dict) -> Path:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=("Issue one stock FileHandling.fileDownlink.SendFile command through Yamcs, then "
+        description=("Request one stock Yamcs file download, then "
                      "independently verify the reconstructed fprimeFilesIn bytes."),
         epilog=("--source-file is passed verbatim as the remote Zero W path; the ground helper never "
                 "resolves or opens it. Use --expected-file only as a separate local integrity oracle. "
@@ -274,24 +385,40 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--url", default=DEFAULT_URL, help=f"Yamcs HTTP base URL (default {DEFAULT_URL})")
     parser.add_argument("--instance", default=DEFAULT_INSTANCE)
     parser.add_argument("--processor", default=DEFAULT_PROCESSOR)
+    parser.add_argument("--service", default=DEFAULT_SERVICE)
+    parser.add_argument("--station", type=Path,
+                        help="station directory containing Yamcs-access.txt; enables saved loopback authentication")
     parser.add_argument("--destination", help="unique Yamcs bucket object name; default is generated")
     parser.add_argument("--expected-file", help="optional local oracle file; never sent to Yamcs")
     parser.add_argument("--expected-size", type=int, help="expected received byte count")
     parser.add_argument("--expected-sha256", help="expected received SHA-256 hex digest")
     parser.add_argument("--expected-crc16", type=parse_nonnegative_integer,
                         help="expected CRC-16/CCITT-FALSE value (decimal or 0x-prefixed hex)")
-    parser.add_argument("--timeout", type=float, default=60.0, help="receipt wait timeout in seconds")
+    parser.add_argument("--timeout", type=float, default=300.0, help="overall transfer timeout in seconds (default 300)")
+    parser.add_argument("--idle-timeout", type=float, default=30.0,
+                        help="fail helper after this many seconds without byte progress (default 30)")
     parser.add_argument("--run-dir", help="directory for received bytes and JSON evidence; default under ignored yamcs/run")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
+    global _authenticated_client
+    _authenticated_client = None
     parser = build_parser()
     args = parser.parse_args(argv)
     if not math.isfinite(args.timeout) or args.timeout <= 0:
         parser.error("--timeout must be finite and positive")
+    if not math.isfinite(args.idle_timeout) or args.idle_timeout <= 0:
+        parser.error("--idle-timeout must be finite and positive")
     if args.product_id is not None and args.product_id <= 0:
         parser.error("--product-id must be positive")
+    address = parse.urlsplit(args.url)
+    if (address.scheme not in ("http", "https") or not address.hostname or
+            address.username is not None or address.password is not None or
+            address.path not in ("", "/") or address.query or address.fragment):
+        parser.error("--url must be an HTTP(S) server root without credentials, query or fragment")
+    args.url = args.url.rstrip("/")
+    station = (args.station or Path.home() / "yamcs-station").expanduser().resolve()
 
     run_dir = Path(args.run_dir).expanduser().resolve() if args.run_dir else (
         Path(__file__).resolve().parents[2] / "yamcs" / "run" /
@@ -299,64 +426,77 @@ def main(argv: list[str] | None = None) -> int:
     result: dict = {
         "status": "IN_PROGRESS", "started_at": datetime.now(timezone.utc).isoformat(),
         "url": args.url, "instance": args.instance, "processor": args.processor,
-        "method": "stock FileHandling.fileDownlink.SendFile",
-        "bucket": BUCKET, "network_mux": False,
+        "method": "stock Yamcs File Transfer DOWNLOAD API",
+        "service": args.service, "bucket": BUCKET, "network_mux": False,
+        "product_id": args.product_id,
     }
+    helper_started = time.monotonic()
     try:
         run_dir.mkdir(parents=True, exist_ok=True)
-        selected = None
-        if args.product_id is not None:
-            selected = resolve_product(args.url, args.instance, args.processor,
-                                       args.product_id, args.timeout)
-            source = selected["source_file"]
-        else:
-            source = args.source_file
-        source_bytes_limit(source, "source file name")
-        destination = args.destination or default_destination(source)
-        source_bytes_limit(destination, "destination file name")
+        if args.station is not None:
+            from transfer_watchdog import LocalYamcs, loopback_url
+            loopback_url(args.url)
+            _authenticated_client = LocalYamcs(args.url, station / "Yamcs-access.txt")
+        with helper_lock(station, args.url, args.instance, args.service):
+            require_idle(args.url, args.instance, args.service)
+            selected = None
+            if args.product_id is not None:
+                selected = resolve_product(args.url, args.instance, args.processor,
+                                           args.product_id, min(30.0, args.timeout))
+                source = selected["source_file"]
+            else:
+                source = args.source_file
+            source_bytes_limit(source, "source file name")
+            destination = args.destination or default_destination(source, args.product_id)
+            source_bytes_limit(destination, "destination file name")
 
-        expected = None
-        if args.expected_file:
-            expected = Path(args.expected_file).expanduser().read_bytes()
-        expectations = integrity_expectations(args, selected, expected)
-        result.update({"remote_source_path": source, "destination": destination,
-                       "product_id": args.product_id,
-                       "product_selection": selected,
-                       "integrity_expectations": {
-                           key: value for key, value in expectations.items()
-                           if key != "expected_file_bytes"
-                       }})
-        if existing_object(args.url, args.instance, destination):
-            raise ValueError(f"Yamcs object {destination!r} already exists; use a fresh destination")
+            expected = None
+            if args.expected_file:
+                expected = Path(args.expected_file).expanduser().read_bytes()
+            expectations = integrity_expectations(args, selected, expected)
+            result.update({"remote_source_path": source, "destination": destination,
+                           "product_selection": selected,
+                           "integrity_expectations": {
+                               key: value for key, value in expectations.items()
+                               if key != "expected_file_bytes"
+                           }})
+            if existing_object(args.url, args.instance, destination):
+                raise ValueError(f"Yamcs object {destination!r} already exists; use a fresh destination")
 
-        command = issue(args.url, args.instance, args.processor,
-                        "FileHandling.fileDownlink.SendFile",
-                        {"sourceFileName": source, "destFileName": destination})
-        released = stamp(command["generationTime"])
-        result["command"] = command
-        result["command_generation_time"] = command.get("generationTime")
-        received, _ = await_object(args.url, args.instance, source, destination,
-                                   released, args.timeout)
-        received_sha = hashlib.sha256(received).hexdigest()
-        received_crc = binascii.crc_hqx(received, 0xFFFF)
-        received_name = "received-" + destination.replace("\\", "/").rsplit("/", 1)[-1]
-        received_path = run_dir / received_name
-        if received_path.exists():
-            raise FileExistsError(f"refusing to overwrite prior received bytes: {received_path}")
-        received_path.write_bytes(received)
-        checks = verify_received(received, expectations)
-        result["received"] = {"bytes": len(received), "sha256": received_sha,
-                              "crc16_ccitt": received_crc,
-                              "sha256_verified_against_source": expectations["source_sha256_verified"],
-                              "checks": checks}
-        if not all(checks.values()):
-            raise RuntimeError("independently received Yamcs bytes failed integrity checks")
-        result["received"]["saved_path"] = str(received_path)
-        result["status"] = "PASS"
+            # A UI user can start another download while metadata is being read.
+            require_idle(args.url, args.instance, args.service)
+            transfer_started = time.monotonic()
+            result["request_started_at"] = datetime.now(timezone.utc).isoformat()
+            transfer = create_download(args.url, args.instance, args.service, source, destination)
+            transfer_id = str(transfer["id"])
+            result["transfer_id"] = transfer_id
+            result["transfer"] = transfer_receipt(transfer)
+            await_transfer(args.url, args.instance, args.service, transfer_id,
+                           args.timeout, args.idle_timeout, transfer_started, result)
+            result["transfer_completed_at"] = datetime.now(timezone.utc).isoformat()
+            result["transfer_seconds"] = time.monotonic() - transfer_started
+            received = api_bytes(args.url, object_endpoint(args.instance, destination))
+            received_sha = hashlib.sha256(received).hexdigest()
+            received_crc = binascii.crc_hqx(received, 0xFFFF)
+            received_name = "received-" + destination.replace("\\", "/").rsplit("/", 1)[-1]
+            received_path = run_dir / received_name
+            # Exclusive creation also preserves prior evidence on integrity failure.
+            with received_path.open("xb") as output:
+                output.write(received)
+            checks = verify_received(received, expectations)
+            result["received"] = {"bytes": len(received), "sha256": received_sha,
+                                  "crc16_ccitt": received_crc,
+                                  "sha256_verified_against_source": expectations["source_sha256_verified"],
+                                  "saved_path": str(received_path), "checks": checks}
+            if not all(checks.values()):
+                raise RuntimeError("independently received Yamcs bytes failed integrity checks; received bytes retained")
+            result["status"] = "PASS"
     except Exception as exc:
         result["status"] = "FAIL"
         result["error"] = f"{type(exc).__name__}: {exc}"
     result["finished_at"] = datetime.now(timezone.utc).isoformat()
+    result["elapsed_seconds"] = time.monotonic() - helper_started
+    _authenticated_client = None
     evidence_path = write_evidence(run_dir, result)
     print(json.dumps(result, indent=2, sort_keys=True))
     print(f"Evidence: {evidence_path}")
