@@ -37,18 +37,18 @@ Use the matching flight dictionary and select the retained **CSV** product ID fr
 3. Issue `FileHandling.fileDownlink.SendFile` with `sourceFileName = <exact sourcePath>` and `destFileName = <fresh name>.csv`. Do not include quotes in the Yamcs argument fields. Use a different destination for every attempt.
 4. Wait for **File Transfer → COMPLETED**. Retrieve the file at **Storage → Buckets → fprimeFilesIn → <destination>**. On the persistent ground station it is also mirrored at `/home/n2-fprime-yamcs/yamcs-station/received-files/<destination>`.
 
-The verified legacy CSV product 6 uses these exact arguments (change `attempt1` if already used):
+Use values from the current capture, not an earlier test's product ID:
 
 ```text
 storageManager.SELECT_PRODUCT
-  productId: 6
+  productId: <CSV_ID from the current capture completion event>
 
 FileHandling.fileDownlink.SendFile
-  sourceFileName: /home/n2-obc/artemis/data/science-products/product_6.bin
-  destFileName: science-product-6-cdr-attempt1.csv
+  sourceFileName: <sourcePath returned by ProductSelected>
+  destFileName: <fresh name for this CSV and attempt>.csv
 ```
 
-Expected legacy product 6 size is 605,968 bytes. The source's `.bin` extension is historical; its bytes are CSV. Future CSV commits use `.csv` after deploying the filename update. Do not rename old catalog files manually. A manual COMPLETED status is the stock receiver result; use the helper below for independent size/CRC verification and an optional expected SHA-256.
+Product IDs, paths, sizes, and checksums change with each capture. Copy them from the matching current commit/selection events. Older CSV sources may have historical `.bin` extensions; future CSV commits use `.csv` after deploying the filename update. Do not rename old catalog files manually. A manual COMPLETED status is the stock receiver result; use the helper below for independent size/CRC verification and an optional expected SHA-256 for that specific product.
 
 ### Verified helper
 
@@ -61,7 +61,7 @@ Instead of issuing `SendFile` manually, request one transfer with the ground hel
 
 The source path is passed unchanged to F′; a relative source is relative to the spacecraft process's working directory. Stock source/destination names are limited to 100 UTF-8 bytes in this dictionary. The local oracle is used only for comparison and is never uploaded into Yamcs. Source-path mode requires a local oracle or explicit expected size plus SHA-256/CRC; product mode obtains size/CRC from a fresh `StorageManager.ProductSelected` event. `--expected-file` can also supply a separate SHA/byte oracle in product mode.
 
-The helper requests one download through Yamcs's stock File Transfer API, waits for its transfer ID to complete, independently downloads the reconstructed `fprimeFilesIn` object, and saves it with PASS/FAIL evidence. On the persistent station, pass `--station ~/yamcs-station` to use saved local authentication. Product mode defaults to a unique destination preserving the selected source's recognized `.csv` or `.bin` extension (otherwise `.bin`). New StorageManager commits retain CSV as `product_<ID>.csv` and binary/opaque data as `product_<ID>.bin`. Existing legacy CSVs such as product 6 retain their `.bin` source names; supply an explicit `.csv` `--destination` for those. Always copy `ProductSelected.sourcePath` exactly. A reported receive SHA is source-verified only when an independent expected SHA/oracle was supplied. `FileSent` or command OK alone is not delivery proof. Only one helper runs per station/service, and an existing nonterminal download prevents a new request. Missing files, missing/partial receipt or mismatched integrity fail; stock transfer has no selective retry/resume guarantee. Timeouts do not cancel the stock receiver or resend automatically. Before a manual retry, stop the old sender and clear/drain its transport state as described in the [ground recovery procedure](../../deploy/ground/README.md), then use a fresh destination.
+The helper requests one download through Yamcs's stock File Transfer API, waits for its transfer ID to complete, independently downloads the reconstructed `fprimeFilesIn` object, and saves it with PASS/FAIL evidence. On the persistent station, pass `--station ~/yamcs-station` to use saved local authentication. Product mode defaults to a unique destination preserving the selected source's recognized `.csv` or `.bin` extension (otherwise `.bin`). New StorageManager commits retain CSV as `product_<ID>.csv` and binary/opaque data as `product_<ID>.bin`. Existing legacy CSVs can retain their `.bin` source names; supply an explicit `.csv` `--destination` for those. Always copy `ProductSelected.sourcePath` exactly. A reported receive SHA is source-verified only when an independent expected SHA/oracle was supplied. `FileSent` or command OK alone is not delivery proof. Only one helper runs per station/service, and an existing nonterminal download prevents a new request. Missing files, missing/partial receipt or mismatched integrity fail; stock transfer has no selective retry/resume guarantee. Timeouts do not cancel the stock receiver or resend automatically. Before a manual retry, stop the old sender and clear/drain its transport state as described in the [ground recovery procedure](../../deploy/ground/README.md), then use a fresh destination.
 
 The default simulator dictionary exposes collection-only `scienceApp.SCIENCE_CAPTURE(durationMinutes)` and accepts 1 or 2 minutes. The simulator generates the corresponding 60 or 120 seconds of exposure data. A build with `NEUTRON2_CONFIGURED_CAPTURE=ON` exposes `scienceApp.CONFIGURE_CAPTURE_DURATION(durationMinutes)` followed by `scienceApp.SCIENCE_CAPTURE()`. The private hardware backend accepts finite durations of 1–216 minutes. Wait for the configuration command to complete before issuing capture. Use the dictionary from the selected build and wait for the matching `ScienceProductCommitted` event before running the stock helper.
 
