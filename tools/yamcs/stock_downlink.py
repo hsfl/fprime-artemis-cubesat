@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Command stock F' FileDownlink through Yamcs and verify the received object."""
+"""Send stock FileDownlink once and verify local receiver plus Yamcs bucket receipt."""
 
 from __future__ import annotations
 
@@ -13,13 +13,14 @@ import math
 import os
 from pathlib import Path
 import secrets
+import shlex
+import sys
 import time
 from urllib import error, parse, request
 
 DEFAULT_URL = "http://127.0.0.1:8090"
 DEFAULT_INSTANCE = "fprime-project"
 DEFAULT_PROCESSOR = "realtime"
-DEFAULT_SERVICE = "FprimeFilePacketService"
 DEPLOYMENT = "ArtemisRpiTeensyDeployment"
 BUCKET = "fprimeFilesIn"
 FILE_ERRORS = (
@@ -232,65 +233,87 @@ def downlink_error(url: str, instance: str, source: str, destination: str,
     return None
 
 
-def await_object(url: str, instance: str, source: str, destination: str,
-                 released: datetime, timeout: float) -> tuple[bytes, dict | None]:
-    endpoint = object_endpoint(instance, destination)
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        failure = downlink_error(url, instance, source, destination, released)
-        if failure is not None:
-            raise RuntimeError(f"F' FileDownlink reported {failure.get('type')}: {failure.get('message')}")
-        try:
-            received = api_bytes(url, endpoint, timeout=10)
-            return received, None
-        except error.HTTPError as exc:
-            if exc.code != 404:
-                raise
-        time.sleep(0.5)
-    failure = downlink_error(url, instance, source, destination, released)
-    if failure is not None:
-        raise RuntimeError(f"F' FileDownlink reported {failure.get('type')}: {failure.get('message')}")
-    raise TimeoutError(f"Yamcs did not expose {destination!r} in {BUCKET} within {timeout:g}s")
-
-
 def default_destination(source: str, product_id: int | None = None) -> str:
     if product_id is not None:
-        suffix = Path(source).suffix.lower()
-        if suffix not in (".csv", ".bin"):
-            suffix = ".bin"
-        return (f"grns-product-{product_id}-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}"
-                f"-{secrets.token_hex(4)}{suffix}")
+        basename = source.replace("\\", "/").rsplit("/", 1)[-1]
+        stem = Path(basename).stem
+        if not stem.startswith("daq_"):
+            stem = f"science-product-{product_id}"
+        return f"{stem}-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}-{secrets.token_hex(3)}.csv"
     basename = source.replace("\\", "/").rsplit("/", 1)[-1] or "science.bin"
     basename = basename[-64:]
-    result = f"cdr-{secrets.token_hex(4)}-{basename}"
+    result = f"cdr-{secrets.token_hex(4)}-{Path(basename).stem}.csv"
     source_bytes_limit(result, "destination file name")
     return result
 
 
-def transfer_endpoint(instance: str, service: str, transfer_id: str | None = None) -> str:
-    base = (f"/api/filetransfer/{parse.quote(instance, safe='')}/"
-            f"{parse.quote(service, safe='')}/transfers")
-    return base if transfer_id is None else base + "/" + parse.quote(str(transfer_id), safe="")
+def require_receiver_ready(receive_dir: Path) -> dict:
+    """The disk receiver, rather than native transfer rows, owns admission."""
+    try:
+        status = json.loads((receive_dir / "receiver-status.json").read_text())
+        age = time.time() - float(status["heartbeat_unix"])
+        if not -5 <= age <= 10:
+            raise RuntimeError("local receiver heartbeat is stale; start/check the ground bridge")
+        if status.get("state") != "ready":
+            raise RuntimeError(f"local receiver is {status.get('state')}: {status.get('destination') or ''}")
+        if not status.get("file_admission_ready", True):
+            raise RuntimeError("file reception unavailable: " + str(status.get("file_error", "spool fault")))
+        os.kill(int(status["pid"]), 0)
+    except (OSError, KeyError, ValueError) as exc:
+        raise RuntimeError("local receiver is unavailable; start/check the ground bridge") from exc
+    return status
 
 
-def require_idle(url: str, instance: str, service: str) -> None:
-    """Fail closed before any command if another download may still be active."""
-    endpoint = transfer_endpoint(instance, service)
-    query = {"direction": "DOWNLOAD", "limit": 1,
-             "state": ["RUNNING", "QUEUED", "PAUSED", "CANCELLING"]}
-    listing = api(url, endpoint + "?" + parse.urlencode(query, doseq=True))
-    for transfer in listing.get("transfers", []):
-        if (transfer.get("direction") == "DOWNLOAD" and
-                transfer.get("state") not in ("COMPLETED", "FAILED")):
-            raise RuntimeError(
-                f"download {transfer.get('id', '?')} is {transfer.get('state', 'unknown')}; "
-                "finish or recover the old sender/ground transfer before starting another")
+def await_local_receipt(receive_dir: Path, source: str, destination: str,
+                        released: float, timeout: float, idle_timeout: float,
+                        url: str, instance: str, result: dict) -> dict:
+    path = receive_dir / (destination + ".receipt.json")
+    deadline = time.monotonic() + timeout
+    last_progress = time.monotonic()
+    previous_size = -1
+    next_error_check = 0.0
+    while time.monotonic() < deadline:
+        try:
+            receipt = json.loads(path.read_text())
+        except FileNotFoundError:
+            receipt = None
+        if receipt is not None:
+            if (receipt.get("destination") != destination or receipt.get("source_path") != source
+                    or float(receipt.get("started_unix", 0)) < released - 2):
+                raise RuntimeError("local receipt does not match this SendFile request")
+            result["local_receipt"] = receipt
+            size = int(receipt.get("received_size", 0))
+            if size > previous_size:
+                previous_size = size
+                last_progress = time.monotonic()
+            state = receipt.get("state")
+            if state == "failed":
+                raise RuntimeError(f"local receive failed: {receipt.get('error', 'invalid/incomplete file')}")
+            if state == "available_in_yamcs":
+                return receipt
+            if receipt.get("publication_error"):
+                raise RuntimeError("file saved locally; Yamcs publication failed: " + str(receipt["publication_error"]) +
+                                   f"; retry publication from {path}")
+            # Receiving idle is distinct from a slow HTTP publication. The
+            # receiver owns its own deadline and never treats FileSent as proof.
+            if state in ("receiving", "finalizing") and time.monotonic() - last_progress >= idle_timeout:
+                raise TimeoutError("local file reception stopped progressing; inspect receiver receipt; no resend")
+        elif time.monotonic() >= next_error_check:
+            next_error_check = time.monotonic() + 2.0
+            failure = downlink_error(url, instance, source, destination,
+                                     datetime.fromtimestamp(released, timezone.utc))
+            if failure:
+                raise RuntimeError(f"F' FileDownlink reported {failure.get('type')}: {failure.get('message')}")
+            if time.monotonic() - last_progress >= idle_timeout:
+                raise TimeoutError("no local START receipt; inspect flight/bridge logs; no resend")
+        time.sleep(0.25)
+    raise TimeoutError("file delivery exceeded overall deadline; inspect retained local receipt before retrying")
 
 
 @contextmanager
-def helper_lock(station: Path, url: str, instance: str, service: str):
+def helper_lock(station: Path, url: str, instance: str):
     """Portable exclusive lock, deliberately never reclaimed automatically."""
-    identity = "\n".join((url.rstrip("/"), instance, service)).encode()
+    identity = "\n".join((url.rstrip("/"), instance, "local-receiver")).encode()
     lock_dir = station / "locks"
     lock_dir.mkdir(parents=True, exist_ok=True)
     lock_path = lock_dir / ("stock-downlink-" + hashlib.sha256(identity).hexdigest()[:20] + ".lock")
@@ -308,62 +331,6 @@ def helper_lock(station: Path, url: str, instance: str, service: str):
         lock_path.unlink(missing_ok=True)
 
 
-def create_download(url: str, instance: str, service: str, source: str, destination: str) -> dict:
-    """Submit exactly once; an uncertain response must never trigger an automatic resend."""
-    try:
-        transfer = api(url, transfer_endpoint(instance, service), {
-            "direction": "DOWNLOAD", "bucket": BUCKET, "objectName": destination,
-            "remotePath": source, "source": "spacecraft", "destination": "ground",
-        })
-    except Exception as exc:
-        code = f" (HTTP {exc.code})" if isinstance(exc, error.HTTPError) else ""
-        raise RuntimeError(
-            f"download request did not return a confirmed transfer{code}; its outcome may be "
-            "unknown. Inspect Yamcs File Transfer and recover before retrying; no resend was attempted") from exc
-    if not isinstance(transfer, dict) or transfer.get("id") is None:
-        raise RuntimeError("download response omitted its transfer ID; inspect Yamcs before retrying")
-    return transfer
-
-
-def transfer_receipt(transfer: dict) -> dict:
-    fields = ("id", "state", "bucket", "objectName", "remotePath", "direction",
-              "startTime", "creationTime", "totalSize", "sizeTransferred", "failureReason")
-    return {key: transfer[key] for key in fields if key in transfer}
-
-
-def await_transfer(url: str, instance: str, service: str, transfer_id: str,
-                   timeout: float, idle_timeout: float, started: float, result: dict) -> dict:
-    """Observe stock state; timeout fails only this helper, never cancels or retries."""
-    last_progress = started
-    previous_size = 0
-    endpoint = transfer_endpoint(instance, service, transfer_id)
-    while True:
-        now = time.monotonic()
-        if now - started >= timeout:
-            raise TimeoutError(
-                f"download {transfer_id} exceeded {timeout:g}s overall; stock transfer may "
-                "remain RUNNING. No automatic cancel or retry")
-        transfer = api(url, endpoint, timeout=min(10.0, timeout - (now - started)))
-        result["transfer"] = transfer_receipt(transfer)
-        state = transfer.get("state")
-        if state == "FAILED":
-            raise RuntimeError(f"stock transfer {transfer_id} FAILED: {transfer.get('failureReason', 'unspecified')}")
-        if state == "COMPLETED":
-            return transfer
-        if state not in ("RUNNING", "QUEUED", "PAUSED", "CANCELLING"):
-            raise RuntimeError(f"stock transfer {transfer_id} has unexpected state {state!r}")
-        size = int(transfer.get("sizeTransferred", 0))
-        now = time.monotonic()
-        if size > previous_size:
-            last_progress = now
-            previous_size = size
-        if now - last_progress >= idle_timeout:
-            raise TimeoutError(
-                f"download {transfer_id} made no byte progress for {idle_timeout:g}s; stock "
-                "transfer may remain RUNNING. No automatic cancel or retry")
-        time.sleep(min(0.5, max(0.0, timeout - (now - started))))
-
-
 def write_evidence(run_dir: Path, record: dict) -> Path:
     run_dir.mkdir(parents=True, exist_ok=True)
     path = run_dir / f"stock-downlink-{time.strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(3)}.json"
@@ -373,8 +340,8 @@ def write_evidence(run_dir: Path, record: dict) -> Path:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=("Request one stock Yamcs file download, then "
-                     "independently verify the reconstructed fprimeFilesIn bytes."),
+        description=("Issue stock SendFile once, wait for the verified local receipt, then "
+                     "independently verify the fprimeFilesIn object. Native transfer rows are unused."),
         epilog=("--source-file is passed verbatim as the remote Zero W path; the ground helper never "
                 "resolves or opens it. Use --expected-file only as a separate local integrity oracle. "
                 "The helper does not upload files, replay commands, or treat FileSent as ground receipt."),
@@ -385,10 +352,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--url", default=DEFAULT_URL, help=f"Yamcs HTTP base URL (default {DEFAULT_URL})")
     parser.add_argument("--instance", default=DEFAULT_INSTANCE)
     parser.add_argument("--processor", default=DEFAULT_PROCESSOR)
-    parser.add_argument("--service", default=DEFAULT_SERVICE)
     parser.add_argument("--station", type=Path,
                         help="station directory containing Yamcs-access.txt; enables saved loopback authentication")
-    parser.add_argument("--destination", help="unique Yamcs bucket object name; default is generated")
+    parser.add_argument("--receive-dir", type=Path, help="bridge spool directory (default: station/received-files)")
+    parser.add_argument("--destination", help="unique receiver/bucket basename; default preserves acquisition identity")
     parser.add_argument("--expected-file", help="optional local oracle file; never sent to Yamcs")
     parser.add_argument("--expected-size", type=int, help="expected received byte count")
     parser.add_argument("--expected-sha256", help="expected received SHA-256 hex digest")
@@ -396,8 +363,9 @@ def build_parser() -> argparse.ArgumentParser:
                         help="expected CRC-16/CCITT-FALSE value (decimal or 0x-prefixed hex)")
     parser.add_argument("--timeout", type=float, default=300.0, help="overall transfer timeout in seconds (default 300)")
     parser.add_argument("--idle-timeout", type=float, default=30.0,
-                        help="fail helper after this many seconds without byte progress (default 30)")
+                        help="fail helper after this many seconds without local receive progress (default 30)")
     parser.add_argument("--run-dir", help="directory for received bytes and JSON evidence; default under ignored yamcs/run")
+    parser.add_argument("--json", action="store_true", help="print full receipt JSON instead of concise status")
     return parser
 
 
@@ -423,22 +391,23 @@ def main(argv: list[str] | None = None) -> int:
     run_dir = Path(args.run_dir).expanduser().resolve() if args.run_dir else (
         Path(__file__).resolve().parents[2] / "yamcs" / "run" /
         f"cdr-downlink-{time.strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(3)}")
+    receive_dir = (args.receive_dir or station / "received-files").expanduser().resolve()
     result: dict = {
         "status": "IN_PROGRESS", "started_at": datetime.now(timezone.utc).isoformat(),
         "url": args.url, "instance": args.instance, "processor": args.processor,
-        "method": "stock Yamcs File Transfer DOWNLOAD API",
-        "service": args.service, "bucket": BUCKET, "network_mux": False,
+        "method": "stock SendFile -> local receiver -> HTTP bucket",
+        "receive_dir": str(receive_dir), "bucket": BUCKET, "network_mux": False,
         "product_id": args.product_id,
     }
     helper_started = time.monotonic()
     try:
         run_dir.mkdir(parents=True, exist_ok=True)
-        if args.station is not None:
-            from transfer_watchdog import LocalYamcs, loopback_url
+        if (station / "Yamcs-access.txt").is_file():
+            from yamcs_client import LocalYamcs, loopback_url
             loopback_url(args.url)
             _authenticated_client = LocalYamcs(args.url, station / "Yamcs-access.txt")
-        with helper_lock(station, args.url, args.instance, args.service):
-            require_idle(args.url, args.instance, args.service)
+        with helper_lock(station, args.url, args.instance):
+            require_receiver_ready(receive_dir)
             selected = None
             if args.product_id is not None:
                 selected = resolve_product(args.url, args.instance, args.processor,
@@ -463,16 +432,22 @@ def main(argv: list[str] | None = None) -> int:
             if existing_object(args.url, args.instance, destination):
                 raise ValueError(f"Yamcs object {destination!r} already exists; use a fresh destination")
 
-            # A UI user can start another download while metadata is being read.
-            require_idle(args.url, args.instance, args.service)
+            from local_file_receiver import valid_name
+            valid_name(destination)
+            if any((receive_dir / (destination + suffix)).exists()
+                   for suffix in ("", ".part", ".receipt.json")):
+                raise ValueError("local destination already exists; use a fresh destination")
+            require_receiver_ready(receive_dir)
             transfer_started = time.monotonic()
+            released = time.time()
             result["request_started_at"] = datetime.now(timezone.utc).isoformat()
-            transfer = create_download(args.url, args.instance, args.service, source, destination)
-            transfer_id = str(transfer["id"])
-            result["transfer_id"] = transfer_id
-            result["transfer"] = transfer_receipt(transfer)
-            await_transfer(args.url, args.instance, args.service, transfer_id,
-                           args.timeout, args.idle_timeout, transfer_started, result)
+            # Submit exactly once. A lost HTTP response is an uncertain outcome,
+            # never a reason to replay the spacecraft command automatically.
+            result["command"] = issue(args.url, args.instance, args.processor,
+                                      "FileHandling.fileDownlink.SendFile",
+                                      {"sourceFileName": source, "destFileName": destination})
+            await_local_receipt(receive_dir, source, destination, released,
+                                args.timeout, args.idle_timeout, args.url, args.instance, result)
             result["transfer_completed_at"] = datetime.now(timezone.utc).isoformat()
             result["transfer_seconds"] = time.monotonic() - transfer_started
             received = api_bytes(args.url, object_endpoint(args.instance, destination))
@@ -484,6 +459,7 @@ def main(argv: list[str] | None = None) -> int:
             with received_path.open("xb") as output:
                 output.write(received)
             checks = verify_received(received, expectations)
+            checks["local_file_sha256"] = received_sha == result["local_receipt"].get("sha256")
             result["received"] = {"bytes": len(received), "sha256": received_sha,
                                   "crc16_ccitt": received_crc,
                                   "sha256_verified_against_source": expectations["source_sha256_verified"],
@@ -494,11 +470,30 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         result["status"] = "FAIL"
         result["error"] = f"{type(exc).__name__}: {exc}"
+        receipt = result.get("local_receipt", {})
+        if receipt.get("state") in ("saved_locally", "available_in_yamcs"):
+            path = receive_dir / (result["destination"] + ".receipt.json")
+            result["next_action"] = shlex.join([sys.executable,
+                str(Path(__file__).with_name("local_file_receiver.py")), "--station", str(station),
+                "--url", args.url, "--retry", str(path)])
+        elif result.get("request_started_at"):
+            result["next_action"] = ("Inspect receiver/flight logs. Stop and drain the old sender with stock "
+                                     "FileHandling.fileDownlink.Cancel before a fresh SendFile; no automatic resend.")
+        else:
+            result["next_action"] = "Correct the reported preflight problem, then request the current CSV product."
     result["finished_at"] = datetime.now(timezone.utc).isoformat()
     result["elapsed_seconds"] = time.monotonic() - helper_started
     _authenticated_client = None
     evidence_path = write_evidence(run_dir, result)
-    print(json.dumps(result, indent=2, sort_keys=True))
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(f"{result['status']}: {result.get('destination', 'CSV request')}")
+        if result.get("received"):
+            print(f"Verified {result['received']['bytes']} bytes; SHA-256 {result['received']['sha256']}")
+        if result.get("error"):
+            print(result["error"])
+            print("Next: " + result["next_action"])
     print(f"Evidence: {evidence_path}")
     return 0 if result["status"] == "PASS" else 1
 
