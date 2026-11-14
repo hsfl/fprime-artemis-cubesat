@@ -22,9 +22,11 @@ from pathlib import Path
 import queue
 import re
 import secrets
+import shlex
 import shutil
 import socket
 import struct
+import sys
 import tempfile
 import threading
 import time
@@ -42,6 +44,18 @@ DEFAULT_MAX_FILE_BYTES = 128 * 1024 * 1024
 DEFAULT_MAX_SPOOL_BYTES = 2 * 1024 * 1024 * 1024
 MAX_SPOOL_ENTRIES = 4096
 NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,179}\Z")
+
+
+def publication_retry_command(receipt: Path | str, station: Path, url: str,
+                              bucket: str = "fprimeFilesIn", *, windows: bool | None = None) -> str:
+    """Render the existing disk-only CLI for POSIX shells or Windows PowerShell."""
+    arguments = [sys.executable, str(Path(__file__).with_name("local_file_receiver.py").resolve()),
+                 "--station", str(station), "--url", url, "--bucket", bucket, "--retry", str(receipt)]
+    if windows is None:
+        windows = os.name == "nt"
+    if windows:
+        return "& " + " ".join("'" + argument.replace("'", "''") + "'" for argument in arguments)
+    return shlex.join(arguments)
 
 
 def utc_now() -> str:
@@ -634,7 +648,8 @@ class BucketPublisher:
                 receipt.pop("publication_error", None)
                 LOG.info("available in Yamcs destination=%s bytes=%d sha256=%s", destination, size, digest)
             except Exception as error:
-                receipt.update(state="saved_locally", publication_error=str(error), updated_at=utc_now())
+                receipt.update(state="saved_locally", bucket=self.bucket,
+                               publication_error=str(error), updated_at=utc_now())
                 LOG.warning("Publication failed; local file retained destination=%s reason=%s", destination, error)
                 raise
             finally:

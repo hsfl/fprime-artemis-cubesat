@@ -20,7 +20,7 @@ import binascii
 from fprime_gds.common.communication.ccsds.chain import RawSpaceDataLinkFramerDeframer
 
 import cdr_comm_bridge
-from local_file_receiver import BucketPublisher, LocalFileReceiver, PublicationWorker
+from local_file_receiver import BucketPublisher, LocalFileReceiver, PublicationWorker, publication_retry_command
 
 
 def checksum(data):
@@ -510,16 +510,26 @@ raise RuntimeError('fault was not exercised')
 
     def test_uploader_outage_retains_verified_file_and_manual_retry_is_idempotent(self):
         receipt_path = self.receive_file(b"a,b\n1,2\n")
-        publisher = BucketPublisher("http://127.0.0.1:1", timeout=0.2)
+        publisher = BucketPublisher("http://127.0.0.1:1", timeout=0.2, bucket="science archive")
         with self.assertRaises(OSError):
             publisher.publish(receipt_path)
         self.assertEqual(self.receipt()["state"], "saved_locally")
+        self.assertEqual(self.receipt()["bucket"], "science archive")
         with object_server() as (url, state):
-            publisher = BucketPublisher(url)
+            publisher = BucketPublisher(url, bucket="science archive")
             publisher.publish(receipt_path)
             publisher.publish(receipt_path)
             self.assertEqual(state["posts"], 1)
         self.assertEqual(self.receipt()["state"], "available_in_yamcs")
+
+    def test_retry_command_quotes_windows_powershell_arguments(self):
+        with patch.object(sys, "executable", "C:\\Program Files\\Python\\python.exe"):
+            command = publication_retry_command(Path("receipt's file.json"), Path("station's folder"),
+                                                "http://127.0.0.1:8123", "science archive", windows=True)
+        self.assertTrue(command.startswith("& 'C:\\Program Files\\Python\\python.exe' "))
+        self.assertIn("'--station' 'station''s folder'", command)
+        self.assertIn("'--bucket' 'science archive'", command)
+        self.assertIn("'--retry' 'receipt''s file.json'", command)
 
     def test_changed_local_file_and_conflicting_bucket_object_are_not_overwritten(self):
         receipt_path = self.receive_file(b"abc")

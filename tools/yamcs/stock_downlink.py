@@ -13,8 +13,6 @@ import math
 import os
 from pathlib import Path
 import secrets
-import shlex
-import sys
 import time
 from urllib import error, parse, request
 
@@ -29,6 +27,10 @@ FILE_ERRORS = (
     "FilenameDestinationOverflow",
 )
 _authenticated_client = None
+
+
+class IntegrityMismatch(RuntimeError):
+    """Received bytes failed an independent source/catalog/receipt check."""
 
 
 def api(url: str, path: str, body: dict | None = None, timeout: float = 10.0):
@@ -258,7 +260,13 @@ def require_receiver_ready(receive_dir: Path) -> dict:
             raise RuntimeError(f"local receiver is {status.get('state')}: {status.get('destination') or ''}")
         if not status.get("file_admission_ready", True):
             raise RuntimeError("file reception unavailable: " + str(status.get("file_error", "spool fault")))
-        os.kill(int(status["pid"]), 0)
+        pid = status["pid"]
+        if type(pid) is not int or pid <= 0:
+            raise ValueError("receiver PID must be a positive integer")
+        # Signal zero is a POSIX liveness probe. Windows os.kill uses
+        # TerminateProcess for signals other than its supported console events.
+        if os.name != "nt":
+            os.kill(pid, 0)
     except (OSError, KeyError, ValueError) as exc:
         raise RuntimeError("local receiver is unavailable; start/check the ground bridge") from exc
     return status
@@ -460,22 +468,31 @@ def main(argv: list[str] | None = None) -> int:
                 output.write(received)
             checks = verify_received(received, expectations)
             checks["local_file_sha256"] = received_sha == result["local_receipt"].get("sha256")
+            integrity_verified = all(checks.values())
             result["received"] = {"bytes": len(received), "sha256": received_sha,
                                   "crc16_ccitt": received_crc,
-                                  "sha256_verified_against_source": expectations["source_sha256_verified"],
+                                  "integrity_verified": integrity_verified,
+                                  "sha256_verified_against_source": (expectations["source_sha256_verified"] and
+                                                                      checks["expected_sha256"]),
                                   "saved_path": str(received_path), "checks": checks}
-            if not all(checks.values()):
-                raise RuntimeError("independently received Yamcs bytes failed integrity checks; received bytes retained")
+            if not integrity_verified:
+                raise IntegrityMismatch("independently received Yamcs bytes failed integrity checks; received bytes retained")
             result["status"] = "PASS"
     except Exception as exc:
         result["status"] = "FAIL"
         result["error"] = f"{type(exc).__name__}: {exc}"
         receipt = result.get("local_receipt", {})
-        if receipt.get("state") in ("saved_locally", "available_in_yamcs"):
+        if isinstance(exc, IntegrityMismatch):
+            result["failure_kind"] = "integrity_mismatch"
+            result["failed_checks"] = [name for name, passed in result["received"]["checks"].items() if not passed]
+            result["next_action"] = (
+                "Reconcile catalog/source identity and expected size, CRC and SHA-256 with the retained local "
+                "and received bytes. Preserve evidence; do not republish or resend until the mismatch is resolved.")
+        elif receipt.get("state") in ("saved_locally", "available_in_yamcs"):
+            from local_file_receiver import publication_retry_command
             path = receive_dir / (result["destination"] + ".receipt.json")
-            result["next_action"] = shlex.join([sys.executable,
-                str(Path(__file__).with_name("local_file_receiver.py")), "--station", str(station),
-                "--url", args.url, "--retry", str(path)])
+            result["next_action"] = publication_retry_command(path, station, args.url,
+                                                             receipt.get("bucket") or BUCKET)
         elif result.get("request_started_at"):
             result["next_action"] = ("Inspect receiver/flight logs. Stop and drain the old sender with stock "
                                      "FileHandling.fileDownlink.Cancel before a fresh SendFile; no automatic resend.")
@@ -490,7 +507,10 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(f"{result['status']}: {result.get('destination', 'CSV request')}")
         if result.get("received"):
-            print(f"Verified {result['received']['bytes']} bytes; SHA-256 {result['received']['sha256']}")
+            if result["status"] == "PASS" and result["received"]["integrity_verified"]:
+                print(f"Verified {result['received']['bytes']} bytes; SHA-256 {result['received']['sha256']}")
+            else:
+                print(f"Unverified {result['received']['bytes']} bytes; observed SHA-256 {result['received']['sha256']}")
         if result.get("error"):
             print(result["error"])
             print("Next: " + result["next_action"])
