@@ -1,10 +1,13 @@
 """CSV operator tools preserve verified copies and require explicit retirement."""
 import binascii
+from contextlib import redirect_stdout
 import hashlib
+import io
 import json
 from pathlib import Path
 import tempfile
 import time
+import shlex
 import unittest
 from unittest.mock import patch
 
@@ -119,6 +122,31 @@ class ScienceFileTests(unittest.TestCase):
                 self.assertEqual(issue.call_count, 1)
             self.assertEqual(source.read_bytes(), data)
             self.assertTrue(path.exists())
+
+    def test_human_status_shows_fault_counts_and_executable_disk_retry(self):
+        with tempfile.TemporaryDirectory(prefix="science status ") as temporary:
+            station = Path(temporary)
+            receipt = str(station / "received-files" / "pending file.csv.receipt.json")
+            report = {"bridge": {"state": "ready", "file_admission_ready": True,
+                "saved_files": 3, "pending_publications": 1, "quarantined_receipts": 2},
+                "flight_storage": {}, "bad_receipts": [{"receipt": "bad.receipt.json", "error": "invalid receipt"}],
+                "csv_files": [{"state": "saved_locally", "destination": "pending file.csv", "received_size": 4,
+                               "expected_size": 4, "retry_receipt": receipt, "bucket": "science archive"}]}
+            output = io.StringIO()
+            with patch.object(science_files, "status", return_value=report), redirect_stdout(output):
+                self.assertEqual(science_files.main(["--station", str(station), "--url",
+                    "http://127.0.0.1:8123", "status"]), 0)
+            lines = output.getvalue().splitlines()
+            self.assertIn("Spool: 3 saved | 1 pending publication | 2 quarantined receipts", lines)
+            self.assertIn("Receipt fault: bad.receipt.json: invalid receipt", lines)
+            command = next(line.split(": ", 1)[1] for line in lines if "Publish retry (ground only):" in line)
+            # This suite runs on the macOS/Linux developer host; exercise paths with spaces.
+            if science_files.os.name != "nt":
+                arguments = shlex.split(command)
+                self.assertEqual(arguments[-2:], ["--retry", receipt])
+                self.assertEqual(arguments[arguments.index("--url") + 1], "http://127.0.0.1:8123")
+                self.assertEqual(arguments[arguments.index("--bucket") + 1], "science archive")
+                self.assertEqual(arguments[arguments.index("--station") + 1], str(station.resolve()))
 
 
 if __name__ == "__main__":

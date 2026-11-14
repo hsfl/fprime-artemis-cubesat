@@ -14,7 +14,7 @@ import time
 from urllib import parse
 
 import stock_downlink as downlink
-from local_file_receiver import file_sha256, publication_lock, read_receipt, valid_name
+from local_file_receiver import file_sha256, publication_lock, publication_retry_command, read_receipt, valid_name
 from yamcs_client import LocalYamcs, loopback_url
 
 
@@ -117,7 +117,7 @@ def status(receive_dir: Path, url: str, instance: str, processor: str) -> dict:
             if not str(receipt.get("destination", "")).lower().endswith(".csv"):
                 continue
             files.append({key: receipt.get(key) for key in (
-                "destination", "source_path", "state", "received_size", "expected_size", "publication_error")})
+                "destination", "source_path", "state", "received_size", "expected_size", "publication_error", "bucket")})
             if receipt.get("state") == "saved_locally":
                 files[-1]["retry_receipt"] = str(path)
         except (OSError, ValueError) as error:
@@ -216,12 +216,19 @@ def main(argv=None) -> int:
                   f"| heartbeat age: {bridge.get('heartbeat_age_seconds', 'unknown')}s")
             print(f"Storage: {json.dumps(result['flight_storage'])}")
             print(f"Spool headroom: {bridge.get('free_spool_bytes', 'unknown')} bytes")
+            print(f"Spool: {bridge.get('saved_files', 'unknown')} saved | "
+                  f"{bridge.get('pending_publications', 'unknown')} pending publication | "
+                  f"{bridge.get('quarantined_receipts', 'unknown')} quarantined receipts")
             if bridge.get("file_error"):
                 print("File fault: " + str(bridge["file_error"]))
+            for item in result["bad_receipts"]:
+                print(f"Receipt fault: {item['receipt']}: {item['error']}")
             for item in result["csv_files"]:
                 print(f"{item['state']}: {item['destination']} {item['received_size']}/{item['expected_size']} bytes")
                 if item.get("retry_receipt"):
-                    print("  Publish retry receipt: " + item["retry_receipt"])
+                    rendered = publication_retry_command(item["retry_receipt"], station, args.url,
+                                                         item.get("bucket") or "fprimeFilesIn")
+                    print("  Publish retry (ground only): " + rendered)
         return 0
     except RetirementUnknown as error:
         print(f"UNKNOWN: {error}")

@@ -6,7 +6,7 @@ This revision is for local development/verification until explicitly deployed. H
 
 ## Components and configuration
 
-Install matching versions of `tools/yamcs/cdr_comm_bridge.py`, `local_file_receiver.py`, `file_delivery_config.py`, `stock_downlink.py`, the shared `yamcs_client.py` authentication client, `deploy/ground/station.py`, and `n2-ground-bridge.service`. Use the project's pinned Python environment and matching flight dictionary. The obsolete native-transfer watchdog is removed; the existing authenticated HTTP client is shared directly.
+Install matching versions of `tools/yamcs/cdr_comm_bridge.py`, `local_file_receiver.py`, `file_delivery_config.py`, `stock_downlink.py`, `science_files.py`, the shared `yamcs_client.py` authentication client, `deploy/ground/station.py`, and `n2-ground-bridge.service`. Use the project's pinned Python environment and matching flight dictionary. The obsolete native-transfer watchdog is removed; the existing authenticated HTTP client is shared directly.
 
 `station.py` preserves operator configuration while setting the supported HTTP `maxContentLength` to at least 128 MiB and the `fprimeFilesIn` bucket to at least 2 GiB/4096 objects. Larger existing settings are retained. The local receiver defaults to 128 MiB per file and 2 GiB total spool; it stops accepting files when quota/entry capacity is exhausted. Keep sufficient free disk space and remove archived evidence deliberately. No automatic eviction occurs. No upstream JAR is patched.
 
@@ -48,6 +48,8 @@ tools/yamcs/.venv/bin/python tools/yamcs/local_file_receiver.py \
 
 Retry first checks whether the same object already exists and matches; it refuses to overwrite a different object. It never issues a spacecraft command. A quota or HTTP size rejection requires correcting configuration/capacity before retrying.
 
+A catalog or independently expected byte/hash mismatch is an integrity failure. Preserve the observed bytes and evidence, then reconcile the selected source/catalog and expected values. Uploading those same bytes again cannot resolve that mismatch.
+
 Do not overlap spacecraft file sends. After a failed spacecraft send, preserve evidence and explicitly stop/drain the old sender before another request with a fresh destination. Stock `FileHandling.fileDownlink.Cancel` remains the flight cancellation command. Restarting ground alone does not establish that the sender stopped. Existing stale native rows are a separate maintenance concern.
 
 ## CSV status and deliberate cleanup
@@ -60,7 +62,16 @@ tools/yamcs/.venv/bin/python tools/yamcs/science_files.py --station "$HOME/yamcs
 
 `archive` and `retire` default to preview; `--confirm` performs the displayed action. Ground archive verifies and fsyncs another copy outside the active spool before removing the originals. Flight retirement requires a matching verified CSV copy and uses normal F Prime commanding; a lost response reports UNKNOWN and requires catalog/event reconciliation. Retired IDs are never reused. The payload workflow retains one CSV per acquisition; temporary input is not a separate catalog product. Legacy files remain readable until explicitly retired.
 
-Malformed receipts are quarantined separately. A ground disk fault disables file admission while telemetry/events/commanding continue; repair the disk and restart the bridge before receiving files again. HTTP requests have total time/size bounds; failed publication remains retryable from disk. Status reports heartbeat freshness, file admission/fault and spool/catalog headroom.
+Malformed receipts are quarantined separately. A ground disk fault disables file admission while telemetry/events/commanding continue; repair the disk and restart the bridge before receiving files again. HTTP requests have total time/size bounds; failed publication remains retryable from disk. Status reports heartbeat freshness, file admission/fault, spool/catalog headroom, publication backlog and quarantine counts. Pending CSV entries include a complete ground-only retry command using the current station, URL and bucket.
+
+The examples above use macOS/Linux shells. For a native Windows operator environment with the same ground dependencies installed, use PowerShell and the environment's Python directly:
+
+```powershell
+.\tools\yamcs\.venv\Scripts\python.exe .\tools\yamcs\science_files.py status
+.\tools\yamcs\.venv\Scripts\python.exe .\tools\yamcs\stock_downlink.py --product-id <CURRENT_PRODUCT_ID>
+```
+
+The default station is `yamcs-station` under the current user's home directory; pass `--station` for another local station. The status command renders retry commands for the current operating system. F Prime builds and PTY integration tests use macOS or WSL; native Windows operation has not been hardware-qualified.
 
 ## Local verification
 
