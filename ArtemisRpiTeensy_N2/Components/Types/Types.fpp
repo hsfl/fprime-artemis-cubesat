@@ -235,6 +235,23 @@ module Components {
     sourceCrc: U32
   )
 
+  @ Acquisition identity sent before its matching science product descriptor.
+  port ScienceProductProvenance(productId: U32, acquisitionId: U32, run: U32)
+
+  @ Current durable catalog admission capacity; ready is false during a storage fault.
+  port ScienceStorageCapacity(freeSlots: U32, ready: bool)
+
+  @ Product handoff retaining the source instrument's acquisition identity.
+  port ScienceProductDescriptorWithProvenance(
+    productId: U32,
+    productBytes: U32,
+    sourceKind: ScienceProductSource,
+    sourcePath: string size 192,
+    sourceCrc: U32,
+    acquisitionId: U32,
+    run: U32
+  )
+
   @ Terminal outcome of a new product submission to durable storage.
   port ScienceProductCommitResult(productId: U32, productBytes: U32, committed: bool)
 

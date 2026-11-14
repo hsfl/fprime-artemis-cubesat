@@ -75,39 +75,53 @@ bool ensureDirectory(const std::string& path) {
     return true;
 }
 
+bool readUnsigned(const char*& cursor, U32& value) {
+    const char* first = cursor;
+    U64 parsed = 0U;
+    while (*cursor >= '0' && *cursor <= '9') {
+        parsed = parsed * 10U + static_cast<U64>(*cursor - '0');
+        if (parsed > std::numeric_limits<U32>::max()) {
+            return false;
+        }
+        ++cursor;
+    }
+    value = static_cast<U32>(parsed);
+    return cursor != first;
+}
+
 bool parseProductIdFile(const char* name, U32& productId) {
+    if (name == nullptr) {
+        return false;
+    }
+    const char* cursor = name;
+    bool acquisitionName = false;
+    if (std::strncmp(cursor, "daq_", 4U) == 0) {
+        acquisitionName = true;
+        cursor += 4U;
+        U32 ignored = 0U;
+        if (!readUnsigned(cursor, ignored) || std::strncmp(cursor, "_run_", 5U) != 0) {
+            return false;
+        }
+        cursor += 5U;
+        if (!readUnsigned(cursor, ignored) || *cursor != '_') {
+            return false;
+        }
+        ++cursor;
+    }
     const std::size_t prefixLength = std::strlen(PRODUCT_PREFIX);
-    const std::size_t nameLength = std::strlen(name);
-    const char* suffix = nullptr;
-    if (nameLength > prefixLength + 4U &&
-        std::strcmp(name + nameLength - 4U, ".bin") == 0) {
-        suffix = ".bin";
-    } else if (nameLength > prefixLength + 4U &&
-               std::strcmp(name + nameLength - 4U, ".csv") == 0) {
-        suffix = ".csv";
-    } else if (nameLength > prefixLength + 5U &&
-               std::strcmp(name + nameLength - 5U, ".meta") == 0) {
-        suffix = ".meta";
-    }
-    if ((suffix == nullptr) || (std::strncmp(name, PRODUCT_PREFIX, prefixLength) != 0)) {
+    if (std::strncmp(cursor, PRODUCT_PREFIX, prefixLength) != 0) {
         return false;
     }
-    const char* digit = name + prefixLength;
-    const char* end = name + nameLength - std::strlen(suffix);
-    U64 value = 0U;
-    for (; digit < end; ++digit) {
-        if ((*digit < '0') || (*digit > '9')) {
-            return false;
-        }
-        value = (value * 10U) + static_cast<U64>(*digit - '0');
-        if (value > std::numeric_limits<U32>::max()) {
-            return false;
-        }
-    }
-    if (value == 0U) {
+    cursor += prefixLength;
+    U32 parsedId = 0U;
+    if (!readUnsigned(cursor, parsedId) || parsedId == 0U) {
         return false;
     }
-    productId = static_cast<U32>(value);
+    if (std::strcmp(cursor, ".bin") != 0 && std::strcmp(cursor, ".csv") != 0 &&
+        (acquisitionName || std::strcmp(cursor, ".meta") != 0)) {
+        return false;
+    }
+    productId = parsedId;
     return true;
 }
 
@@ -198,6 +212,10 @@ bool writeProductIdHighWater(const std::string& root, U32 nextProductId) {
 }
 
 }  // namespace
+
+bool parseProductIdFilename(const char* name, U32& productIdOut) {
+    return parseProductIdFile(name, productIdOut);
+}
 
 bool reserveProductId(U32& productIdOut) {
     const std::string root = getProductStorageRoot();
