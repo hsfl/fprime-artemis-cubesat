@@ -8,6 +8,9 @@ namespace Components {
 
 class StorageManagerTester final : public StorageManagerGTestBase {
   public:
+    // FPP grants this tester and its nested fixture access to dispatch queued input.
+    class CatalogTester;
+
     static const FwSizeType MAX_HISTORY_SIZE = 32;
     static const FwEnumStoreType TEST_INSTANCE_ID = 0;
     static const FwSizeType TEST_INSTANCE_QUEUE_DEPTH = 10;

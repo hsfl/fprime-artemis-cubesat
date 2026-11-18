@@ -12,6 +12,7 @@ module ArtemisRpiTeensyDeployment {
       missionApp.captureControlOut -> payloadManager.captureControlIn
       payloadManager.captureControlReportOut -> missionApp.captureControlReportIn
       payloadManager.driverRequestOut -> payloadDriverNeutronSim.requestIn
+      payloadManager.simulationCaptureOptionsOut -> payloadDriverNeutronSim.simulationCaptureOptionsIn
       payloadDriverNeutronSim.operationResponseOut -> payloadManager.driverOperationResultIn
       payloadDriverNeutronSim.availabilityOut -> payloadManager.driverAvailabilityIn
       payloadManager.driverPassthroughOut -> payloadDriverNeutronSim.passthroughIn

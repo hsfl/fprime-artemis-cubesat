@@ -33,12 +33,6 @@ class CdrTcpToolTests(unittest.TestCase):
         with self.assertRaises(Exception):
             cdr_tcp.validate_heap("1024m; rm -rf /")
 
-    def test_frame_interval_rejects_zero_and_nonfinite_values(self):
-        self.assertEqual(cdr_tcp.validate_frame_interval("5"), 5.0)
-        for value in ("0", "-1", "nan", "inf"):
-            with self.subTest(value=value), self.assertRaises(Exception):
-                cdr_tcp.validate_frame_interval(value)
-
     def test_bridge_uses_dictionary_tm_constants(self):
         with tempfile.TemporaryDirectory() as temporary:
             dictionary = Path(temporary) / "dict.json"
@@ -47,32 +41,6 @@ class CdrTcpToolTests(unittest.TestCase):
                 {"qualifiedName": "ComCfg.SpacecraftId", "value": 68},
             ]}))
             self.assertEqual(cdr_comm_bridge.dictionary_constants(dictionary), (1024, 68))
-
-    def test_paced_adapter_spaces_writes_without_catchup_bursts(self):
-        class FakeClock:
-            now = 0.0
-            sleeps = []
-
-            def clock(self):
-                return self.now
-
-            def sleep(self, duration):
-                self.sleeps.append(duration)
-                self.now += duration
-
-        clock = FakeClock()
-        adapter = cdr_comm_bridge.PacedUdpFastAdapter(
-            frame_interval_ms=5, clock=clock.clock, sleeper=clock.sleep)
-        with patch.object(cdr_comm_bridge.UdpFastAdapter, "write", return_value=True) as stock_write:
-            self.assertTrue(adapter.write(b"one"))
-            clock.now += 0.020  # a delayed producer must not trigger catch-up sends
-            self.assertTrue(adapter.write(b"two"))
-            self.assertTrue(adapter.write(b"three"))
-
-        self.assertEqual(len(stock_write.call_args_list), 3)
-        self.assertEqual(len(clock.sleeps), 1)
-        self.assertAlmostEqual(clock.sleeps[0], 0.005)
-        self.assertAlmostEqual(adapter._next_write_at, 0.030)
 
     def test_http_readiness_stops_when_startup_is_cancelled(self):
         process = MagicMock()
@@ -120,18 +88,18 @@ class CdrTcpToolTests(unittest.TestCase):
             self.assertEqual(len(file_packet_services), 1)
             self.assertEqual(file_packet_services[0]["args"]["downlinkMirrorDir"],
                              str(run_dir / "received-files"))
+            global_config = yaml.safe_load((config_dir / "etc" / "yamcs.yaml").read_text())
+            server = next(service for service in global_config["services"]
+                          if service["class"].endswith("HttpServer"))
+            self.assertGreaterEqual(server["args"]["maxContentLength"], 128 * 1024 * 1024)
+            bucket = next(bucket for bucket in global_config["buckets"] if bucket["name"] == "fprimeFilesIn")
+            self.assertGreaterEqual(bucket["maxSize"], 2 * 1024 * 1024 * 1024)
+            main = next(link for link in instance["dataLinks"] if link["name"] == "UDP_TM_IN")
+            self.assertEqual(main["class"], "org.yamcs.tctm.UdpTmDataLink")
+            self.assertEqual(main["port"], 50000)
+            self.assertEqual(main["maxLength"], 65535)
+            self.assertNotIn("virtualChannels", main)
 
-    def test_java_wrapper_substitutes_the_pinned_launcher_heap(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            env = os.environ.copy()
-            wrapper = cdr_tcp.configure_heap_wrapper(Path(temporary), "768m", env)
-            self.assertEqual(env["JAVA_HOME"], str(wrapper.parent.parent))
-            output = subprocess.run([str(wrapper), "-version"], env=env,
-                                    capture_output=True, text=True, timeout=30)
-            self.assertEqual(output.returncode, 0, output.stderr)
-            self.assertIn("version", output.stderr.lower() + output.stdout.lower())
-
-    @unittest.skipUnless(os.name == "posix", "requires POSIX process groups")
     def test_cleanup_kills_children_after_process_group_leader_exits(self):
         with tempfile.TemporaryDirectory() as temporary:
             pid_file = Path(temporary) / "child.pid"

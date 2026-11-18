@@ -36,8 +36,8 @@ DEPLOYMENT = "ArtemisRpiTeensyDeployment"
 MISSION = DEPLOYMENT + ".missionApp"
 SCIENCE = DEPLOYMENT + ".scienceApp"
 PAYLOAD = DEPLOYMENT + ".payloadManager"
-# Short captures keep the cycle quick. CONFIGURE_CAPTURE_DURATION is volatile (lost on restart).
-CAPTURE_SECONDS = 3
+# Use the shortest exposure supported by the public simulator.
+CAPTURE_MINUTES = 1
 SCHEDULE_DELAY_SECONDS = 2
 QUEUED_DELAY_SECONDS = 15  # long enough to reach SAFE first, short enough to wait out
 
@@ -299,8 +299,8 @@ def main():
     print("== start")
     s.step("REPORT_MODE answers BASE on a fresh stack", M + ".REPORT_MODE", {}, True,
            [Expect("ModeReport", "Mission mode is", mode="BASE")])
-    s.step("Shorten the capture for this run", SCIENCE + ".CONFIGURE_CAPTURE_DURATION",
-           {"durationSeconds": CAPTURE_SECONDS}, True)
+    s.step("Configure a one-minute simulated exposure", SCIENCE + ".CONFIGURE_CAPTURE_DURATION",
+           {"durationMinutes": CAPTURE_MINUTES}, True)
 
     print("== Part A: nominal cycle")
     s.step("SET_MODE SCIENCE_PROCESSING refused in BASE (automatic only)", M + ".SET_MODE",
@@ -386,14 +386,14 @@ def main():
     s.in_order("The inhibit came before SAFE entry completed", skip=1)
     safe_from = latest_release(s)
     s.step("payloadManager.SCIENCE_CAPTURE refused at the gate", PAYLOAD + ".SCIENCE_CAPTURE",
-           {"durationSeconds": CAPTURE_SECONDS}, False, [refused_at_gate()])
+           {"durationMinutes": CAPTURE_MINUTES}, False, [refused_at_gate()])
     s.step("payloadManager.START_PAYLOAD_COLLECTION refused at the gate", PAYLOAD + ".START_PAYLOAD_COLLECTION",
            {"collectionId": 77}, False, [refused_at_gate()])
     s.step("payloadManager.SYNTHETIC_PASSTHROUGH refused at the gate", PAYLOAD + ".SYNTHETIC_PASSTHROUGH",
            {"requestId": 77, "literalCommand": "SAFE-CHECK"}, False, [refused_at_gate()])
     s.step("scienceApp.SCIENCE_CAPTURE: queued, then refused at the gate", SCIENCE + ".SCIENCE_CAPTURE",
-           {"durationSeconds": CAPTURE_SECONDS}, True,
-           [science("ScienceOperationRejected", "rejected", state="INHIBITED")])
+           {"durationMinutes": CAPTURE_MINUTES}, True,
+           [science("ScienceOperationRejected", "Science payload operation", state="INHIBITED")])
     s.none_since("No product, no COLLECTING and no SCIENCE_READY while in SAFE", safe_from,
                  [science("ScienceProductReady", "Science product ready"), mode_changed("COLLECTING"),
                   mode_changed("SCIENCE_READY")])
@@ -409,11 +409,11 @@ def main():
     s.in_order("The cancel came before SAFE entry completed")
     s.none_since("The queued collection never fires, not even to meet the gate", latest_release(s),
                  [science("ScienceProductReady", "Science product ready"), mode_changed("COLLECTING"),
-                  science("ScienceOperationRejected", "rejected")],
+                  science("ScienceOperationRejected", "Science payload operation")],
                  settle=QUEUED_DELAY_SECONDS + 3)
     s.step("SET_MODE BASE leaves SAFE", M + ".SET_MODE", {"mode": "BASE"}, True, [mode_changed("BASE")])
     s.step("scienceApp.SCIENCE_CAPTURE after SAFE gives a stored product", SCIENCE + ".SCIENCE_CAPTURE",
-           {"durationSeconds": CAPTURE_SECONDS}, True, [mode_changed("COLLECTING")],
+           {"durationMinutes": CAPTURE_MINUTES}, True, [mode_changed("COLLECTING")],
            later=[science("ScienceProductReady", "Science product ready"), mode_changed("SCIENCE_READY")])
     s.step("SET_MODE BASE ends the cycle", M + ".SET_MODE", {"mode": "BASE"}, True, [mode_changed("BASE")])
     s.step("REPORT_MODE answers BASE at the end", M + ".REPORT_MODE", {}, True,

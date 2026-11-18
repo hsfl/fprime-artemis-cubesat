@@ -152,9 +152,9 @@
       missionApp.collectionRequestOut -> scienceApp.requestIn
       missionApp.cancelRequestOut -> scienceApp.cancelRequestIn
       scienceApp.cancelReportOut -> missionApp.cancelReportIn
-      storageManager.productStoredOut -> scienceApp.productStoredIn
       payloadManager.operationNoticeOut -> scienceApp.operationNoticeIn
       scienceApp.scienceProductOut -> storageManager.requestIn
+      storageManager.productCommitOut -> scienceApp.productCommitIn
       scienceApp.deliveryRequestOut -> storageManager.deliveryRequestIn
       scienceApp.missionModeOut -> missionApp.modeUpdateIn[0]
     }

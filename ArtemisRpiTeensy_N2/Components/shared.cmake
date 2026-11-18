@@ -1,5 +1,6 @@
 # Register the shared components from this public F′ project.
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/Types/")
+add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/ProductId/")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/LinkCfg/")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/UartChannelMux/")
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/PayloadDownlinkApp/")

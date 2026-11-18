@@ -121,7 +121,7 @@ def capture(fault, expected, component="scienceApp", command_name="SCIENCE_CAPTU
     returned(reset, "missionApp", "ModeChanged", lambda e: extra(e, "mode") == "BASE")
     before = counts()
     configure(fault, timeout=1000 if expected == "TIMED_OUT" else 8000)
-    command = send(component, command_name, args if args is not None else {"durationSeconds": 1})
+    command = send(component, command_name, args if args is not None else {"durationMinutes": 1})
     accepted = status(command, "ACCEPTED", kind="CAPTURE")
     op = {"command": command, "accepted": accepted, "counts_before": before,
           "requestId": int(extra(accepted, "requestId")), "generation": int(extra(accepted, "generation"))}
@@ -157,7 +157,7 @@ def probe():
     check("zero pass-through request ID rejected", literal("zero ID rejected", request_id=0, expected="INVALID"))
     command = send("payloadManager", "START_PAYLOAD_COLLECTION", {"collectionId": 0})
     check("zero explicit legacy collection ID rejected", status(command, "INVALID", request_id=0, generation=0, kind="CAPTURE"))
-    command = send("payloadManager", "SCIENCE_CAPTURE", {"durationSeconds": 0})
+    command = send("payloadManager", "SCIENCE_CAPTURE", {"durationMinutes": 0})
     check("invalid duration rejected", status(command, "INVALID", kind="CAPTURE"))
     command = send("payloadManager", "CONFIGURE_SIMULATION", {"faultMode": "NORMAL", "delayMs": 0, "timeoutMs": 999})
     check("unsafe timeout configuration rejected", returned(command, "payloadManager", "SimulationConfigRejected"))
@@ -176,9 +176,9 @@ def probe():
     contenders = []
     for component, command_name, args in (
         ("payloadManager", "START_PAYLOAD_COLLECTION", {"collectionId": 917}),
-        ("payloadManager", "SCIENCE_CAPTURE", {"durationSeconds": 1}),
+        ("payloadManager", "SCIENCE_CAPTURE", {"durationMinutes": 1}),
         ("scienceApp", "START_COLLECTION", {}),
-        ("scienceApp", "SCIENCE_CAPTURE", {"durationSeconds": 1}),
+        ("scienceApp", "SCIENCE_CAPTURE", {"durationMinutes": 1}),
         ("missionApp", "SCHEDULE_COLLECTION", {"delaySeconds": 1}),
     ):
         command = send(component, command_name, args)
@@ -263,7 +263,7 @@ def probe():
     returned(reset, "missionApp", "ModeChanged", lambda e: extra(e, "mode") == "BASE")
     before = counts()
     configure("DELAYED_RESPONSE", delay=4000, timeout=8000)
-    command = send("scienceApp", "SCIENCE_CAPTURE", {"durationSeconds": 1})
+    command = send("scienceApp", "SCIENCE_CAPTURE", {"durationMinutes": 1})
     accepted = status(command, "ACCEPTED", kind="CAPTURE")
     owner = {"command": command, "accepted": accepted, "requestId": int(extra(accepted, "requestId")),
              "generation": int(extra(accepted, "generation"))}
@@ -288,12 +288,12 @@ def probe():
     if duplicated_capture["counts_after"] != expected_counts:
         raise RuntimeError("Duplicate capture reply changed completion/storage more than once")
     check("duplicate capture publishes exactly once", duplicated_capture)
-    invalid = send("payloadManager", "SCIENCE_CAPTURE", {"durationSeconds": 0})
+    invalid = send("payloadManager", "SCIENCE_CAPTURE", {"durationMinutes": 0})
     check("invalid duration remains rejected after captures", status(invalid, "INVALID", kind="CAPTURE"))
     legacy = capture("NORMAL", "COMPLETED", "payloadManager", "START_PAYLOAD_COLLECTION", {"collectionId": 909})
     if legacy["requestId"] != 909:
         raise RuntimeError("Legacy collection ID was not preserved as request identity")
-    legacy["duration"] = fresh_parameter(f"{DEPLOYMENT}.payloadDriverNeutronSim.LastDurationSeconds", stamp(legacy["command"]["generationTime"]),
+    legacy["duration"] = fresh_parameter(f"{DEPLOYMENT}.payloadDriverNeutronSim.LastDurationMinutes", stamp(legacy["command"]["generationTime"]),
                                         predicate=lambda v: int(v["engValue"]["uint32Value"]) == 1)
     check("invalid duration does not poison legacy capture configuration", legacy)
     check("scheduled capture uses same accepted lifecycle", capture("NORMAL", "COMPLETED", "missionApp", "SCHEDULE_COLLECTION", {"delaySeconds": 1}))

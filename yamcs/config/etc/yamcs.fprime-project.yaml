@@ -55,7 +55,7 @@ services:
       inStream: tm_realtime
       bucket: fprimeFilesIn
       fileApid: 3
-      downloadTimeoutMs: 8000
+      downloadTimeoutMs: 30000  # Wait for START only; active stalls use the external observer.
       uplinkChunkSize: ${FPRIME_UPLINK_CHUNK_SIZE:512}
       downlinkMirrorDir: ${FPRIME_DOWNLINK_DIR:/tmp/runner/fprime-downlink}
 

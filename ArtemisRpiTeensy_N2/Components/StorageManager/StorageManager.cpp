@@ -1,7 +1,9 @@
 #include "Components/StorageManager/StorageManager.hpp"
+#include "Components/ProductId/ProductId.hpp"
 
 #include <algorithm>
 #include <cerrno>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -21,7 +23,9 @@ constexpr const char* DEFAULT_STORAGE_ROOT = "/home/pi/artemis/data/science-prod
 constexpr const char* ID_HIGH_WATER_FILE = "product-id-high-water";
 constexpr const char* PRODUCT_PREFIX = "product_";
 constexpr const char* PRODUCT_DATA_SUFFIX = ".bin";
+constexpr const char* PRODUCT_CSV_SUFFIX = ".csv";
 constexpr const char* PRODUCT_METADATA_SUFFIX = ".meta";
+constexpr const char* PRODUCT_RETIRE_SUFFIX = ".retire";
 constexpr const char* TRANSIENT_CAPTURE_DIR = "/tmp/neutron_payload_captures";
 constexpr const char* TRANSIENT_CAPTURE_PREFIX = "neutron_capture_";
 constexpr const char* TRANSIENT_CAPTURE_SUFFIX = ".csv";
@@ -35,6 +39,7 @@ constexpr U32 REJECT_INVALID_STORED_FILE = 6U;
 constexpr U32 REJECT_STORAGE_UNAVAILABLE = 7U;
 constexpr U32 REJECT_ID_COUNTER = 8U;
 constexpr U32 REJECT_PATH_TOO_LONG = 9U;
+constexpr U32 REJECT_INVALID_PROVENANCE = 10U;
 constexpr U32 STORAGE_UNAVAILABLE_ROOT = 1U;
 constexpr U32 STORAGE_UNAVAILABLE_CATALOG_OVERFLOW = 2U;
 constexpr U32 STORAGE_UNAVAILABLE_ID_COUNTER = 3U;
@@ -47,12 +52,27 @@ std::string getStorageRoot() {
     return std::string(DEFAULT_STORAGE_ROOT);
 }
 
-std::string productDataPath(const std::string& root, U32 productId) {
-    return root + "/" + PRODUCT_PREFIX + std::to_string(productId) + PRODUCT_DATA_SUFFIX;
+std::string productDataPath(const std::string& root, U32 productId,
+                            const char* suffix = PRODUCT_DATA_SUFFIX,
+                            bool hasProvenance = false, U32 acquisitionId = 0U, U32 run = 0U) {
+    const std::string acquisition = hasProvenance
+        ? "daq_" + std::to_string(acquisitionId) + "_run_" + std::to_string(run) + "_"
+        : "";
+    return root + "/" + acquisition + PRODUCT_PREFIX + std::to_string(productId) + suffix;
 }
 
 std::string productMetadataPath(const std::string& root, U32 productId) {
     return root + "/" + PRODUCT_PREFIX + std::to_string(productId) + PRODUCT_METADATA_SUFFIX;
+}
+
+bool syncDirectory(const std::string& root) {
+    const int fd = ::open(root.c_str(), O_RDONLY);
+    if (fd < 0) {
+        return false;
+    }
+    const bool ok = ::fsync(fd) == 0;
+    (void)::close(fd);
+    return ok;
 }
 
 bool hasPrefix(const char* value, const char* prefix) {
@@ -64,6 +84,22 @@ bool hasSuffix(const char* value, const char* suffix) {
     const std::size_t suffixLength = std::strlen(suffix);
     return (valueLength >= suffixLength) &&
            (std::strcmp(value + valueLength - suffixLength, suffix) == 0);
+}
+
+const char* productDataSuffix(const char* sourcePath) {
+    // Only carry a known format suffix into the generated storage name. Do not
+    // preserve arbitrary source basenames or interpret CSV content heuristically.
+    const std::size_t length = std::strlen(sourcePath);
+    if (length >= 4U) {
+        const char* suffix = sourcePath + length - 4U;
+        if ((suffix[0] == '.') &&
+            (std::tolower(static_cast<unsigned char>(suffix[1])) == 'c') &&
+            (std::tolower(static_cast<unsigned char>(suffix[2])) == 's') &&
+            (std::tolower(static_cast<unsigned char>(suffix[3])) == 'v')) {
+            return PRODUCT_CSV_SUFFIX;
+        }
+    }
+    return PRODUCT_DATA_SUFFIX;
 }
 
 bool ensureDirectory(const std::string& path) {
@@ -113,36 +149,28 @@ bool ensureDirectory(const std::string& path) {
     return true;
 }
 
-bool parseProductFileId(const char* name, U32& productId) {
-    const std::size_t prefixLength = std::strlen(PRODUCT_PREFIX);
-    if ((std::strncmp(name, PRODUCT_PREFIX, prefixLength) != 0) ||
-        (!hasSuffix(name, PRODUCT_DATA_SUFFIX) && !hasSuffix(name, PRODUCT_METADATA_SUFFIX))) {
+bool countProductDataFiles(const std::string& root, U32 productId, U32& count) {
+    DIR* directory = ::opendir(root.c_str());
+    if (directory == nullptr) {
         return false;
     }
-    const std::size_t nameLength = std::strlen(name);
-    const std::size_t suffixLength = hasSuffix(name, PRODUCT_DATA_SUFFIX)
-        ? std::strlen(PRODUCT_DATA_SUFFIX)
-        : std::strlen(PRODUCT_METADATA_SUFFIX);
-    if (nameLength <= prefixLength + suffixLength) {
-        return false;
-    }
-    const char* firstDigit = name + prefixLength;
-    const char* endDigits = name + nameLength - suffixLength;
-    U64 value = 0U;
-    for (const char* digit = firstDigit; digit < endDigits; ++digit) {
-        if ((*digit < '0') || (*digit > '9')) {
-            return false;
+    count = 0U;
+    bool scanOk = true;
+    for (;;) {
+        errno = 0;
+        const struct dirent* entry = ::readdir(directory);
+        if (entry == nullptr) {
+            scanOk = errno == 0;
+            break;
         }
-        value = (value * 10U) + static_cast<U64>(*digit - '0');
-        if (value > std::numeric_limits<U32>::max()) {
-            return false;
+        U32 parsedId = 0U;
+        if ((hasSuffix(entry->d_name, PRODUCT_DATA_SUFFIX) || hasSuffix(entry->d_name, PRODUCT_CSV_SUFFIX)) &&
+            parseProductIdFilename(entry->d_name, parsedId) && parsedId == productId) {
+            ++count;
         }
     }
-    if (value == 0U) {
-        return false;
-    }
-    productId = static_cast<U32>(value);
-    return true;
+    (void)::closedir(directory);
+    return scanOk;
 }
 
 bool parseHighWaterLine(const char* line, U32& nextProductId) {
@@ -327,7 +355,6 @@ StorageManager::StorageManager(const char* const compName)
       m_storedProducts(0U),
       m_lastProductSize(0U),
       m_selectedProductId(0U),
-      m_lastInputProductId(0U),
       m_nextProductId(1U),
       m_removedDatasetFiles(0U),
       m_removeDatasetFailures(0U),
@@ -337,7 +364,12 @@ StorageManager::StorageManager(const char* const compName)
       m_idCounterExhausted(false),
       m_recoveryReported(false),
       m_storageRoot(getStorageRoot()),
-      m_history{} {}
+      m_history{},
+      m_pendingProvenance{},
+      m_provenanceOverflow(false),
+      m_capacityPublished(false),
+      m_lastCapacityReady(false),
+      m_lastFreeSlots(0U) {}
 
 StorageManager::~StorageManager() {}
 
@@ -356,13 +388,43 @@ void StorageManager::run_handler(FwIndexType portNum, U32 context) {
     this->tlmWrite_RemovedDatasetFiles(this->m_removedDatasetFiles);
     this->tlmWrite_RemoveDatasetFailures(this->m_removeDatasetFailures);
     this->tlmWrite_SelectedProductId(this->m_selectedProductId);
-    this->tlmWrite_StorageReady(this->m_storageReady);
+    this->publishCapacity();
     if (this->isConnected_sohStatusOut_OutputPort(0)) {
         const Components::HealthState health = this->m_storageReady
             ? ((this->m_removeDatasetFailures == 0U) ? Components::HealthState::OK : Components::HealthState::WARN)
             : Components::HealthState::FAIL;
         this->sohStatusOut_out(0, health, this->m_storedProducts);
     }
+}
+
+void StorageManager::provenanceIn_handler(FwIndexType portNum, U32 productId, U32 acquisitionId, U32 run) {
+    static_cast<void>(portNum);
+    if (productId == 0U) {
+        this->log_WARNING_HI_ProductProvenanceRejected(productId, 1U);
+        return;
+    }
+    PendingProvenance* empty = nullptr;
+    for (PendingProvenance& entry : this->m_pendingProvenance) {
+        if (entry.productId == productId) {
+            if (entry.acquisitionId != acquisitionId || entry.run != run) {
+                entry.conflicting = true;
+                this->log_WARNING_HI_ProductProvenanceRejected(productId, 2U);
+            }
+            return;
+        }
+        if (entry.productId == 0U && empty == nullptr) {
+            empty = &entry;
+        }
+    }
+    if (empty == nullptr) {
+        // Fail closed until restart rather than silently commit an unlabelled
+        // descriptor whose acquisition metadata could not be retained.
+        this->m_provenanceOverflow = true;
+        this->log_WARNING_HI_ProductProvenanceRejected(productId, 3U);
+        this->publishCapacity();
+        return;
+    }
+    *empty = PendingProvenance{productId, acquisitionId, run, false};
 }
 
 void StorageManager::requestIn_handler(FwIndexType portNum,
@@ -373,6 +435,9 @@ void StorageManager::requestIn_handler(FwIndexType portNum,
                                        U32 sourceCrc) {
     static_cast<void>(portNum);
     const bool stored = this->storeProduct(productId, productBytes, sourceKind, sourcePath, sourceCrc);
+    if (this->isConnected_productCommitOut_OutputPort(0)) {
+        this->productCommitOut_out(0, productId, stored ? productBytes : 0U, stored);
+    }
     if (this->isConnected_productStoredOut_OutputPort(0)) {
         this->productStoredOut_out(0, productId, stored);
     }
@@ -383,7 +448,18 @@ bool StorageManager::storeProduct(U32 productId,
                                   const Components::ScienceProductSource& sourceKind,
                                   const Fw::StringBase& sourcePath,
                                   U32 sourceCrc) {
-    this->m_lastInputProductId = 0U;
+    PendingProvenance provenance{};
+    for (PendingProvenance& entry : this->m_pendingProvenance) {
+        if (entry.productId == productId) {
+            provenance = entry;
+            entry = PendingProvenance{};
+            break;
+        }
+    }
+    if (this->m_provenanceOverflow || provenance.conflicting) {
+        this->rejectProduct(productId, REJECT_INVALID_PROVENANCE, sourcePath);
+        return false;
+    }
     if (!this->ensureCatalogLoaded()) {
         this->rejectProduct(productId, REJECT_STORAGE_UNAVAILABLE, sourcePath);
         return false;
@@ -402,14 +478,21 @@ bool StorageManager::storeProduct(U32 productId,
         this->rejectProduct(productId, REJECT_CATALOG_FULL, sourcePath);
         return false;
     }
-    if ((this->findProduct(productId) != nullptr) ||
-        (::access(productDataPath(this->m_storageRoot, productId).c_str(), F_OK) == 0) ||
+    U32 existingDataFiles = 0U;
+    if (!countProductDataFiles(this->m_storageRoot, productId, existingDataFiles)) {
+        this->rejectProduct(productId, REJECT_STORAGE_UNAVAILABLE, sourcePath);
+        return false;
+    }
+    if ((this->findProduct(productId) != nullptr) || existingDataFiles != 0U ||
         (::access(productMetadataPath(this->m_storageRoot, productId).c_str(), F_OK) == 0)) {
         this->rejectProduct(productId, REJECT_DUPLICATE_ID, sourcePath);
         return false;
     }
 
-    const std::string dataPath = productDataPath(this->m_storageRoot, productId);
+    const bool hasProvenance = provenance.productId != 0U;
+    const std::string dataPath = productDataPath(this->m_storageRoot, productId,
+                                                  productDataSuffix(sourcePath.toChar()),
+                                                  hasProvenance, provenance.acquisitionId, provenance.run);
     const std::string metadataPath = productMetadataPath(this->m_storageRoot, productId);
     if (dataPath.size() >= SOURCE_PATH_CAPACITY) {
         this->rejectProduct(productId, REJECT_PATH_TOO_LONG, sourcePath);
@@ -423,16 +506,17 @@ bool StorageManager::storeProduct(U32 productId,
         this->rejectProduct(productId, REJECT_COPY_OR_CRC, sourcePath);
         return false;
     }
-    if (!this->writeMetadataAtomically(metadataPath, productId, productBytes, sourceKind, sourceCrc)) {
+    if (!this->writeMetadataAtomically(metadataPath, productId, productBytes, sourceKind, sourceCrc, provenance)) {
+        (void)::unlink(dataPath.c_str());
         this->rejectProduct(productId, REJECT_METADATA_COMMIT, Fw::String(dataPath.c_str()));
         return false;
     }
 
     const Fw::String storedPath(dataPath.c_str());
     ProductRecord& record = this->m_history[this->m_storedProducts];
-    record = ProductRecord{productId, productId, productBytes, sourceCrc, sourceKind, storedPath};
+    record = ProductRecord{productId, productId, productBytes, sourceCrc, sourceKind, storedPath,
+                           hasProvenance, provenance.acquisitionId, provenance.run};
     this->m_storedProducts += 1U;
-    this->m_lastInputProductId = productId;
     this->m_lastProductSize = productBytes;
     this->m_selectedProductId = productId;
     this->log_ACTIVITY_HI_ScienceStored(this->m_storedProducts, productBytes);
@@ -442,7 +526,7 @@ bool StorageManager::storeProduct(U32 productId,
     this->tlmWrite_LastProductSize(this->m_lastProductSize);
     this->tlmWrite_StorageHistoryDepth(this->historyDepth());
     this->tlmWrite_SelectedProductId(this->m_selectedProductId);
-    this->tlmWrite_StorageReady(true);
+    this->publishCapacity();
     return true;
 }
 
@@ -452,12 +536,7 @@ void StorageManager::deliveryRequestIn_handler(FwIndexType portNum, U32 productI
         this->rejectProduct(productId, REJECT_STORAGE_UNAVAILABLE, Fw::String(""));
         return;
     }
-    if ((productId == 0U) || (productId != this->m_lastInputProductId) ||
-        (productId != this->m_selectedProductId)) {
-        this->rejectProduct(productId, REJECT_INVALID_DESCRIPTOR, Fw::String(""));
-        return;
-    }
-    ProductRecord* record = this->findProduct(this->m_selectedProductId);
+    const ProductRecord* const record = this->findProduct(productId);
     if ((record == nullptr) || !this->isValidStoredProduct(*record)) {
         this->rejectProduct(productId, REJECT_INVALID_STORED_FILE,
                             (record == nullptr) ? Fw::String("") : record->sourcePath);
@@ -519,7 +598,7 @@ void StorageManager::REPORT_STORAGE_STATUS_cmdHandler(FwOpcodeType opCode, U32 c
     this->tlmWrite_LastProductSize(this->m_lastProductSize);
     this->tlmWrite_StorageHistoryDepth(this->historyDepth());
     this->tlmWrite_SelectedProductId(this->m_selectedProductId);
-    this->tlmWrite_StorageReady(true);
+    this->publishCapacity();
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
@@ -583,6 +662,76 @@ void StorageManager::SELECT_PRODUCT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, 
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
+void StorageManager::RETIRE_PRODUCT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 productId, U32 confirm) {
+    if (confirm > 1U) {
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::VALIDATION_ERROR);
+        return;
+    }
+    if (!this->ensureCatalogLoaded()) {
+        this->log_WARNING_HI_ProductRetirementFailed(productId);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
+        return;
+    }
+    ProductRecord* record = this->findProduct(productId);
+    if (record == nullptr || !this->isValidStoredProduct(*record)) {
+        this->log_WARNING_HI_ProductRetirementFailed(productId);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
+        return;
+    }
+    this->log_ACTIVITY_HI_ProductRetirementPreview(productId, record->productBytes, record->sourcePath);
+    if (confirm == 0U) {
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+        return;
+    }
+    const std::string marker = this->m_storageRoot + "/" + PRODUCT_PREFIX +
+                               std::to_string(productId) + PRODUCT_RETIRE_SUFFIX;
+    if (!this->writeRetirementMarker(*record) || !this->completeRetirement(marker, productId)) {
+        // Retry recovery on a later tick. An explicit marker authorizes only
+        // this product; failed operations never announce a free slot/success.
+        this->m_storageReady = false;
+        this->m_catalogLoaded = false;
+        this->publishCapacity();
+        this->log_WARNING_HI_ProductRetirementFailed(productId);
+        this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::EXECUTION_ERROR);
+        return;
+    }
+    const U32 slot = static_cast<U32>(record - &this->m_history[0]);
+    for (U32 index = slot + 1U; index < this->m_storedProducts; ++index) {
+        this->m_history[index - 1U] = this->m_history[index];
+    }
+    this->m_history[--this->m_storedProducts] = ProductRecord{};
+    this->m_lastProductSize = this->m_storedProducts == 0U ? 0U :
+        this->m_history[this->m_storedProducts - 1U].productBytes;
+    if (this->m_selectedProductId == productId) {
+        this->m_selectedProductId = this->m_storedProducts == 0U ? 0U :
+            this->m_history[this->m_storedProducts - 1U].productId;
+    }
+    this->tlmWrite_StoredProducts(this->m_storedProducts);
+    this->tlmWrite_StorageHistoryDepth(this->m_storedProducts);
+    this->tlmWrite_LastProductSize(this->m_lastProductSize);
+    this->tlmWrite_SelectedProductId(this->m_selectedProductId);
+    this->publishCapacity();
+    this->log_ACTIVITY_HI_ProductRetired(productId, HISTORY_CAPACITY - this->m_storedProducts);
+    this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void StorageManager::publishCapacity() {
+    const bool ready = this->m_storageReady && !this->m_provenanceOverflow && !this->m_idCounterExhausted;
+    const U32 freeSlots = ready ? HISTORY_CAPACITY - this->m_storedProducts : 0U;
+    this->tlmWrite_FreeProductSlots(freeSlots);
+    this->tlmWrite_StorageReady(ready);
+    if (!this->m_capacityPublished || ready != this->m_lastCapacityReady || freeSlots != this->m_lastFreeSlots) {
+        for (FwIndexType port = 0; port < this->getNum_capacityOut_OutputPorts(); ++port) {
+            if (this->isConnected_capacityOut_OutputPort(port)) {
+                this->capacityOut_out(port, freeSlots, ready);
+            }
+        }
+        this->m_capacityPublished = true;
+        this->m_lastCapacityReady = ready;
+        this->m_lastFreeSlots = freeSlots;
+    }
+}
+
 bool StorageManager::ensureCatalogLoaded() {
     if (this->m_catalogLoaded) {
         return this->m_storageReady;
@@ -596,17 +745,19 @@ bool StorageManager::ensureCatalogLoaded() {
             this->log_WARNING_HI_StorageUnavailable(reason);
             this->m_recoveryReported = true;
         }
-        this->tlmWrite_StorageReady(false);
+        this->publishCapacity();
         return false;
     }
     this->m_catalogLoaded = true;
     this->m_storageReady = true;
     this->m_recoveryReported = true;
-    this->tlmWrite_StorageReady(true);
     for (U32 index = 0U; index < this->m_storedProducts; ++index) {
         const ProductRecord& record = this->m_history[index];
         this->log_ACTIVITY_HI_ScienceProductRecovered(record.productId, record.productBytes,
                                                        record.sourceCrc, record.sourcePath);
+        if (record.hasProvenance) {
+            this->log_ACTIVITY_HI_ProductProvenance(record.productId, record.acquisitionId, record.run);
+        }
     }
     this->m_selectedProductId = (this->m_storedProducts > 0U)
         ? this->m_history[this->m_storedProducts - 1U].productId
@@ -618,6 +769,7 @@ bool StorageManager::ensureCatalogLoaded() {
     this->tlmWrite_StoredProducts(this->m_storedProducts);
     this->tlmWrite_LastProductSize(this->m_lastProductSize);
     this->tlmWrite_StorageHistoryDepth(this->historyDepth());
+    this->publishCapacity();
     return true;
 }
 
@@ -625,9 +777,8 @@ bool StorageManager::loadCatalog() {
     this->m_storedProducts = 0U;
     this->m_lastProductSize = 0U;
     this->m_selectedProductId = 0U;
-    this->m_lastInputProductId = 0U;
     this->m_catalogOverflow = 0U;
-    if (!ensureDirectory(this->m_storageRoot)) {
+    if (!ensureDirectory(this->m_storageRoot) || !this->recoverRetirements()) {
         return false;
     }
 
@@ -659,7 +810,7 @@ bool StorageManager::loadCatalog() {
                 break;
             }
             U32 parsedId = 0U;
-            if (parseProductFileId(entry->d_name, parsedId) && (parsedId > highestReservedId)) {
+            if (parseProductIdFilename(entry->d_name, parsedId) && (parsedId > highestReservedId)) {
                 highestReservedId = parsedId;
             }
         }
@@ -704,12 +855,14 @@ bool StorageManager::loadCatalog() {
         }
         U32 productId = 0U;
         if (!hasSuffix(entry->d_name, PRODUCT_METADATA_SUFFIX) ||
-            !parseProductFileId(entry->d_name, productId)) {
+            !parseProductIdFilename(entry->d_name, productId)) {
             continue;
         }
         ProductRecord record{};
         if (!this->readMetadata(productId, record) || !this->isValidStoredProduct(record)) {
-            const std::string expectedPath = productDataPath(this->m_storageRoot, productId);
+            const std::string expectedPath = (record.sourcePath.length() > 0U)
+                ? std::string(record.sourcePath.toChar())
+                : productMetadataPath(this->m_storageRoot, productId);
             this->rejectProduct(productId, REJECT_INVALID_STORED_FILE, Fw::String(expectedPath.c_str()));
             continue;
         }
@@ -733,6 +886,113 @@ bool StorageManager::loadCatalog() {
         return false;
     }
     return true;
+}
+
+bool StorageManager::writeRetirementMarker(const ProductRecord& record) const {
+    const std::string source(record.sourcePath.toChar());
+    const std::string prefix = this->m_storageRoot + "/";
+    if (source.compare(0U, prefix.size(), prefix) != 0) {
+        return false;
+    }
+    const std::string basename = source.substr(prefix.size());
+    U32 parsedId = 0U;
+    if (!parseProductIdFilename(basename.c_str(), parsedId) || parsedId != record.productId ||
+        (!hasSuffix(basename.c_str(), PRODUCT_CSV_SUFFIX) && !hasSuffix(basename.c_str(), PRODUCT_DATA_SUFFIX))) {
+        return false;
+    }
+    const std::string marker = prefix + PRODUCT_PREFIX + std::to_string(record.productId) + PRODUCT_RETIRE_SUFFIX;
+    const std::string contents = basename + "\n";
+    std::string temporary;
+    int fd = -1;
+    for (U32 attempt = 0U; attempt < 16U; ++attempt) {
+        temporary = marker + ".tmp." + std::to_string(static_cast<unsigned long>(::getpid())) +
+                    "." + std::to_string(attempt);
+        fd = ::open(temporary.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0640);
+        if (fd >= 0 || errno != EEXIST) {
+            break;
+        }
+    }
+    if (fd < 0) {
+        return false;
+    }
+    bool ok = writeAll(fd, contents.data(), contents.size()) && ::fsync(fd) == 0;
+    if (::close(fd) != 0) {
+        ok = false;
+    }
+    if (ok) {
+        ok = ::link(temporary.c_str(), marker.c_str()) == 0;
+    }
+    (void)::unlink(temporary.c_str());
+    return ok && syncDirectory(this->m_storageRoot);
+}
+
+bool StorageManager::completeRetirement(const std::string& markerPath, U32 productId) const {
+    const int fd = ::open(markerPath.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0) {
+        return false;
+    }
+    struct stat info {};
+    char contents[SOURCE_PATH_CAPACITY] = {};
+    const ssize_t size = ::read(fd, contents, sizeof(contents) - 1U);
+    const bool regular = ::fstat(fd, &info) == 0 && S_ISREG(info.st_mode);
+    (void)::close(fd);
+    if (!regular || size <= 1 || static_cast<U64>(size) != static_cast<U64>(info.st_size) ||
+        contents[size - 1] != '\n') {
+        return false;
+    }
+    contents[size - 1] = '\0';
+    U32 parsedId = 0U;
+    if (!parseProductIdFilename(contents, parsedId) || parsedId != productId ||
+        (!hasSuffix(contents, PRODUCT_CSV_SUFFIX) && !hasSuffix(contents, PRODUCT_DATA_SUFFIX))) {
+        return false;
+    }
+    const std::string metadata = productMetadataPath(this->m_storageRoot, productId);
+    const std::string data = this->m_storageRoot + "/" + contents;
+    if ((::unlink(metadata.c_str()) != 0 && errno != ENOENT) ||
+        (::unlink(data.c_str()) != 0 && errno != ENOENT)) {
+        return false;
+    }
+    // Persist deletion before removing the marker. Restart can safely repeat
+    // missing-file unlinks but can never recover a retired product as active.
+    return syncDirectory(this->m_storageRoot) && ::unlink(markerPath.c_str()) == 0 &&
+           syncDirectory(this->m_storageRoot);
+}
+
+bool StorageManager::recoverRetirements() const {
+    DIR* directory = ::opendir(this->m_storageRoot.c_str());
+    if (directory == nullptr) {
+        return false;
+    }
+    std::string markers[HISTORY_CAPACITY];
+    U32 ids[HISTORY_CAPACITY] = {};
+    U32 count = 0U;
+    bool ok = true;
+    for (;;) {
+        errno = 0;
+        const struct dirent* entry = ::readdir(directory);
+        if (entry == nullptr) {
+            ok = errno == 0;
+            break;
+        }
+        if (!hasSuffix(entry->d_name, PRODUCT_RETIRE_SUFFIX)) {
+            continue;
+        }
+        std::string metadataName(entry->d_name);
+        metadataName.replace(metadataName.size() - std::strlen(PRODUCT_RETIRE_SUFFIX),
+                             std::strlen(PRODUCT_RETIRE_SUFFIX), PRODUCT_METADATA_SUFFIX);
+        U32 id = 0U;
+        if (count == HISTORY_CAPACITY || !parseProductIdFilename(metadataName.c_str(), id)) {
+            ok = false;
+            break;
+        }
+        markers[count] = this->m_storageRoot + "/" + entry->d_name;
+        ids[count++] = id;
+    }
+    (void)::closedir(directory);
+    for (U32 index = 0U; ok && index < count; ++index) {
+        ok = this->completeRetirement(markers[index], ids[index]);
+    }
+    return ok;
 }
 
 bool StorageManager::persistNextProductId(U32 nextProductId) const {
@@ -849,10 +1109,15 @@ bool StorageManager::writeMetadataAtomically(const std::string& metadataPath,
                                              U32 productId,
                                              U32 productBytes,
                                              const Components::ScienceProductSource& sourceKind,
-                                             U32 sourceCrc) const {
-    char contents[96];
-    const int length = std::snprintf(contents, sizeof(contents), "N2P1 %u %u %u %u\n",
-                                     productId, productBytes, static_cast<U32>(sourceKind), sourceCrc);
+                                             U32 sourceCrc,
+                                             const PendingProvenance& provenance) const {
+    char contents[128];
+    const int length = provenance.productId != 0U
+        ? std::snprintf(contents, sizeof(contents), "N2P2 %u %u %u %u %u %u\n",
+                        productId, productBytes, static_cast<U32>(sourceKind), sourceCrc,
+                        provenance.acquisitionId, provenance.run)
+        : std::snprintf(contents, sizeof(contents), "N2P1 %u %u %u %u\n",
+                        productId, productBytes, static_cast<U32>(sourceKind), sourceCrc);
     if ((length <= 0) || (static_cast<std::size_t>(length) >= sizeof(contents))) {
         return false;
     }
@@ -898,7 +1163,7 @@ bool StorageManager::readMetadata(U32 filenameProductId, ProductRecord& record) 
     if (file == nullptr) {
         return false;
     }
-    char line[96] = {};
+    char line[128] = {};
     const bool readOk = (std::fgets(line, sizeof(line), file) != nullptr) &&
                         (std::fgetc(file) == EOF) && !std::ferror(file);
     (void)std::fclose(file);
@@ -907,9 +1172,17 @@ bool StorageManager::readMetadata(U32 filenameProductId, ProductRecord& record) 
     unsigned long long productBytes = 0U;
     unsigned long long sourceKind = 0U;
     unsigned long long sourceCrc = 0U;
+    unsigned long long acquisitionId = 0U;
+    unsigned long long run = 0U;
     int consumed = 0;
-    const int fields = std::sscanf(line, "%7s %llu %llu %llu %llu %n", magic,
-                                   &productId, &productBytes, &sourceKind, &sourceCrc, &consumed);
+    int fields = std::sscanf(line, "%7s %llu %llu %llu %llu %n", magic,
+                             &productId, &productBytes, &sourceKind, &sourceCrc, &consumed);
+    const bool hasProvenance = std::strcmp(magic, "N2P2") == 0;
+    if (hasProvenance) {
+        fields = std::sscanf(line, "%7s %llu %llu %llu %llu %llu %llu %n", magic,
+                             &productId, &productBytes, &sourceKind, &sourceCrc,
+                             &acquisitionId, &run, &consumed);
+    }
     bool onlyWhitespaceRemains = true;
     for (const char* remainder = line + consumed; *remainder != '\0'; ++remainder) {
         if ((*remainder != ' ') && (*remainder != '\t') && (*remainder != '\r') && (*remainder != '\n')) {
@@ -917,15 +1190,30 @@ bool StorageManager::readMetadata(U32 filenameProductId, ProductRecord& record) 
             break;
         }
     }
-    if (!readOk || (fields != 5) || !onlyWhitespaceRemains || (std::strcmp(magic, "N2P1") != 0) ||
-        (productId != filenameProductId) || (productBytes == 0U) ||
-        (productBytes > std::numeric_limits<U32>::max()) ||
-        (sourceKind == static_cast<U32>(Components::ScienceProductSource::UNKNOWN)) ||
-        (sourceKind > static_cast<U32>(Components::ScienceProductSource::TEST)) ||
-        (sourceCrc > 0xFFFFU)) {
+    if (!readOk || fields != (hasProvenance ? 7 : 5) || !onlyWhitespaceRemains ||
+        (!hasProvenance && std::strcmp(magic, "N2P1") != 0) ||
+        productId != filenameProductId || productBytes == 0U ||
+        productBytes > std::numeric_limits<U32>::max() ||
+        sourceKind == static_cast<U32>(Components::ScienceProductSource::UNKNOWN) ||
+        sourceKind > static_cast<U32>(Components::ScienceProductSource::TEST) ||
+        sourceCrc > 0xFFFFU || acquisitionId > std::numeric_limits<U32>::max() ||
+        run > std::numeric_limits<U32>::max()) {
         return false;
     }
-    const std::string dataPath = productDataPath(this->m_storageRoot, filenameProductId);
+    const std::string binPath = productDataPath(this->m_storageRoot, filenameProductId, PRODUCT_DATA_SUFFIX,
+                                               hasProvenance, static_cast<U32>(acquisitionId), static_cast<U32>(run));
+    const std::string csvPath = productDataPath(this->m_storageRoot, filenameProductId, PRODUCT_CSV_SUFFIX,
+                                               hasProvenance, static_cast<U32>(acquisitionId), static_cast<U32>(run));
+    const bool binExists = (::access(binPath.c_str(), F_OK) == 0);
+    const bool csvExists = (::access(csvPath.c_str(), F_OK) == 0);
+    U32 dataFileCount = 0U;
+    // N2P1 recovers legacy filenames unchanged. N2P2 derives the acquisition
+    // label from metadata, and rejects mismatched names or duplicate ID files.
+    if (binExists == csvExists || !countProductDataFiles(this->m_storageRoot, filenameProductId, dataFileCount) ||
+        dataFileCount != 1U) {
+        return false;
+    }
+    const std::string& dataPath = csvExists ? csvPath : binPath;
     if (dataPath.size() >= SOURCE_PATH_CAPACITY) {
         return false;
     }
@@ -935,7 +1223,10 @@ bool StorageManager::readMetadata(U32 filenameProductId, ProductRecord& record) 
                            static_cast<U32>(sourceCrc),
                            Components::ScienceProductSource(
                                static_cast<Components::ScienceProductSource::T>(sourceKind)),
-                           Fw::String(dataPath.c_str())};
+                           Fw::String(dataPath.c_str()),
+                           hasProvenance,
+                           static_cast<U32>(acquisitionId),
+                           static_cast<U32>(run)};
     return record.sourcePath.length() == dataPath.size();
 }
 
@@ -963,6 +1254,9 @@ void StorageManager::publishSelected(const ProductRecord& record, bool selectedB
     if (selectedByCommand) {
         this->log_ACTIVITY_HI_ProductSelected(record.productId, record.productBytes,
                                                record.sourceCrc, record.sourcePath);
+    }
+    if (record.hasProvenance) {
+        this->log_ACTIVITY_HI_ProductProvenance(record.productId, record.acquisitionId, record.run);
     }
     if (this->isConnected_downlinkReadyOut_OutputPort(0)) {
         this->downlinkReadyOut_out(0,
@@ -993,6 +1287,9 @@ void StorageManager::reportHistory() const {
         this->log_ACTIVITY_LO_StorageHistoryEntry(slot, slot + 1U, record.productBytes);
         this->log_ACTIVITY_LO_StorageCatalogEntry(slot, record.productId, record.productBytes,
                                                    record.sourceCrc, record.sourcePath);
+        if (record.hasProvenance) {
+            this->log_ACTIVITY_HI_ProductProvenance(record.productId, record.acquisitionId, record.run);
+        }
     }
 }
 

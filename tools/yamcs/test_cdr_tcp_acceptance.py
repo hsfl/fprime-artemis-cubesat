@@ -242,11 +242,50 @@ def send_file(source, destination):
     return smoke.issue("FileHandling.fileDownlink.SendFile", {"sourceFileName": source, "destFileName": destination})
 
 
+def publication_outage(run):
+    """Fail an HTTP attempt, then retry retained bytes against actual Yamcs."""
+    from local_file_receiver import BucketPublisher, LocalFileReceiver
+    from test_local_file_receiver import file_packets
+    directory = run / "publication-outage"
+    destination = "retry-from-disk-" + secrets.token_hex(4) + ".csv"
+    expected = b"1,2,3\n" * 200
+    receiver = LocalFileReceiver(directory)
+    try:
+        for packet in file_packets(expected, destination):
+            if not receiver.receive(packet):
+                raise RuntimeError("publication-outage fixture failed local reception")
+    finally:
+        receiver.close()
+    receipt = directory / (destination + ".receipt.json")
+    try:
+        BucketPublisher(f"http://127.0.0.1:{free_port()}", timeout=1).publish(receipt)
+    except OSError:
+        pass
+    else:
+        raise RuntimeError("unavailable Yamcs endpoint unexpectedly accepted publication")
+    failed = json.loads(receipt.read_text())
+    if failed["state"] != "saved_locally" or not failed.get("publication_error"):
+        raise RuntimeError("HTTP outage did not preserve verified local file")
+    with (run / "publication-retry.log").open("wb") as log:
+        subprocess.run([sys.executable, str(ROOT / "tools/yamcs/local_file_receiver.py"),
+                        "--retry", str(receipt), "--station", str(run / "ground"), "--url", smoke.URL],
+                       stdout=log, stderr=subprocess.STDOUT, check=True, timeout=30)
+    published = json.loads(receipt.read_text())
+    if published["state"] != "available_in_yamcs" or object_bytes(destination) != expected:
+        raise RuntimeError("manual disk-only publication retry failed independent readback")
+    return {"outage_receipt": failed, "published_receipt": published,
+            "independent_sha256": hashlib.sha256(expected).hexdigest()}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", required=True, type=Path)
     parser.add_argument("--dictionary", required=True, type=Path)
+    parser.add_argument("--http-port", type=int, default=8090)
     args = parser.parse_args()
+    if args.http_port == 0:
+        args.http_port = free_port()
+    smoke.URL = f"http://127.0.0.1:{args.http_port}"
     run = ROOT / "yamcs/run" / ("cdr-acceptance-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + secrets.token_hex(3))
     run.mkdir(parents=True)
     source = run / "source"
@@ -263,6 +302,9 @@ def main():
         if len(data) != byte_count or expected["bytes"] != byte_count or hashlib.sha256(data).hexdigest() != expected["sha256"]:
             raise RuntimeError("Payload fixture identity mismatch: " + name)
         shutil.copy2(path, source / path.name)
+    # Exercise the real whole-object HTTP publisher above UploadObject's stock
+    # 5 MiB route limit, using an actual FileDownlink command and receiver.
+    (source / "large-http.csv").write_bytes(b"1,2,3\n" * 1_048_577)
     result = {"result": "RUNNING", "scope": "native F′ TCP + real Yamcs + fake UART/PDU only; no network mux or RF",
               "binary": str(args.binary.resolve()), "dictionary": str(args.dictionary.resolve()),
               "binary_sha256": hashlib.sha256(args.binary.read_bytes()).hexdigest(),
@@ -287,7 +329,8 @@ def main():
         wait_until(lambda: len(pdu.requests) >= 1, 10, "Fake UART/PDU did not work with TCP client absent")
         result["checks"]["pdu_without_tcp_client"] = {"requests": len(pdu.requests), "app_running": app.poll() is None}
         ground = subprocess.Popen([str(ROOT / "tools/yamcs/run_cdr_tcp.sh"), "--dictionary", str(args.dictionary.resolve()),
-                                   "--address", "127.0.0.1", "--port", str(proxy.port), "--run-dir", str(run / "ground")],
+                                   "--address", "127.0.0.1", "--port", str(proxy.port),
+                                   "--http-port", str(args.http_port), "--run-dir", str(run / "ground")],
                                   cwd=ROOT, env=env, stdout=handles[1], stderr=subprocess.STDOUT)
 
         def ready():
@@ -299,11 +342,16 @@ def main():
                 return False
 
         wait_until(ready, 100, "Yamcs did not reach RUNNING")
+        # The F Prime event subscriber starts after the instance reports RUNNING.
+        # Wait for a real event from the periodic fake PDU traffic before pinging.
+        smoke.wait_for_event("PduRequestHandled",
+                             predicate=lambda event: event.get("type") ==
+                             DEPLOYMENT + ".epsDriverArtemis.PduRequestHandled")
         result["checks"]["ping"] = ping()
         rejections = []
         for command_name, arguments in [
-            ("COLLECT_AND_DOWNLINK", {"durationSeconds": 1}),
-            ("VERIFIED_COLLECT_AND_DOWNLINK", {"verificationToken": 42, "durationSeconds": 1}),
+            ("COLLECT_AND_DOWNLINK", {"durationMinutes": 1}),
+            ("VERIFIED_COLLECT_AND_DOWNLINK", {"verificationToken": 42, "durationMinutes": 1}),
         ]:
             command = smoke.issue(DEPLOYMENT + ".scienceApp." + command_name, arguments)
             released = datetime.fromisoformat(command["generationTime"].replace("Z", "+00:00"))
@@ -347,6 +395,7 @@ def main():
             if len(received) == 606273 and not concurrent_rpc:
                 raise RuntimeError("No fake PDU RPC completed inside the large-file transfer interval")
         result["checks"]["sample_files"] = files
+        result["checks"]["publication_outage_retry"] = publication_outage(run)
         result["checks"]["pdu_during_file_transfer"] = {"requests_before": before, "requests_after": len(pdu.requests),
                                                        "within_transfer_intervals": sum(f["uart_rpc_within_transfer_interval"] for f in files)}
 
@@ -390,14 +439,23 @@ def main():
             helper_run = run / ("helper-" + label)
             with (run / ("helper-" + label + ".log")).open("wb") as helper_log:
                 helper = subprocess.run([str(ROOT / "tools/yamcs/downlink_stock.sh"), *helper_args,
+                                         "--url", smoke.URL,
+                                         "--station", str(run / "ground"),
                                          "--run-dir", str(helper_run), "--timeout", "30"],
                                         cwd=ROOT, stdout=helper_log, stderr=subprocess.STDOUT, timeout=45)
             records = sorted(helper_run.glob("stock-downlink-*.json"))
             if not records or (helper.returncode == 0) != should_succeed:
                 raise RuntimeError("Stock helper outcome wrong: " + label)
             helper_checks[label] = json.loads(records[-1].read_text())
-        capture = smoke.issue(DEPLOYMENT + ".scienceApp.SCIENCE_CAPTURE", {"durationSeconds": 1})
-        committed = smoke.wait_for_event("ScienceProductCommitted", after=datetime.fromisoformat(capture["generationTime"].replace("Z", "+00:00")))
+        capture = smoke.issue(DEPLOYMENT + ".scienceApp.SCIENCE_CAPTURE", {"durationMinutes": 1})
+        released = datetime.fromisoformat(capture["generationTime"].replace("Z", "+00:00"))
+        captured = smoke.wait_for_event("CaptureComplete", after=released, timeout=90,
+                                        predicate=lambda event: event.get("extra", {}).get("durationMinutes") == "1")
+        if int(captured["extra"]["rows"]) != 60:
+            raise RuntimeError("One-minute simulated capture did not produce 60 one-second rows")
+        committed = smoke.wait_for_event("ScienceProductCommitted", after=released, timeout=90,
+                                         predicate=lambda event: event.get("extra", {}).get("productId") ==
+                                         captured["extra"]["productId"])
         product_id = int(committed["extra"]["productId"])
         oracle = Path(committed["extra"]["sourcePath"])
         if not oracle.is_absolute():
@@ -405,14 +463,23 @@ def main():
         helper_run = run / "helper-product"
         with (run / "helper-product.log").open("wb") as helper_log:
             helper = subprocess.run([str(ROOT / "tools/yamcs/downlink_stock.sh"), "--product-id", str(product_id),
+                                     "--url", smoke.URL,
+                                     "--station", str(run / "ground"),
                                      "--expected-file", str(oracle), "--run-dir", str(helper_run), "--timeout", "30"],
                                     cwd=ROOT, stdout=helper_log, stderr=subprocess.STDOUT, timeout=45)
         records = sorted(helper_run.glob("stock-downlink-*.json"))
         if helper.returncode or not records:
             raise RuntimeError("Stock helper product/catalog downlink failed")
-        helper_checks["retained_product"] = {"capture_command": capture, "committed_event": committed,
+        helper_checks["retained_product"] = {"capture_command": capture, "capture_event": captured,
+                                               "committed_event": committed,
                                                "stock_downlink": json.loads(records[-1].read_text())}
         result["checks"]["ground_helper"] = helper_checks
+        # File delivery is independent of native File Transfer API rows.
+        rows = smoke.api("/api/filetransfer/" + smoke.INSTANCE +
+                         "/FprimeFilePacketService/transfers?direction=DOWNLOAD&limit=100")
+        if rows.get("transfers"):
+            raise RuntimeError("Local delivery unexpectedly created native download records")
+        result["checks"]["native_download_records"] = 0
         if object_bytes(interrupted_name) is not None:
             raise RuntimeError("Interrupted transfer falsely appeared as a complete object after recovery")
         result["checks"]["interrupted_transfer"]["still_absent_after_recovery"] = True

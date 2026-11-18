@@ -5,16 +5,19 @@ register_fprime_library(
         ${CMAKE_CURRENT_LIST_DIR}/StorageManager.cpp
     DEPENDS
         Components_Types
+        Components_ProductId
 )
 
 set(UT_SOURCE_FILES
     "${CMAKE_CURRENT_LIST_DIR}/StorageManager.fpp"
     "${CMAKE_CURRENT_LIST_DIR}/test/ut/StorageManagerTestMain.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/test/ut/StorageManagerTester.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/test/ut/StorageManagerTest.cpp"
 )
 
 set(UT_MOD_DEPS
     Components_Types
+    Components_ProductId
     STest
 )
 

@@ -24,6 +24,12 @@ class PayloadDriver_NeutronSim final : public PayloadDriver_NeutronSimComponentB
         std::string outputPath;
     };
 
+    struct CaptureOptions {
+        U32 generation = 0U;
+        Components::PayloadSimulationFault fault = Components::PayloadSimulationFault::NORMAL;
+        U32 delayMs = 0U;
+    };
+
     struct PendingReply {
         bool valid = false;
         U32 requestId = 0U;
@@ -43,13 +49,17 @@ class PayloadDriver_NeutronSim final : public PayloadDriver_NeutronSimComponentB
 
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void run_handler(FwIndexType portNum, U32 context) override;
+    void simulationCaptureOptionsIn_handler(
+        FwIndexType portNum,
+        U32 generation,
+        const Components::PayloadSimulationFault& faultMode,
+        U32 delayMs
+    ) override;
     void requestIn_handler(
         FwIndexType portNum,
         U32 requestId,
         U32 generation,
-        U32 durationSeconds,
-        const Components::PayloadSimulationFault& faultMode,
-        U32 delayMs,
+        U32 durationMinutes,
         U32 timeoutMs
     ) override;
     void passthroughIn_handler(
@@ -62,7 +72,7 @@ class PayloadDriver_NeutronSim final : public PayloadDriver_NeutronSimComponentB
         U32 timeoutMs
     ) override;
 
-    bool launchCapture(U32 durationSeconds, const Components::PayloadSimulationFault& faultMode, U32 timeoutMs);
+    bool launchCapture(U32 durationMinutes, const Components::PayloadSimulationFault& faultMode, U32 timeoutMs);
     void pollCapture();
     void finishCapture(U32 exitStatus, bool suppressResponse);
     void scheduleOrSendReply(
@@ -102,7 +112,7 @@ class PayloadDriver_NeutronSim final : public PayloadDriver_NeutronSimComponentB
     static bool computeFileCrc16(const std::string& outputPath, U32& crcOut);
     static U32 parseU32(const std::string& value);
 
-    U32 m_lastDurationSeconds;
+    U32 m_lastDurationMinutes;
     U32 m_lastRowsCaptured;
     U32 m_lastTotalCounts;
     U32 m_lastSaaRows;
@@ -120,7 +130,7 @@ class PayloadDriver_NeutronSim final : public PayloadDriver_NeutronSimComponentB
     U32 m_captureRequestId;
     U32 m_captureGeneration;
     U32 m_captureProductId;
-    U32 m_captureDurationSeconds;
+    U32 m_captureDurationMinutes;
     U32 m_captureTimeoutMs;
     U32 m_captureDelayMs;
     Components::PayloadSimulationFault m_captureFaultMode;
@@ -130,6 +140,7 @@ class PayloadDriver_NeutronSim final : public PayloadDriver_NeutronSimComponentB
     U32 m_captureOutputTotalBytes;
     std::chrono::steady_clock::time_point m_captureDeadline;
     std::chrono::steady_clock::time_point m_killDeadline;
+    CaptureOptions m_nextCaptureOptions{};
     static constexpr U32 PENDING_REPLY_CAPACITY = 4U;
     PendingReply m_pendingReplies[PENDING_REPLY_CAPACITY];
 };

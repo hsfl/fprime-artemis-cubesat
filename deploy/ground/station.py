@@ -72,12 +72,14 @@ def generate_xtce(config_dir: Path, dictionary: Path, env: dict[str, str], venv:
         yamcs_instances,
     )
     import yaml
+    from file_delivery_config import atomic_text
 
     instances = yamcs_instances(config_dir)
     for instance_file in sorted((config_dir / "etc").glob("yamcs.*.yaml")):
         instance_config = yaml.safe_load(instance_file.read_text()) or {}
         if anchor_relative_mdb_paths(instance_config, config_dir):
-            instance_file.write_text(yaml.safe_dump(instance_config, sort_keys=False))
+            atomic_text(instance_file, yaml.safe_dump(instance_config, sort_keys=False),
+                        instance_file.stat().st_mode & 0o777)
 
     xtce_path, instance = xtce_mdb_location(config_dir, instances)
     xtce_path = xtce_path.resolve()
@@ -151,7 +153,10 @@ def main(argv: list[str] | None = None) -> int:
     env["FPRIME_YAMCS_TM_INJECT_PORT"] = str(TM_INJECT_PORT_FALLBACK)
     env["FPRIME_DOWNLINK_DIR"] = str(received_dir)
     try:
+        sys.path.insert(0, str(repo / "tools" / "yamcs"))
         instance = generate_xtce(config_dir, dictionary, env, venv)
+        from file_delivery_config import configure_file_delivery
+        configure_file_delivery(config_dir, dictionary)
         env["FPRIME_YAMCS_INSTANCE"] = instance
         env["FPRIME_YAMCS_TM_INJECT_PORT"] = str(split_tm_inject_port(config_dir, instance))
 
@@ -169,6 +174,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Starting Yamcs instance {instance}; OBC TCP peer {args.address} is handled by n2-ground-bridge.service",
           flush=True)
+    print("File delivery is owned by the local ground receiver; native transfer rows are not used", flush=True)
     os.chdir(repo)
     os.execvpe(command[0], command, env)
     return 0

@@ -15,6 +15,7 @@ class StorageManager final : public StorageManagerComponentBase {
   private:
     void pingIn_handler(FwIndexType portNum, U32 key) override;
     void run_handler(FwIndexType portNum, U32 context) override;
+    void provenanceIn_handler(FwIndexType portNum, U32 productId, U32 acquisitionId, U32 run) override;
     void requestIn_handler(FwIndexType portNum,
                            U32 productId,
                            U32 productBytes,
@@ -33,6 +34,7 @@ class StorageManager final : public StorageManagerComponentBase {
     void REPORT_STORAGE_HISTORY_cmdHandler(FwOpcodeType opCode, U32 cmdSeq) override;
     void REMOVE_OLD_DATASETS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 confirm) override;
     void SELECT_PRODUCT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 productId) override;
+    void RETIRE_PRODUCT_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U32 productId, U32 confirm) override;
 
     struct ProductRecord {
         U32 productId;
@@ -41,10 +43,24 @@ class StorageManager final : public StorageManagerComponentBase {
         U32 sourceCrc;
         Components::ScienceProductSource sourceKind;
         Fw::String sourcePath;
+        bool hasProvenance;
+        U32 acquisitionId;
+        U32 run;
+    };
+
+    struct PendingProvenance {
+        U32 productId;
+        U32 acquisitionId;
+        U32 run;
+        bool conflicting;
     };
 
     bool ensureCatalogLoaded();
     bool loadCatalog();
+    bool recoverRetirements() const;
+    bool writeRetirementMarker(const ProductRecord& record) const;
+    bool completeRetirement(const std::string& markerPath, U32 productId) const;
+    void publishCapacity();
     bool persistNextProductId(U32 nextProductId) const;
     bool copyProductAtomically(const Fw::StringBase& sourcePath,
                                const std::string& targetPath,
@@ -54,7 +70,8 @@ class StorageManager final : public StorageManagerComponentBase {
                                  U32 productId,
                                  U32 productBytes,
                                  const Components::ScienceProductSource& sourceKind,
-                                 U32 sourceCrc) const;
+                                 U32 sourceCrc,
+                                 const PendingProvenance& provenance) const;
     bool readMetadata(U32 filenameProductId, ProductRecord& record) const;
     bool isValidStoredProduct(const ProductRecord& record) const;
     //! The catalog and file work of requestIn. True once the product is committed.
@@ -77,7 +94,6 @@ class StorageManager final : public StorageManagerComponentBase {
     U32 m_storedProducts;
     U32 m_lastProductSize;
     U32 m_selectedProductId;
-    U32 m_lastInputProductId;
     U32 m_nextProductId;
     U32 m_removedDatasetFiles;
     U32 m_removeDatasetFailures;
@@ -88,6 +104,11 @@ class StorageManager final : public StorageManagerComponentBase {
     bool m_recoveryReported;
     std::string m_storageRoot;
     ProductRecord m_history[HISTORY_CAPACITY];
+    PendingProvenance m_pendingProvenance[HISTORY_CAPACITY];
+    bool m_provenanceOverflow;
+    bool m_capacityPublished;
+    bool m_lastCapacityReady;
+    U32 m_lastFreeSlots;
 };
 
 }  // namespace Components

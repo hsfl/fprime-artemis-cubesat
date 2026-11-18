@@ -19,7 +19,7 @@ Power note: the real payload will require 28 V. PDU owns rail control; Payload o
 - `REQUEST_PAYLOAD_STATUS`
 - `CONFIGURE_PAYLOAD(sampleCount, periodMs)`
 - `START_PAYLOAD_COLLECTION(collectionId)`
-- `SCIENCE_CAPTURE(durationSeconds)`
+- `SCIENCE_CAPTURE(durationMinutes)`
 
 ## Abstraction Rule
 

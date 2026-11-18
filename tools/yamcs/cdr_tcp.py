@@ -21,6 +21,7 @@ import time
 from urllib import error, request
 
 import yaml
+from file_delivery_config import atomic_text, configure_file_delivery
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOLS = ROOT / "tools" / "yamcs"
@@ -37,6 +38,11 @@ def now_utc() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def http_url(bind: str, port: int) -> str:
+    host = "127.0.0.1" if bind in ("0.0.0.0", "::") else bind
+    return f"http://{'[' + host + ']' if ':' in host else host}:{port}"
+
+
 def atomic_json(path: Path, value: dict) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
@@ -47,16 +53,6 @@ def validate_heap(value: str) -> str:
     if not re.fullmatch(r"[1-9][0-9]*(?:k|m|g)?", value, flags=re.IGNORECASE):
         raise argparse.ArgumentTypeError("heap must look like 1024m, 2g, or 512k")
     return value
-
-
-def validate_frame_interval(value: str) -> float:
-    try:
-        interval = float(value)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError("frame interval must be a number of milliseconds") from exc
-    if not math.isfinite(interval) or interval <= 0:
-        raise argparse.ArgumentTypeError("frame interval must be finite and greater than zero")
-    return interval
 
 
 def validate_marker(dictionary: Path) -> None:
@@ -135,7 +131,8 @@ def copy_yamcs_config(run_dir: Path, http_bind: str, http_port: int) -> Path:
     (run_dir / "signing-key").write_text(signing_key + "\n")
     (run_dir / "signing-key").chmod(0o600)
     global_config["secretKey"] = signing_key
-    global_path.write_text(yaml.safe_dump(global_config, sort_keys=False))
+    atomic_text(global_path, yaml.safe_dump(global_config, sort_keys=False), global_path.stat().st_mode & 0o777)
+    configure_file_delivery(destination)
 
     instance_path = destination / "etc" / "yamcs.fprime-project.yaml"
     instance_config = yaml.safe_load(instance_path.read_text())
@@ -150,36 +147,14 @@ def copy_yamcs_config(run_dir: Path, http_bind: str, http_port: int) -> Path:
         raise ValueError(f"expected one FprimeFilePacketService, found {len(file_packet_services)}")
     file_packet_services[0].setdefault("args", {})["downlinkMirrorDir"] = str(
         run_dir / "received-files")
-    instance_path.write_text(yaml.safe_dump(instance_config, sort_keys=False))
+    # APID 3 is consumed by the local receiver before UDP. Keep the stock
+    # service for its existing bucket/uplink support, not download records.
+    for service in instance_config.get("services", []):
+        command = service.get("args", {}).get("command", [])
+        if command and command[0] in ("fprime-yamcs-events", "fprime-yamcs-tlmchan"):
+            command.extend(["--yamcs-url", http_url(http_bind, http_port)])
+    atomic_text(instance_path, yaml.safe_dump(instance_config, sort_keys=False), instance_path.stat().st_mode & 0o777)
     return destination
-
-
-def configure_heap_wrapper(run_dir: Path, heap: str, environment: dict[str, str]) -> Path:
-    # fprime-yamcs 0.2.4 hard-codes -Xmx4g. Resolve its selected Java before
-    # placing a small wrapper first in JAVA_HOME; the wrapper substitutes only
-    # that exact argument and forwards every other argument unchanged.
-    try:
-        from fprime_yamcs.java import find_java
-        real_java = str(find_java().resolve())
-    except Exception as exc:
-        raise ValueError(f"cannot resolve the Java runtime selected by fprime-yamcs: {exc}") from exc
-    wrapper_root = run_dir / "java-wrapper"
-    wrapper_bin = wrapper_root / "bin"
-    wrapper_bin.mkdir(parents=True)
-    wrapper = wrapper_bin / "java"
-    wrapper.write_text(
-        "#!/usr/bin/env python3\n"
-        "import os, sys\n"
-        "real = os.environ['N2_CDR_TCP_REAL_JAVA']\n"
-        "heap = os.environ['N2_CDR_TCP_HEAP']\n"
-        "args = ['-Xmx' + heap if arg == '-Xmx4g' else arg for arg in sys.argv[1:]]\n"
-        "os.execv(real, [real, *args])\n"
-    )
-    wrapper.chmod(0o755)
-    environment["JAVA_HOME"] = str(wrapper_root)
-    environment["N2_CDR_TCP_REAL_JAVA"] = real_java
-    environment["N2_CDR_TCP_HEAP"] = heap
-    return wrapper
 
 
 def http_ready(base_url: str, timeout: float, process: subprocess.Popen,
@@ -199,6 +174,9 @@ def http_ready(base_url: str, timeout: float, process: subprocess.Popen,
                 if response.status == 200:
                     payload = json.loads(response.read())
                     instances = payload.get("instances", []) if isinstance(payload, dict) else []
+                    if any(instance.get("name") == "fprime-project" and instance.get("state") == "FAILED"
+                           for instance in instances):
+                        raise RuntimeError("Yamcs instance failed during startup; see ground log")
                     if any(instance.get("name") == "fprime-project"
                            and instance.get("state") == "RUNNING" for instance in instances):
                         return True
@@ -292,8 +270,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--http-port", type=int, default=HTTP_PORT_DEFAULT, help=f"Yamcs HTTP port (default {HTTP_PORT_DEFAULT})")
     parser.add_argument("--heap", type=validate_heap, default=DEFAULT_HEAP,
                         help=f"Yamcs JVM max heap; replaces fprime-yamcs's fixed 4g (default {DEFAULT_HEAP})")
-    parser.add_argument("--frame-interval-ms", type=validate_frame_interval, default=5.0,
-                        help="minimum gap between outgoing TM UDP frames (default: 5 ms)")
     parser.add_argument("--run-dir", help="new or existing empty-of-reserved-paths run directory; default is ignored yamcs/run/cdr-tcp-*")
     parser.add_argument("--startup-timeout", type=float, default=90.0, help="seconds to wait for Yamcs HTTP readiness")
     return parser
@@ -315,8 +291,8 @@ def main(argv: list[str] | None = None) -> int:
         check_local_ports(args.http_bind, args.http_port)
         run_dir = prepare_run_dir(args.run_dir)
         config_dir = copy_yamcs_config(run_dir, args.http_bind, args.http_port)
+        configure_file_delivery(config_dir, dictionary)
         environment = os.environ.copy()
-        configure_heap_wrapper(run_dir, args.heap, environment)
         environment["PATH"] = str(VENV / "bin") + os.pathsep + environment.get("PATH", "")
         environment["FPRIME_DICTIONARY"] = str(dictionary)
         environment["FPRIME_YAMCS_INSTANCE"] = "fprime-project"
@@ -341,9 +317,9 @@ def main(argv: list[str] | None = None) -> int:
         "run_dir": str(run_dir),
         "dictionary": str(dictionary),
         "dictionary_sha256": dictionary_hash,
-        "transport": "Pi Zero W Drv.TcpServer <-> stock F' TCP/UDP adapters with local paced TM egress <-> Yamcs; direct ComCcsds and stock FileDownlink",
-        "paced_tm_egress": {"frame_interval_ms": args.frame_interval_ms, "default": 5.0,
-                             "catch_up_bursts": False},
+        "transport": "stock FileDownlink TCP -> stock CCSDS decoder -> local verified file -> HTTP bucket; telemetry/events -> Yamcs packet UDP",
+        "file_delivery": {"receive_dir": str(run_dir / "received-files"),
+                          "native_transfer_records": False, "max_file_bytes": 128 * 1024 * 1024},
         "network_mux": False,
         "physical_uart_mux": {"channel": 2, "purpose": "Teensy/PDU RPC", "independent_of_tcp": True},
         "tcp_peer": {"address": args.address, "port": args.port},
@@ -361,17 +337,19 @@ def main(argv: list[str] | None = None) -> int:
     bridge_command = [
         str(VENV / "bin" / "python"), "-u", str(PACED_BRIDGE),
         "--dictionary", str(dictionary), "--address", args.address,
-        "--port", str(args.port), "--frame-interval-ms", str(args.frame_interval_ms),
+        "--port", str(args.port),
+        "--station", str(run_dir), "--receive-dir", str(run_dir / "received-files"),
+        "--yamcs-url", http_url(args.http_bind, args.http_port),
     ]
-    command = [
-        str(fprime_yamcs), "--no-app", "--dictionary", str(dictionary),
-        "--communication-selection", "none",
-        "--udp-tm-inject-port", "50002",
-        "--yamcs-config-dir", str(config_dir),
-        "--yamcs-data-dir", str(run_dir / "yamcs-data"),
-        "--logs", str(run_dir / "gds-logs"), "--log-directly",
-        "--log-to-stdout", "--skip-browser-open",
-    ]
+    # Use the same pinned Java/runtime as the persistent station. The stock
+    # fprime-yamcs launcher rewrites *every* UdpTmDataLink to the splitter port,
+    # which would merge our dedicated packet inputs. Do not patch that package.
+    sys.path.insert(0, str(ROOT / "deploy" / "ground"))
+    from station import generate_xtce
+    from fprime_yamcs.java import build_classpath, find_java, yamcs_launch_command
+    generate_xtce(config_dir, dictionary, environment, VENV)
+    command = yamcs_launch_command(find_java(), build_classpath([]), config_dir / "etc",
+                                   run_dir / "yamcs-data", jvm_args=["-Xmx" + args.heap])
     manifest["paced_bridge_command"] = bridge_command
     manifest["command"] = command
     atomic_json(manifest_path, manifest)
@@ -400,8 +378,7 @@ def main(argv: list[str] | None = None) -> int:
         manifest["process_group_id"] = process.pid if os.name == "posix" else None
         atomic_json(manifest_path, manifest)
         print(f"PIDs: launcher={os.getpid()} paced-bridge={bridge_process.pid} fprime-yamcs={process.pid}", flush=True)
-        http_host = "127.0.0.1" if args.http_bind in ("0.0.0.0", "::") else args.http_bind
-        ready_url = f"http://{http_host}:{args.http_port}"
+        ready_url = http_url(args.http_bind, args.http_port)
         ready_start = time.monotonic()
         ready = http_ready(ready_url, args.startup_timeout, process, bridge_process,
                            cancel_requested=lambda: interrupted)

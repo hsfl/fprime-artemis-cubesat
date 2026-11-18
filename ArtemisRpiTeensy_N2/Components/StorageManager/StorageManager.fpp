@@ -14,6 +14,15 @@ module Components {
         @ Science product input from ScienceApp
         async input port requestIn: Components.ScienceProductDescriptor
 
+        @ Optional acquisition identity; enqueue before the matching requestIn.
+        async input port provenanceIn: Components.ScienceProductProvenance
+
+        @ Terminal commit result for each incoming product descriptor.
+        output port productCommitOut: Components.ScienceProductCommitResult
+
+        @ Optional capacity updates for capture and direct retrieval admission.
+        output port capacityOut: [2] Components.ScienceStorageCapacity
+
         @ Explicit automatic-delivery request for a product already stored here.
         async input port deliveryRequestIn: Components.ScienceProductDeliveryRequest
 
@@ -47,6 +56,10 @@ module Components {
         @ Select an immutable stored product for a later CommsApp science downlink.
         async command SELECT_PRODUCT(productId: U32)
 
+        @ Preview retirement with confirm=0; confirm=1 explicitly removes this durable product.
+        @ The operator must verify ground receipt before confirming. No automatic eviction occurs.
+        async command RETIRE_PRODUCT(productId: U32, confirm: U32)
+
         @ Number of stored products
         telemetry StoredProducts: U32
 
@@ -67,6 +80,9 @@ module Components {
 
         @ Whether the durable product store and catalog are available.
         telemetry StorageReady: bool
+
+        @ Free durable catalog slots, or zero when storage is unavailable.
+        telemetry FreeProductSlots: U32
 
         @ Stored product event
         event ScienceStored(productCount: U32, productBytes: U32) severity activity high format "Stored science product count={} size={}"
@@ -109,6 +125,21 @@ module Components {
 
         @ Durable storage root is unavailable or its catalog exceeds configured capacity.
         event StorageUnavailable(reason: U32) severity warning high format "Science storage unavailable reason={}"
+
+        @ Durable acquisition identity for a committed, recovered or selected product.
+        event ProductProvenance(productId: U32, acquisitionId: U32, run: U32) severity activity high format "Science product={} acquisition={} run={}"
+
+        @ Invalid or conflicting pending acquisition identity; reason 1 invalid ID, 2 conflict, 3 capacity.
+        event ProductProvenanceRejected(productId: U32, reason: U32) severity warning high format "Rejected science provenance product={} reason={}"
+
+        @ Exact durable product selected for explicit retirement.
+        event ProductRetirementPreview(productId: U32, productBytes: U32, sourcePath: string size 192) severity activity high format "Retirement preview product={} bytes={} path='{}'"
+
+        @ Durable product data and metadata removed following explicit confirmation.
+        event ProductRetired(productId: U32, freeSlots: U32) severity activity high format "Retired science product={} freeSlots={}"
+
+        @ Retirement failed; no successful retirement is reported.
+        event ProductRetirementFailed(productId: U32) severity warning high format "Science retirement failed product={}"
 
         @ Port for requesting the current time
         time get port timeCaller

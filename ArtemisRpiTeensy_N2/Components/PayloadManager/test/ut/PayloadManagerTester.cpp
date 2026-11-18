@@ -8,7 +8,7 @@ namespace Components {
 namespace {
 constexpr const char* PRODUCT_PATH = "/tmp/payload_manager_ut.bin";
 constexpr U8 PRODUCT[] = {1U, 2U, 3U, 4U};
-constexpr U32 CAPTURE_SECONDS = 5U;
+constexpr U32 CAPTURE_MINUTES = 1U;
 
 U32 productCrc() {
     U16 crc = 0xFFFFU;
@@ -59,7 +59,7 @@ void PayloadManagerTester::testDirectCaptureCommandsRefusedWhileInhibited() {
     this->clearHistory();
     ASSERT_NO_FATAL_FAILURE(this->applyControl(Fw::Enabled::DISABLED, false));
 
-    this->sendCmd_SCIENCE_CAPTURE(0, 1, CAPTURE_SECONDS);
+    this->sendCmd_SCIENCE_CAPTURE(0, 1, CAPTURE_MINUTES);
     this->component.doDispatch();
     ASSERT_CMD_RESPONSE(0, PayloadManagerComponentBase::OPCODE_SCIENCE_CAPTURE, 1, Fw::CmdResponse::EXECUTION_ERROR);
 
@@ -78,7 +78,7 @@ void PayloadManagerTester::testScienceRequestRefusedWhileInhibited() {
     this->clearHistory();
     ASSERT_NO_FATAL_FAILURE(this->applyControl(Fw::Enabled::DISABLED, false));
 
-    this->invoke_to_requestIn(0, 9U, CAPTURE_SECONDS);
+    this->invoke_to_requestIn(0, 9U, CAPTURE_MINUTES);
     this->component.doDispatch();
 
     ASSERT_from_driverRequestOut_SIZE(0);
@@ -107,7 +107,7 @@ void PayloadManagerTester::testCapturesResumeWhenEnabled() {
     ASSERT_NO_FATAL_FAILURE(this->applyControl(Fw::Enabled::DISABLED, false));
     ASSERT_NO_FATAL_FAILURE(this->applyControl(Fw::Enabled::ENABLED, false));
 
-    this->invoke_to_requestIn(0, 9U, CAPTURE_SECONDS);
+    this->invoke_to_requestIn(0, 9U, CAPTURE_MINUTES);
     this->component.doDispatch();
 
     ASSERT_from_driverRequestOut_SIZE(1);
@@ -118,7 +118,7 @@ void PayloadManagerTester::testCapturesResumeWhenEnabled() {
 void PayloadManagerTester::testRunningCaptureFinishesUnderInhibit() {
     this->clearHistory();
     ASSERT_TRUE(writeProduct());
-    this->invoke_to_requestIn(0, 9U, CAPTURE_SECONDS);
+    this->invoke_to_requestIn(0, 9U, CAPTURE_MINUTES);
     this->component.doDispatch();
     ASSERT_from_driverRequestOut_SIZE(1);
     const U32 generation = this->fromPortHistory_driverRequestOut->at(0).generation;
@@ -140,7 +140,7 @@ void PayloadManagerTester::testRunningCaptureFinishesUnderInhibit() {
 void PayloadManagerTester::testRequestQueuedAfterInhibitIsRefused() {
     this->clearHistory();
     this->invoke_to_captureControlIn(0, Fw::Enabled::DISABLED);
-    this->invoke_to_requestIn(0, 9U, CAPTURE_SECONDS);
+    this->invoke_to_requestIn(0, 9U, CAPTURE_MINUTES);
     this->component.doDispatch();
     this->component.doDispatch();
 
@@ -152,7 +152,7 @@ void PayloadManagerTester::testRequestQueuedAfterInhibitIsRefused() {
 // A build that never connects the control keeps today's behavior, which is what C3M's topologies need.
 void PayloadManagerTester::testCapturesStartBeforeAnyControlArrives() {
     this->clearHistory();
-    this->invoke_to_requestIn(0, 9U, CAPTURE_SECONDS);
+    this->invoke_to_requestIn(0, 9U, CAPTURE_MINUTES);
     this->component.doDispatch();
     ASSERT_from_driverRequestOut_SIZE(1);
 }

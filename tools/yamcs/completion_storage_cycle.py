@@ -361,7 +361,7 @@ def assert_no_downstream_events(command, timeout=1):
 def reject_capture(current, token, duration, state, timeout=DEFAULT_TIMEOUT):
     before_count = storage_count()
     command = issue(f"{SCIENCE}.VERIFIED_COLLECT_AND_DOWNLINK", {
-        "verificationToken": token, "durationSeconds": duration,
+        "verificationToken": token, "durationMinutes": duration,
     })
     accepted = None
     if state in {"FAILED", "TIMED_OUT"}:
@@ -460,7 +460,7 @@ def wait_capture_delivery(current, command, token, accepted=None,
 
 def start_verified_capture(token, duration, timeout=DEFAULT_TIMEOUT):
     command = issue(f"{SCIENCE}.VERIFIED_COLLECT_AND_DOWNLINK", {
-        "verificationToken": token, "durationSeconds": duration,
+        "verificationToken": token, "durationMinutes": duration,
     })
     accepted = capture_status(command, token, "ACCEPTED", timeout=timeout)
     return command, accepted
@@ -971,7 +971,7 @@ def after_restart(args, current, result):
         current, old_downlink, selected_product, timeout=args.timeout)
 
     third_token = random_token(product["verification_token"] for product in products)
-    third_command, third_accepted = start_verified_capture(third_token, 3, timeout=args.timeout)
+    third_command, third_accepted = start_verified_capture(third_token, 1, timeout=args.timeout)
     third = wait_capture_delivery(current, third_command, third_token, accepted=third_accepted,
                                   timeout=args.timeout, label="post-restart product")
     if third["product_id"] in product_ids:

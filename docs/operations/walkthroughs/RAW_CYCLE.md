@@ -21,11 +21,11 @@ The photographed run's nonce is `aa83d80ef47f`. Product IDs and transfer IDs can
 
 Open **Commanding → Send a command**, search for `COLLECT_AND_DOWNLINK`, and select the command under `ArtemisRpiTeensyDeployment/scienceApp`.
 
-| Argument | Photographed value | Valid range |
+| Argument | Example | Valid range |
 | --- | --- | --- |
-| `durationSeconds` | `30` | `1–120` seconds |
+| `durationMinutes` | `1` | `1–2` minutes |
 
-![Configure collection and automatic downlink](images/n2-raw-cycle-2026-10-08/01-collection-command.jpg)
+![Archived command form for a 30-second collection and automatic downlink](images/n2-raw-cycle-2026-10-08/01-collection-command.jpg)
 
 Click **Send** once. The duration applies only to this request; it does not change the configured default capture duration. The simulator produces one row per requested window without waiting the full wall-clock acquisition duration. Real payload timing remains part of hardware integration.
 
@@ -101,7 +101,7 @@ In a second terminal:
 ./tools/yamcs/raw_cycle.sh
 ```
 
-`raw_cycle.sh` requests 30- and 5-second products through Yamcs. The first transfer deliberately loses one packet and corrupts another, then recovers both through channel-1 retry requests. The second transfer is nominal. It also checks invalid-duration and failed-capture suppression, same-request-ID BUSY rejection without losing the accepted automatic-delivery intent, distinct raw objects, retained sources, independent Yamcs readback, and the histogram calculation. For a normal operator replay, use `run.sh` without the fault variable.
+`raw_cycle.sh` requests one- and two-minute products through Yamcs. The first transfer deliberately loses one packet and corrupts another, then recovers both through channel-1 retry requests. The second transfer is nominal. It also checks invalid-duration and failed-capture suppression, same-request-ID BUSY rejection without losing the accepted automatic-delivery intent, distinct raw objects, retained sources, independent Yamcs readback, and the histogram calculation. For a normal operator replay, use `run.sh` without the fault variable.
 
 ## Acceptance evidence and limits
 
